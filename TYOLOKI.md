@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — haasteen vaatimukset tarkistettu toteutusta vasten (Claude Code, katselmointichatti)
+
+- **Käyttäjän pyyntö:** tarkista kaikki tehty haastekuvausta vasten ja vastaa, miten toteutus täyttää sen. Kohta kohdalta -kartta: `docs/challenge-coverage.md`. Koodia ei muutettu.
+- **Tarkistukset:** puhdas kopio commitista `90ca34f` (ei työpuun commitoimattomia WhatsApp-muutoksia): `npm test` 219/219, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54. `npm run demo` eristetyllä palvelimella (portti 4799, omat väliaikaiset kannat ja avain, ei malliavainta) oikeaa mock-API:a vasten: kaikki 10 skenaariota ajettu, briefin lause → 1 010,00 € → `SPEND_CAP_ORDER` → hyväksyntä → confirmed, lokiketju ehjä. Testipalvelin pysäytetty. Gitissä ei `.env`-, kanta-, avain- tai `data/raw/`-tiedostoja eikä API-avaimen jälkiä historiassa.
+- **Ydinvaatimukset (haku, kiinteähintainen tarjous → tilaus, oikeudet ja hyväksyntä) täyttyvät.** Vapaaehtoisista jäljitettävyys täyttyy, toimitus/CO₂ ja korvaukset osittain. Esimerkkiskenaarioista allergeeniturvallinen korvaus täyttyy, muut osittain (puutteet kartassa).
+- **Löydökset, ei korjattu:** (1) demon skenaario 3 "by Sunday" tulkitaan sunnuntaina 22.11.:ksi, joten tilaus vahvistuu ilman `DELIVERY_DATE_SHIFT`-polkua; "today" tulkitaan 15.11.:ksi, mutta päästä päähän -polkua ei ajettu sillä. (2) Tunnelin kautta näkyvät vain `/healthz` ja WhatsAppin reitit; portin `/mcp`, `/openapi.json`, `/.well-known` ja `/v1/*` ovat vain localhostissa. (3) README:n ja SUUNNITELMA.md:n alku kuvaa WhatsAppia vain lukevana / pääkäyttöliittymänä, mikä sotii haasteen "ei chatbot" -kehystä vastaan. (4) Palautuksen checklist on kokonaan avoin.
+
 ## 15.11.2026 — WhatsAppin korilinkki avautuu käyttäjän puhelimessa (Codex, token-korjauschatti)
 
 - Käyttäjä vahvisti **”Kyllä, linkki ja kori aukeavat”** WhatsAppin avaa kori -viestin tarkistukseen. Aiemman palvelin-/selainvarmennuksen lisäksi myös linkin saaminen WhatsAppissa ja avaaminen on nyt käyttäjän varmentama. Uuden korin vahvistusta, maksua tai sähköpostia ei tämän perusteella väitetä tehdyksi.
