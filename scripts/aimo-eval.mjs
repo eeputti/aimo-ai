@@ -69,5 +69,5 @@ for (const [text, exp] of CASES) {
   if (!errs.length) pass += 1;
   console.log(`${errs.length ? 'VIRHE' : 'ok   '} ${text}${errs.length ? `\n        ${errs.join('\n        ')}` : ''}`);
 }
-console.log(`\n${pass}/${CASES.length} oikein · 0 mallikutsua · keskimäärin ${(ms / CASES.length).toFixed(2)} ms / pyyntö`);
+console.log(`\n${pass}/${CASES.length} oikein, 0 mallikutsua, keskimäärin ${(ms / CASES.length).toFixed(2)} ms / pyyntö`);
 process.exit(pass === CASES.length ? 0 : 1);

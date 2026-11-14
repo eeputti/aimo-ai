@@ -1,6 +1,6 @@
 # Tarkkuustesti: 20/20 oikein
 
-Ajettu 2026-11-14 07:36 UTC · portin kello kiinnitetty 2026-11-14T10:00:00+02:00 · hinnat ja saatavuus Aimon mock-rajapinnasta · keskimäärin 426 ms / pyyntö.
+Ajettu 2026-11-14 07:36 UTC, portin kello kiinnitetty 2026-11-14T10:00:00+02:00, hinnat ja saatavuus Aimon mock-rajapinnasta, keskimäärin 426 ms / pyyntö.
 
 Oikein = tilaus täyttää pyynnön ehdot (tuoteryhmä, väittämät, nimi), kattaa määrän ilman ylitilausta, on yhtä halpa kuin riippumattoman oraakkelin halvin tilattava vaihtoehto, ja toimituspäivä sekä lopputila ovat odotetut.
 
@@ -17,8 +17,8 @@ Oikein = tilaus täyttää pyynnön ehdot (tuoteryhmä, väittämät, nimi), kat
 | ✅ | 20 litraa laktoositonta kuohukermaa maanantaiksi | 465193 × 12 = 69.96 € | confirmed | 69 |
 | ✅ | 20 kg voita maanantaiksi | 464411 × 40 = 132.00 € | confirmed | 128 |
 | ✅ | 10 kg laktoositonta voita maanantaiksi | 463437 × 20 = 66.20 € | confirmed | 74 |
-| ✅ | 20 kg voita ja 50 l kuohukermaa maanantaiksi | 464411 × 40 = 132.00 € · 465193 × 29 = 169.07 € | confirmed | 81 |
-| ✅ | 60 l kaurajuomaa ja 10 kg sokeria maanantaiksi | 468465 × 60 = 70.20 € · 460460 × 1 = 24.27 € | confirmed | 141 |
+| ✅ | 20 kg voita ja 50 l kuohukermaa maanantaiksi | 464411 × 40 = 132.00 €, 465193 × 29 = 169.07 € | confirmed | 81 |
+| ✅ | 60 l kaurajuomaa ja 10 kg sokeria maanantaiksi | 468465 × 60 = 70.20 €, 460460 × 1 = 24.27 € | confirmed | 141 |
 | ✅ | 25 kg basmatiriisiä maanantaiksi | 473735 × 5 = 60.30 € | confirmed | 132 |
 | ✅ | 10 kg gluteenitonta pastaa maanantaiksi | 462324 × 20 = 42.00 € | confirmed | 150 |
 | ✅ | 50 kg lohifileetä maanantaiksi | ei tilausta (oikein pysähtyi) | – | 149 |

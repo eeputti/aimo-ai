@@ -5,7 +5,7 @@ import { packHint } from './packs.mjs';
 import { cutoffPassed, helsinkiLabel } from './gateway/clock.mjs';
 
 export const DEFAULT_RULES = {
-  autonomy: 'ask_exceptions', // 'suggest' = vain ehdottaa · 'ask_exceptions' = kysyy luvan poikkeuksiin · 'auto_within_rules' = hyväksyy itse sääntöjen sisällä
+  autonomy: 'ask_exceptions', // 'suggest' = vain ehdottaa, 'ask_exceptions' = kysyy luvan poikkeuksiin, 'auto_within_rules' = hyväksyy itse sääntöjen sisällä
   budgetCap: 1800, // € alv 0 % / tilaus
   maxQtyJumpPct: 60, // rivin määrä yli tämän verran perustasosta → varmistus
   bannedAllergens: [],

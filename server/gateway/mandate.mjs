@@ -50,7 +50,7 @@ const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(
  * @param {object} buyer
  * @param {{lines: Array, totals: {net: number}, flags: string[], requestedDeliveryDate?: string, deliveryDate: string, substitutions: Array}} draft
  * @returns {{status: 'confirmed'|'pending_approval'|'rejected', reasons: Array}}
- * severity: block = hylätään aina · approval = ihminen päättää · info = kirjataan ja ilmoitetaan jälkikäteen
+ * severity: block = hylätään aina, approval = ihminen päättää, info = kirjataan ja ilmoitetaan jälkikäteen
  */
 export function evaluateMandate(buyer, draft, { excludeOrderId } = {}) {
   const m = buyer.mandate;

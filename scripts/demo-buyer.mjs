@@ -15,7 +15,7 @@ async function scenario(title, opts) {
   const r = await runBuyerAgent({ baseUrl, ...opts });
   for (const s of r.steps) line(`   ${String(s.ms).padStart(7)} ms  ${s.request.padEnd(34)} ${s.status}  ${s.note || ''}`);
   line(`   → ${r.summary}  (yhteensä ${r.totalMs} ms)`);
-  if (r.order) for (const l of r.order.lines || []) line(`     · ${l.productId} ${l.name} × ${l.quantity} ${l.salesUnitLabel} = ${l.lineNet.toFixed(2)} €${l.substituteFor ? `  (korvaa ${l.substituteFor})` : ''}`);
+  if (r.order) for (const l of r.order.lines || []) line(`     - ${l.productId} ${l.name} × ${l.quantity} ${l.salesUnitLabel} = ${l.lineNet.toFixed(2)} €${l.substituteFor ? `  (korvaa ${l.substituteFor})` : ''}`);
   return r;
 }
 

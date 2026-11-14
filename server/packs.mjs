@@ -1,4 +1,4 @@
-// PAKKAUSKOKO-EHDOTUS. Kun rivin määrä jää vähän vajaaksi täydestä laatikosta, tarjotaan yhden napautuksen pyöristys ("laatikossa 10 kpl · 27 → 30").
+// PAKKAUSKOKO-EHDOTUS. Kun rivin määrä jää vähän vajaaksi täydestä laatikosta, tarjotaan yhden napautuksen pyöristys ("laatikossa 10 kpl, 27 → 30").
 // Laatikkokoko tulee tuotedatasta (data/packs.json, scripts/build-packs.mjs), ei arvauksesta eikä kielimallista.
 // Ehdotus ei väitä täyttä laatikkoa halvemmaksi: data ei kerro sitä. Se on pelkkä pyöristys, ja muutos kulkee saman sääntötarkistuksen läpi kuin käsin tehty.
 import fs from 'node:fs';
@@ -30,7 +30,7 @@ export function packHint(line, rules = {}) {
   if (ref > 0 && rules.maxQtyJumpPct != null && to > ref * (1 + rules.maxQtyJumpPct / 100)) return null;
   return {
     caseSize: pack.size, to, add, cases: to / pack.size,
-    text: `${CASE_LABEL[pack.unit] || 'Laatikossa'} ${num(pack.size)} ${line.unitLabel} · pyöristä ${num(line.qty)} → ${num(to)}`,
+    text: `${CASE_LABEL[pack.unit] || 'Laatikossa'} ${num(pack.size)} ${line.unitLabel}, pyöristä ${num(line.qty)} → ${num(to)}`,
     title: `Tuotedatan mukaan ${num(pack.size)} ${line.unitLabel} / laatikko. ${num(to)} ${line.unitLabel} on ${num(to / pack.size)} täyttä laatikkoa (+${num(add)} ${line.unitLabel}).`,
   };
 }

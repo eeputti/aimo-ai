@@ -173,10 +173,10 @@ The gateway notices what is missing before the buyer does. For a buyer's most re
 ## Layout
 
 ```
-server/gateway/   contract · service (search, quote, order) · mandate · signing · store (ledger) · clock · http (REST + MCP) · buyerAgent (reference client)
-server/           catalog (search index) · valioApi (price + availability, cached) · substitutes · kitchen demo client
-public/           index.html / gateway.html (storefront) · agent.html (console) · approve.html (phone) · kitchen.html (kitchen demo)
-scripts/          build-catalog · fetch-data · demo-buyer
+server/gateway/   contract, service (search, quote, order), mandate, signing, store (ledger), clock, http (REST + MCP), buyerAgent (reference client)
+server/           catalog (search index), valioApi (price + availability, cached), substitutes, kitchen demo client
+public/           index.html / gateway.html (storefront), agent.html (console), approve.html (phone), kitchen.html (kitchen demo)
+scripts/          build-catalog, fetch-data, demo-buyer
 ```
 
 The challenge data may only be used for this event, so `data/raw/` and the API key are not in the repository. MIT licence.

@@ -110,13 +110,13 @@ for (const c of CASES.filter((x) => !only.length || only.includes(x.id))) {
     if (o.lines.length > c.needs.reduce((s, n) => s + (c.split ? 2 : 1), 0)) errs.push(`ylimääräisiä rivejä: ${o.lines.length}`);
   }
   if (!errs.length) pass += 1;
-  rows.push({ id: c.id, text: c.text, ok: !errs.length, got: c.noOrder ? (o ? 'tilaus' : 'ei tilausta (oikein pysähtyi)') : got.join(' · ') || '–', status: o?.status || '–', ms, errs });
-  console.log(`${errs.length ? 'VIRHE' : 'ok   '} ${String(ms).padStart(5)} ms  ${c.text}${errs.length ? `\n        → ${errs.join('\n        → ')}` : `\n        ${rows.at(-1).got}${o ? ` · ${o.status}` : ''}`}`);
+  rows.push({ id: c.id, text: c.text, ok: !errs.length, got: c.noOrder ? (o ? 'tilaus' : 'ei tilausta (oikein pysähtyi)') : got.join(', ') || '–', status: o?.status || '–', ms, errs });
+  console.log(`${errs.length ? 'VIRHE' : 'ok   '} ${String(ms).padStart(5)} ms  ${c.text}${errs.length ? `\n        → ${errs.join('\n        → ')}` : `\n        ${rows.at(-1).got}${o ? `, ${o.status}` : ''}`}`);
 }
 const total = rows.length;
 const avg = Math.round(rows.reduce((s, r) => s + r.ms, 0) / total);
-console.log(`\n${pass}/${total} pyynnöstä oikein ilman käsikorjausta · keskimäärin ${avg} ms / pyyntö (haku → tarjous → tilaus, live-mock-API)`);
-const md = [`# Tarkkuustesti: ${pass}/${total} oikein`, '', `Ajettu ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC · portin kello kiinnitetty ${NOW} · hinnat ja saatavuus Aimon mock-rajapinnasta · keskimäärin ${avg} ms / pyyntö.`, '', 'Oikein = tilaus täyttää pyynnön ehdot (tuoteryhmä, väittämät, nimi), kattaa määrän ilman ylitilausta, on yhtä halpa kuin riippumattoman oraakkelin halvin tilattava vaihtoehto, ja toimituspäivä sekä lopputila ovat odotetut.', '', '| | Pyyntö | Tilaus | Tila | ms |', '|---|---|---|---|---|', ...rows.map((r) => `| ${r.ok ? '✅' : '❌'} | ${r.text} | ${r.ok ? r.got : r.errs.join('; ')} | ${r.status} | ${r.ms} |`), ''].join('\n');
+console.log(`\n${pass}/${total} pyynnöstä oikein ilman käsikorjausta, keskimäärin ${avg} ms / pyyntö (haku → tarjous → tilaus, live-mock-API)`);
+const md = [`# Tarkkuustesti: ${pass}/${total} oikein`, '', `Ajettu ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC, portin kello kiinnitetty ${NOW}, hinnat ja saatavuus Aimon mock-rajapinnasta, keskimäärin ${avg} ms / pyyntö.`, '', 'Oikein = tilaus täyttää pyynnön ehdot (tuoteryhmä, väittämät, nimi), kattaa määrän ilman ylitilausta, on yhtä halpa kuin riippumattoman oraakkelin halvin tilattava vaihtoehto, ja toimituspäivä sekä lopputila ovat odotetut.', '', '| | Pyyntö | Tilaus | Tila | ms |', '|---|---|---|---|---|', ...rows.map((r) => `| ${r.ok ? '✅' : '❌'} | ${r.text} | ${r.ok ? r.got : r.errs.join('; ')} | ${r.status} | ${r.ms} |`), ''].join('\n');
 if (!only.length) fs.writeFileSync(path.join(root, 'eval', 'results.md'), md);
 if (!only.length) fs.writeFileSync(path.join(root, 'eval', 'results.json'), JSON.stringify({ pass, total, avgMs: avg, clock: NOW, rows }, null, 2));
 process.exit(pass === total ? 0 : 2);

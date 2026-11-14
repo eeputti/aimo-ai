@@ -19,7 +19,7 @@ function summarize(req, gw) {
     const extra = [...it.claims.map((c) => CLAIM_FI[c]), it.brand, it.countryOfOrigin === 'fi' ? 'kotimainen' : null].filter(Boolean).join(', ');
     return `${q}${it.productTerm}${extra ? ` (${extra})` : ''}: ${gw.resolved[i].total} sopivaa tuotetta`;
   });
-  return `${parts.join(' · ')}${req.deliveryDate ? ` · toimitus ${req.deliveryDate}` : ''}`;
+  return `${parts.join(', ')}${req.deliveryDate ? `, toimitus ${req.deliveryDate}` : ''}`;
 }
 
 /**

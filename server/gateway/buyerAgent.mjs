@@ -86,7 +86,7 @@ export async function runBuyerAgent({ baseUrl, apiKey, text, tamper = false, pat
   // Jos se ei ymmärrä riittävän varmasti tai ei ole käytössä, jatketaan alla olevalla yksinkertaisella jäsentimellä.
   const aimo = await call('Tulkitse pyyntö (Aimo-malli)', 'POST', '/api/aimo/interpret', { text: ask, patches }).catch(() => null);
   const rq = aimo?.res.ok && !aimo.json.handoff ? aimo.json.gateway?.requestQuote : null;
-  if (aimo) aimo.step.note = rq ? `${aimo.json.summary} · ${aimo.json.trace.via}, ${aimo.json.trace.llmCalls} mallikutsua, ${aimo.json.trace.ms} ms${aimo.json.understood.assumptions.length ? ` · oletukset: ${aimo.json.understood.assumptions.map((a) => a.fi).join('; ')}` : ''}` : `ei käytetty: ${aimo.json.handoff?.fi || aimo.json.gateway?.blocked?.map((b) => b.code).join(', ') || aimo.json.error || 'ei tulkintaa'}`;
+  if (aimo) aimo.step.note = rq ? `${aimo.json.summary}, ${aimo.json.trace.via}, ${aimo.json.trace.llmCalls} mallikutsua, ${aimo.json.trace.ms} ms${aimo.json.understood.assumptions.length ? `, oletukset: ${aimo.json.understood.assumptions.map((a) => a.fi).join('; ')}` : ''}` : `ei käytetty: ${aimo.json.handoff?.fi || aimo.json.gateway?.blocked?.map((b) => b.code).join(', ') || aimo.json.error || 'ei tulkintaa'}`;
   // Aimo-malli vastasi, mutta ei ymmärtänyt tai jotain puuttuu: pysähdytään eikä arvata. Varajäsennin on vain sitä varten, ettei reittiä ole.
   if (aimo?.res.ok && aimo.json.handoff) return finish(`${aimo.json.handoff.fi}${aimo.json.understood.unparsed.length ? ` (tuntematon: ${aimo.json.understood.unparsed.join(', ')})` : ''}.`);
   if (aimo?.res.ok && aimo.json.gateway.blocked.length) return finish(aimo.json.gateway.blocked.some((b) => b.code === 'QUANTITY_MISSING') ? 'Pyynnöstä puuttuu määrä (esim. "1 000 litres" tai "50 kg"), joten tilausta ei tehty.' : 'Aimon valikoimasta ei löytynyt pyydettyä tuotetta, joten tilausta ei tehty.');
@@ -94,8 +94,8 @@ export async function runBuyerAgent({ baseUrl, apiKey, text, tamper = false, pat
     const quote = await call('Pyydä tarjous', 'POST', '/v1/quotes', { ...rq, deliveryDate: target?.deliveryDate || rq.deliveryDate || today });
     const needs = quote.json.needs || [];
     const open = needs.filter((n) => !n.options?.length);
-    if (!quote.res.ok || !needs.length || open.length) { quote.step.note = quote.json.error?.message || `ei tarjottavaa: ${open.map((n) => `${n.ref} ${JSON.stringify(n.excludedSummary || {})}`).join(' · ')}`; return finish('Portti ei voinut tarjota pyydettyä määrää kaikille riveille.'); }
-    quote.step.note = needs.map((n) => `${n.ref}: ${n.options.length} allekirjoitettua vaihtoehtoa, halvin ${n.options[0].totals.net.toFixed(2)} € (${n.options[0].lines.map((l) => `${l.productId} × ${l.quantity}`).join(' + ')})`).join(' · ');
+    if (!quote.res.ok || !needs.length || open.length) { quote.step.note = quote.json.error?.message || `ei tarjottavaa: ${open.map((n) => `${n.ref} ${JSON.stringify(n.excludedSummary || {})}`).join(', ')}`; return finish('Portti ei voinut tarjota pyydettyä määrää kaikille riveille.'); }
+    quote.step.note = needs.map((n) => `${n.ref}: ${n.options.length} allekirjoitettua vaihtoehtoa, halvin ${n.options[0].totals.net.toFixed(2)} € (${n.options[0].lines.map((l) => `${l.productId} × ${l.quantity}`).join(' + ')})`).join(', ');
     let offers = needs.map((n) => n.options[0].offer);
     if (tamper) { // demotaan allekirjoituksen todennus: muutetaan hintaa ensimmäisen tarjouksen sisällä
       const [h, p, s] = offers[0].split('.');
@@ -124,7 +124,7 @@ export async function runBuyerAgent({ baseUrl, apiKey, text, tamper = false, pat
   const n = quote.json.needs?.[0];
   if (!quote.res.ok || !n?.options.length) { quote.step.note = quote.json.error?.message || `ei tarjottavaa: ${JSON.stringify(n?.excludedSummary || {})}`; return finish('Portti ei voinut tarjota pyydettyä määrää.'); }
   const opt = n.options[0];
-  quote.step.note = `${n.options.length} allekirjoitettua vaihtoehtoa, halvin ${opt.totals.net.toFixed(2)} € (${opt.lines.map((l) => `${l.productId} × ${l.quantity}`).join(' + ')})` + (Object.keys(n.excludedSummary).length ? ` · pois jäi: ${Object.entries(n.excludedSummary).map(([c, k]) => `${k} × ${c}`).join(', ')}` : '');
+  quote.step.note = `${n.options.length} allekirjoitettua vaihtoehtoa, halvin ${opt.totals.net.toFixed(2)} € (${opt.lines.map((l) => `${l.productId} × ${l.quantity}`).join(' + ')})` + (Object.keys(n.excludedSummary).length ? `, pois jäi: ${Object.entries(n.excludedSummary).map(([c, k]) => `${k} × ${c}`).join(', ')}` : '');
 
   let offer = opt.offer;
   if (tamper) { // demotaan allekirjoituksen todennus: muutetaan hintaa tarjouksen sisällä

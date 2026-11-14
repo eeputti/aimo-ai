@@ -29,10 +29,10 @@ function card(o, l) {
     <div class="pc-id">${esc(l.productId)}</div>
     <div class="pc-price">${eur(l.unitPriceNet)} <small>/ ${esc(l.salesUnitLabel)}</small></div>
     <div class="pc-buy">
-      <div class="pc-sub">${num(l.quantity)} ${esc(l.salesUnitLabel)} = ${eur(l.lineNet)}${l.orders > 1 ? ` · ${l.orders} tilausta` : ''}<br>${eur(gross)} / ${esc(l.salesUnitLabel)} (alv ${num(l.vatRate ?? 13.5)} %)</div>
+      <div class="pc-sub">${num(l.quantity)} ${esc(l.salesUnitLabel)} = ${eur(l.lineNet)}${l.orders > 1 ? `, ${l.orders} tilausta` : ''}<br>${eur(gross)} / ${esc(l.salesUnitLabel)} (alv ${num(l.vatRate ?? 13.5)} %)</div>
       <a class="pc-go${pending ? ' ring' : ''}" href="#o-${esc(o.orderId)}" data-order="${esc(o.orderId)}" title="${pending ? 'Odottaa hyväksyntääsi: näytä tilaus' : 'Näytä tilaus'}" aria-label="Näytä tilaus ${esc(o.orderId)}">${pending ? ICON.bell : ICON.cart}</a>
     </div>
-    <div class="pc-stock"><span class="pc-dot ${cls}"></span><span>${label} · ${esc(o.buyerName)}${l.orders > 1 ? ' ym.' : ''}</span><span class="pc-clock" title="Tilattu ${esc(when(o.createdAt))}">${ICON.clock}</span></div>
+    <div class="pc-stock"><span class="pc-dot ${cls}"></span><span>${label}, ${esc(o.buyerName)}${l.orders > 1 ? ' ym.' : ''}</span><span class="pc-clock" title="Tilattu ${esc(when(o.createdAt))}">${ICON.clock}</span></div>
   </article>`;
 }
 

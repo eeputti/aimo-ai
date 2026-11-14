@@ -2,6 +2,16 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — keskipisteet pois koko projektista (Claude Code)
+
+**Käyttäjän päätös:** Eelis ei halua keskipistettä (U+00B7) erottimena missään. Älä lisää sitä uuteen käyttöliittymätekstiin, lokitulosteeseen, kommenttiin tai dokumenttiin. Käytä pilkkua tai jaa tieto omiin elementteihinsä.
+
+- Kaikki 90 esiintymää 20 seuratussa tiedostossa korvattiin: käyttöliittymät (`public/app.js`, `gateway.js`, `gateway-products.js`, `aimo-shell.js`), palvelimen tekstit ja kommentit, skriptien tulosteet, README, SUUNNITELMA ja tallennetut `eval/results.*`. Erotin on nyt pilkku. Poikkeukset: nopean agentin päätöslista erotetaan puolipisteellä, `demo-buyer`-tulosteen rivimerkki on tavuviiva, ja budjettirivi sekä tulkintanäkymän faktarivi muotoiltiin ilman edeltävää merkkiä.
+- Sama korjaus tehtiin commitoimattomaan luonnokseen `design/aimo-ui-ehdotukset.html` (13 kohtaa). Tiedosto ei ole tässä commitissa, koska se on toisen työvaiheen keskeneräistä työtä.
+- Riskilistan luettelomerkki (`public/app.js`, banneri) jätettiin: se on luettelomerkki eikä erotin.
+
+**Tarkistukset:** haku koko projektista ei löydä enää merkkiä (pois lukien `node_modules`, `data/`), `node --check` muutetuille JavaScript-tiedostoille läpi, `git diff --check` läpi, `npm test` 26/26, `npm run aimo:eval` 26/26. Käyttöliittymää ei katsottu selaimessa; käynnissä oleva palvelin näyttää palvelinpuolen tekstit uusina vasta uudelleenkäynnistyksen ja ehdotuksen uudelleenajon jälkeen.
+
 ## 14.11.2026 — resepti- ja ostotarvelaskennan suurimmat aukot
 
 **Käyttäjän pyyntö:** korjaa tarkistuksessa löytyneet suurimmat aukot: uudet reseptiraaka-aineet, varausten ja ryhmien kaksinkertainen laskenta, hiljaisemman viikon määrät sekä varasto-, saanto- ja reseptikorvausten käsittely.

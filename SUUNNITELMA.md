@@ -159,7 +159,7 @@ Jäljellä olevat nopeuskorjaukset:
 2. ~~Varmuus alas, kun jotain jää ymmärtämättä.~~ Tehty epäselville luvuille ja pitkille jäsentymättömille lauseille.
 3. **Haku ja hintakysely liikkeelle heti**, rinnan mahdollisen Haiku-kutsun kanssa, ei sen jälkeen.
 4. **Lämmitys käynnistyksessä:** Anthropic-SDK ladataan nyt vasta ensimmäisellä kutsulla, joten demon ensimmäinen mallikutsu on hitain.
-5. **Nopeus näkyviin:** jokaisen vastauksen viereen kesto ja kutsumäärät, esim. "190 ms · 0 mallikutsua · 2 API-kutsua". Audit-loki tallentaa keston jo (`ms`-kenttä), ja `apiStats` sekä `llmStats` ovat olemassa.
+5. **Nopeus näkyviin:** jokaisen vastauksen viereen kesto ja kutsumäärät, esim. "190 ms, 0 mallikutsua, 2 API-kutsua". Audit-loki tallentaa keston jo (`ms`-kenttä), ja `apiStats` sekä `llmStats` ovat olemassa.
 
 Pitchiin: briefin oma lupaus on "in a fraction of the time it takes today". Vertailukohta on verkkokaupan minuutit, ei toinen chatbot.
 

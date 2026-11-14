@@ -8,7 +8,7 @@ import { DEFAULT_RULES } from './proposal.mjs';
 import { fetchQuotes, clearApiCache } from './valioApi.mjs';
 import { apiMode } from './config.mjs';
 
-export const KITCHEN = { id: 'kulma', name: 'Ravintola Kulma', kind: 'Lounas + à la carte · 70 asiakaspaikkaa', city: 'Helsinki', contact: 'Keittiöpäällikkö', demo: true };
+export const KITCHEN = { id: 'kulma', name: 'Ravintola Kulma', kind: 'Lounas + à la carte, 70 asiakaspaikkaa', city: 'Helsinki', contact: 'Keittiöpäällikkö', demo: true };
 
 // base = tyypillinen viikkomäärä myyntiyksikköinä. every = tilausrytmi viikkoina. trend = muutos / viikko.
 export const STAPLES = [

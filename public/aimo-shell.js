@@ -117,8 +117,8 @@
       const s = await load(); if (!s) return empty('Tapahtumia ei saatu ladattua.');
       const rows = s.ledger.filter((e) => NEWS[e.type]).slice(0, 6);
       return `<h4>Viimeisimmät tapahtumat</h4>
-        ${rows.map((e) => row(e.orderId ? `/approve.html?order=${encodeURIComponent(e.orderId)}` : '/agent.html#trail', NEWS[e.type], `${e.orderId ? `${esc(e.orderId)} · ` : ''}${esc(e.actor)}`, `<small>${hhmm(e.ts)}</small>`)).join('') || empty('Ei vielä tapahtumia.')}
-        <a class="as-more" href="/agent.html#trail">Koko päätösketju${s.chain ? ` · ketju ${s.chain.valid ? 'ehjä' : 'rikki'}` : ''}</a>`;
+        ${rows.map((e) => row(e.orderId ? `/approve.html?order=${encodeURIComponent(e.orderId)}` : '/agent.html#trail', NEWS[e.type], `${e.orderId ? `${esc(e.orderId)}, ` : ''}${esc(e.actor)}`, `<small>${hhmm(e.ts)}</small>`)).join('') || empty('Ei vielä tapahtumia.')}
+        <a class="as-more" href="/agent.html#trail">Koko päätösketju${s.chain ? `, ketju ${s.chain.valid ? 'ehjä' : 'rikki'}` : ''}</a>`;
     },
     async date() {
       const s = await load(); if (!s) return empty('Toimituksia ei saatu ladattua.');
@@ -148,13 +148,13 @@
         <div class="as-cal-legend"><span><b>${+today.slice(8)}</b>Kuluva päivä</span><span><i class="done"></i>Vahvistettu tilaus</span><span><i class="sel"></i>Valittu päivä</span><span><i class="open"></i>Odottaa hyväksyntää</span></div>
       </div>
       <h4>Toimitus ${fiDate(cal.sel)}</h4>
-      ${picked.map((o) => { const [cls, label] = STATUS[o.status] || ['no', o.status]; return row(`/approve.html?order=${encodeURIComponent(o.orderId)}`, esc(o.orderId), `${esc(o.buyerName)} · ${label}`, `<b>${money(o.totals?.net || 0)}</b>`, cls); }).join('') || empty('Ei tilauksia tälle päivälle.')}`;
+      ${picked.map((o) => { const [cls, label] = STATUS[o.status] || ['no', o.status]; return row(`/approve.html?order=${encodeURIComponent(o.orderId)}`, esc(o.orderId), `${esc(o.buyerName)}, ${label}`, `<b>${money(o.totals?.net || 0)}</b>`, cls); }).join('') || empty('Ei tilauksia tälle päivälle.')}`;
     },
     async cart() {
       const s = await load(); if (!s) return empty('Koria ei saatu ladattua.');
       const w = waitingOf(s);
       return `<h4>Odottaa hyväksyntääsi</h4>
-        ${w.map((o) => row(`/approve.html?order=${encodeURIComponent(o.orderId)}`, esc(o.orderId), `${esc(o.buyerName)} · ${o.status === 'pending_approval' ? `${o.lines?.length || 0} riviä` : 'lisäys tilaukseen'}`, `<b>${money(waitNet(o))}</b>`, 'wait')).join('') || empty('Kori on tyhjä: mikään ei odota hyväksyntää.')}
+        ${w.map((o) => row(`/approve.html?order=${encodeURIComponent(o.orderId)}`, esc(o.orderId), `${esc(o.buyerName)}, ${o.status === 'pending_approval' ? `${o.lines?.length || 0} riviä` : 'lisäys tilaukseen'}`, `<b>${money(waitNet(o))}</b>`, 'wait')).join('') || empty('Kori on tyhjä: mikään ei odota hyväksyntää.')}
         ${w.length ? `<div class="as-total"><span>Yhteensä (alv 0 %)</span><b>${money(w.reduce((t, o) => t + waitNet(o), 0))}</b></div>` : ''}
         <a class="as-more" href="/agent.html#inbox">Siirry hyväksymään</a>`;
     },

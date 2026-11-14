@@ -38,14 +38,14 @@ function orderCard(o, { actions = true, link = true } = {}) {
       <span class="tag ${o.status}">${STATUS[o.status]}</span>
     </div>
     ${o.pendingAddition ? additionCard(o, actions) : ''}
-    ${o.totals ? `<div><div class="total">${money(o.totals.net)}</div><div class="small muted" title="alv 0 % · verollisena ${money(o.totals.gross)}">toimitus ${day(o.deliveryDate)}${o.cutoffLabel && o.status === 'pending_approval' ? ` · päätä ennen ${esc(o.cutoffLabel)}` : ''}</div></div>` : ''}
-    ${o.lines?.length ? `<ul class="lines">${o.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b> · ${money(l.lineNet)}</span>${l.substituteFor ? `<span class="sub">korvaa tuotteen ${esc(l.substituteFor)}</span>` : ''}${l.addedIn ? '<span class="sub">lisätty jälkikäteen</span>' : ''}</li>`).join('')}</ul>` : ''}
+    ${o.totals ? `<div><div class="total">${money(o.totals.net)}</div><div class="small muted" title="alv 0 %, verollisena ${money(o.totals.gross)}">toimitus ${day(o.deliveryDate)}${o.cutoffLabel && o.status === 'pending_approval' ? `, päätä ennen ${esc(o.cutoffLabel)}` : ''}</div></div>` : ''}
+    ${o.lines?.length ? `<ul class="lines">${o.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span>${l.substituteFor ? `<span class="sub">korvaa tuotteen ${esc(l.substituteFor)}</span>` : ''}${l.addedIn ? '<span class="sub">lisätty jälkikäteen</span>' : ''}</li>`).join('')}</ul>` : ''}
     ${o.suggestions?.length ? suggestBlock(o) : ''}
-    ${o.approval?.explanation && o.status === 'pending_approval' ? `<details class="ai-note"><summary><b>${{ approve: 'Tekoäly suosittelee: hyväksy', reject: 'Tekoäly suosittelee: hylkää', review: 'Tekoäly suosittelee: tarkista' }[o.approval.explanation.suggestion] || 'Tekoälyn selitys'}</b></summary><p class="small">${esc(o.approval.explanation.text)} ${esc(o.approval.explanation.suggestionWhy)}</p><p class="small muted">${esc(o.approval.explanation.model)} · päätös on sinun</p></details>` : ''}
+    ${o.approval?.explanation && o.status === 'pending_approval' ? `<details class="ai-note"><summary><b>${{ approve: 'Tekoäly suosittelee: hyväksy', reject: 'Tekoäly suosittelee: hylkää', review: 'Tekoäly suosittelee: tarkista' }[o.approval.explanation.suggestion] || 'Tekoälyn selitys'}</b></summary><p class="small">${esc(o.approval.explanation.text)} ${esc(o.approval.explanation.suggestionWhy)}</p><p class="small muted">${esc(o.approval.explanation.model)}, päätös on sinun</p></details>` : ''}
     ${o.substitutions?.some((s) => s.modelNote) ? `<div class="ai-note"><p class="small">${o.substitutions.filter((s) => s.modelNote).map((s) => esc(s.modelNote)).join(' ')} <span class="muted">Korvaajan valitsi tekoäly portin tarkistamista vaihtoehdoista (${esc(o.substitutions.find((s) => s.modelNote).chosenBy)}).</span></p></div>` : ''}
     ${reasons.length ? `<ul class="why">${reasons.map((r) => `<li class="${r.severity}">${esc(reasonText(r))}<code>${esc(r.code)}</code></li>`).join('')}</ul>` : ''}
     ${o.status === 'pending_approval' && actions ? `<div class="actions"><button class="btn primary big" data-act="approve" data-order="${o.orderId}">Hyväksy</button><button class="btn danger big" data-act="reject" data-order="${o.orderId}">Hylkää</button></div>` : ''}
-    <div class="small muted">${esc(o.orderId)} · ${dayTime(o.createdAt)}${link ? ` · <a href="#" data-act="trail" data-order="${o.orderId}">päätösketju</a>${o.status === 'pending_approval' || o.pendingAddition ? ` · <a href="/approve.html?order=${o.orderId}" target="_blank" rel="noopener">avaa puhelinnäkymä</a>` : ''}` : ''}</div>
+    <div class="small muted">${esc(o.orderId)}, ${dayTime(o.createdAt)}${link ? `, <a href="#" data-act="trail" data-order="${o.orderId}">päätösketju</a>${o.status === 'pending_approval' || o.pendingAddition ? `, <a href="/approve.html?order=${o.orderId}" target="_blank" rel="noopener">avaa puhelinnäkymä</a>` : ''}` : ''}</div>
   </article>`;
 }
 
@@ -54,7 +54,7 @@ function suggestBlock(o) {
   return `<div class="suggest"><div class="suggest-head">Unohtuiko tämä?</div>
     <ul>${o.suggestions.map((s) => `<li>
       <span class="limg"><img src="/img/${esc(s.productId)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></span>
-      <span><b>${esc(s.name)}</b><span class="small muted" title="${esc(s.message)}">mukana ${s.inOrders}/${s.ofOrders} viime tilauksessa · yleensä ${qty(s.typicalQuantity)} ${esc(s.salesUnitLabel)}</span></span>
+      <span><b>${esc(s.name)}</b><span class="small muted" title="${esc(s.message)}">mukana ${s.inOrders}/${s.ofOrders} viime tilauksessa, yleensä ${qty(s.typicalQuantity)} ${esc(s.salesUnitLabel)}</span></span>
       <button class="btn add" data-act="suggest" data-order="${o.orderId}" data-product="${esc(s.productId)}" aria-label="Lisää tilaukseen ${esc(s.name)}, ${qty(s.typicalQuantity)} ${esc(s.salesUnitLabel)}">+ Lisää${s.estimateNet != null ? ` <span class="num">noin ${money(s.estimateNet)}</span>` : ''}</button>
     </li>`).join('')}</ul></div>`;
 }
@@ -64,8 +64,8 @@ function additionCard(o, actions) {
   const a = o.pendingAddition;
   return `<div class="addition">
     <div class="who">Lisäys odottaa hyväksyntääsi</div>${a.requestedBy ? `<div class="asked">"${esc(a.requestedBy)}"</div>` : ''}
-    <ul class="lines">${a.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b> · ${money(l.lineNet)}</span></li>`).join('')}</ul>
-    <div class="small muted">+${money(a.addedNet)} · uusi summa olisi ${money(a.orderNetIfApproved)}${a.approval?.expiresAt ? ' · tilaus pysyy ennallaan, jos et hyväksy' : ''}</div>
+    <ul class="lines">${a.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span></li>`).join('')}</ul>
+    <div class="small muted">+${money(a.addedNet)}, uusi summa olisi ${money(a.orderNetIfApproved)}${a.approval?.expiresAt ? ', tilaus pysyy ennallaan, jos et hyväksy' : ''}</div>
     <ul class="why">${a.reasons.filter((r) => r.severity === 'approval').map((r) => `<li class="${r.severity}">${esc(reasonText(r))}<code>${esc(r.code)}</code></li>`).join('')}</ul>
     ${actions ? `<div class="actions"><button class="btn primary big" data-act="approve" data-order="${o.orderId}">Hyväksy lisäys</button><button class="btn danger big" data-act="reject" data-order="${o.orderId}">Hylkää lisäys</button></div>` : ''}
   </div>`;
@@ -74,18 +74,18 @@ function additionCard(o, actions) {
 const EVENT_FI = { MODEL_CALL: 'Kielimalli avusti', QUOTE_REQUESTED: 'Agentti pyysi tarjousta', OFFER_ISSUED: 'Portti antoi allekirjoitetun tarjouksen', CANDIDATES_EXCLUDED: 'Ehdokkaita jäi pois', ORDER_RECEIVED: 'Agentti lähetti tilauksen', OFFER_VERIFIED: 'Tarjouksen allekirjoitus todennettu', OFFER_VERIFICATION_FAILED: 'Tarjouksen todennus epäonnistui', LIVE_RECHECK: 'Hinta, saldo ja tilausaika tarkistettu uudelleen', MANDATE_EVALUATED: 'Mandaatti arvioitu', WATCH_EVALUATED: 'Taustavahti vertasi ostajan historiaan',APPROVAL_REQUESTED: 'Hyväksyntäpyyntö lähetetty ihmiselle', ORDER_PENDING_APPROVAL: 'Tilaus odottaa hyväksyntää', ORDER_CONFIRMED: 'Tilaus vahvistettu', ORDER_REJECTED: 'Tilaus hylätty', HUMAN_APPROVED: 'Ihminen hyväksyi', HUMAN_REJECTED: 'Ihminen hylkäsi', SUGGESTION_ACCEPTED: 'Ihminen lisäsi portin ehdotuksen', NOTIFICATION_SENT: 'Ilmoitus lähetetty ihmiselle', MANDATE_UPDATED: 'Mandaattia muutettu', DEMO_RESET: 'Demo nollattu' };
 function eventDetail(e) {
   const p = e.payload || {};
-  if (e.type === 'MODEL_CALL') return `${{ pick_substitute: 'korvaajan valinta', explain_approval: 'selitys hyväksyjälle', interpret_request: 'pyynnön tulkinta' }[p.purpose] || p.purpose} · ${p.model} · ${p.ms} ms${p.tokens ? ` · ${p.tokens.in}+${p.tokens.out} tokenia` : ''} · ${p.error ? `virhe: ${p.error}` : p.usedByCode ? 'koodi käytti vastausta' : 'koodi ei käyttänyt vastausta'}${p.note ? ` (${p.note})` : ''}`;
-  if (e.type === 'OFFER_ISSUED') return `${p.kind}: ${(p.lines || []).join(' + ')} = ${money(p.net)}${p.flags?.length ? ` · ${p.flags.join(', ')}` : ''}`;
+  if (e.type === 'MODEL_CALL') return `${{ pick_substitute: 'korvaajan valinta', explain_approval: 'selitys hyväksyjälle', interpret_request: 'pyynnön tulkinta' }[p.purpose] || p.purpose}, ${p.model}, ${p.ms} ms${p.tokens ? `, ${p.tokens.in}+${p.tokens.out} tokenia` : ''}, ${p.error ? `virhe: ${p.error}` : p.usedByCode ? 'koodi käytti vastausta' : 'koodi ei käyttänyt vastausta'}${p.note ? ` (${p.note})` : ''}`;
+  if (e.type === 'OFFER_ISSUED') return `${p.kind}: ${(p.lines || []).join(' + ')} = ${money(p.net)}${p.flags?.length ? `, ${p.flags.join(', ')}` : ''}`;
   if (e.type === 'CANDIDATES_EXCLUDED') return Object.entries(p.summary || {}).map(([c, n]) => `${n} × ${c}`).join(', ');
   if (e.type === 'MANDATE_EVALUATED') return `taso ${p.approvalLevel} → ${p.outcome}${p.reasons?.length ? `: ${p.reasons.map((r) => `${r.code} (${r.severity})`).join(', ')}` : ''}`;
   if (e.type === 'WATCH_EVALUATED') return p.findings?.length ? `${p.findings.map((f) => f.message).join(' ')} → ihmisen hyväksyntään` : `ei poikkeamia (${p.historyOrders} aiempaa tilausta)`;
   if (e.type === 'QUOTE_REQUESTED') return `${p.productsPriced} tuotetta hinnoiteltu (${p.priceSource}), toimitus ${p.deliveryDate}`;
   if (e.type === 'LIVE_RECHECK') return `${p.products} tuotetta${p.changed?.length ? `, muuttunut: ${p.changed.join(', ')}` : ', ei muutoksia'}`;
-  if (e.type === 'OFFER_VERIFIED' || e.type === 'OFFER_VERIFICATION_FAILED') return `${p.algorithm}${p.failures?.length ? ` · ${p.failures.join(', ')}` : ''}`;
-  if (e.type === 'SUGGESTION_ACCEPTED') return `${p.name} × ${qty(p.quantity)} ${p.unit} · mukana ${p.basis?.inOrders}/${p.basis?.ofOrders} viime tilauksessa`;
+  if (e.type === 'OFFER_VERIFIED' || e.type === 'OFFER_VERIFICATION_FAILED') return `${p.algorithm}${p.failures?.length ? `, ${p.failures.join(', ')}` : ''}`;
+  if (e.type === 'SUGGESTION_ACCEPTED') return `${p.name} × ${qty(p.quantity)} ${p.unit}, mukana ${p.basis?.inOrders}/${p.basis?.ofOrders} viime tilauksessa`;
   if (e.type === 'HUMAN_APPROVED') return p.overrode?.length ? `hyväksyi poikkeukset: ${p.overrode.join(', ')}` : '';
   if (e.type === 'APPROVAL_REQUESTED' || e.type === 'NOTIFICATION_SENT') return `vastaanottaja: ${p.to}`;
-  if (e.type.startsWith('ORDER_')) return [p.net != null ? money(p.net) : '', (p.reasons || []).join(', ')].filter(Boolean).join(' · ');
+  if (e.type.startsWith('ORDER_')) return [p.net != null ? money(p.net) : '', (p.reasons || []).join(', ')].filter(Boolean).join(', ');
   return '';
 }
 const timeline = (entries) => `<ul class="timeline">${entries.map((e) => `<li class="${e.actor.split(':')[0]}"><span class="t">${time(e.ts)}</span><span class="dot"></span><div><b>${esc(EVENT_FI[e.type] || e.type)}</b> <span class="muted small">${esc(e.actor)}</span><div class="detail">${esc(eventDetail(e))}</div><div class="hash">#${e.seq} ${esc(e.hash.slice(0, 16))}… ← ${esc(e.prevHash.slice(0, 8))}…</div></div></li>`).join('')}</ul>`;
@@ -100,7 +100,7 @@ async function phone(orderId) {
     if (o.clock?.simulated) document.body.insertAdjacentHTML('afterbegin', '<div class="demo-clock">Demokello: aika on simuloitu</div>');
     if (o.status === 'pending_approval') root.innerHTML = `<h2>Hyväksytkö tilauksen?</h2>${orderCard(o, { link: false })}`;
     else if (o.pendingAddition) root.innerHTML = `<h2>Hyväksytkö lisäyksen?</h2>${orderCard(o, { link: false })}`;
-    else root.innerHTML = `<div class="done"><div class="tick ${o.status === 'confirmed' ? '' : 'no'}">${o.status === 'confirmed' ? '✓' : '✕'}</div><h2>${o.addition ? (o.addition.status === 'applied' ? 'Lisäys hyväksytty' : 'Lisäys hylätty, tilaus ennallaan') : o.status === 'confirmed' ? 'Tilaus vahvistettu' : 'Tilaus hylätty'}</h2><p>${esc(o.orderId)}${o.totals ? ` · ${money(o.totals.net)} · toimitus ${day(o.deliveryDate)}` : ''}</p></div>${orderCard(o, { actions: false, link: false })}`;
+    else root.innerHTML = `<div class="done"><div class="tick ${o.status === 'confirmed' ? '' : 'no'}">${o.status === 'confirmed' ? '✓' : '✕'}</div><h2>${o.addition ? (o.addition.status === 'applied' ? 'Lisäys hyväksytty' : 'Lisäys hylätty, tilaus ennallaan') : o.status === 'confirmed' ? 'Tilaus vahvistettu' : 'Tilaus hylätty'}</h2><p>${esc(o.orderId)}${o.totals ? `, ${money(o.totals.net)}, toimitus ${day(o.deliveryDate)}` : ''}</p></div>${orderCard(o, { actions: false, link: false })}`;
   };
   root.addEventListener('click', async (ev) => {
     const b = ev.target.closest('[data-act]'); if (!b) return;
@@ -126,8 +126,8 @@ function renderTop() {
   const d = S.d;
   $('#chips').innerHTML = `
     <span class="chip ${d.mode.api === 'live' ? 'live' : 'sim'}">${d.mode.api === 'live' ? 'Live: Aimo-mock-API' : 'Simuloitu hinta ja saatavuus'}</span>
-    <span class="chip">Portin kello <b>${dayTime(d.clock.now)}</b>${d.clock.simulated ? ' · simuloitu' : ''}</span>
-    <span class="chip">Loki ${d.chain.valid ? '✓ ehjä' : `✕ rikki rivillä ${d.chain.brokenAt}`} · ${d.chain.entries} riviä</span>
+    <span class="chip">Portin kello <b>${dayTime(d.clock.now)}</b>${d.clock.simulated ? ', simuloitu' : ''}</span>
+    <span class="chip">Loki ${d.chain.valid ? '✓ ehjä' : `✕ rikki rivillä ${d.chain.brokenAt}`}, ${d.chain.entries} riviä</span>
     <a class="chip" href="/kitchen.html">Keittiödemo (asiakas)</a>`;
   if (d.clock.simulated && !$('.demo-clock')) document.body.insertAdjacentHTML('afterbegin', '<div class="demo-clock">Demokello päällä: portin aika on simuloitu (DEMO_NOW)</div>');
 }
@@ -135,12 +135,12 @@ function renderAgent() {
   const run = S.run;
   $('#agent').innerHTML = `
     <div class="panel-head"><h2>Ulkopuolinen ostoagentti</h2><span class="tag agent">vain julkinen REST-sopimus</span></div>
-    <div class="scenarios">${SCENARIOS.map((s, i) => `<button class="scenario" data-act="scenario" data-i="${i}" title="${esc(S.d.buyers.find((b) => b.id === s.buyer)?.name || s.buyer)} · ${esc(s.hint)}" ${S.running ? 'disabled' : ''}><img src="/img/${s.img}" alt="" loading="lazy" onerror="this.remove()"><b>${esc(s.title)}</b><span>"${esc(s.text)}"</span></button>`).join('')}</div>
+    <div class="scenarios">${SCENARIOS.map((s, i) => `<button class="scenario" data-act="scenario" data-i="${i}" title="${esc(S.d.buyers.find((b) => b.id === s.buyer)?.name || s.buyer)}, ${esc(s.hint)}" ${S.running ? 'disabled' : ''}><img src="/img/${s.img}" alt="" loading="lazy" onerror="this.remove()"><b>${esc(s.title)}</b><span>"${esc(s.text)}"</span></button>`).join('')}</div>
     <form class="ask" id="ask"><input id="askText" value="${esc(S.askText || '')}" autocomplete="off" placeholder="Oma pyyntö, esim. 40 kg voita ja 20 l laktoositonta kermaa maanantaiksi" aria-label="Oma pyyntö agentille"><button class="btn" ${S.running ? 'disabled' : ''}>Lähetä agentille</button></form>
     <div id="aimoPreview" class="aimo" aria-live="polite">${previewHtml()}</div>
     <div class="buyer-pick" role="group" aria-label="Ostaja">${S.d.buyers.map((b) => `<button type="button" data-act="buyer" data-buyer="${b.id}" aria-pressed="${S.buyer === b.id}">${esc(b.name)}</button>`).join('')}</div>
     ${S.running ? '<p><span class="spinner"></span> Agentti asioi portin kanssa…</p>' : ''}
-    ${run ? `<div><div class="small muted" style="margin-bottom:6px">"${esc(run.text)}" · koko ketju ${ms(run.totalMs)}</div>
+    ${run ? `<div><div class="small muted" style="margin-bottom:6px">"${esc(run.text)}", koko ketju ${ms(run.totalMs)}</div>
       <ol class="trace">${run.steps.map((s) => `<li><span class="ms">${ms(s.ms)}</span><div><b>${esc(s.name)}</b> <span class="req">${esc(s.request)} → ${s.status}</span><div>${esc(s.note || '')}</div></div></li>`).join('')}</ol></div>
       <div class="verdict ${run.order?.status || 'rejected'}">${esc(run.summary)}</div>` : ''}`;
 }
@@ -198,17 +198,17 @@ function previewHtml() {
     const c = p.cards[i];
     const facts = [...it.claims.map((x) => CLAIM[x] || x), it.brand, it.countryOfOrigin === 'fi' ? 'kotimainen' : null, FAT[it.attributes.fat], it.attributes.pack ? `${qty(it.attributes.pack.value)} ${UNIT[it.attributes.pack.unit]} pakkaus` : null, ...it.excludeAllergens.map((a) => `ei allergeenia ${a}`)].filter(Boolean);
     return `<li>
-      <div><b>${it.quantity ? `${qty(it.quantity.value)} ${UNIT[it.quantity.unit]} ` : ''}${esc(it.productTerm)}</b>${facts.length ? ` <span class="muted">· ${esc(facts.join(' · '))}</span>` : ''}
+      <div><b>${it.quantity ? `${qty(it.quantity.value)} ${UNIT[it.quantity.unit]} ` : ''}${esc(it.productTerm)}</b>${facts.length ? ` <span class="muted">${esc(facts.join(', '))}</span>` : ''}
         <span class="tag ${c.status === 'ok' ? 'ok' : 'bad'}">${c.status === 'ok' ? `${c.total} tuotetta` : 'ei osumia'}</span></div>
       ${c.reason ? `<div class="small warn-text">${esc(c.reason.fi)}</div>` : ''}
-      ${c.top.length ? `<div class="small muted">esim. ${esc(c.top.map((t) => t.name).join(' · '))}</div>` : ''}
+      ${c.top.length ? `<div class="small muted">esim. ${esc(c.top.map((t) => t.name).join(', '))}</div>` : ''}
       <div class="refine" role="group" aria-label="Tarkenna riviä ${i + 1}">
         ${applied(i).map((x) => `<button type="button" data-act="unchip" data-k="${x.k}" aria-pressed="true" title="Poista tarkennus">${esc(x.label)} ✕</button>`).join('')}
         ${c.chips.map((ch, k) => `<button type="button" data-act="chip" data-item="${i}" data-k="${k}" aria-pressed="false">${esc(ch.label)} <span class="n">${ch.matches}</span></button>`).join('')}
       </div></li>`;
   }).join('');
   const notes = u.assumptions.filter((a) => a.code !== 'UNKNOWN_WORD');
-  return `<div class="aimo-head"><b>Näin pyyntö ymmärrettiin</b><span class="small muted">${u.deliveryDate ? `toimitus ${day(u.deliveryDate)} · ` : ''}${p.trace.via === 'aimo-rules' ? 'säännöt + Aimon sanasto' : esc(p.trace.via)} · ${p.trace.llmCalls} mallikutsua · ${ms(p.trace.ms)}</span></div>
+  return `<div class="aimo-head"><b>Näin pyyntö ymmärrettiin</b><span class="small muted">${u.deliveryDate ? `toimitus ${day(u.deliveryDate)}, ` : ''}${p.trace.via === 'aimo-rules' ? 'säännöt + Aimon sanasto' : esc(p.trace.via)}, ${p.trace.llmCalls} mallikutsua, ${ms(p.trace.ms)}</span></div>
     ${rows ? `<ul class="aimo-items">${rows}</ul>` : ''}
     ${notes.length ? `<ul class="aimo-notes small">${notes.map((a) => `<li>Oletus: ${esc(a.fi)}</li>`).join('')}</ul>` : ''}
     ${p.handoff ? `<div class="small warn-text"><b>${esc(p.handoff.fi)}.</b>${u.unparsed.length ? ` Tuntematon: ${esc(u.unparsed.join(', '))}.` : ''} Agentti ei tilaa tällä pyynnöllä mitään.</div>` : ''}
