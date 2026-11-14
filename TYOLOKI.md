@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — toimituspäivä näkyy etusivun otsakkeessa myös puhelimella (Claude Code)
+
+**Käyttäjän pyyntö:** Eelis huomasi, että puhelinleveydellä otsakkeessa näkyi vain ostoskori, ei toimituspäivää.
+
+- `public/storefront.css`: poistettu enintään 600 px:n säännöstä rivi, joka piilotti otsakkeen ensimmäisen toiminnon (toimituspäivä). Uusi enintään 350 px:n sääntö pienentää logon 80 px:iin ja tiivistää välejä, jotta logo, toimituspäivä ja ostoskori mahtuvat samalle riville.
+- Commitissa on vain nämä kaksi kohtaa. Tiedoston lopussa olevat toisen työvaiheen commitoimattomat rivit jätettiin työpuuhun.
+
+**Tarkistukset:** selaimessa `http://localhost:4747/` leveyksillä 375 px ja 320 px: toimituspäivä ja ostoskori ovat logon rivillä, ei vaakaylivuotoa. Oikealla puhelimella ei katsottu. Päivä on yhä kiinteää näyttödataa (16.11.2026).
+
 ## 14.11.2026 — konsolin toimitusvarmuus- ja hiilijalanjälkimerkit poistettu (Claude Code)
 
 **Käyttäjän päätös:** Eelis pyysi poistamaan commitissa `c991ca2` lisätyt merkit, koska työ on rajattu hakukenttään ja ostoskoriin.

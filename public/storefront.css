@@ -178,7 +178,6 @@ h2 { font-size: 32px; line-height: 1.1; }
   .header-action { font-size: 12px; line-height: 14px; gap: 8px; }
   .header-actions { gap: 12px; }
   .header-icon .icon { width: 24px; height: 24px; }
-  .header-action:first-child { display: none; }
   h2 { font-size: 28px; }
   .section-heading { align-items: flex-start; }
   .section-heading .text-link { font-size: 12px; max-width: 130px; text-align: right; }
@@ -205,6 +204,13 @@ h2 { font-size: 32px; line-height: 1.1; }
   .footer-bottom div { flex-wrap: wrap; gap: 16px; }
   .chat-intro { width: min(300px, calc(100vw - 32px)); bottom: 84px; }
   .chat-launch { width: 48px; height: 48px; }
+}
+@media (max-width: 350px) {
+  .main-header { column-gap: 8px; }
+  .brand { flex-basis: 80px; }
+  .brand img { width: 80px; height: auto; }
+  .header-actions { gap: 8px; }
+  .header-action { gap: 4px; }
 }
 
 /* Fiksu haku: tulkinta ja osumat avautuvat otsakkeen alle (storefront-search.js). */
