@@ -1,7 +1,10 @@
 body.cart-page { background: #fff; }
 .cart-main { padding-top: 32px; padding-bottom: 64px; }
 .cart-main h1 { font-size: 56px; line-height: 1.1; margin-bottom: 32px; }
-.cart-days { display: flex; margin-bottom: 40px; }
+.cart-days { display: flex; overflow-x: auto; }
+.cart-date-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; margin: 16px 0 32px; font-size: 14px; }
+.cart-date-tools button { color: var(--petrol); text-decoration: underline; text-underline-offset: 3px; min-height: 40px; }
+.cart-date-tools button:disabled { color: #79878b; text-decoration: none; cursor: default; }
 .cart-day { display: flex; align-items: center; justify-content: center; gap: 16px; min-width: 120px; padding: 16px 8px 18px; border-bottom: 4px solid var(--bg); font-size: 16px; white-space: nowrap; }
 .cart-day[aria-selected="true"] { font-weight: 700; border-bottom-color: var(--petrol); }
 .cart-count { display: inline-grid; place-items: center; min-width: 20px; height: 20px; border-radius: 50%; background: var(--red); color: #fff; font-size: 11px; font-weight: 700; }
@@ -90,6 +93,7 @@ body.cart-page { background: #fff; }
 .cart-dialog { border: 0; border-radius: 4px; padding: 32px; width: min(440px, calc(100vw - 32px)); color: #000; }
 .cart-dialog::backdrop { background: #002c3b66; }
 .cart-dialog h2 { margin-bottom: 24px; }
+.cart-dialog p { font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
 .cart-dialog label { display: grid; gap: 8px; }
 .cart-dialog input { padding: 12px; border: 1px solid #929b9e; border-radius: 4px; }
 .cart-dialog-actions { display: flex; justify-content: flex-end; align-items: center; gap: 24px; margin-top: 24px; }
@@ -117,7 +121,8 @@ body.cart-page { background: #fff; }
 @media (max-width: 700px) {
   .cart-main { padding-top: 24px; }
   .cart-main h1 { font-size: 40px; margin-bottom: 24px; }
-  .cart-days { margin-bottom: 24px; overflow-x: auto; }
+  .cart-date-tools { gap: 8px 20px; margin-bottom: 24px; }
+  .cart-date-tools strong { flex-basis: 100%; }
   .cart-details { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; margin-bottom: 32px; }
   .cart-content h2 { font-size: 32px; }
   .cart-alert { align-items: flex-start; padding: 12px; }

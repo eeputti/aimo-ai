@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const CATALOG_FILE = path.join(ROOT, 'data', 'catalog.json');
+const CATALOG_FILE = process.env.AIMO_CATALOG || path.join(ROOT, 'data', 'catalog.json');
 
 // Näyttölyhenteet on päätelty toimitustukun verkkokaupasta; challenge-datassa on vain tekniset koodit.
 export const UNIT_LABEL = { KI: 'ltk', ST: 'kpl', KG: 'kg', PAK: 'pkt', BAG: 'pss', RAS: 'ras', PRK: 'prk', BOT: 'pl', SK: 'sk', CS: 'ltk', KLE: 'kää', KRT: 'krt', KAN: 'kan', PAL: 'lava', NIP: 'nippu' };

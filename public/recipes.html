@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reseptit ja menut | Valio Aimo</title>
+  <meta name="description" content="Tuo oma resepti tai viikkomenu. Laske annosmäärät ja valitse toimituspäivään sopivat tuotteet.">
+  <link rel="icon" href="/aimo-logo.png">
+  <link rel="preload" href="/storefront-assets/Matter-Regular.otf" as="font" type="font/otf" crossorigin>
+  <link rel="stylesheet" href="/storefront.css">
+  <link rel="stylesheet" href="/recipes.css">
+</head>
+<body class="recipes-page">
+  <a class="skip" href="#main">Siirry sisältöön</a>
+  <header class="store-header">
+    <div class="service-bar"><div class="container">
+      <nav class="services" aria-label="Valio Aimon palvelut">
+        <button type="button" class="service"><span class="service-logo" aria-hidden="true"></span>Valioaimo.fi</button>
+        <button type="button" class="service"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/storefront.svg')"></span>Pikatukku</button>
+        <a class="service selected" href="/" aria-current="page"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/truck.svg')"></span>Toimitustukku</a>
+        <button type="button" class="service"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/package.svg')"></span>VALO Tilauspalvelu</button>
+        <button type="button" class="service"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/chart-bar.svg')"></span>Minun Aimo</button>
+      </nav>
+      <div class="account"><span class="customer">554485 VALIO OY / ALKOHOLI</span><button type="button" aria-label="Oma tili"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/user.svg')"></span><span class="user-name">Junction TestUser</span><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/caret-down.svg')"></span></button><button type="button" class="language" aria-label="Kieli: suomi">FI<span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/caret-down.svg')"></span></button></div>
+    </div></div>
+    <div class="container main-header">
+      <a class="brand" href="/" aria-label="Valio Aimo etusivu"><img src="/storefront-assets/logo.svg" alt="Valio Aimo" width="96" height="32"></a>
+      <nav class="main-nav" aria-label="Päävalikko"><button type="button">Tuotteet</button><button type="button">Tilaukset</button><a href="/recipes.html" aria-current="page">Reseptit</a></nav>
+      <div class="search" role="search"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/magnifying-glass.svg')"></span><input type="search" aria-label="Hae tuotteita" placeholder="Hae tuotteita" autocomplete="off"></div>
+      <div class="header-actions">
+        <button type="button" class="header-action" aria-label="Toimituspäivä 16.11.2026"><span class="header-icon"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/calendar-blank.svg')"></span><span class="badge">2</span></span><span>Toimituspäivä<b>16.11.2026</b></span></button>
+        <button type="button" class="header-action" aria-label="Ostoskori: 3 tuotetta, 79,39 euroa"><span class="header-icon"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/shopping-cart.svg')"></span><span class="badge">3</span></span><span>Ostoskori<b>79,39 €</b></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="container recipe-main">
+    <nav class="recipe-crumb" aria-label="Murupolku"><a href="/">Toimitustukku</a><span aria-hidden="true">/</span><span>Reseptit ja menut</span></nav>
+    <div class="recipe-heading"><div><h1>Sinun menusi, sopivat tuotteet.</h1><p>Tuo viikon lounaslista tai kerro, mitä valmistat.<br>Me autamme laskemaan raaka-aineet ja löytämään tuotteet.</p></div><a class="recipe-cart-link" href="/cart.html">Katso ostoskori <span aria-hidden="true">↗</span></a></div>
+    <ol class="recipe-steps" aria-label="Reseptistä tuotteiksi"><li class="current"><span>1</span>Tuo menu tai resepti</li><li><span>2</span>Tarkista annokset</li><li><span>3</span>Valitse tuotteet</li></ol>
+    <section class="recipe-import" aria-label="Lisää oma menu tai resepti">
+      <div class="recipe-drop" id="recipe-drop" tabindex="0" role="button" aria-label="Pudota tai valitse kuva, Excel tai tekstitiedosto" aria-describedby="file-types">
+        <input id="recipe-file" type="file" accept=".png,.jpg,.jpeg,.webp,.xlsx,.csv,.tsv,.txt" hidden>
+        <div class="drop-idle"><span class="drop-symbol" aria-hidden="true"><svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 31v9h28v-9M24 32V7m-9 9 9-9 9 9"/><path d="M6 22v5m33-12v5" opacity=".3"/></svg></span><h2>Pudota menu tähän.</h2><p>Kuva ruokalistasta, oma resepti tai Excel.<br>Voit myös liittää kuvan leikepöydältä.</p><span class="recipe-file-button">Valitse tiedosto <span aria-hidden="true">＋</span></span><small id="file-types">PNG, JPG, WebP, XLSX, CSV, TSV tai TXT, enintään 5 Mt</small></div>
+        <div class="drop-working" hidden><div class="scan-preview"><img id="scan-image" alt="Luettava menu" hidden><span class="scan-document" aria-hidden="true">≡</span><span class="scan-line"></span></div><h2 id="scan-title">Luen menuasi…</h2><p id="scan-detail">Tunnistan ruoat, annokset ja raaka-aineet.</p><div class="scan-activity" role="progressbar" aria-label="Reseptin lukeminen käynnissä"></div><button id="recipe-cancel" type="button">Peruuta lukeminen</button></div>
+      </div>
+      <div class="recipe-write"><span class="recipe-kicker">TAI ALOITA SANOISTA</span><h2>Mitä valmistat?</h2><label for="recipe-text">Kerro ruoka tai liitä koko ruokalista</label><textarea id="recipe-text" rows="5" maxlength="45000" placeholder="Esim. maanantaina lohikeittoa 80 hengelle, tiistaina kasvislasagnea 60 hengelle…"></textarea><div class="recipe-write-actions"><button type="button" id="recipe-analyze" class="recipe-primary">Lue menu <span aria-hidden="true">✦</span></button><button type="button" id="recipe-manual" class="recipe-text-button">Kirjoita resepti itse</button></div><p class="recipe-fine">Tarkistat reseptit ja määrät ennen tuotevalintoja.</p></div>
+    </section>
+    <p id="recipe-message" class="recipe-message" role="status" hidden></p>
+    <div class="recipe-examples"><span>Kokeile reseptipohjaa</span><button type="button" data-example="lohikeitto">Lohikeitto <span aria-hidden="true">↗</span></button><button type="button" data-example="kanacurry">Kanacurry ja riisi <span aria-hidden="true">↗</span></button><button type="button" data-example="riisipuuro">Riisipuuro <span aria-hidden="true">↗</span></button></div>
+    <section id="recipe-review" class="recipe-review" hidden aria-labelledby="review-title">
+      <div class="recipe-section-head"><div><p class="recipe-eyebrow">02 / TARKISTA RESEPTIT</p><h2 id="review-title">Kuinka monelle valmistat?</h2><p>Muokkaa annoksia ja raaka-aineita. Saman raaka-aineen tarpeet lasketaan yhteen.</p></div><label class="recipe-date-label">Toimituspäivä<input type="date" id="recipe-date" required></label></div>
+      <div id="recipe-warnings" class="recipe-notices"></div>
+      <details id="recipe-source" class="recipe-source" hidden><summary>Katso lähteestä luettu sisältö</summary><pre></pre></details>
+      <div id="recipe-list"></div>
+      <button type="button" id="recipe-add" class="recipe-text-button">＋ Lisää toinen ruoka</button>
+      <div class="recipe-calculate"><p>Pakkausmäärät pyöristetään ylöspäin.<br><span>Vain toimituspäivälle sopivat tuotteet näytetään.</span></p><button type="button" id="recipe-products" class="recipe-primary">Etsi sopivat tuotteet <span aria-hidden="true">→</span></button></div>
+    </section>
+    <section id="recipe-results" class="recipe-results" hidden aria-labelledby="products-title">
+      <div class="recipe-section-head"><div><p class="recipe-eyebrow">03 / VALITSE TUOTTEET</p><h2 id="products-title">Sinä tunnet keittiösi.</h2><p id="recipe-result-summary"></p></div><a href="#recipe-review" class="recipe-text-button">Muokkaa reseptejä ↑</a></div>
+      <div class="recipe-shopping"><aside class="ingredient-nav"><h3>Raaka-aineet</h3><div id="ingredient-tabs" role="group" aria-label="Valitse raaka-aine"></div></aside><div class="recipe-shelf"><div id="ingredient-heading"></div><div id="ingredient-filters" class="ingredient-filters"></div><div id="recipe-product-grid" class="recipe-product-grid"></div></div></div>
+      <div class="recipe-checkout"><div><b id="recipe-selection-count"></b><span id="recipe-selection-total"></span><small>Valinnat lisätään ostoskoriin tarkistettaviksi.</small></div><button type="button" id="recipe-to-cart" class="recipe-primary" disabled>Lisää valitut ostoskoriin <span aria-hidden="true">→</span></button></div>
+    </section>
+  </main>
+  <footer class="recipe-footer container"><img src="/storefront-assets/logo.svg" alt="Valio Aimo" width="96" height="32"><p>Hyvää ruokaa. Sinun tavallasi.</p><a href="/">Takaisin toimitustukkuun ↑</a></footer>
+  <script src="/storefront-cart-store.js"></script>
+  <script src="/aimo-ask.js"></script>
+  <script type="module" src="/recipes.js"></script>
+</body>
+</html>

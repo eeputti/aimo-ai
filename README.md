@@ -1,10 +1,12 @@
-# Aimo Agent Gateway
+# Aimo tilausapuri ja Agent Gateway
 
-**The open front door for buyer agents at Valio Aimo: verifiable offers, spend-limited mandates, human sign-off when it matters, and a tamper-evident record of every decision.**
+**Current product direction (14 Nov 2026): a WhatsApp ordering assistant that remembers the active conversation, asks for missing requirements, proposes suitable products and requests approval before submitting an order.**
+
+A read-only WhatsApp test channel is implemented (see [setup](docs/whatsapp.md)); a live Meta connection has not been verified. Ordering and production customer identification are not implemented in this channel. Valio is intended to own customer identification and ordering permissions through its own customer systems; that integration is unconfirmed. The existing gateway, catalogue, quantity conversions and price/availability checks form the backend foundation. See the current direction at the top of [SUUNNITELMA.md](SUUNNITELMA.md).
 
 Shared development context for Codex and Claude Code: [working instructions](AGENTS.md), [current status and work log](TYOLOKI.md), and [competition plan](SUUNNITELMA.md). Claude Code loads the shared instructions through [CLAUDE.md](CLAUDE.md). Record each completed work stage and its checks in the work log, then commit and push it to GitHub.
 
-Junction 2026, Valio Aimo challenge "Trusted Trade Agents". This is not a chatbot on top of the web shop. It is the Aimo-side interface that lets *any* buyer agent go from inquiry to commitment, with the buyer's own rules deciding what the agent may do alone.
+Junction 2026, Valio Aimo challenge "Trusted Trade Agents". The existing Agent Gateway is the Aimo-side interface that lets a buyer agent go from inquiry to commitment, with the buyer's own rules deciding what the agent may do alone. The WhatsApp assistant will add a conversational client to this foundation.
 
 ```
 buyer's agent ──► search_products ──► request_quote ──► place_order ──► confirmed
@@ -30,7 +32,9 @@ npm start                   # http://localhost:4747
 |---|---|
 | `/` or `/gateway.html` | Static local copy of the Toimitustukku homepage, based on the 14 Nov 2026 reference |
 | `/cart.html` | Editable storefront cart based on the user's Toimitustukku cart; separate from kitchen proposals and agent orders |
-| `/agent.html` | Console: run a buyer agent, approve, edit the mandate, read the audit trail |
+| `/recipes.html` | Own recipes and menus: image/Excel/text import, editable portions and ingredients, product alternatives for the chosen delivery date |
+| `/agent` or `/agent.html` | Opens the same storefront shopping assistant and shared basket |
+| `/console.html` | Gateway diagnostics: run demo scenarios, approve, edit the mandate, read the audit trail |
 | `/approve.html?order=…` | The human approval view, built for a phone: what was asked, what is proposed, why it stopped, Approve / Reject |
 | `/openapi.json` | The contract (OpenAPI 3.1) |
 | `/mcp` | The same contract as MCP tools (Streamable HTTP, JSON-RPC) |
@@ -39,7 +43,7 @@ npm start                   # http://localhost:4747
 | `/kitchen.html` | Demo client: a kitchen ordering agent (Ravintola Kulma) |
 | `/assistant.html` | Tilausapuri: chat with Daniel's shopping agent (Python MCP server on Render) through the Claude API MCP connector. Answers with one table: earliest delivery, order deadline, price, substitute. Needs `ANTHROPIC_API_KEY`, `ASSISTANT_MCP_URL`, `ASSISTANT_MCP_TOKEN` |
 
-Start at `/`: the storefront keeps its existing appearance and search. Its **Tilaukset** menu opens orders, approvals, mandate limits and the audit trail inside the storefront. In the basket, **Tarkista ja tilaa** requests signed gateway offers for the selected buyer and delivery date. Review prices, substitutions and delivery dates, then explicitly send the order. The existing mandate determines whether it is confirmed or waits for human approval. All orders are demo commitments; no external order or payment is made. Changes to products, quantities, date, reference or buyer require a new quote. Interrupted order requests retry with the same idempotency key, including after a reload. The separate `/agent.html` console remains available for debugging.
+Start at `/`: the storefront keeps its existing appearance and search. Its **Tilaukset** menu opens orders, approvals, mandate limits and the audit trail inside the storefront. In the basket, **Tarkista ja tilaa** requests signed gateway offers for the selected buyer and delivery date. Review prices, substitutions and delivery dates, then explicitly send the order. The existing mandate determines whether it is confirmed or waits for human approval. All orders are demo commitments; no external order or payment is made. Changes to products, quantities, date, reference or buyer require a new quote. Interrupted order requests retry with the same idempotency key, including after a reload. The separate `/console.html` console remains available for debugging; legacy agent links open the storefront.
 
 The homepage uses local images, fonts and a fixed product snapshot. The signed offer is the authoritative price and availability check before ordering. Asset sources are recorded in `public/storefront-assets/sources.json`. A single quote supports 1–20 basket lines. **Tarkista tuoterivit ja korvaajat** retains the inline basket review.
 
@@ -49,9 +53,15 @@ Reference product photos use small 400 px WebP copies with fingerprinted filenam
 
 Before presenting, run `npm run images` to prepare the current kitchen proposal and the first 12 catalogue matches for common demo searches. Use `npm run images -- --query "laktoositon kerma"` for a custom search or pass product/category IDs. This only downloads public photos into the ignored `data/img/` cache, without price API or language model calls. Running servers see newly cached photos without a restart once the updated image service is loaded. Previously unseen products can still need a slower first download, and some products have no public image.
 
-The header and search panel open the same browser-local storefront cart (`aimo.storefront.cart.v1`). Quantity edits, removal, delivery-date moves and the order reference persist in that browser. The cart never imports the kitchen proposal or existing gateway orders. The working cart starts empty and is filled through search. The real cart snapshot is retained separately as `referenceCart` for visual comparison; its product IDs may be absent from the challenge catalogue. An untouched legacy reference basket is retired automatically, while user edits and additions are preserved. Payment processing is not connected. The cart's **Lisää tuotteita** field uses the same AI search and microphone as the header, and the panel opens from the field that was used.
+The header and search panel open the same browser-local storefront cart (`aimo.storefront.cart.v1`). Quantity edits, removal, delivery-date moves and the order reference persist in that browser. The cart never imports the kitchen proposal or existing gateway orders. Product-card buttons, collection pages, recipe selections and the shopping assistant all use the same fresh-review basket update. Kokoa ostoskori opens a missing quantity field when needed, or continues with products explicitly selected by the user. The working cart starts empty and is filled through search. The real cart snapshot is retained separately as `referenceCart` for visual comparison; its product IDs may be absent from the challenge catalogue. An untouched legacy reference basket is retired automatically, while user edits and additions are preserved. After review, **Vahvista demotilaus** records a signed, idempotent demo order in the existing gateway ledger and displays its order number. Payment processing and real fulfilment are not connected. The cart's **Lisää tuotteita** field uses the same AI search and microphone as the header, and the panel opens from the field that was used.
 
-The kitchen demo combines history, ordinary bookings and recipe demand, including new ingredients, yield factors and explicitly supplied usable inventory/incoming deliveries. See [kitchen planning inputs and limitations](docs/kitchen-planning.md). Run `npm test` for isolated planning and HTTP regression tests; the local catalogue is required, and the tests do not use live API keys or the running demo databases.
+The search panel's **Katso tilausehdotus** shortcut opens the history-based kitchen proposal at `/kitchen.html`. Its expandable preview reads the saved proposal even when the browser-local cart is empty. The kitchen demo combines history, ordinary bookings and recipe demand, including new ingredients, yield factors and explicitly supplied usable inventory/incoming deliveries. See [kitchen planning inputs and limitations](docs/kitchen-planning.md). Run `npm test` for isolated planning and HTTP regression tests; the local catalogue is required, and the tests do not use live API keys or the running demo databases.
+
+The header, search date picker and selected cart tab share one delivery date. Search uses it when the request has no date; a date written or dictated in the request updates the shared selection. Selecting a day keeps the other baskets intact. In the cart, **Muuta toimituspäivää** moves the whole selected basket and removes its old tab; an existing destination basket merges product quantities and preserves both references. **Poista toimituspäivä** confirms removal of that day's products and reference, then selects the next remaining day (or the previous one). One delivery day is always retained. Date changes invalidate the cart's availability/payment review.
+
+Search presents requested requirements as plain text and links to the closest supported product group, with a broader group when useful. For example, milk opens **Maidot ja piimät → Maitotaloustuotteet** and chicken breast opens **Broilerin rintafileet → Broileri ja kana**. The demo has ten curated groups in `public/aimo-collections.js`; it does not discover arbitrary production collection URLs. `/collection.html?group=…` browses a local catalogue snapshot, with search, progressive loading and a return to the original request, including edited quantities. Group browsing shows the full group without the request's dietary/brand filters; price and delivery availability are checked in product search. Regenerate the price-free snapshot after catalogue or group changes with `node scripts/build-storefront-collections.mjs`. Production integration should map these destinations to the shop's own collection hierarchy.
+
+**Recipes and menus:** “Lisää reseptistä” opens a separate page. Drop a PNG/JPG/WebP image, Excel `.xlsx`, CSV/TSV/TXT file (max 5 MB), paste an image, or enter a menu in “Mitä valmistat?”. `ANTHROPIC_API_KEY` enables image/text analysis; manual recipes and labeled example templates work without it. Source quantities and recipe estimates remain distinguishable. Unknown original portions, amounts or units must be corrected before calculating. Each dish has original and target portions; identical ingredients are summed before package rounding. Product alternatives use the storefront's delivery-date, price, stock, cutoff and dietary checks. The buyer selects each product or marks the ingredient as already in the kitchen; combined quantities (including existing cart quantities) are rechecked before cart addition. Import never places an order. Drafts persist in this tab's session storage; source files are processed in memory, not saved on the server. Legacy `.xls` and PDFs are not supported. ExcelJS's `uuid` dependency uses the patched 11.x line through `overrides` (ExcelJS uses only the compatible `v4` export).
 
 The whole chain in one command, as an outside agent sees it (real HTTP calls, live mock API):
 
@@ -91,6 +101,10 @@ Or plain REST:
 curl -s localhost:4747/v1/products/search -H 'authorization: Bearer demo-nordic-hotels' \
   -H 'content-type: application/json' -d '{"query":"lactose-free milk"}'
 ```
+
+## WhatsApp-testikanava
+
+Nykyinen Tilausapuri toimii myös WhatsApp Cloud API -kanavan kautta: numeron yhdistäminen kertakäyttökoodilla, tuotehaku ja keskustelumuisti. Tämä testiversio vain hakee tietoja; se ei tee tilauksia tai muuta selaimen koria. Käynnistä erikseen `npm run whatsapp` tai liitä sivuston palvelimeen asetuksella `WHATSAPP_ENABLED=true`. Meta-asetukset, julkinen HTTPS-webhook, henkilön yhdistäminen ja testaus: [WhatsAppin käyttöönotto](docs/whatsapp.md).
 
 ## The contract
 
@@ -187,7 +201,7 @@ The gateway notices what is missing before the buyer does. For a buyer's most re
 ```
 server/gateway/   contract, service (search, quote, order), mandate, signing, store (ledger), clock, http (REST + MCP), buyerAgent (reference client)
 server/           catalog (search index), valioApi (price + availability, cached), substitutes, kitchen demo client
-public/           index.html / gateway.html (storefront), agent.html (console), approve.html (phone), kitchen.html (kitchen demo)
+public/           index.html / gateway.html (storefront), agent.html (shop entry), console.html (diagnostics), approve.html (phone), kitchen.html (kitchen demo)
 scripts/          build-catalog, fetch-data, demo-buyer
 ```
 

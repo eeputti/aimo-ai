@@ -33,7 +33,7 @@ test('product card clicks add to the selected basket, merge and persist; unavail
   let feedback;
   const card = { dataset: { cartProduct: 'card-test' }, querySelector: () => feedback, append: (node) => { feedback = node; } };
   const button = { closest: () => card };
-  const event = { target: { closest: () => button } };
+  const event = { target: { closest: (selector) => selector.includes('.cart-button') ? button : null } };
   await click(event); await click(event);
   assert.equal(f.cart.lines()[0].qty, 2);
   assert.equal(f.cart.get().selectedDate, '2026-11-20');
@@ -128,4 +128,87 @@ test('only an untouched old reference basket is retired; user changes remain', a
   saved.carts[saved.selectedDate][0].qty = 4;
   const edited = await fixture(new Map([[key, JSON.stringify(saved)]]), { reference: false });
   assert.equal(edited.cart.lines().length, 10); assert.equal(edited.cart.lines()[0].qty, 4);
+});
+
+test('selecting a delivery day never moves another day and reading dates creates no tabs', async () => {
+  const f = await fixture(); const before = JSON.stringify(f.cart.get().carts);
+  f.cart.lines('2026-11-30'); f.cart.totals('2026-11-30');
+  assert.equal(JSON.stringify(f.cart.get().carts), before);
+  f.cart.select('2026-11-20');
+  assert.equal(f.cart.lines().length, 0);
+  assert.equal(f.cart.lines('2026-11-16').length, 10);
+  const events = f.events.length;
+  f.cart.select('2026-11-20');
+  assert.equal(f.events.length, events, 'no recursive change event for the same date');
+  const reloaded = await fixture(f.storage);
+  assert.equal(reloaded.cart.get().selectedDate, '2026-11-20');
+});
+
+test('moving a complete delivery removes its tab and preserves both references on a merge', async () => {
+  const f = await fixture(); const { cart } = f;
+  cart.reference('Keittiö');
+  cart.select('2026-11-20'); cart.reference('Kahvila');
+  await cart.add({ id: '8097348', name: 'Sama tuote', price: 1 }, 2);
+  cart.select('2026-11-16'); cart.move('2026-11-20');
+  assert.equal(Object.hasOwn(cart.get().carts, '2026-11-16'), false);
+  assert.equal(Object.hasOwn(cart.get().references, '2026-11-16'), false);
+  assert.equal(cart.lines().find((p) => p.id === '8097348').qty, 5);
+  assert.equal(cart.get().references['2026-11-20'], 'Kahvila / Keittiö');
+  const reloaded = await fixture(f.storage);
+  assert.equal(Object.hasOwn(reloaded.cart.get().carts, '2026-11-16'), false);
+  assert.equal(reloaded.cart.get().selectedDate, '2026-11-20');
+});
+
+test('removing a delivery deletes only its products and reference and picks the next then previous day', async () => {
+  const f = await fixture(); const { cart } = f;
+  cart.select('2026-11-20'); cart.reference('Poistettava viite');
+  await cart.add({ id: 'remove-me', name: 'Poistettava tuote', price: 1 }, 2);
+  cart.select('2026-11-25'); cart.select('2026-11-20');
+  cart.removeDate();
+  assert.equal(cart.get().selectedDate, '2026-11-25');
+  assert.equal(Object.hasOwn(cart.get().carts, '2026-11-20'), false);
+  assert.equal(Object.hasOwn(cart.get().references, '2026-11-20'), false);
+  cart.removeDate(); assert.equal(cart.get().selectedDate, '2026-11-18');
+  cart.removeDate(); assert.equal(cart.get().selectedDate, '2026-11-16');
+  assert.equal(cart.lines().length, 10);
+  assert.throws(() => cart.removeDate(), /Säilytä yksi/);
+  const reloaded = await fixture(f.storage);
+  assert.equal(reloaded.cart.lines().length, 10);
+  assert.equal(Object.keys(reloaded.cart.get().carts).length, 1);
+});
+
+test('removing an unselected empty day preserves the selected day and invalid removal changes nothing', async () => {
+  const { cart } = await fixture();
+  cart.removeDate('2026-11-18');
+  assert.equal(cart.get().selectedDate, '2026-11-16');
+  const before = JSON.stringify(cart.get());
+  assert.throws(() => cart.removeDate('2026-11-30'), /ei löydy/);
+  assert.equal(JSON.stringify(cart.get()), before);
+});
+
+test('a failed quantity merge leaves both delivery baskets intact', async () => {
+  const { cart } = await fixture(new Map(), { reference: false });
+  await cart.add({ id: 'bulk', name: 'Tuote', price: 1 }, 999999);
+  await cart.add({ id: 'bulk', name: 'Tuote', price: 1 }, 1, '2026-11-20');
+  const before = JSON.stringify(cart.get());
+  assert.throws(() => cart.move('2026-11-16'), /enimmäismäärän/);
+  await assert.rejects(cart.add({ id: 'bulk', name: 'Tuote', price: 1 }, 999999), /enimmäismäärän/);
+  assert.equal(JSON.stringify(cart.get()), before);
+});
+
+test('a batch is atomic and refreshes current product prices on a merged line', async () => {
+  const { cart } = await fixture(new Map(), { reference: false });
+  await assert.rejects(cart.addMany([{ product: { id: 'one', name: 'One' }, qty: 1 }, { product: { id: 'bad' }, qty: -1 }]));
+  assert.equal(cart.lines().length, 0);
+  await cart.add({ id: 'one', name: 'One', price: 2 }, 1);
+  await cart.addMany([{ product: { id: 'one', name: 'One', price: 3 }, qty: 2 }]);
+  assert.equal(cart.lines()[0].qty, 3); assert.equal(cart.lines()[0].price, 3);
+});
+
+test('an asynchronous batch refuses a basket changed after its availability check', async () => {
+  const { cart } = await fixture(new Map(), { reference: false });
+  const old = JSON.stringify(cart.lines());
+  await cart.add({ id: 'one', name: 'One', price: 2 }, 1);
+  await assert.rejects(cart.addMany([{ product: { id: 'one', name: 'One', price: 2 }, qty: 2 }], cart.get().selectedDate, { lines: old }), /muuttui/);
+  assert.equal(cart.lines()[0].qty, 1);
 });

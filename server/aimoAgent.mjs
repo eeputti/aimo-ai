@@ -27,7 +27,7 @@ const textOf = (msg) => msg.content.filter((b) => b.type === 'text').map((b) => 
  * @param {string} o.purpose   tehtävän nimi laskureihin ja lokiin, esim. 'recipe_ideas'
  * @param {'fast'|'deep'} [o.tier]
  * @param {string} o.system    tehtävän ohje (välimuistitetaan)
- * @param {string} o.user      syöte
+ * @param {string|Array<object>} o.user      teksti tai multimodaaliset sisältölohkot
  * @param {object} [o.schema]  JSON-skeema: vastaus palautetaan myös jäsennettynä kentässä json
  * @param {number} [o.maxTokens]
  * @param {number} [o.timeoutMs]  kutsukohtainen aikakatkaisu; ilman tätä asiakkaan oletus (120 s)
@@ -100,9 +100,10 @@ export async function askAgent({ purpose, tier = 'fast', system, user, schema, m
  * @param {(text: string) => void} [o.onText]
  * @param {(toolName: string) => void} [o.onTool]
  * @param {number} [o.maxTokens]
+ * @param {string[]} [o.allowedTools] Enable only these remote tools; other tools stay disabled.
  * @returns {Promise<{text: string, model: string, ms: number, toolCalls: number, usage: {input: number, output: number, cacheRead: number}}>}
  */
-export async function chatWithMcp({ purpose, system, messages, mcp, onText, onTool, maxTokens = 16000 }) {
+export async function chatWithMcp({ purpose, system, messages, mcp, onText, onTool, maxTokens = 16000, allowedTools }) {
   const t0 = performance.now();
   const MCP_BETA = 'mcp-client-2025-11-20';
   const base = {
@@ -111,7 +112,7 @@ export async function chatWithMcp({ purpose, system, messages, mcp, onText, onTo
     output_config: { effort: 'medium' },
     system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
     mcp_servers: [{ type: 'url', url: mcp.url, name: mcp.name, ...(mcp.token ? { authorization_token: mcp.token } : {}) }],
-    tools: [{ type: 'mcp_toolset', mcp_server_name: mcp.name }],
+    tools: [{ type: 'mcp_toolset', mcp_server_name: mcp.name, ...(allowedTools ? { default_config: { enabled: false }, configs: Object.fromEntries(allowedTools.map((name) => [name, { enabled: true }])) } : {}) }],
   };
   const history = [...messages];
   const usage = { input: 0, output: 0, cacheRead: 0 };

@@ -16,12 +16,20 @@
     "aimo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/aimo.mjs",
     "aimo:eval": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/aimo-eval.mjs",
     "aimo:eval:spoken": "node --disable-warning=ExperimentalWarning scripts/aimo-spoken-eval.mjs",
-    "eval": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/eval.mjs"
+    "eval": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/eval.mjs",
+    "whatsapp": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/whatsapp-server.mjs",
+    "whatsapp:member": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/whatsapp-member.mjs"
   },
   "engines": {
     "node": ">=22.13"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.8.0"
+    "@anthropic-ai/sdk": "^1.8.0",
+    "exceljs": "^4.4.0"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

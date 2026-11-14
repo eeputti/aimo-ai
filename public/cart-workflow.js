@@ -5,7 +5,7 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const money = (n) => n == null ? 'Hinta ei tiedossa' : `${Number(n).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/cart-workflow.css'; document.head.append(css);
 let review = null; let busy = false; let applying = false; let message = '';
-const signature = () => JSON.stringify([cart.get().selectedDate, cart.lines().map((p) => [p.id, p.qty, p.price])]);
+const signature = () => JSON.stringify([cart.get().selectedDate, cart.get().references[cart.get().selectedDate] || '', cart.lines().map((p) => [p.id, p.qty, p.price, p.vat])]);
 let checkedSignature = '';
 const post = async (url, body) => {
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });

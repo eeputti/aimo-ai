@@ -22,12 +22,22 @@ import { packHint } from './packs.mjs';
 import { validatePlanning } from './planning.mjs';
 import { interpret as aimoInterpret, warm as aimoWarm, loadLexicon as aimoLexicon } from './aimo/index.mjs'; // Aimo-malli: vapaa teksti → rakenteinen pyyntö
 import { searchStorefront, reviewStorefront, validDeliveryDate } from './storefront.mjs';
+import { analyzeRecipeSource, recipeProducts } from './recipe-import.mjs';
+import { prepareCheckout, confirmCheckout } from './storefront-checkout.mjs';
 import { handleAssistantChat, assistantStatus } from './assistant.mjs'; // Tilausapuri: Danielin MCP-agentti sivulla /assistant.html
+
+import { createConfiguredWhatsApp } from './whatsapp/runtime.mjs';
+const whatsapp = process.env.WHATSAPP_ENABLED === 'true' ? createConfiguredWhatsApp() : null;
 
 const PUBLIC = path.join(ROOT, 'public');
 
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
-const readBody = (req) => new Promise((resolve, reject) => { let data = ''; req.on('data', (c) => { data += c; if (data.length > 1e6) reject(new Error('liian suuri pyyntö')); }); req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); } }); req.on('error', reject); });
+const readBody = (req, limit = 1e6) => new Promise((resolve, reject) => {
+  let data = ''; let bytes = 0;
+  req.on('data', (chunk) => { bytes += chunk.length; if (bytes > limit) { data = ''; reject(Object.assign(new Error('Liian suuri pyyntö'), { status: 413 })); return; } data += chunk; });
+  req.on('end', () => { if (bytes > limit) return; try { resolve(data ? JSON.parse(data) : {}); } catch (err) { reject(err); } });
+  req.on('error', reject);
+});
 function sse(res) {
   res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive', 'x-accel-buffering': 'no' });
   return (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
@@ -133,10 +143,29 @@ const routes = {
       json(res, 200, out);
     } catch (err) { json(res, 400, { error: err.message }); }
   },
+  'POST /api/recipes/analyze': async (req, res) => {
+    try {
+      const out = await analyzeRecipeSource(await readBody(req, 8e6));
+      if (out.model) gatewayLedger.append('model', 'MODEL_CALL', { purpose: 'recipe_import', model: out.model, ms: out.ms, recipes: out.recipes.length });
+      json(res, 200, out);
+    } catch (err) { json(res, err.status || 400, { error: err.message }); }
+  },
+  'POST /api/recipes/products': async (req, res) => {
+    try { json(res, 200, await recipeProducts(await readBody(req))); }
+    catch (err) { json(res, err.status || 400, { error: err.message }); }
+  },
   'POST /api/storefront/review': async (req, res) => {
     const body = await readBody(req);
     if (!validDeliveryDate(body.deliveryDate) || !Array.isArray(body.lines) || !body.lines.length || body.lines.length > 80 || body.lines.some((l) => !l || typeof l.id !== 'string' || !Number.isFinite(l.qty) || l.qty <= 0 || l.qty > 999999) || new Set(body.lines.map((l) => l.id)).size !== body.lines.length) return json(res, 400, { error: 'Tarkista toimituspäivä ja ostoskorin määrät (1–80 eri tuotetta).' });
     json(res, 200, await reviewStorefront(body.lines, body.deliveryDate));
+  },
+  'POST /api/storefront/checkout': async (req, res) => {
+    try { json(res, 200, await prepareCheckout(await readBody(req))); }
+    catch (err) { json(res, err.status || 500, { error: err.message }); }
+  },
+  'POST /api/storefront/checkout/confirm': async (req, res) => {
+    try { json(res, 200, await confirmCheckout((await readBody(req)).token)); }
+    catch (err) { json(res, err.status || 500, { error: err.message }); }
   },
   'GET /api/assistant/status': (req, res) => json(res, 200, assistantStatus()),
   'POST /api/assistant/chat': async (req, res) => handleAssistantChat(req, res, await readBody(req)),
@@ -289,6 +318,11 @@ const routes = {
 const server = http.createServer(async (req, res) => {
   const t0 = performance.now();
   const url = new URL(req.url, 'http://localhost');
+  if (['/agent', '/agent/', '/agent.html'].includes(url.pathname)) {
+    url.searchParams.set('shop', 'agent');
+    res.writeHead(302, { location: '/' + url.search, 'cache-control': 'no-store' }); res.end(); return;
+  }
+  if (whatsapp && await whatsapp.handle(req, res, url)) return;
   if (await handleGateway(req, res, url)) return; // portin reitit ensin; se käsittelee omat virheensä
   const handler = routes[`${req.method} ${url.pathname}`];
   try {
@@ -316,6 +350,7 @@ async function boot() {
   bootGateway();
   await aimoWarm();
   console.log(`Aimo-malli: sanasto ${aimoLexicon().stats.concepts} käsitettä, ${aimoLexicon().stats.categories} tuoteryhmää, ${aimoLexicon().stats.brands} merkkiä (${aimoLexicon().stats.ms} ms)`);
+  whatsapp?.start();
   server.listen(config.port, () => console.log(`\n→ http://localhost:${server.address().port}\n`));
 
   // Hintalähteen vaihtuessa (simuloitu ↔ live) demodata alustetaan uudelleen.

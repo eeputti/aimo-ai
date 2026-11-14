@@ -35,6 +35,10 @@ function row(p, date) {
 function render() {
   const s = cart.get(); const date = s.selectedDate; const rows = cart.lines(); const t = cart.totals();
   days.innerHTML = Object.keys(s.carts).sort().map((d) => `<button type="button" class="cart-day" role="tab" aria-selected="${d === date}" aria-controls="cart-content" data-cart-day="${d}">${dateLabel(d)}<span class="cart-count">${s.carts[d].length}</span></button>`).join('');
+  document.querySelector('#cart-selected-day').textContent = `Valittu toimitus ${dateLabel(date)}`;
+  const removeDate = document.querySelector('[data-cart-action="remove-date"]');
+  removeDate.disabled = Object.keys(s.carts).length < 2;
+  removeDate.title = removeDate.disabled ? 'Säilytä yksi toimituspäivä. Voit tyhjentää sen ostoskorin.' : '';
   reference.value = s.references[date] || '';
   const missing = rows.filter((p) => unavailable(p, date));
   const warningKey = `${date}:${missing.map((p) => p.id).join(',')}`;
@@ -55,11 +59,28 @@ function render() {
 const dialog = document.querySelector('#cart-date-dialog');
 const dateInput = document.querySelector('#cart-date');
 const dateError = document.querySelector('#cart-date-error');
-function openDate() { dateInput.value = cart.get().selectedDate; dateError.hidden = true; dialog.showModal(); }
+let movingDate;
+function openDate() {
+  movingDate = cart.get().selectedDate; dateInput.value = movingDate; dateError.hidden = true;
+  document.querySelector('#cart-date-description').textContent = `Siirrä toimituksen ${dateLabel(movingDate)} kaikki tuotteet uudelle päivälle. Vanha toimitusvälilehti poistuu. Saatavuus ja hinnat tarkistetaan uudelleen.`;
+  document.querySelector('#cart-date-merge').hidden = true;
+  dialog.showModal();
+}
+dateInput.addEventListener('input', () => { document.querySelector('#cart-date-merge').hidden = dateInput.value === movingDate || !cart.get().carts[dateInput.value]; });
 document.querySelector('#cart-date-form').addEventListener('submit', (ev) => {
   ev.preventDefault();
-  try { cart.move(dateInput.value); dialog.close(); tell('Toimituspäivä vaihdettu.'); }
+  try {
+    if (cart.get().selectedDate !== movingDate) throw new Error('Valittu toimituspäivä muuttui. Avaa päivän vaihto uudelleen.');
+    cart.move(dateInput.value); dialog.close(); tell('Toimituspäivä vaihdettu. Tarkista tuotteiden saatavuus uudelleen.');
+  }
   catch (e) { dateError.textContent = e.message; dateError.hidden = false; }
+});
+const removeDialog = document.querySelector('#cart-remove-date-dialog');
+let removingDate;
+document.querySelector('#cart-remove-date-form').addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  try { cart.removeDate(removingDate); removeDialog.close(); tell('Toimituspäivä ja sen tuotteet poistettu.'); }
+  catch (e) { const error = document.querySelector('#cart-remove-date-error'); error.textContent = e.message; error.hidden = false; }
 });
 reference.addEventListener('input', () => cart.reference(reference.value));
 const cartSearch = document.querySelector('#cart-search');
@@ -76,7 +97,14 @@ document.addEventListener('click', (ev) => {
   }
   if (b.dataset.move) { cart.move(b.dataset.move, b.closest('[data-product]').dataset.product); tell('Tuote siirretty toiselle toimituspäivälle.'); return; }
   if (b.dataset.cartAction === 'date') openDate();
+  if (b.dataset.cartAction === 'select-date') cart.openDatePicker();
+  if (b.dataset.cartAction === 'remove-date') {
+    removingDate = cart.get().selectedDate;
+    document.querySelector('#cart-remove-date-description').textContent = `Poistetaanko toimituspäivä ${dateLabel(removingDate)} ja sen ${cart.lines().length} tuotetta sekä tilaajan viite? Muiden toimituspäivien tuotteet säilyvät.`;
+    document.querySelector('#cart-remove-date-error').hidden = true; removeDialog.showModal();
+  }
   if (b.dataset.cartAction === 'cancel-date') dialog.close();
+  if (b.dataset.cartAction === 'cancel-remove-date') removeDialog.close();
   if (b.dataset.cartAction === 'search') cartSearch.click();
   if (b.dataset.cartAction === 'print') window.print();
   if (b.dataset.cartAction === 'clear' && window.confirm('Haluatko varmasti tyhjentää tämän toimituspäivän ostoskorin?')) { cart.clear(); tell('Ostoskori tyhjennetty.'); }
@@ -97,7 +125,11 @@ content.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.targe
 window.addEventListener('aimo:cart-change', render);
 try {
   await cart.ready; render();
-  if (location.hash === '#toimituspaiva') openDate();
+  if (location.hash === '#toimituspaiva') {
+    // Consume this navigation request so refreshing does not reopen the dialog.
+    history.replaceState(history.state, '', location.pathname + location.search);
+    cart.openDatePicker();
+  }
   const d = await (await fetch('/storefront-cart-data.json')).json();
   if (d.recommendations?.length) document.querySelector('#cart-recommendations').innerHTML = rail('🎄Tilaa joulutuotteet ennakkoon', d.recommendations, { link: 'Katso kaikki' });
 } catch (e) { content.textContent = e.message; }

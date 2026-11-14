@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aimo Agent Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Sofia+Sans+Extra+Condensed:wght@800&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%23005670%27/%3E%3Cpath d=%27M8 16h10m-4-5 5 5-5 5M22 9v14%27 stroke=%27%23c0e021%27 stroke-width=%273%27 fill=%27none%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/gateway.css">
+  <link rel="stylesheet" href="/aimo-shell.css">
+  <link rel="stylesheet" href="/approve-track.css">
+</head>
+<body>
+  <script src="/aimo-shell.js" data-page="gateway"></script>
+  <div class="wrap">
+    <section id="products" aria-label="Agenttien tilaamat tuotteet"></section>
+    <div class="cols">
+      <div class="side">
+        <section class="panel" id="agent"></section>
+        <section class="panel" id="contract"></section>
+      </div>
+      <div class="side">
+        <section class="panel" id="inbox"></section>
+        <section class="panel" id="watch"></section>
+        <section class="panel" id="mandate"></section>
+        <section class="panel" id="trail"></section>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/gateway.js"></script>
+  <script type="module" src="/gateway-products.js"></script>
+</body>
+</html>
