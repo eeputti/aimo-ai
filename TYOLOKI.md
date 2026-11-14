@@ -14,6 +14,8 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 **Käyttöönotto ja työnjako:** selainmuutokset tulevat käyttöön sivun päivityksellä. Päädemon palvelinta, tietokantoja tai käyttäjän koria ei muutettu. Saatavuussäännöt ja oikean mock-API:n muiden toimituspäivien rajoitus säilyvät. Työpuussa jatkuu toisen chatin reseptituonti, myös `aimo-ask.js`:ssä; tämän commitin hakutiedostosta rajataan vain toimituspäivän omat muutokset. Reseptituonnin tiedostot ja paketit jäävät sen omaan työvaiheeseen.
 
+**Etämuutosten yhdistäminen:** ennen pushia etähaaraan oli tullut toimituspäiväikkunan toistuvan avautumisen korjaus `25b2806` ja sen yhdistäminen animaatiotyöhön `c88310c`. Yhdistetty molemmat: vanha `#toimituspaiva`-linkki poistaa avauspyynnön osoitteesta ja avaa uuden päivänvalitsimen kerran. Selaimessa eristetyn demon `?qa=delivery#toimituspaiva` avasi valitsimen, säilytti kyselyparametrin ja seuraava päivitys jätti ikkunan kiinni. Reseptityön keskeneräisiin tiedostoihin ei koskettu yhdistämisessä. Myös commitiin rajatun version erillisessä tiedostokopiossa testit 74/74.
+
 ## 14.11.2026 — ostoskorin hakukenttä liikkuu paneelin yläreunaan (Codex)
 
 **Käyttäjän pyyntö:** ostoskorin vasemman reunan Lisää tuotteita -kenttä siirtyy animoituna avautuvan hakunäkymän yläreunaan. Sen pitää näyttää samalta jatkuvalta kentältä.
@@ -24,6 +26,13 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 **Varmennus:** selaimessa `http://localhost:4747/cart.html`, 1440 × 1000 ja 375 × 812: lähtö-, väli- ja lopputila, saman hakurivin palautuminen paneeliin, sulkeminen myös kesken avautumisen, Enter-avaus, fokuksen ja `aria-expanded`-tilan palautus. Molemmissa leveyksissä 0 px vaakaylivuotoa, ei selaimen virheitä. JavaScriptin syntaksi ja muutoksen diff-tarkistus läpi. Yhteisen työpuun `npm test`: 69 muuta testiä läpi, HTTP-testin portti estyi hiekkalaatikossa; saman eristetyn HTTP-testin uusinta oikeuslaajennuksella läpi (5/5 alitesteineen). Käynnissä olevaa palvelinta, käyttäjän koria tai tilauksia ei muutettu. Staattinen muutos tulee käyttöön sivun päivityksellä.
 
 **Työnjako:** samassa työpuussa jatkuu reseptituonti ja toimituspäivän valinta, myös hakupaneelin tiedostoissa. Tähän commitiin rajataan vain animaation rivit ja tämä lokimerkintä; muiden muutokset säilytetään. Oikeaa puhetta tai hakurajapintaa ei ajettu tämän ulkoasumuutoksen tarkistukseen.
+
+## 14.11.2026 — toimituspäiväikkuna ei avaudu uudelleen päivityksessä (Codex)
+
+**Käyttäjän pyyntö:** poista sivun päivityksen yhteydessä toistuva toimituspäivän asetusikkuna. Etusivun toimituspäiväpainike ohjasi osoitteeseen `/cart.html#toimituspaiva`, ja korin lataus avasi ikkunan aina tunnisteen perusteella.
+
+- `public/storefront-cart.js`: avauspyynnön tunniste poistetaan osoitteesta `history.replaceState`-kutsulla ennen ikkunan avaamista. Painikkeesta saavuttaessa ikkuna avautuu kerran; seuraava päivitys ei avaa sitä uudelleen. Osoitteen kyselyparametrit ja historian tila säilyvät. Päivävalintaan ja korin tallennukseen ei tehty muutoksia.
+- **Tarkistukset:** korin storetestit 9/9, JavaScriptin syntaksi ja `git diff --check` läpi. Varsinaisen koriskriptin ajaminen eristetyllä DOM-jäljitelmällä varmisti ensimmäisen avauksen, päivityksen ilman avausta sekä kyselyparametrien, historian tilan ja muiden ankkurien säilymisen. Oikeaa selainta tai tuotantopalvelinta ei tässä ympäristössä varmennettu. Muutos on staattinen JavaScript-korjaus.
 
 ## 14.11.2026 — historiaan perustuva tilausehdotus takaisin hakupaneeliin (Codex)
 
