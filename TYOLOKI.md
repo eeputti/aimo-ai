@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — itsekeskustelukorjaus käytössä WhatsApp-palvelimessa (Codex)
+
+- **Julkaistu** `5e0a61f6829caa315df48d0d4451df5c3c7e473a` jäädytetystä snapshotista `/private/tmp/aimo-whatsapp-runtime-5e0a61f68`. Oma keskusteluvaihe `68afeaa`/`8989a2f`, Clauden tuotetyökalu-/päivä-ensin-korjaukset `1a517f5`/`5e0a61f` ja uusi korisivu ovat mukana. Kaikki 487 seurattua tiedostoa vastasivat Gitin blob-tiivisteitä. Myöhempi `135c1fd`-checkout ei kuulu tähän julkaisuun.
+- **Yksi restart:** vanha PID 70391 hallitusti TERM, portti 4749 ensin tyhjä, uusi PID **98250** (istunto 73691). Samat ympäristöasetukset, viisi kantaa ja tunneli. Kaikkien 21 kantataulun rivimäärät ja sisältötiivisteet sekä kantatiedostojen identiteetit täsmäsivät ennen/jälkeen. Käyttäjän koria tai keskusteluja ei nollattu.
+- **Tarkistukset:** tarkan lopullisen snapshotin `npm test` **253/253**. Paikallinen ja julkinen health **200 / ordering-demo**, korilinkkisivu **200**, uuden ja vanhan korin JavaScript-tiivisteet vastaavat lähdettä. Tunnelin `/demo` **403**, `/` **404**. Preflight kunnossa ilman huomioita.
+- **Oikea malli:** korjauksen jälkeiset lisäkokeet 5 keskustelua / 17 asiakasvuoroa / 54 kutsua, 0 mallivirhettä, 0 tilausta. Viimeinen julkaistun version koe: maustamaton ruokakerma 2 l + jo ensiviestissä "tavallinen käy" -> oikeat maustamattomat vaihtoehdot, ei uutta laktoosikysymystä, luonnollisesta valinta+linkki-viestistä oikea korilinkki. Kaikkiaan tässä chatissa 15 keskustelua / 51 asiakasvuoroa / 159 mallikutsua eri korjausvaiheiden läpi. Asiakas, Meta-lähetys ja hinnat simuloituja omissa testikannoissa, HTTP/jono/tilausmoottori/korilinkki oikeita. Uutta puhelimeen toimitusta ei väitetä testatuksi.
+- **Jäljellä:** katalogin ehdokasjärjestys ja vastausten selkeys tarvitsevat vielä hiomista; DM Champin tasoista laatua tai kaikkien viestien ymmärtämistä ei väitetä mitatuksi. Muiden chattien keskeneräiset lähteet säilytettiin. Raportti `docs/parallel/whatsapp-selfplay-deploy.md`. Tämä dokumentointivaihe tallennetaan erillisessä työpuussa, jotta muiden yhteisen hakemiston WIP ei tule mukaan.
+
 ## 15.11.2026 — WhatsApp-korista vahvistetun demotilauksen maksusivulle (Codex, yhdistäjächat)
 
 - **Käyttäjän päätös:** nykyinen localhost-tausta ja rajattu HTTPS-korilinkki → kaupan kori → tuotteiden/toimituspäivän tarkistus → erillinen demotilauksen vahvistus → demomaksu. Ei oikeaa maksupalvelua tai tuotannon Toimitustukku-tilausta.
