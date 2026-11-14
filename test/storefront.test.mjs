@@ -18,11 +18,13 @@ const p = { id: 'test', name: 'Kerma', salesUnit: 'ST', litres: 1, lot: 0.01 };
 const quote = (avail = {}, price = {}) => ({ avail: { status: 'ok', date, amount: 100, closingTime: '2026-11-15T17:00:00+02:00', ...avail }, price: { net: 2, vatRate: 13.5, ...price } });
 const assess = (q, quantity = { value: 20, unit: 'L' }) => orderableProduct(p, q, date, quantity);
 
-test('haku hyväksyy vain pyydetyn päivän, avoimen tilausajan ja tuoreen saatavuuden', () => {
+test('haku hyväksyy pyydetyksi päiväksi ehtivän toimituksen, avoimen tilausajan ja tuoreen saatavuuden', () => {
   assert.equal(assess(quote()).ok, true);
+  // Rajapinta ilmoittaa aikaisimman toimituspäivän: aikaisempi päivä ehtii myös pyydetyksi päiväksi.
+  assert.equal(assess(quote({ date: '2026-11-15' })).ok, true);
   for (const avail of [
     { status: 'out' }, { status: 'late', date: '2026-11-17' }, { status: 'unknown' }, { status: 'blocked' },
-    { date: '2026-11-15' }, { date: '2026-11-17' }, { date: null }, { stale: true },
+    { date: '2026-11-17' }, { date: null }, { stale: true },
     { closingTime: '2026-11-14T09:00:00+02:00' },
   ]) assert.equal(assess(quote(avail)).ok, false, JSON.stringify(avail));
   for (const price of [{ error: true }, { stale: true }, { net: null }, { net: NaN }]) assert.equal(assess(quote({}, price)).ok, false);

@@ -20,8 +20,8 @@ export function orderableProduct(p, quote, date, quantity) {
   if (!p) return fail('UNKNOWN_PRODUCT');
   if (!price || price.error || price.stale || !Number.isFinite(price.net) || price.net < 0) return fail('PRICE_UNAVAILABLE');
   if (!a || a.stale || a.status !== 'ok') return fail('NOT_AVAILABLE');
-  // Pyydetty päivä on tarkka toimituspäivä. Myös aikaisempi toimitus tarvitsee käyttäjän uuden valinnan.
-  if (a.date !== date) return fail('DELIVERY_DATE_MISMATCH');
+  // Rajapinnan päivä on aikaisin mahdollinen toimitus: tuote kelpaa, kun se ehtii pyydetyksi päiväksi.
+  if (!a.date || a.date > date) return fail('DELIVERY_DATE_MISMATCH');
   if (cutoffPassed(a.closingTime)) return fail('CUTOFF_PASSED');
   const size = unitSizeFor(p, price, quantity?.unit || 'PCS', quantity?.basis || 'sales');
   if (!size?.value || !(size.value > 0)) return fail('UNIT_NOT_CONVERTIBLE');
@@ -88,6 +88,10 @@ export async function availableStorefront(r, opts = {}) {
       const a = orderableProduct(cat.get(p.id), quotes.get(p.id), date, item.quantity);
       return a.ok ? [a.product] : [];
     }) : [];
+    // Tyhjä tulos kertoo aikaisimman päivän, jolle sama haku löytää tilattavaa.
+    const nextDeliveryDate = exact.length || card.status !== 'ok' ? null : card.list.map((p) => quotes.get(p.id)?.avail)
+      .filter((a) => a && !a.stale && ['ok', 'late'].includes(a.status) && a.date > date && cutoffPassed(a.closingTime) === false)
+      .map((a) => a.date).sort()[0] || null;
     let substitutes = [];
     if (!exact.length && card.status === 'ok' && card.list.length) {
       const original = cat.get(card.list[0].id);
@@ -101,7 +105,9 @@ export async function availableStorefront(r, opts = {}) {
     card.status = card.total ? 'ok' : 'no_match';
     // Katalogin suodatinten lukumäärät eivät kuvaa tämän päivän saatavuutta.
     card.chips = card.chips.map(({ matches, ...chip }) => chip);
-    if (!card.total) card.reason = { code: 'NOT_AVAILABLE_ON_DATE', fi: 'Ei tilattavia tuotteita valitulle toimituspäivälle. Kokeile toista päivää tai tarkenna hakua.' };
+    if (!card.total) card.reason = nextDeliveryDate
+      ? { code: 'NOT_AVAILABLE_ON_DATE', fi: 'Ei tilattavia tuotteita valitulle toimituspäivälle.', nextDeliveryDate }
+      : { code: 'NOT_AVAILABLE_ON_DATE', fi: 'Ei tilattavia tuotteita valitulle toimituspäivälle. Kokeile toista päivää tai tarkenna hakua.' };
   }
   r.gateway = { ...r.gateway, requestQuote: null };
   return r;

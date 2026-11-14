@@ -171,7 +171,7 @@
       </div>
       ${fixed.length ? `<p class="ask-requirements">${fixed.map(esc).join(' · ')}</p>` : ''}
       ${collectionNavigation(it)}
-      ${!ok ? `<p class="ask-no-products">${esc(card?.reason?.fi || 'Kokeile toista hakusanaa tai toimituspäivää.')}</p>` : ''}
+      ${!ok ? `<p class="ask-no-products">${esc(card?.reason?.fi || 'Kokeile toista hakusanaa tai toimituspäivää.')}${storefrontCart && card?.reason?.nextDeliveryDate ? ` Aikaisin toimitus on ${day(card.reason.nextDeliveryDate)} <button type="button" class="ask-plus" data-next-date="${esc(card.reason.nextDeliveryDate)}">${I.cal}Vaihda päivä</button>` : ''}</p>` : ''}
       ${list.length ? `<div class="ask-rail${all ? ' all' : ''}">
         <button type="button" class="ask-arrow prev" data-rail="-1" aria-label="Edelliset tuotteet">${I.left}</button>
         <div class="ask-tiles">${list.map((p) => tile(p, it)).join('')}</div>
@@ -584,6 +584,8 @@
     if (save) { saveQuantity(save.closest('.ask-qed')); return; }
     const cancel = hit('[data-cancel-quantity]');
     if (cancel) { const item = cancel.closest('.ask-qed').dataset.item; render(last); main.querySelector(`[data-item="${item}"]`)?.focus(); return; }
+    const nextDate = hit('[data-next-date]');
+    if (nextDate && storefrontCart) { storefrontCart.select(nextDate.dataset.nextDate); return; }
     const ask = hit('[data-ask]');
     if (ask?.dataset.ask === 'date') { ask.parentElement.innerHTML = `<span class="ask-pills">${dayPills()}</span>`; return; }
     if (ask?.dataset.ask === 'qty') {
