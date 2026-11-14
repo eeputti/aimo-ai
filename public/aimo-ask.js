@@ -61,10 +61,10 @@
         <div class="ask-body">
           <aside class="ask-side">
             <div class="ask-card" data-card="recipe">
-              <button type="button" class="ask-card-head" aria-expanded="false" title="Lisää reseptistä">
+              <a class="ask-card-head" href="/recipes.html" title="Lisää reseptistä">
                 <span class="ask-ico">${I.recipe}</span>
-                <span class="ask-card-txt"><b>Lisää reseptistä</b><small>Valitse ruoka ja annosmäärä</small></span>
-              </button>
+                <span class="ask-card-txt"><b>Lisää reseptistä</b><small>Tuo menu, kuva tai oma resepti</small></span>
+              </a>
               <div class="ask-recipes" hidden>
                 <label class="ask-rq">${I.find}<input class="ask-rinput" type="text" autocomplete="off" placeholder="Mitä valmistat? esim. kermainen lohikeitto" aria-label="Hae reseptiä"></label>
                 <div class="ask-step" role="group" aria-label="Annosmäärä">
@@ -193,23 +193,13 @@
     const r = await res.json();
     return res.ok ? r : { error: r.error?.message || r.error || 'Haku epäonnistui' };
   }
-  async function openRecipeRequest(routed, source, speech, mine) {
-    const context = recipeContext = { ...routed.recipe, productText: routed.productText, source, speech, productCount: 0 };
-    picked = null; override = null; patches = []; selectedNeeds.clear(); orderable = false; last = null;
-    recipes.hidden = false; root.classList.add('ask-recipe-mode');
-    root.querySelector('[data-card="recipe"] .ask-card-head').setAttribute('aria-expanded', 'true');
-    rinput.value = context.query;
-    portions = Number.isInteger(context.portions) && context.portions >= 1 && context.portions <= 2000 ? context.portions : 0;
-    pinput.value = portions || ''; pinput.placeholder = 'Määrä';
-    main.innerHTML = `<div class="ask-recipe-prompt"><p>${portions ? 'Valitse haluamasi resepti, niin kokoan raaka-aineet.' : 'Valitse resepti ja anna annosmäärä (1–2000).'}</p>${context.productText ? `<p>Mukana säilyvät myös: <b>${esc(context.productText)}</b></p>` : ''}</div>`;
-    await loadIdeas();
-    if (mine !== seq || root.hidden || recipeContext !== context || rinput.value !== context.query) return false;
-    const exact = ideas.find((idea) => idea.name.toLowerCase() === context.query.toLowerCase() || idea.id === context.query.toLowerCase());
-    if (exact) {
-      picked = exact; paintIdeas();
-      if (portions) return runRecipe();
-    }
-    requestAnimationFrame(() => { if (!root.hidden && recipeContext === context) recipes.scrollIntoView({ block: 'nearest', behavior: still() ? 'auto' : 'smooth' }); });
+  function openRecipeRequest(routed) {
+    voice?.cancel();
+    const params = new URLSearchParams({ q: routed.recipe.query });
+    if (routed.recipe.portions != null) params.set('portions', routed.recipe.portions);
+    if (routed.recipe.deliveryText) params.set('when', routed.recipe.deliveryText);
+    if (routed.productText) params.set('extra', routed.productText);
+    location.href = `/recipes.html?${params}`;
     return true;
   }
   let deepTimer;
@@ -550,8 +540,6 @@
     if (step) { setPortions(bump(portions, +step.dataset.step)); return; }
     const idea = ev.target.closest('[data-idea]');
     if (idea) { picked = ideas[+idea.dataset.idea]; paintIdeas(); runRecipe(); return; }
-    const head = ev.target.closest('[data-card="recipe"] .ask-card-head');
-    if (head) { recipes.hidden = !recipes.hidden; head.setAttribute('aria-expanded', String(!recipes.hidden)); if (!recipes.hidden) { if (!ideas.length) loadIdeas(); rinput.focus({ preventScroll: true }); } }
   });
 
   /** Tekee otsakkeen hakukentästä paneelin avaimen: tekoälykuvake, uusi vihjeteksti ja avaus klikkauksesta tai näppäilystä. */

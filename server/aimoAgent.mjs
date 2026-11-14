@@ -27,7 +27,7 @@ const textOf = (msg) => msg.content.filter((b) => b.type === 'text').map((b) => 
  * @param {string} o.purpose   tehtävän nimi laskureihin ja lokiin, esim. 'recipe_ideas'
  * @param {'fast'|'deep'} [o.tier]
  * @param {string} o.system    tehtävän ohje (välimuistitetaan)
- * @param {string} o.user      syöte
+ * @param {string|Array<object>} o.user      teksti tai multimodaaliset sisältölohkot
  * @param {object} [o.schema]  JSON-skeema: vastaus palautetaan myös jäsennettynä kentässä json
  * @param {number} [o.maxTokens]
  * @param {number} [o.timeoutMs]  kutsukohtainen aikakatkaisu; ilman tätä asiakkaan oletus (120 s)

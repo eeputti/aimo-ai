@@ -30,6 +30,7 @@ npm start                   # http://localhost:4747
 |---|---|
 | `/` or `/gateway.html` | Static local copy of the Toimitustukku homepage, based on the 14 Nov 2026 reference |
 | `/cart.html` | Editable storefront cart based on the user's Toimitustukku cart; separate from kitchen proposals and agent orders |
+| `/recipes.html` | Own recipes and menus: image/Excel/text import, editable portions and ingredients, product alternatives for the chosen delivery date |
 | `/agent.html` | Console: run a buyer agent, approve, edit the mandate, read the audit trail |
 | `/approve.html?order=…` | The human approval view, built for a phone: what was asked, what is proposed, why it stopped, Approve / Reject |
 | `/openapi.json` | The contract (OpenAPI 3.1) |
@@ -50,6 +51,8 @@ The header and search panel open the same browser-local storefront cart (`aimo.s
 The search panel's **Katso tilausehdotus** shortcut opens the history-based kitchen proposal at `/kitchen.html`. Its expandable preview reads the saved proposal even when the browser-local cart is empty. The kitchen demo combines history, ordinary bookings and recipe demand, including new ingredients, yield factors and explicitly supplied usable inventory/incoming deliveries. See [kitchen planning inputs and limitations](docs/kitchen-planning.md). Run `npm test` for isolated planning and HTTP regression tests; the local catalogue is required, and the tests do not use live API keys or the running demo databases.
 
 The header, search date picker and selected cart tab share one delivery date. Search uses it when the request has no date; a date written or dictated in the request updates the shared selection. Selecting a day keeps the other baskets intact. In the cart, **Muuta toimituspäivää** moves the whole selected basket and removes its old tab; an existing destination basket merges product quantities and preserves both references. **Poista toimituspäivä** confirms removal of that day's products and reference, then selects the next remaining day (or the previous one). One delivery day is always retained. Date changes invalidate the cart's availability/payment review.
+
+**Recipes and menus:** “Lisää reseptistä” opens a separate page. Drop a PNG/JPG/WebP image, Excel `.xlsx`, CSV/TSV/TXT file (max 5 MB), paste an image, or enter a menu in “Mitä valmistat?”. `ANTHROPIC_API_KEY` enables image/text analysis; manual recipes and labeled example templates work without it. Source quantities and recipe estimates remain distinguishable. Unknown original portions, amounts or units must be corrected before calculating. Each dish has original and target portions; identical ingredients are summed before package rounding. Product alternatives use the storefront's delivery-date, price, stock, cutoff and dietary checks. The buyer selects each product or marks the ingredient as already in the kitchen; combined quantities (including existing cart quantities) are rechecked before cart addition. Import never places an order. Drafts persist in this tab's session storage; source files are processed in memory, not saved on the server. Legacy `.xls` and PDFs are not supported. ExcelJS's `uuid` dependency uses the patched 11.x line through `overrides` (ExcelJS uses only the compatible `v4` export).
 
 The whole chain in one command, as an outside agent sees it (real HTTP calls, live mock API):
 

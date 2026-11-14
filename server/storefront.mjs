@@ -60,6 +60,11 @@ async function alternatives(original, qty, date, item, cat) {
 
 export async function searchStorefront(text, opts = {}) {
   const r = await interpret(text, { ...opts, limit: 80 });
+  return availableStorefront(r, opts);
+}
+
+// Myös reseptien rakenteiset määrät tarkistetaan samalla saatavuusehdolla.
+export async function availableStorefront(r, opts = {}) {
   const date = r.understood.deliveryDate || opts.deliveryDate;
   if (!validDeliveryDate(date) || date < clock.today()) throw new Error('Valitse kelvollinen tuleva toimituspäivä.');
   r.deliveryDate = date;
