@@ -17,6 +17,7 @@ export function createTeamMcp(store, auth) {
       try {
         if (!store.member(actor)) throw new TeamError('UNAUTHORIZED', 'This identity was revoked');
         if (!auth.scopes.includes(scope)) throw new TeamError('INSUFFICIENT_SCOPE', `Requires ${scope}`);
+        for (const p of args.project ? [args.project] : store.member(actor).projects) store.coordination.touch(actor, p, name);
         const data = fn(args);
         return { content: [{ type: 'text', text: JSON.stringify(data) }], structuredContent: data };
       } catch (err) {
@@ -27,6 +28,7 @@ export function createTeamMcp(store, auth) {
   }
   tool('whoami', 'Read your authenticated identity and allowed projects. Actor cannot be supplied in tool arguments.', {}, true, () => store.member(actor));
   tool('get_project_state', 'Read shared summary, every open task and the last 100 closed tasks, members and active or expired advisory file reservations. owner is the assignee; handed_off requires explicit acceptance with claim_task. leaseExpired or ownerAvailable=false means the task can be reclaimed, subject to file conflicts. requestedResources are intended paths; resources are current reservations. Does not read private messages.', { project }, true, (args) => store.state(actor, args));
+  tool('get_agent_activity', 'Read members’ last MCP contact, reported work and coordinator status. Contact is not proof of ongoing work. Shows only your own API jobs, never other members’ direct job prompts or replies. For an automatic coordination/review run, send_message directly to team-coordinator; consumer chats are not woken.', { project }, true, (args) => store.coordination.snapshot(actor, args.project));
   tool('send_message', 'Send a project broadcast or a direct message to an authorized project member. Provide a unique requestKey; retrying the same key and content does not send twice. This does not wake another chat.', { project, recipient: project.optional(), subject: z.string().min(1).max(200), body: z.string().min(1).max(12000), requestKey: z.string().min(8).max(120) }, false, (args) => store.sendMessage(actor, args), true);
   tool('read_messages', 'Read broadcasts, direct messages addressed to you, and your own sent messages, in sequence. Default cursor is your last explicit acknowledgement. Reading is non-destructive; use nextCursor to paginate.', { project, after: revision.optional(), limit: z.number().int().min(1).max(50).default(50) }, true, (args) => store.readMessages(actor, args));
   tool('ack_messages', 'Persist a processed message cursor. Acknowledgement only moves forward and affects only your identity.', { project, through: revision }, false, (args) => store.ack(actor, args), true);
