@@ -137,3 +137,46 @@ export async function answerQuestion(question, facts, onToken) {
   llmStats.lastMs = Math.round(performance.now() - t0);
   return textOf(msg);
 }
+
+// ---------- Reseptiehdotukset hakupaneeliin ----------
+// Malli ehdottaa ruokia ja raaka-aineet per annos. Tuotteita, hintoja tai saatavuutta se ei päätä: raaka-aineet haetaan katalogista erikseen.
+const RECIPE_SYSTEM = `Olet ammattikeittiön reseptiapuri suomalaisessa tukkukaupassa. Saat hakusanan (ruoka, raaka-aine tai tyyli) ja ehdotat 6 erilaista suurkeittiöön sopivaa ruokaa, jotka vastaavat hakua: ensin lähin osuma, sitten muunnelmia (esim. kermainen, kirkas, kasvis, laktoositon) ja lähisukuisia ruokia.
+
+Jokaiselle ruoalle:
+- name: ruoan nimi suomeksi, enintään 4 sanaa
+- note: 2–5 sanan kuvaus, joka erottaa sen muista (esim. "kermainen, tilliä ja purjoa")
+- ingredients: 4–6 pääraaka-ainetta YHDELLE annokselle. name on tukun hakusana perusmuodossa, 1–3 sanaa (esim. "lohifilee", "kuohukerma", "peruna", "kuorittu sipuli"). amount on määrä per annos yksikössä unit: KG kiinteille, L nesteille. Käytä realistisia suurkeittiön annoskokoja (pääraaka-aine 0.08–0.2 kg).
+- Liemet ovat tiivistettä tai jauhetta (esim. "kalaliemijauhe", 0.004–0.01 kg per annos), ei valmista nestettä.
+- Jätä pois suola, vesi, pippuri ja öljy.
+
+Vastaa vain pyydetyssä JSON-muodossa. Jos haku ei liity ruokaan, palauta tyhjä lista.`;
+const RECIPE_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['ideas'],
+  properties: {
+    ideas: {
+      type: 'array',
+      items: {
+        type: 'object', additionalProperties: false, required: ['name', 'note', 'ingredients'],
+        properties: {
+          name: { type: 'string' }, note: { type: 'string' },
+          ingredients: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['name', 'amount', 'unit'], properties: { name: { type: 'string' }, amount: { type: 'number' }, unit: { type: 'string', enum: ['KG', 'L'] } } } },
+        },
+      },
+    },
+  },
+};
+export async function suggestRecipes(query) {
+  const { client } = await getClient();
+  const t0 = performance.now();
+  const msg = check(await client.messages.create({
+    model: config.fastModel,
+    max_tokens: 3000,
+    thinking: { type: 'disabled' },
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: RECIPE_SCHEMA } },
+    system: [{ type: 'text', text: RECIPE_SYSTEM, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: `Haku: ${query}` }],
+  }));
+  llmStats.calls += 1;
+  llmStats.lastMs = Math.round(performance.now() - t0);
+  return { ideas: JSON.parse(textOf(msg)).ideas || [], model: msg.model, ms: llmStats.lastMs };
+}

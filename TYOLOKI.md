@@ -2,6 +2,24 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — hakupaneelin reseptihaku kielimallilla ja annoslaskuri (Claude Code)
+
+**Käyttäjän pyyntö:** Eelis halusi, että reseptin voi hakea kirjoittamalla ("lohikeitto", "kermainen lohikeitto"), ehdotuksia tulee paljon ja ne tulevat tekoälymallilta. Annosmäärälle laskuri: miinus vasemmalla, plus oikealla, luku keskellä muokattavana.
+
+- **Reseptihaku** (`public/aimo-ask.js`, `aimo-ask.css`): reseptikortissa on oma hakukenttä ja ehdotuslista. Tyhjällä haulla näkyvät neljä omaa reseptiä (`recipes.mjs`, tähti-ikoni). Kolmesta merkistä alkaen lista täydentyy mallin ehdotuksilla (kipinä-ikoni), enintään 6.
+- **Uusi reitti** `GET /console/recipes?q=…` (`server/gateway/http.mjs`) ja `suggestRecipes` (`server/llm.mjs`, nopea malli, JSON-skeema): malli palauttaa ruoan nimen, lyhyen kuvauksen ja raaka-aineet per annos (KG tai L). Vastaukset ovat muistissa hakusanan mukaan; jokaisesta mallikutsusta jää `MODEL_CALL`-rivi päätösketjuun (`purpose: recipe_ideas`). Ilman `ANTHROPIC_API_KEY`-avainta reitti palauttaa vain omat reseptit.
+- **Malli ei valitse tuotteita.** Mallin ehdotuksen valinta muodostaa raaka-ainelistan (määrä per annos × annokset) ja ajaa sen tavallisen tulkinnan läpi (`/api/aimo/interpret`, `llm: false`). Hakukentässä näkyy ruoan nimi, agentille lähtee raaka-ainelista. Otsikon vieressä on merkki "Tekoälyn ehdotus, tarkista tuotteet". Oma resepti kulkee entistä kiinnitettyä polkua.
+- **Annoslaskuri:** askel on 5 alle 50 annoksen, 10 alle 200 annoksen ja 25 siitä ylöspäin; luvun voi kirjoittaa itse (1–2000), nuolinäppäimet toimivat. Muutos laskee valitun reseptin uudelleen. Aiemmat annosnapit (20, 50, 100, 200) poistettiin.
+- Commitissa on mukana toisen työvaiheen yhden rivin korjaus `aimo-ask.css`:ään (`.ask:not(form)`, luokkatörmäys agenttisivun `form.ask`-lomakkeen kanssa).
+
+**Tarkistukset:** `node --check`, `npm test` 26/26. Selaimessa portissa 4748 (live-mock-API, `claude-haiku-5-5`): haku "kermainen lohikeitto" palautti oman Lohikeiton ja 6 mallin ehdotusta; ensimmäinen kutsu kesti noin 9 s (8 ehdotuksella, sen jälkeen pyyntö rajattiin 6:een, uutta aikaa ei mitattu). "Kermainen lohikeitto, 120 annosta" tuotti 5 raaka-aineriviä hintoineen ja saatavuuksineen; laskuri 100 → 120 kahdella plussalla.
+
+**Keskeneräistä ja huomiot:**
+
+- Mallin raaka-aineet osuvat vapaan haun kautta välillä väärään tuotteeseen (aiemmin kirjattu vika: "tilli" → pastilli). Siksi tuotteet pitää tarkistaa; kiinnitetyt omat reseptit ovat luotettavampi polku.
+- Mallin suomi ei ole aina siistiä (kuvauksissa esim. "dilli"). Toimituspäivä on reseptipolulla aina "maanantaiksi".
+- Daniel rakentaa varsinaisen mallin; tämä reitti on sen paikka, vastausmuoto `{items: [{name, note, pinned, ingredients: [{name, amount, unit}]}]}`.
+
 ## 14.11.2026 — hakukenttä avaa sivun levyisen hakupaneelin (Claude Code)
 
 **Käyttäjän pyyntö:** Eelis halusi, että otsakkeen hakukentän suurennuslasi vaihtuu pieneksi tekoälykuvakkeeksi ja klikkaus avaa sivun levyisen valkoisen paneelin, joka kasvaa hakukentän kohdalta. Vasemmalle kaksi oikotietä (resepti, valmis tilaus), oikealle tuotteet kirjoittaessa, mukana hinta ja saatavuus. Tämä on käyttäjän tietoinen poikkeus aiempaan linjaukseen "ei AI-nappia".

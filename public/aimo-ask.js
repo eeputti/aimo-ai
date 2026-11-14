@@ -17,6 +17,10 @@
     recipe: svg('<path d="M7 14.500a4 4 0 1 1 1.600-7.700 4 4 0 0 1 6.800 0A4 4 0 1 1 17 14.500V19H7z"/><path d="M7 16.500h10"/>', 26),
     order: svg('<rect x="5" y="4.500" width="14" height="16" rx="1.500"/><path d="M9 4.500V3h6v1.500M8.500 12.500l2.500 2.500 4.500-5"/>', 26),
     go: svg('<path d="M5 12h14m-6-6 6 6-6 6"/>', 20),
+    find: svg('<circle cx="11" cy="11" r="6.500"/><path d="m16 16 4.500 4.500"/>', 18),
+    minus: svg('<path d="M6 12h12"/>', 20),
+    plus: svg('<path d="M6 12h12M12 6v12"/>', 20),
+    own: svg('<path d="M12 3.500 14.600 9l6 .700-4.500 4.100 1.300 5.900L12 16.700 6.600 19.700l1.300-5.900L3.400 9.700l6-.700z"/>', 18),
     cal: svg('<rect x="3.500" y="5.500" width="17" height="15" rx="1.500"/><path d="M3.500 10h17M8 3v4M16 3v4"/>', 16),
     check: svg('<path d="m5 12.500 4.500 4.500L19 7.500"/>', 14),
     truck: svg('<path d="M2 6h11v10H2zM13 9h4l4 4v3h-8z"/><circle cx="6.500" cy="17.500" r="1.800"/><circle cx="17" cy="17.500" r="1.800"/>', 20),
@@ -28,7 +32,6 @@
   const utcDay = (iso) => { const [y, m, d] = iso.split('-').map(Number); return { wd: new Date(Date.UTC(y, m - 1, d)).getUTCDay(), d, m }; };
   const day = (iso) => { const t = utcDay(iso); return `${WD[t.wd]} ${t.d}.${t.m}.`; };
   const today = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Helsinki' });
-  const RECIPES = ['Lohikeitto', 'Kanacurry ja riisi', 'Riisipuuro', 'Mustikkarahka'];
   const EXAMPLES = ['1000 litraa maitoa maanantaiksi', 'laktoositonta kermaa 20 l perjantaiksi', 'Lohikeitto 100 annosta maanantaiksi'];
 
   const css = document.createElement('link');
@@ -54,8 +57,13 @@
                 <span class="ask-card-txt"><b>Hae tuotteita reseptin perusteella</b><small>Ruoka ja annosmäärä, saat raaka-aineet koriin</small></span>
               </button>
               <div class="ask-recipes" hidden>
-                <div class="ask-pills" data-recipes="1">${RECIPES.map((r, i) => `<button type="button" class="ask-pill${i ? '' : ' on'}" data-recipe="${esc(r)}">${esc(r)}</button>`).join('')}</div>
-                <div class="ask-pills" data-portions="1">${[20, 50, 100, 200].map((n) => `<button type="button" class="ask-pill${n === 100 ? ' on' : ''}" data-portion="${n}">${n} annosta</button>`).join('')}</div>
+                <label class="ask-rq">${I.find}<input class="ask-rinput" type="text" autocomplete="off" placeholder="Mitä valmistat? esim. kermainen lohikeitto" aria-label="Hae reseptiä"></label>
+                <div class="ask-step" role="group" aria-label="Annosmäärä">
+                  <button type="button" data-step="-1" aria-label="Vähennä annoksia">${I.minus}</button>
+                  <label class="ask-step-mid"><input class="ask-portions" type="text" inputmode="numeric" maxlength="4" value="100" aria-label="Annosmäärä"><span>annosta</span></label>
+                  <button type="button" data-step="1" aria-label="Lisää annoksia">${I.plus}</button>
+                </div>
+                <div class="ask-ideas" aria-live="polite"></div>
               </div>
             </div>
             <a class="ask-card" data-card="order" href="/kitchen.html">
@@ -73,9 +81,13 @@
   const sheet = root.querySelector('.ask-sheet'); const dim = root.querySelector('.ask-dim');
   const q = root.querySelector('.ask-q'); const main = root.querySelector('.ask-main');
   const recipes = root.querySelector('.ask-recipes'); const ready = root.querySelector('.ask-ready');
+  const rinput = root.querySelector('.ask-rinput'); const pinput = root.querySelector('.ask-portions'); const ideasEl = root.querySelector('.ask-ideas');
   const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   let origin = null; let seq = 0; let timer; let orderable = false;
+  // Valittu resepti. override: hakukentässä näkyy ruoan nimi, mutta tulkintaan ja agentille lähtee raaka-ainelista määrineen.
+  let portions = 100; let ideas = []; let picked = null; let override = null; let ideaSeq = 0; let ideaTimer;
+  const sent = () => (override && q.value.trim() === override.label ? override.text : q.value.trim());
 
   const idle = () => {
     orderable = false;
@@ -144,8 +156,9 @@
     const notes = (u.assumptions || []).map((a) => a.fi).filter(Boolean);
     main.innerHTML = `
       <div class="ask-head">
-        <h2>${r.recipe?.name ? `${esc(r.recipe.name)}, ${r.recipe.portions} annosta` : 'Näin ymmärsin'}</h2>
+        <h2>${override ? esc(override.title) : r.recipe?.name ? `${esc(r.recipe.name)}, ${r.recipe.portions} annosta` : 'Näin ymmärsin'}</h2>
         ${u.deliveryDate ? `<span class="ask-date">${I.cal}${day(u.deliveryDate)}</span>` : ''}
+        ${override ? `<span class="ask-aitag">${I.spark(14)}Tekoälyn ehdotus, tarkista tuotteet</span>` : ''}
       </div>
       ${items.length ? `<div class="ask-needs${r.recipe ? ' compact' : ''}">${items.map((it, i) => need(it, r.cards?.[i])).join('')}</div>` : `<p class="ask-warn">${esc(r.summary || 'En löytänyt tuotepyyntöä.')}</p>`}
       ${u.unparsed?.length ? `<p class="ask-warn">En ymmärtänyt: ${esc(u.unparsed.join(', '))}</p>` : ''}
@@ -156,7 +169,8 @@
       </div>`;
   }
   async function search() {
-    const text = q.value.trim(); const mine = ++seq;
+    if (override && q.value.trim() !== override.label) { override = null; picked = null; paintIdeas(); }
+    const text = sent(); const mine = ++seq;
     if (text.length < 2) { idle(); return; }
     let r;
     try {
@@ -168,9 +182,9 @@
     render(r);
     if (!r.error) loadLive(r.understood?.deliveryDate || today(), mine);
   }
-  const setText = (text) => { q.value = text; q.focus(); clearTimeout(timer); search(); };
+  const setText = (text) => { q.value = text; q.focus({ preventScroll: true }); clearTimeout(timer); search(); };
   const toAgent = () => {
-    const text = q.value.trim(); if (!text) return;
+    const text = sent(); if (!text) return;
     try { sessionStorage.setItem(HANDOFF_KEY, text); } catch { /* ilman tallennusta konsoli avautuu tyhjänä */ }
     location.href = '/agent.html';
   };
@@ -227,16 +241,52 @@
   q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 160); });
   root.querySelector('.ask-bar').addEventListener('submit', (ev) => { ev.preventDefault(); toAgent(); });
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !root.hidden) close(); });
-  const recipeText = () => `${recipes.querySelector('[data-recipe].on').dataset.recipe} ${recipes.querySelector('[data-portion].on').dataset.portion} annosta maanantaiksi`;
+
+  // ---------- reseptihaku ja annoslaskuri ----------
+  // Askel kasvaa määrän mukana: alle 50 annosta 5, alle 200 annosta 10, siitä ylöspäin 25. Luvun voi myös kirjoittaa itse.
+  const stepAt = (n) => (n < 50 ? 5 : n < 200 ? 10 : 25);
+  const bump = (n, dir) => { const st = stepAt(dir > 0 ? n : n - 1); return Math.min(2000, Math.max(1, dir > 0 ? Math.floor(n / st) * st + st : Math.ceil(n / st) * st - st)); };
+  const amountText = (v) => { const r = v >= 10 ? Math.round(v) : Math.max(0.1, Math.round(v * 10) / 10); return String(r).replace('.', ','); };
+  function paintIdeas(loading = false) {
+    const rows = ideas.map((it, i) => `<button type="button" class="ask-idea${picked === it ? ' on' : ''}" data-idea="${i}">
+        <span class="ask-idea-ico${it.pinned ? ' own' : ''}">${it.pinned ? I.own : I.spark(16)}</span>
+        <span class="ask-idea-txt"><b>${esc(it.name)}</b><small>${esc(it.pinned ? `Oma resepti: ${it.note}` : it.note)}</small></span>
+      </button>`).join('');
+    ideasEl.innerHTML = `${rows}${loading ? '<span class="ask-idea-load"><i class="ask-skel"></i><i class="ask-skel"></i><i class="ask-skel"></i></span>' : ''}${!rows && !loading ? '<p class="ask-idea-none">Ei ehdotuksia tällä haulla.</p>' : ''}`;
+  }
+  async function loadIdeas() {
+    const text = rinput.value.trim(); const mine = ++ideaSeq;
+    if (text.length >= 3) paintIdeas(true);
+    let r = null;
+    try { const res = await fetch(`/console/recipes?q=${encodeURIComponent(text)}`); if (res.ok) r = await res.json(); } catch { /* lista jää ennalleen */ }
+    if (mine !== ideaSeq) return;
+    ideas = r?.items || []; if (picked) picked = ideas.find((it) => it.name === picked.name) || picked;
+    paintIdeas();
+  }
+  function runRecipe() {
+    if (!picked) return;
+    const label = `${picked.name} ${portions} annosta maanantaiksi`;
+    override = picked.pinned ? null : { label, title: `${picked.name}, ${portions} annosta`, text: `${picked.ingredients.map((g) => `${amountText(g.amount * portions)} ${g.unit === 'L' ? 'l' : 'kg'} ${g.name}`).join(', ')} maanantaiksi` };
+    q.value = label; clearTimeout(timer); search();
+  }
+  const setPortions = (n) => { portions = Math.min(2000, Math.max(1, Math.round(n) || portions)); pinput.value = portions; runRecipe(); };
+  rinput.addEventListener('input', () => { clearTimeout(ideaTimer); ideaTimer = setTimeout(loadIdeas, 420); });
+  rinput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ideas.length) { ev.preventDefault(); picked = ideas[0]; paintIdeas(); runRecipe(); } });
+  pinput.addEventListener('input', () => { pinput.value = pinput.value.replace(/\D/g, ''); });
+  pinput.addEventListener('change', () => setPortions(parseInt(pinput.value, 10)));
+  pinput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); pinput.blur(); } if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') { ev.preventDefault(); setPortions(bump(portions, ev.key === 'ArrowUp' ? 1 : -1)); } });
+  pinput.addEventListener('focus', () => pinput.select());
   root.addEventListener('click', (ev) => {
     if (ev.target.closest('[data-close]')) { close(); return; }
     if (ev.target.closest('.ask-go')) { toAgent(); return; }
     const example = ev.target.closest('[data-example]');
     if (example) { setText(example.dataset.example); return; }
-    const pill = ev.target.closest('[data-recipe], [data-portion]');
-    if (pill) { pill.parentElement.querySelectorAll('.ask-pill').forEach((p) => p.classList.toggle('on', p === pill)); setText(recipeText()); return; }
+    const step = ev.target.closest('[data-step]');
+    if (step) { setPortions(bump(portions, +step.dataset.step)); return; }
+    const idea = ev.target.closest('[data-idea]');
+    if (idea) { picked = ideas[+idea.dataset.idea]; paintIdeas(); runRecipe(); return; }
     const head = ev.target.closest('[data-card="recipe"] .ask-card-head');
-    if (head) { recipes.hidden = !recipes.hidden; head.setAttribute('aria-expanded', String(!recipes.hidden)); if (!recipes.hidden) setText(recipeText()); }
+    if (head) { recipes.hidden = !recipes.hidden; head.setAttribute('aria-expanded', String(!recipes.hidden)); if (!recipes.hidden) { if (!ideas.length) loadIdeas(); rinput.focus({ preventScroll: true }); } }
   });
 
   /** Tekee otsakkeen hakukentästä paneelin avaimen: tekoälykuvake, uusi vihjeteksti ja avaus klikkauksesta tai näppäilystä. */

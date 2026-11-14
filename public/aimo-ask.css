@@ -1,6 +1,6 @@
 /* Hakupaneeli (aimo-ask.js): sivun levyinen valkoinen paneeli, joka avautuu otsakkeen hakukentän kohdalta.
    Luokat alkavat ask-, joten ne eivät osu sivujen omiin tyyleihin. */
-.ask { --ask-petrol: #005670; --ask-blue: #1668e3; --ask-blue-bg: #e7f0ff; --ask-line: #dee4e6; --ask-muted: #6b797d; --ask-bg: #f2f6f8;
+.ask:not(form) { --ask-petrol: #005670; --ask-blue: #1668e3; --ask-blue-bg: #e7f0ff; --ask-line: #dee4e6; --ask-muted: #6b797d; --ask-bg: #f2f6f8;
   position: fixed; inset: 0; z-index: 200; color: #1d2b30; font: 400 15px/1.4 "DM Sans", Matter, system-ui, -apple-system, "Segoe UI", sans-serif; }
 .ask[hidden] { display: none; }
 .ask *, .ask *::before { box-sizing: border-box; }
@@ -39,7 +39,34 @@ html.ask-open { overflow: hidden; }
 .ask-card-txt { display: grid; gap: 2px; min-width: 0; }
 .ask-card-txt b { font-size: 16px; line-height: 1.25; color: var(--ask-petrol); }
 .ask-card-txt small { font-size: 13px; color: var(--ask-muted); }
-.ask-recipes { display: grid; gap: 10px; padding: 0 16px 16px; }
+.ask-recipes { display: grid; gap: 12px; padding: 0 16px 16px; }
+.ask-rq { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px; border-radius: 8px; background: #fff; color: var(--ask-blue); cursor: text; }
+.ask-rq:focus-within { box-shadow: 0 0 0 2px var(--ask-blue); }
+.ask .ask-rinput { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; box-shadow: none; background: transparent; color: #000; font-family: inherit; font-size: 15px; }
+.ask-rinput::placeholder { color: var(--ask-muted); opacity: 1; }
+/* annoslaskuri: miinus vasemmalla, plus oikealla, luku keskellä muokattavana */
+.ask-step { display: grid; grid-template-columns: 52px 1fr 52px; align-items: center; height: 60px; border-radius: 30px; background: #fff; }
+.ask-step > button { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: 0 auto; border: 0; border-radius: 50%; background: var(--ask-blue); color: #fff; cursor: pointer; transition: transform .1s, background-color .15s; }
+.ask-step > button:hover { background: #0f55c2; }
+.ask-step > button:active { transform: scale(.92); }
+.ask-step > button:focus-visible { outline: 2px solid var(--ask-petrol); outline-offset: 2px; }
+.ask-step-mid { display: flex; align-items: baseline; justify-content: center; gap: 8px; color: var(--ask-muted); font-size: 14px; cursor: text; }
+.ask .ask-portions { width: 4ch; padding: 0; border: 0; outline: 0; box-shadow: none; border-bottom: 2px solid transparent; background: transparent; color: var(--ask-petrol); text-align: right; font: 800 34px/1 "Sofia Sans Extra Condensed", National, "Arial Narrow", sans-serif; font-variant-numeric: tabular-nums; }
+.ask .ask-portions:focus { border-bottom-color: var(--ask-blue); }
+.ask-ideas { display: grid; gap: 6px; max-height: 300px; overflow-y: auto; margin: 0 -4px; padding: 2px 4px; }
+.ask-idea { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 12px; border: 0; border-radius: 8px; background: #fff; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.ask-idea:hover, .ask-idea:focus-visible { box-shadow: 0 0 0 2px var(--ask-blue); outline: 0; }
+.ask-idea.on { background: var(--ask-blue); color: #fff; }
+.ask-idea-ico { display: inline-flex; flex: none; color: var(--ask-blue); }
+.ask-idea-ico.own { color: #d98e00; }
+.ask-idea.on .ask-idea-ico { color: #fff; }
+.ask-idea-txt { display: grid; min-width: 0; }
+.ask-idea-txt b { font-size: 15px; line-height: 1.25; }
+.ask-idea-txt small { font-size: 12px; line-height: 1.3; opacity: .72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ask-idea-load { display: grid; gap: 6px; }
+.ask-idea-load .ask-skel { width: 100%; height: 50px; border-radius: 8px; }
+.ask-idea-none { margin: 0; padding: 6px 4px; font-size: 13px; color: var(--ask-muted); }
+.ask-aitag { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: var(--ask-blue-bg); color: var(--ask-blue); font-size: 13px; font-weight: 500; }
 .ask-recipes[hidden], .ask-ready[hidden] { display: none; }
 .ask-pills { display: flex; flex-wrap: wrap; gap: 8px; }
 .ask-pill { padding: 7px 14px; border: 1px solid var(--ask-line); border-radius: 999px; background: #fff; color: var(--ask-petrol); font-family: inherit; font-size: 14px; font-weight: 500; line-height: 1.2; cursor: pointer; }

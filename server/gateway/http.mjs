@@ -8,6 +8,9 @@ import { clock, cutoffPassed, helsinkiLabel } from './clock.mjs';
 import { runBuyerAgent } from './buyerAgent.mjs';
 import { apiMode, config } from '../config.mjs';
 import { apiStats, fetchQuotes } from '../valioApi.mjs';
+import { RECIPES } from '../aimo/recipes.mjs';
+import { suggestRecipes } from '../llm.mjs';
+import { llmEnabled } from '../config.mjs';
 import { watchReport, WATCH_DISCLOSURE } from './watch.mjs';
 import { SUGGEST_DISCLOSURE } from './suggest.mjs';
 
@@ -104,6 +107,8 @@ async function mcpMessage(msg, req, url) {
   }
 }
 
+const recipeIdeaCache = new Map(); // hakusana → mallin ehdotukset; sama haku ei maksa toista mallikutsua
+
 /** @returns {Promise<boolean>} true jos pyyntö käsiteltiin */
 export async function handleGateway(req, res, url) {
   const p = url.pathname; const m = req.method;
@@ -169,6 +174,33 @@ export async function handleGateway(req, res, url) {
           };
         }),
       }), true;
+    }
+    // Hakupaneelin reseptihaku: omat kiinnitetyt reseptit (recipes.mjs) ja kielimallin ehdotukset raaka-aineineen per annos.
+    // Malli ei valitse tuotteita eikä hintoja: selain hakee raaka-aineet katalogista tavallisella tulkinnalla. Mallikutsusta jää rivi päätösketjuun.
+    if (p === '/console/recipes' && m === 'GET') {
+      const q = (url.searchParams.get('q') || '').trim().slice(0, 80);
+      const own = RECIPES.filter((r) => !q || r.match.test(q) || r.name.toLowerCase().includes(q.toLowerCase()))
+        .map((r) => ({ id: r.id, name: r.name, note: r.lines.slice(0, 3).map((l) => l.label.replace(/\s*\(.*\)/, '')).join(', '), pinned: true }));
+      let ai = []; let model = null; let error = null;
+      if (q.length >= 3 && llmEnabled()) {
+        const key = q.toLowerCase();
+        let hit = recipeIdeaCache.get(key);
+        if (!hit) {
+          try {
+            hit = await suggestRecipes(q);
+            if (recipeIdeaCache.size > 200) recipeIdeaCache.clear();
+            recipeIdeaCache.set(key, hit);
+            ledger.append('model', 'MODEL_CALL', { purpose: 'recipe_ideas', model: hit.model, ms: hit.ms, text: q, output: { ideas: hit.ideas.map((i) => i.name) } });
+          } catch (e) { error = String(e.message || e).slice(0, 160); }
+        }
+        if (hit) {
+          model = hit.model;
+          const taken = new Set(own.map((r) => r.name.toLowerCase()));
+          ai = hit.ideas.filter((i) => i.name && Array.isArray(i.ingredients) && i.ingredients.length && !taken.has(i.name.toLowerCase())).slice(0, 8)
+            .map((i) => ({ name: i.name, note: i.note, pinned: false, ingredients: i.ingredients.filter((g) => g.amount > 0 && g.amount < 2).slice(0, 8) }));
+        }
+      }
+      return send(res, 200, { q, items: [...own, ...ai], llm: llmEnabled(), model, error }), true;
     }
     if (p === '/console/watch' && m === 'GET') return send(res, 200, watchReport(buyers.all())), true;
     if (p === '/console/events' && m === 'GET') {
