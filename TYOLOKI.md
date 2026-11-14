@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — puhelintestin vastaanotto toimii, Meta palauttaa 131005 (Codex)
+
+**Varmennettu katkos:** käyttäjän oikea WhatsApp-tekstiviesti saapui 4749-palvelimen pysyvään jonoon ja kanava muodosti tukivastauksen. Kolme automaattista lähetysyritystä epäonnistuivat HTTP 403:een; Metan tarkempi virhe on 131005 / Access denied. Vastausta puhelimeen ei siis ole varmennettu eikä tilauspolkua otettu käyttöön.
+
+**Token rajattu ja uusittu:** debugger vahvisti oikean sovelluksen, voimassaolon sekä viesti-/hallintaoikeudet vain Test Messaging Accountiin. Pian vanhentuva token uusittiin Metan nykyisellä samalla valtuutuksella, tallennettiin suoraan Gitin ohittamaan `.env`:iin ja luettiin takaisin, oikeudet 0600. Uuden tokenin rajaus varmennettiin. Sama aiemmin epäonnistunut tukivastaus hylättiin myös uudella tokenilla ja ilman vastausviitettä; yhtäkään näistä lähetyksistä Meta ei hyväksynyt, tuplavastausta ei syntynyt.
+
+**Metan tilat ja jatko:** numero CONNECTED/VERIFIED, numero ja sovellus AVAILABLE. WABA:n lähetys on BLOCKED / 141006 (maksutapaeston kuvaus koskee business-initiated conversations); business LIMITED / 141010 (yritysvahvistus puuttuu). Tämä ei vielä todista maksutavan olevan käyttäjän aloittaman palveluvastauksen 131005:n juurisyy. Maksullista käyttöönottoa tai yritysvahvistusta ei tehty. Tarkempi raportti `docs/parallel/1.md`. Kytkentäehdotus on yhä commitoimatta ja snapshot käyttää käynnistyksessä ladattua vanhaa tokenia; uusi arvo latautuu seuraavassa restartissa. Ei muutoksia käyttäjän rajaamiin lähdekooditiedostoihin tai tilausten nollausta.
+
 ## 14.11.2026 — WhatsApp-tukiviesti saapui, vastaus estyy Metassa (Codex, alkuperäisen chatin lukutarkistus)
 
 Käyttäjä ilmoitti tehneensä testin myös toisessa chatissa ja ettei vastausta tullut. Projektin WhatsApp-kannassa on saapunut tekstiviesti ja tallennettu vastaus, mutta lähetysuusinnat epäonnistuivat `META_HTTP_403`-virheeseen. Käyttöönottoa omistava `Jatka WhatsApp-käyttöönottoa` -chat selvittää samaa tapausta ja sai tarkemman Meta-virheen `131005: Access denied`. Vastaanotto siis toimii; puhelimeen saapuvaa vastausta ei ole varmennettu. Käyttäjältä ei pyydetty uutta viestiä tässä tarkistuksessa.
