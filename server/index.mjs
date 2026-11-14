@@ -16,6 +16,7 @@ import { subscribe } from './bus.mjs';
 import { handleGateway, bootGateway } from './gateway/http.mjs';
 import { ledger as gatewayLedger } from './gateway/store.mjs'; // Aimo Agent Gateway: /v1, /mcp, /console, /.well-known, /openapi.json
 import { serveImage } from './images.mjs';
+import { staticAssetHeaders } from './static-assets.mjs';
 import { orderMode, setOrderMode } from './mode.mjs';
 import { packHint } from './packs.mjs';
 import { validatePlanning } from './planning.mjs';
@@ -24,7 +25,6 @@ import { searchStorefront, reviewStorefront, validDeliveryDate } from './storefr
 import { handleAssistantChat, assistantStatus } from './assistant.mjs'; // Tilausapuri: Danielin MCP-agentti sivulla /assistant.html
 
 const PUBLIC = path.join(ROOT, 'public');
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon' };
 
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
 const readBody = (req) => new Promise((resolve, reject) => { let data = ''; req.on('data', (c) => { data += c; if (data.length > 1e6) reject(new Error('liian suuri pyyntö')); }); req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); } }); req.on('error', reject); });
@@ -297,7 +297,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname.startsWith('/img/')) return await serveImage(res, url.pathname.slice(5));
     const file = path.normalize(path.join(PUBLIC, url.pathname === '/' ? 'index.html' : url.pathname));
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
-    res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
+    const headers = staticAssetHeaders(file, fs.statSync(file));
+    if (headers.etag && req.headers['if-none-match'] === headers.etag) { res.writeHead(304, headers); return res.end(); }
+    res.writeHead(200, headers);
     fs.createReadStream(file).pipe(res);
   } catch (err) {
     console.error(err);

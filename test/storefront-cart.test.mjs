@@ -70,3 +70,14 @@ test('kilogram quantities retain gram precision while currency rounds to cents',
   assert.equal(cart.lines()[0].qty, .001); assert.equal(cart.totals().net, .01);
   cart.setQuantity('weighed', '.123'); assert.equal(cart.lines()[0].qty, .123);
 });
+
+test('saved baskets use lightweight reference photos while preserving quantities and custom image URLs', async () => {
+  const saved = structuredClone(seed.cart);
+  const rows = saved.carts[saved.selectedDate];
+  rows[0].qty = 7; rows[0].image = `/storefront-assets/${rows[0].id}.jpg`;
+  rows[1].image = 'https://example.com/custom.webp';
+  const { cart } = await fixture(new Map([['aimo.storefront.cart.v1', JSON.stringify(saved)]]));
+  assert.equal(cart.lines()[0].qty, 7);
+  assert.match(cart.lines()[0].image, /\/optimized\/.*\.webp$/);
+  assert.equal(cart.lines()[1].image, 'https://example.com/custom.webp');
+});

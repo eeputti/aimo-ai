@@ -2,6 +2,20 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — demon tuotekuvat kevyiksi ja esilataus käyttöön (Codex)
+
+**Käyttäjän pyyntö:** selvitä kuvien hitaus ja nopeuta demoa. Syyt: puuttuva kuva etsittiin vasta selaimen pyynnöstä useasta ulkoisesta palvelusta, neljän haun jonossa; hidas GTIN-varatie oli ennen toimittajan lähimmän nimen hakua. Paikalliset tuotekuvat olivat jopa 2048 px ja 2,85 Mt, ja staattiset kuvat/fontit tarjoiltiin `no-store`-asetuksella.
+
+- 51 etusivun ja vertailukorin tuotekuvasta johdettu enintään 400 px:n WebP-kopiot: **24 185 934 → 713 936 tavua, 97,0 % pienemmät**. Esimerkiksi 2 853 859 tavun juustokuva on nyt 26 470 tavua. Läpinäkyvyys säilyy. Alkuperäiset lähdekuvat ja niiden tarkistussummat säilyvät; kopioiden lähteet, muunnos ja hashit lisätty `storefront-assets/sources.json`:ään. `scripts/optimize-storefront-images.py` toistaa muunnoksen Pillow'lla, ajonaikaisia riippuvuuksia ei lisätty.
+- Etusivun ja korin JSON käyttää sormenjäljen sisältäviä kuvapolkuja. Myös selaimeen aiemmin tallennetun korin vanhat vakiokuvapolut vaihtuvat kevyisiin kuviin latauksessa; käyttäjän tuotteet, määrät ja omat kuvaosoitteet säilyvät.
+- `server/static-assets.mjs` ja kytkentä `index.mjs`: oikeat JPEG/WebP/fontti-MIME-tyypit, kuville ja fonteille selainvälimuisti sekä ETag/304. Sormenjälkikuvat ovat immutable; HTML, JS, CSS ja JSON päivittyvät edelleen ilman vanhaa välimuistia.
+- `server/images.mjs`: paikalliset vertailutuotekuvat kelpaavat myös `/img/<id>`-reitille. Toimittajan nimitäsmäys kokeillaan ennen Open Food Factsia. `image-cache.mjs` huomaa toisen prosessin esilataukset ja tallentaa metatiedoston atomisella vaihdolla. Saman kuvan rinnakkaispyynnöt yhdistyvät; levyltä löytyvä kuva ohittaa verkkohakujen jonon. 404-vastausta ei enää lukita selaimen välimuistiin.
+- `npm run images`: oletuksena nykyinen keittiöehdotus/korvaajat ja 13 tavallisen demohaun ensimmäiset 12 katalogiehdokasta. `--query` tukee omaa hakua; tuote- ja kategoriatunnisteet säilyvät. Ehdotus luetaan SQLite-kannasta readOnly-tilassa. Esiladattu tällä koneella `--demo 10400`: **239 tuotetta, 211 kuvaa löytyi, 28:lle ei kuvaa**. Ei hinta-API-, kielimalli- eikä tilauskutsuja. `data/img/` pysyy pois GitHubista, joten uuden koneen/deploymentin kuvat valmistellaan samalla komennolla.
+
+**Tarkistukset:** `npm test` **65/65**, `aimo:eval` **26/26**, 0 mallikutsua; mukana kuusi kuvien regressiota ja tallennetun korin kuvapolun päivitys. Kaikkien lähdemanifestin **114/114** tiedoston koko ja SHA-256 täsmäävät, johdetut kuvat enintään 400 px. JS-syntaksit ja diff-tarkistus läpi. Selaimessa 4747-etusivun ja korin kevyet kuvat näkyvät. Erillisessä simuloidussa 4779-demossa omilla kannoilla maitohaku näyttää esiladatut kuvat. HTTP: paikalliset kuvaesimerkit 0,7–4,1 ms, WebP:n MIME ja immutable-välimuisti oikein, ETag-uusinta 304, puuttuva kuva 404/no-store. Jo käynnissä ollut 4779-palvelin näki erillisen esilatauksen uuden maitokuvan ilman restartia.
+
+**Käyttöönotto ja rajaus:** kevyet etusivu-/korikuvat tulevat käyttöön sivun päivityksellä. Pääpalvelinta 4747 tai sen kantoja ei tässä työvaiheessa käynnistetty uudelleen eikä nollattu. Palvelinpuolen kuvamuutokset otetaan käyttöön muiden chattien kanssa jo sovitussa yhteisessä restartissa saneluvaiheen jälkeen. Ennen näkemättömän tuotteen ensimmäinen ulkoinen kuvahaku voi edelleen olla hidas; puuttuvaa kuvaa ei keksitä. Sanelu- ja reseptityövaiheen keskeneräiset tiedostot jätetään sen omiin committeihin.
+
 ## 14.11.2026 — rinnakkaisten työvaiheiden yhdistäminen (Codex)
 
 - Yhdistetty etähaaran Danielin Tilausapuri `339bee8` sekä paikalliset kori-, haku-, sanelun määrämuunnos- ja budjettirajauksen poistocommitit. `TYOLOKI.md`:n molemmat lisäykset sekä palvelimen hakukorin ja Tilausapurin reitit säilyvät.

@@ -46,7 +46,7 @@
       "stock": "Saatavilla 1.12. alkaen",
       "unavailable": true,
       "substitutes": true,
-      "image": "/storefront-assets/688127.jpg"
+      "image": "/storefront-assets/optimized/688127.eeb1e7a1ae30.webp"
     },
     {
       "id": "8097729",
@@ -55,7 +55,7 @@
       "unit": "kpl",
       "comparison": 18.67,
       "stock": "73 kpl varastossa",
-      "image": "/storefront-assets/8097729.jpg"
+      "image": "/storefront-assets/optimized/8097729.2d444d375e71.webp"
     },
     {
       "id": "8097345",
@@ -66,7 +66,7 @@
       "pack": "4 kpl / ltk",
       "comparison": 17.17,
       "stock": "8 ltk varastossa",
-      "image": "/storefront-assets/8097345.jpg"
+      "image": "/storefront-assets/optimized/8097345.653a8c401017.webp"
     },
     {
       "id": "8097326",
@@ -76,7 +76,7 @@
       "unit": "kpl",
       "comparison": 27.41,
       "stock": "8 kpl varastossa",
-      "image": "/storefront-assets/8097326.png"
+      "image": "/storefront-assets/optimized/8097326.27e7f11a4e40.webp"
     },
     {
       "id": "171140",
@@ -87,7 +87,7 @@
       "stock": "Ei saatavilla",
       "unavailable": true,
       "substitutes": true,
-      "image": "/storefront-assets/171140.png"
+      "image": "/storefront-assets/optimized/171140.ae17529ccbd4.webp"
     },
     {
       "id": "328955",
@@ -96,7 +96,7 @@
       "unit": "ras",
       "comparison": 22.33,
       "stock": "290 ras varastossa",
-      "image": "/storefront-assets/328955.png"
+      "image": "/storefront-assets/optimized/328955.abe102d7ed5d.webp"
     },
     {
       "id": "412924",
@@ -106,7 +106,7 @@
       "comparison": 6.85,
       "stock": "Ei saatavilla",
       "unavailable": true,
-      "image": "/storefront-assets/412924.png"
+      "image": "/storefront-assets/optimized/412924.1a93f067142a.webp"
     },
     {
       "id": "8097726",
@@ -115,7 +115,7 @@
       "unit": "kpl",
       "comparison": 6.17,
       "stock": "59 kpl varastossa",
-      "image": "/storefront-assets/8097726.png"
+      "image": "/storefront-assets/optimized/8097726.541f9db177b9.webp"
     },
     {
       "id": "8069128",
@@ -126,7 +126,7 @@
       "comparison": 5.88,
       "comparisonUnit": "l",
       "stock": "999+ kan varastossa",
-      "image": "/storefront-assets/8069128.jpg"
+      "image": "/storefront-assets/optimized/8069128.9daf5f953201.webp"
     },
     {
       "id": "8092866",
@@ -135,7 +135,7 @@
       "unit": "kpl",
       "comparison": 23.21,
       "stock": "27 kpl varastossa",
-      "image": "/storefront-assets/8092866.png"
+      "image": "/storefront-assets/optimized/8092866.57f7bca93dac.webp"
     }
   ],
   "campaign": [
@@ -147,7 +147,7 @@
       "unit": "kpl",
       "comparison": 13,
       "stock": "37 kpl varastossa",
-      "image": "/storefront-assets/8096918.jpg"
+      "image": "/storefront-assets/optimized/8096918.233f62878390.webp"
     },
     {
       "id": "8096919",
@@ -157,7 +157,7 @@
       "unit": "kpl",
       "comparison": 13,
       "stock": "39 kpl varastossa",
-      "image": "/storefront-assets/8096919.jpg"
+      "image": "/storefront-assets/optimized/8096919.484d96f6c2bf.webp"
     },
     {
       "id": "8087461",
@@ -168,7 +168,7 @@
       "comparison": 0.59,
       "stock": "369 ltk varastossa",
       "frozen": true,
-      "image": "/storefront-assets/8087461.jpg"
+      "image": "/storefront-assets/optimized/8087461.cf96bd8b9df9.webp"
     },
     {
       "id": "9906609",
@@ -180,7 +180,7 @@
       "comparisonUnit": "l",
       "stock": "537 kpl varastossa",
       "seasonal": true,
-      "image": "/storefront-assets/9906609.jpg"
+      "image": "/storefront-assets/optimized/9906609.a00fcb1431be.webp"
     },
     {
       "id": "9906601",
@@ -192,7 +192,7 @@
       "comparisonUnit": "l",
       "stock": "92 kpl varastossa",
       "seasonal": true,
-      "image": "/storefront-assets/9906601.jpg"
+      "image": "/storefront-assets/optimized/9906601.4d2af7b59631.webp"
     },
     {
       "id": "8082077",
@@ -204,7 +204,7 @@
       "stock": "41 ltk varastossa",
       "seasonal": true,
       "frozen": true,
-      "image": "/storefront-assets/8082077.png"
+      "image": "/storefront-assets/optimized/8082077.e1c626e2e2ad.webp"
     },
     {
       "id": "9906610",
@@ -216,7 +216,7 @@
       "comparisonUnit": "l",
       "stock": "257 kpl varastossa",
       "seasonal": true,
-      "image": "/storefront-assets/9906610.jpg"
+      "image": "/storefront-assets/optimized/9906610.6a968954fe4b.webp"
     },
     {
       "id": "8082054",
@@ -228,7 +228,7 @@
       "stock": "52 ltk varastossa",
       "seasonal": true,
       "frozen": true,
-      "image": "/storefront-assets/8082054.png"
+      "image": "/storefront-assets/optimized/8082054.e1e6f4d458a2.webp"
     }
   ],
   "novelty": [
@@ -241,7 +241,7 @@
       "stock": "Toimitettavissa 18.11.",
       "frozen": true,
       "novelty": true,
-      "image": "/storefront-assets/8095107.png"
+      "image": "/storefront-assets/optimized/8095107.6f14c344aece.webp"
     },
     {
       "id": "8098264",
@@ -252,7 +252,7 @@
       "stock": "Toimitettavissa 18.11.",
       "frozen": true,
       "novelty": true,
-      "image": "/storefront-assets/8098264.png"
+      "image": "/storefront-assets/optimized/8098264.dd395d368ac9.webp"
     },
     {
       "id": "9999298",
@@ -267,7 +267,7 @@
       "stock": "Ei saatavilla",
       "unavailable": true,
       "novelty": true,
-      "image": "/storefront-assets/9999298.webp"
+      "image": "/storefront-assets/optimized/9999298.c48eb8f2ab09.webp"
     },
     {
       "id": "8076230",
@@ -279,7 +279,7 @@
       "stock": "Saatavilla 22.11. alkaen",
       "unavailable": true,
       "novelty": true,
-      "image": "/storefront-assets/8076230.png"
+      "image": "/storefront-assets/optimized/8076230.e4e978941b71.webp"
     },
     {
       "id": "8090955",
@@ -290,7 +290,7 @@
       "stock": "999+ kg varastossa",
       "frozen": true,
       "novelty": true,
-      "image": "/storefront-assets/8090955.jpg"
+      "image": "/storefront-assets/optimized/8090955.1cc689505c43.webp"
     },
     {
       "id": "8086334",
@@ -302,7 +302,7 @@
       "comparisonUnit": "l",
       "stock": "112 kpl varastossa",
       "novelty": true,
-      "image": "/storefront-assets/8086334.png"
+      "image": "/storefront-assets/optimized/8086334.e1cd53d9e137.webp"
     }
   ],
   "seasonal": [
@@ -313,7 +313,7 @@
       "unit": "kg",
       "comparison": 4.21,
       "stock": "96 kg varastossa",
-      "image": "/storefront-assets/3253.jpg"
+      "image": "/storefront-assets/optimized/3253.2fe05e024390.webp"
     },
     {
       "id": "2510",
@@ -322,7 +322,7 @@
       "unit": "kg",
       "comparison": 2.05,
       "stock": "506 kg varastossa",
-      "image": "/storefront-assets/2510.jpg"
+      "image": "/storefront-assets/optimized/2510.5c3f84d1fd86.webp"
     },
     {
       "id": "2098",
@@ -331,7 +331,7 @@
       "unit": "kg",
       "comparison": 20.55,
       "stock": "11 kg varastossa",
-      "image": "/storefront-assets/2098.jpg"
+      "image": "/storefront-assets/optimized/2098.e205ea095b35.webp"
     },
     {
       "id": "3110",
@@ -340,7 +340,7 @@
       "unit": "kg",
       "comparison": 2.96,
       "stock": "999+ kg varastossa",
-      "image": "/storefront-assets/3110.jpg"
+      "image": "/storefront-assets/optimized/3110.022845644d80.webp"
     },
     {
       "id": "2578",
@@ -349,7 +349,7 @@
       "unit": "kg",
       "comparison": 2.63,
       "stock": "99 kg varastossa",
-      "image": "/storefront-assets/2578.jpg"
+      "image": "/storefront-assets/optimized/2578.98619f7fcf7f.webp"
     },
     {
       "id": "3222",
@@ -358,7 +358,7 @@
       "unit": "kpl",
       "comparison": 3.68,
       "stock": "33 kpl varastossa",
-      "image": "/storefront-assets/3222.jpg"
+      "image": "/storefront-assets/optimized/3222.82bd9805f447.webp"
     }
   ],
   "burgers": [
@@ -369,7 +369,7 @@
       "unit": "kpl",
       "comparison": 13.35,
       "stock": "335 kpl varastossa",
-      "image": "/storefront-assets/8067395.png"
+      "image": "/storefront-assets/optimized/8067395.434f703805c7.webp"
     },
     {
       "id": "8069825",
@@ -379,7 +379,7 @@
       "comparison": 7.87,
       "comparisonUnit": "l",
       "stock": "39 pl varastossa",
-      "image": "/storefront-assets/8069825.jpg"
+      "image": "/storefront-assets/optimized/8069825.f41866175dd7.webp"
     },
     {
       "id": "8081949",
@@ -388,7 +388,7 @@
       "unit": "kpl",
       "comparison": 4.15,
       "stock": "71 kpl varastossa",
-      "image": "/storefront-assets/8081949.png"
+      "image": "/storefront-assets/optimized/8081949.7925451e86dd.webp"
     },
     {
       "id": "9901708",
@@ -397,7 +397,7 @@
       "unit": "kg",
       "comparison": 11.94,
       "stock": "93 kg varastossa",
-      "image": "/storefront-assets/9901708.png"
+      "image": "/storefront-assets/optimized/9901708.cfd1f766afdc.webp"
     },
     {
       "id": "8090735",
@@ -406,7 +406,7 @@
       "unit": "pss",
       "vat": 25.5,
       "stock": "20 pss varastossa",
-      "image": "/storefront-assets/8090735.jpg"
+      "image": "/storefront-assets/optimized/8090735.823c58a79a10.webp"
     },
     {
       "id": "8091688",
@@ -415,7 +415,7 @@
       "unit": "kg",
       "comparison": 45.36,
       "stock": "Toimitettavissa 18.11.",
-      "image": "/storefront-assets/8091688.jpg"
+      "image": "/storefront-assets/optimized/8091688.a409d7d5d6b4.webp"
     }
   ]
 }

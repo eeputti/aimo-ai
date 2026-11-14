@@ -14,7 +14,7 @@
           "comparison": 26.09,
           "unit": "kpl",
           "qty": 3,
-          "image": "/storefront-assets/8097348.jpg",
+          "image": "/storefront-assets/optimized/8097348.b9b8895fda1c.webp",
           "vat": 13.5
         },
         {
@@ -26,7 +26,7 @@
           "oldComparison": 37.53,
           "unit": "kpl",
           "qty": 3,
-          "image": "/storefront-assets/8097326.png",
+          "image": "/storefront-assets/optimized/8097326.27e7f11a4e40.webp",
           "vat": 13.5
         },
         {
@@ -38,7 +38,7 @@
           "oldComparison": 20.92,
           "unit": "kpl",
           "qty": 1,
-          "image": "/storefront-assets/8090880.jpg",
+          "image": "/storefront-assets/optimized/8090880.c28b8bedfeb8.webp",
           "vat": 13.5,
           "availableFrom": "2026-11-23"
         },
@@ -51,7 +51,7 @@
           "qty": 1,
           "pack": "4 kpl / ltk",
           "contains": 4,
-          "image": "/storefront-assets/8076442.jpg",
+          "image": "/storefront-assets/optimized/8076442.49b48a7daa28.webp",
           "vat": 13.5,
           "availableFrom": "2026-11-18"
         },
@@ -61,7 +61,7 @@
           "price": 17.37,
           "unit": "kpl",
           "qty": 1,
-          "image": "/storefront-assets/8096833.png",
+          "image": "/storefront-assets/optimized/8096833.49af8d6d764a.webp",
           "vat": 25.5
         },
         {
@@ -73,7 +73,7 @@
           "oldComparison": 6.65,
           "unit": "kpl",
           "qty": 1,
-          "image": "/storefront-assets/874495.jpg",
+          "image": "/storefront-assets/optimized/874495.5948d8174936.webp",
           "vat": 13.5,
           "frozen": true
         },
@@ -86,7 +86,7 @@
           "oldComparison": 4.62,
           "unit": "ras",
           "qty": 1,
-          "image": "/storefront-assets/8055469.jpg",
+          "image": "/storefront-assets/optimized/8055469.301d75efec54.webp",
           "vat": 13.5,
           "availableFrom": "2026-11-18"
         },
@@ -100,7 +100,7 @@
           "unit": "kg",
           "qty": 0.9,
           "step": 0.9,
-          "image": "/storefront-assets/9901719.png",
+          "image": "/storefront-assets/optimized/9901719.caa48e35f5c9.webp",
           "vat": 13.5,
           "availableFrom": "2026-11-18",
           "availabilityNote": "Tuote ei ole saatavilla 10.11.2026 - 16.11.2026"
@@ -112,7 +112,7 @@
           "comparison": 11.05,
           "unit": "ltk",
           "qty": 25,
-          "image": "/storefront-assets/610329.jpg",
+          "image": "/storefront-assets/optimized/610329.4ca3581d6ab6.webp",
           "vat": 13.5,
           "frozen": true
         },
@@ -127,7 +127,7 @@
           "qty": 1,
           "pack": "3 kpl / ltk",
           "contains": 3,
-          "image": "/storefront-assets/8097595.png",
+          "image": "/storefront-assets/optimized/8097595.779fe9172992.webp",
           "vat": 13.5,
           "availableFrom": "2026-11-18"
         }
@@ -146,7 +146,7 @@
       "stock": "999+ ltk varastossa",
       "frozen": true,
       "seasonal": true,
-      "image": "/storefront-assets/8082064.jpg"
+      "image": "/storefront-assets/optimized/8082064.8fceca1b620b.webp"
     },
     {
       "id": "8097472",
@@ -157,7 +157,7 @@
       "comparison": 10.97,
       "stock": "27.11. varastossa",
       "seasonal": true,
-      "image": "/storefront-assets/8097472.png"
+      "image": "/storefront-assets/optimized/8097472.5bd214a3ff7e.webp"
     },
     {
       "id": "8047279",
@@ -167,7 +167,7 @@
       "unit": "pkt",
       "stock": "128 pkt varastossa",
       "vat": 25.5,
-      "image": "/storefront-assets/8047279.jpg"
+      "image": "/storefront-assets/optimized/8047279.55745d772d97.webp"
     },
     {
       "id": "8510",
@@ -176,7 +176,7 @@
       "unit": "kg",
       "comparison": 19.31,
       "stock": "52 kg varastossa",
-      "image": "/storefront-assets/8510.png"
+      "image": "/storefront-assets/optimized/8510.9c8191822efe.webp"
     },
     {
       "id": "8097382",
@@ -186,7 +186,7 @@
       "unit": "pkt",
       "stock": "20 pkt varastossa",
       "vat": 25.5,
-      "image": "/storefront-assets/8097382.jpg"
+      "image": "/storefront-assets/optimized/8097382.597c033933ca.webp"
     },
     {
       "id": "8093815",
@@ -197,7 +197,7 @@
       "stock": "Toimitettavissa 18.11.",
       "frozen": true,
       "pack": "40 kpl / ltk",
-      "image": "/storefront-assets/8093815.jpg"
+      "image": "/storefront-assets/optimized/8093815.0f4641a13154.webp"
     }
   ]
 }

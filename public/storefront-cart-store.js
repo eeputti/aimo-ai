@@ -22,6 +22,12 @@
       const saved = JSON.parse(localStorage.getItem(KEY));
       if (saved && validDate(saved.selectedDate) && saved.carts && Object.values(saved.carts).every((rows) => Array.isArray(rows) && rows.every((p) => p.id && p.name && number(p.qty) > 0 && Number.isFinite(number(p.qty))))) state = { ...saved, references: saved.references || {} };
     } catch { /* a missing or invalid saved basket starts from the reference snapshot */ }
+    // Refresh legacy photo URLs without changing the user's saved products or quantities.
+    const photos = new Map([...Object.values(seed.cart.carts).flat(), ...(seed.recommendations || [])].map((p) => [p.id, p.image]));
+    for (const rows of Object.values(state.carts)) for (const p of rows) {
+      const legacy = [`/img/${p.id}`, ...['jpg', 'png', 'webp'].map((ext) => `/storefront-assets/${p.id}.${ext}`)];
+      if (photos.get(p.id) && (!p.image || legacy.includes(p.image))) p.image = photos.get(p.id);
+    }
     window.dispatchEvent(new Event('aimo:cart-change'));
   });
   const totals = (date = state.selectedDate) => {
