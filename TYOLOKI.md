@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — demomaksusta paluu uuteen tilausnäkymään (Codex, checkout-chat)
+
+- Landing-julkaisu siirsi tilauslistan `/tilaukset.html`:ään. Maksusivun logon ja **Palaa tilausnäkymään** -linkin kohteet päivitetty samalle sivulle; muuten ne veivät uuden landingin etusivulle. Vain kaksi HTML-ankkuria muuttui.
+- Julkaisu tehtiin tuoreesta main-pohjasta9efab5b säilyttäen signup-hook, landing ja maksuvartio. Worker **b59d523f-a72f-47ac-88ba-36c56ae8ab64**. Build/dry-run ja HTML-linkkien tarkistus läpi; HTTPS-takaisinluku maksusivu200 ja molemmat oikeat paluulinkit, landing/tilauslista/health/API200. Muuttumattomia sovellus- ja maksutestejä ei toistettu kahden ankkurin vuoksi, ei D1-kirjoituksia tai Node-/tunnelimuutoksia.
+- Julkaisija6303 jatkaa hyväksyttyä `--order-events`-tilaa. Node9223:ssa fe9940d ja checkoutinJS/CSS200, molempien hashit täsmäävät testattuun135c1fd-versioon. Julkisen tunnelin1033-palautus on edelleen b717fb6b-käyttöönottochatin työ; puhelimen koko ketjusta ei vielä uutta onnistumisväitettä.
+
 ## 15.11.2026 — WhatsApp: kellonajan mukainen tervehdys ja kiireiset tilaukset (Claude Code, päivä ensin -chat)
 
 - **Käyttäjän pyyntö (Eelis klo 01.25):** apurin tervehdys seuraa kellonaikaa, ja kiireiset tilaukset ("tänään", "heti", "huomenna aamulla", "ennen klo 7") hoidetaan fiksusti: viimeinen tilausaika ja aikaisin toimituspäivä kerrotaan, aikaisinta päivää ehdotetaan, eikä luvata mitään, mitä työkalut eivät vahvista. Toimituspäivä kysytään edelleen ensin.
