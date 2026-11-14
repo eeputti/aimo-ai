@@ -7,6 +7,7 @@ import { clock, cutoffPassed } from './gateway/clock.mjs';
 import { unitSizeFor } from './gateway/quantity.mjs';
 import { PRODUCT_TYPES } from './gateway/contract.mjs';
 import { explainItemQuantity } from './itemQuantities.mjs';
+import { typeInfo, compareKeys, TIER } from './aimo/match.mjs';
 
 export function validDeliveryDate(date) {
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
@@ -98,9 +99,23 @@ export async function availableStorefront(r, opts = {}) {
       const size = unitSizeFor(original, quotes.get(original.id)?.price, item.quantity?.unit || 'PCS', item.quantity?.basis || 'sales');
       if (size?.value) substitutes = await alternatives(original, (item.quantity?.value || 1) / size.value, date, item, cat);
     }
-    // Esimerkiksi kurkun tuorehylly säilyy ennen säilykkeitä myös hintajärjestyksessä.
-    const shelfRank = (p) => item.shelf ? item.categories.indexOf(cat.get(p.id).category) : 0;
-    card.list = exact.length ? exact.sort((a, b) => shelfRank(a) - shelfRank(b) || (item.quantity?.basis === 'items' ? (a.quantityExplanation?.excessItems || 0) - (b.quantityExplanation?.excessItems || 0) : 0) || a.price * a.qty - b.price * b.qty) : substitutes;
+    // Pyydetty tuotetyyppi ennen hintaa (match.mjs): kurkun tuorehylly ennen säilykkeitä, tuore tomaatti ennen tomaattimurskaa,
+    // spagetti ennen spagettilihavuokaa. Saman tyypin sisällä halvin tarpeen kattava ensin, kuten ennenkin.
+    const info = new Map(exact.map((p) => [p, typeInfo(cat.get(p.id), item)]));
+    exact.sort((a, b) => compareKeys(info.get(a).key, info.get(b).key) || (item.quantity?.basis === 'items' ? (a.quantityExplanation?.excessItems || 0) - (b.quantityExplanation?.excessItems || 0) : 0) || a.price * a.qty - b.price * b.qty);
+    // Tilausapurin vaihtoehdot (order-tools) järjestävät näillä eivätkä nosta halvempaa väärää tyyppiä kärkeen:
+    // typeRank = tyyppiryhmän järjestysnumero (0 = paras), match = nimen osuman taso (4 = pyydettyä tuotetta ei mainita),
+    // requested = tuote on pyydettyä tuotetta. Kuratoidulla tuotetyypillä (maito, kerma, voi, munat) ryhmä on jo oikea.
+    // Jos sanasto joutui arvaamaan sanan osan ("kuukivi|jogurtti" → jogurtti), mikään osuma ei ole pyydetty tuote.
+    const guessed = r.understood.assumptions?.some((a) => a.item === i && a.code === 'WORD_CORRECTED' && a.dropped);
+    let rank = 0;
+    exact.forEach((p, j) => {
+      if (j && compareKeys(info.get(exact[j - 1]).key, info.get(p).key)) rank += 1;
+      p.typeRank = rank;
+      const { tier, requested } = info.get(p);
+      if (tier != null) { p.match = guessed ? TIER.NONE : tier; p.requested = !guessed && requested; }
+    });
+    card.list = exact.length ? exact : substitutes;
     card.top = card.list.slice(0, 3); card.total = card.list.length;
     card.status = card.total ? 'ok' : 'no_match';
     // Katalogin suodatinten lukumäärät eivät kuvaa tämän päivän saatavuutta.

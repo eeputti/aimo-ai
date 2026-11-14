@@ -3,6 +3,7 @@
 // ja jos mikään ei täsmää, se sanoo sen suoraan (NO_MATCH) ja tarjoaa lähimmät löysennykset nappeina.
 import { loadCatalog } from '../catalog.mjs';
 import { loadLexicon, variants, conceptOf } from './lexicon.mjs';
+import { RAW_INGREDIENT, typeKey, compareKeys } from './match.mjs';
 
 /** Esiintyykö sana (missä tahansa taivutusmuodossa) tuotteen suomen- tai englanninkielisessä nimessä? */
 const nameHas = (p, term) => { const en = (p.nameEn || '').toLowerCase(); return variants(term).some((v) => p._tokens.some((t) => t.includes(v)) || en.includes(v)); };
@@ -11,8 +12,6 @@ let PRODUCT_TYPES = [];
 try { ({ PRODUCT_TYPES } = await import('../gateway/contract.mjs')); } catch { /* ilman porttia rajataan pelkällä kategorialla */ }
 
 const FAT_RE = { 'fat-free': /rasvaton/i, 'semi-skimmed': /kevyt/i, whole: /täys/i }; // suomenkielisestä nimestä: englanniksi "semi-skimmed" sisältää sanan "skimmed"
-// Raaka-ainekategoriat: tuoreet hedelmät, vihannekset, yrtit ja marjat (174xx), pakastevihannekset, -yrtit ja -marjat, kuivamausteet.
-const RAW_INGREDIENT = /^(174\d\d|41731|41733|41740|22630)$/;
 const PORTION = /annos|portion|\d+\s*x\s*\d+\s*(cl|ml|g)\b/i; // annospakkaukset eivät vastaa litra- tai kilotarvetta
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu', MARINE_STEWARDSHIP_COUNCIL_LABEL: 'MSC', FAIR_TRADE_MARK: 'Reilu kauppa' };
 
@@ -25,6 +24,8 @@ function filterSteps(item) {
   else if (item.categories?.length) steps.push(['category', (p) => item.categories.includes(p.category)]);
   else if (item.category) steps.push(['category', (p) => p.category === item.category]);
   if (item.shelf) steps.push(['shelf', (p) => { const n = p.name.toLowerCase(); return item.shelf.names.some((x) => n.includes(x)); }]);
+  // Hyllyn tarkennus: "kanafilee" on broilerin fileetä, ei mitä tahansa broileria.
+  if (item.shelf?.must?.length) steps.push(['shelfMust', (p) => { const n = p.name.toLowerCase(); return item.shelf.must.some((x) => n.includes(x)); }]);
   for (const c of item.claims) steps.push([`claim:${c}`, (p) => p.labels?.includes(c)]);
   for (const a of item.excludeAllergens) steps.push([`excludeAllergen:${a}`, (p) => p.hasAllergenData && !p.contains.includes(a) && !(p.mayContain || []).includes(a)]);
   if (item.countryOfOrigin) steps.push(['countryOfOrigin', (p) => p.country === item.countryOfOrigin]);
@@ -82,9 +83,11 @@ export function resolveItem(item, opts = {}) {
     }
     if (narrowed.length) { pool = narrowed; funnel.push({ filter: 'nameTerms', remaining: pool.length }); }
   }
-  // järjestys: tuote, jolla on toimitusvarmuusdataa (= oikeasti tilattu) ja lyhyt nimi (= perustuote) ensin
-  const shelfRank = (p) => (item.shelf ? item.categories.indexOf(p.category) : 0); // hyllyhaussa tuore raaka-aine ennen pakastetta ja säilykettä
-  const ranked = [...pool].sort((a, b) => shelfRank(a) - shelfRank(b) || (b.reliability != null) - (a.reliability != null) || a.name.length - b.name.length);
+  // Järjestys: ensin pyydetty tuotetyyppi (match.mjs: hylly, raaka-aine ennen valmistetta, nimen osuma), sitten
+  // tuote, jolla on toimitusvarmuusdataa (= oikeasti tilattu), ja lyhyt nimi (= perustuote). Tyyppi ratkaisee jo tässä,
+  // koska vain kärki (limit) jatkaa saatavuustarkistukseen: tomaattisäilykkeet eivät saa syrjäyttää tuoreita tomaatteja.
+  const keys = new Map(pool.map((p) => [p, typeKey(p, item)]));
+  const ranked = [...pool].sort((a, b) => compareKeys(keys.get(a), keys.get(b)) || (b.reliability != null) - (a.reliability != null) || a.name.length - b.name.length);
   const status = relaxed || !ranked.length ? 'no_match' : 'ok';
   return {
     status,

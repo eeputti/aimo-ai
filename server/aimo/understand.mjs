@@ -163,13 +163,16 @@ function canonical(word, lang) {
   const r = recognize(word);
   if (r) return { w: r.word, via: r.via }; // myös kirjoitusvirhe koko sanassa voittaa pilkkomisen: mustikkajugurtti → mustikkajogurtti
   // Tuntematon yhdyssana: pisin loppuosa, jonka sanasto tuntee, on pääsana ("jäävuorisalaatti" → salaatti, alkuosa rajaa nimeä).
+  // Ensin loppuosa, joka on itse sana tuotenimissä: "kelta|sipuli" eikä "kelt|asipuli", vaikka "asipuli" on punasipulin loppu.
   if (lang === 'fi' && word.length >= 8) {
-    for (let k = 3; k <= word.length - 5; k++) {
-      const tail = recognize(word.slice(k));
-      if (!tail || tail.via === 'fuzzy' || tail.concept.total < 3) continue;
-      const head = recognize(word.slice(0, k));
-      const known = head && head.via !== 'fuzzy';
-      return { w: tail.word, via: 'split', head: known ? head.word : null, dropped: known ? null : word.slice(0, k) };
+    for (const real of [true, false]) {
+      for (let k = 3; k <= word.length - 5; k++) {
+        const tail = recognize(word.slice(k));
+        if (!tail || tail.via === 'fuzzy' || tail.concept.total < 3 || (real && tail.via === 'tail')) continue;
+        const head = recognize(word.slice(0, k));
+        const known = head && head.via !== 'fuzzy';
+        return { w: tail.word, via: 'split', head: known ? head.word : null, dropped: known ? null : word.slice(0, k) };
+      }
     }
   }
   return { w: word, via: null };
@@ -225,11 +228,12 @@ function parseItem(raw, lang) {
   for (const orig of words) {
     const c = canonical(orig, lang);
     if (c.state && !item.attributes.state) item.attributes.state = c.state;
-    if (c.head) canon.push(c.head);
+    // Tarkennettu yhdyssana (kelta|sipuli): saman pääsanan muut lajikkeet (punasipuli, valkosipuli) ovat eri tuotteita.
+    if (c.head) { canon.push(c.head); item.qualified = true; }
     canon.push(c.w);
     // Näkyvä korjaus: käyttäjä näkee, millä sanalla haettiin, kun se ei ole se mitä hän kirjoitti.
     if (['synonym', 'learned', 'fuzzy', 'split'].includes(c.via) && !variants(orig).includes(c.w)) {
-      notes.push({ code: 'WORD_CORRECTED', via: c.via, from: orig, to: c.w, fi: c.dropped ? `"${orig}": haetaan sanalla "${c.w}", osaa "${c.dropped}" ei tunnistettu` : `"${orig}": haetaan sanalla "${c.head ? `${c.head} ${c.w}` : c.w}"`, en: `"${orig}": searching with "${c.w}"` });
+      notes.push({ code: 'WORD_CORRECTED', via: c.via, from: orig, to: c.w, ...(c.dropped ? { dropped: c.dropped } : {}), fi: c.dropped ? `"${orig}": haetaan sanalla "${c.w}", osaa "${c.dropped}" ei tunnistettu` : `"${orig}": haetaan sanalla "${c.head ? `${c.head} ${c.w}` : c.w}"`, en: `"${orig}": searching with "${c.w}"` });
     }
   }
   const known = canon.map((w) => {
@@ -251,8 +255,9 @@ function parseItem(raw, lang) {
     if (!head.type && head.concept.top[0].share < 0.5) item.categories = head.concept.top.filter((t) => t.share >= 0.12).map((t) => t.category); // sana elää usealla hyllyllä: haetaan kaikista
     item.categoryLabel = item.category ? loadLexicon().categories.get(item.category)?.label || null : null;
     // Raaka-aineen oma hylly: "kana" yksin tarkoittaa raakaa broileria, ei kanatäytteistä eväsleipää.
-    const shelf = heads.length === 1 && !head.type ? SHELVES[head.concept?.word] || SHELVES[head.w] : null;
-    if (shelf) { item.shelf = { names: shelf.names }; item.category = null; item.categories = shelf.categories; item.categoryLabel = shelf.label; }
+    // Taivutettu muoto ("kanafileetä") löytää saman hyllyn sanan perusmuodon kautta.
+    const shelf = heads.length === 1 && !head.type ? [head.concept?.word, head.w, ...variants(head.w)].map((k) => k && SHELVES[k]).find(Boolean) || null : null;
+    if (shelf) { item.shelf = shelf.must ? { names: shelf.names, must: shelf.must } : { names: shelf.names }; item.category = null; item.categories = shelf.categories; item.categoryLabel = shelf.label; }
     if (!shelf && !head.type && head.concept.top[0].share < 0.5 && head.concept.top[1]) notes.push({ code: 'CATEGORY_AMBIGUOUS', fi: `"${head.concept.word}" esiintyy useassa tuoteryhmässä (${head.concept.top.slice(0, 3).map((t) => t.label).join(' / ')}): haetaan kaikista`, en: `"${head.concept.word}" appears in several product groups: searching all of them` });
   }
   const basis = quantityBasisFor(item, q?.unitWord);

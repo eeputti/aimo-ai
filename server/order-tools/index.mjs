@@ -36,7 +36,8 @@ export function lineQuery(line) {
 // tuotteita ja annospakkauksia. Tässä perustuote tulee ennen maustettua ja tarpeeseen sopiva pakkaus ennen ylisuurta tai
 // kymmeniä pikkupakkauksia. Hinta ja haun oma hyllyjärjestys ratkaisevat tasatilanteet. Heuristiikka nimen sanoista:
 // se vain järjestää, ei pudota mitään pois, ja ostaja valitsee aina itse.
-const NEUTRAL = /^(\d+([.,]\d+)?|x|l|dl|cl|ml|g|kg|kpl|uht|esl|hyla|fi|ja|laktoosit\w*|vähälaktoosi\w*|gluteenit\w*|luomu|rasvat\w*|kevyt|täys\w*|d-vitaminoitu|suomesta|suomi|suomalainen|kotimainen|pakaste|tuore|pesty|\w*suola\w*)$/;
+// Tukkunimissä alkuperämaa ja pakkaustapa ("SIPULI 1KG PUSSI HOLLANTI", "VALKOSIPULI SOLO IRTO KIINA") eivät ole kuvailevia sanoja.
+const NEUTRAL = /^(\d+([.,]\d+)?|x|l|dl|cl|ml|g|kg|kpl|uht|esl|hyla|fi|ja|laktoosit\w*|vähälaktoosi\w*|gluteenit\w*|luomu|rasvat\w*|kevyt|täys\w*|d-vitaminoitu|suomesta|suomi|suomalainen|kotimainen|pakaste|tuore|pesty|\w*suola\w*|irto|pussi|säkki|ltk|laatikko|rasia|purkki|prk|pkt|nippu|filmi|naku|kiina|hollanti|espanja|italia|ruotsi|norja|tanska|saksa|puola|viro|egypti|ranska|kreikka|turkki|israel|marokko|peru|chile|brasilia|intia|kenia|belgia|portugali|meksiko)$/;
 const words = (text) => String(text || '').toLowerCase().replace(/[®™%&(),+]/g, ' ').split(/[\s/]+/).filter(Boolean);
 // Maun tai mausteen sana tuotenimessä ("kolme sipulia", "valkosipuli", "mansikka"). Ostajan itse pyytämä maku ei ole poikkeama.
 const FLAVOUR = /sipul|yrtt|chili|pippur|tilli|basilik|curry|pesto|tomaat|herkkusien|kantarell|savu|sitruun|lime|appelsiin|mansik|vadelm|mustik|banaan|mango|persik|kirsik|vanilj|suklaa|kaakao|karamel|kinuski|toffee|grilli|bbq|paprik/i;
@@ -45,7 +46,11 @@ const stemsOf = (line) => words(line.productTerm).map((w) => (w.length > 4 ? w.s
 export const wantsPlain = (line) => /maustamat|ilman\s+mau|luonnollinen|natural|plain/i.test(line.productTerm || '');
 export const flavoured = (o, line) => { const term = stemsOf(line); return words(o.name).some((w) => FLAVOUR.test(w) && !term.some((t) => w.includes(t))); };
 export function rankOptions(found, line) { return scoreOptions(found, line).map((x) => x.o); }
-/** Järjestetyt vaihtoehdot; regular = ei maustettu eikä hintapoikkeama, eli kelpaa halvimman nostoon kärkeen. */
+/**
+ * Järjestetyt vaihtoehdot. regular = paras tuotetyyppiryhmä, ei maustettu eikä hintapoikkeama, eli kelpaa halvimman
+ * nostoon kärkeen. group = haun tyyppiryhmä (storefront typeRank: 0 = pyydetty tuote, isompi = valmiste tai muu tuote).
+ * known = tarjottu määrä tunnetaan pyydetyssä yksikössä.
+ */
 export function scoreOptions(found, line) {
   const term = words(line.productTerm).map((w) => (w.length > 4 ? w.slice(0, -1) : w)); // taivutus: kerma ~ kerman, maito ~ maitoa
   const need = line.quantity?.value || 0;
@@ -54,19 +59,31 @@ export function scoreOptions(found, line) {
   const cost = (o) => (Number.isFinite(o.price) && o.price > 0 ? o.price * o.qty : null);
   const costs = found.map(cost).filter((c) => c !== null).sort((x, y) => x - y);
   const typical = costs.length ? costs[Math.floor((costs.length - 1) / 2)] : Infinity;
+  // Haun tyyppiryhmä ratkaisee ensin: halvempi väärä tuote (tomaattimurska, kinkkumakkara) ei ohita pyydettyä tuotetta.
+  // Ilman hakutietoa (injektoitu haku) kaikki ovat samaa ryhmää ja aiempi järjestys säilyy.
+  const group = (o) => (Number.isFinite(o.typeRank) ? o.typeRank : 0);
+  const best = found.length ? Math.min(...found.map(group)) : 0;
+  const byMeasure = ['L', 'KG'].includes(line.quantity?.unit);
+  const flavourTerm = FLAVOUR.test(line.productTerm || '');
   const score = (o) => {
     const brand = words(o.brand);
     // Kuvailevat sanat, jotka eivät ole merkki, koko, ruokavaliomerkintä tai itse tuote: "kolme sipulia", "mansikka".
     const extras = words(o.name).filter((w) => w.length > 2 && !/\d/.test(w) && !NEUTRAL.test(w) && !brand.includes(w) && !term.some((t) => w.includes(t))).length;
     const covered = o.quantityExplanation?.providedItems ?? (line.quantity?.unit === 'L' && o.litres ? o.qty * o.litres : line.quantity?.unit === 'KG' && o.kg ? o.qty * o.kg : null);
     const over = need && covered ? (covered - need) / need : 0;
-    const fit = (over > 0.5 ? 2 : over > 0.1 ? 1 : 0) + (o.qty > 30 ? 2 : o.qty > 12 ? 1 : 0);
+    // Irtotavarana kiloittain tai litroittain myytävässä myyntierien määrä on itse tarve (18 kg perunaa = 18 erää), ei pikkupakkauksia.
+    const loose = ['KG', 'L'].includes(String(o.unit || '').toUpperCase());
+    const many = loose ? 0 : o.qty > 30 ? 2 : o.qty > 12 ? 1 : 0;
+    // Kilo- tai litratarpeessa tuote, jonka määrää ei tiedetä samassa yksikössä (SIPULI NIPPU: 2 kpl), ei näytä kattavansa tarvetta.
+    const fit = (over > 0.5 ? 2 : over > 0.1 ? 1 : 0) + many + (byMeasure && covered == null ? 3 : 0);
     // Yksi kuvaileva sana (lajike, tuotesarja) ei vielä tee tuotteesta maustettua. Näin haun oma hyllyjärjestys säilyy.
     // Isossa tilauksessa kaikki vaihtoehdot ovat kymmeniä eriä: silloin vähemmän käsiteltäviä eriä ensin.
-    return [extras >= 2 || flavoured(o, line) || (cost(o) !== null && cost(o) > 2 * typical) ? 1 : 0, fit, o.qty > 30 ? o.qty : 0];
+    // Makusanana käytettävä tuote nimen loppupäässä on maku: "HAPANKAALI 400G VALKOSIPULI" on hapankaalia (haun match 1).
+    const asFlavour = flavourTerm && o.match === 1;
+    return [group(o), extras >= 2 || asFlavour || flavoured(o, line) || (cost(o) !== null && cost(o) > 2 * typical) ? 1 : 0, fit, !loose && o.qty > 30 ? o.qty : 0, byMeasure && covered == null ? 0 : 1];
   };
-  return found.map((o, i) => ({ o, i, s: score(o) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.s[2] - b.s[2] || a.i - b.i)
-    .map((x) => ({ o: x.o, regular: x.s[0] === 0 }));
+  return found.map((o, i) => ({ o, i, s: score(o) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.s[2] - b.s[2] || a.s[3] - b.s[3] || a.i - b.i)
+    .map((x) => ({ o: x.o, group: x.s[0], regular: x.s[0] === best && x.s[1] === 0, known: x.s[4] === 1 }));
 }
 
 async function defaultDeps() {
@@ -135,7 +152,10 @@ export function createOrderingTools(deps = {}) {
       // merkintää (gluteeniton + tilli antoi maustesuolaa). Jos yksikään osuma ei ole pyydettyä tuotetta, näytetään
       // pyydetty tuote ja kerrotaan puuttuva merkintä tuotekohtaisesti.
       const stems = words(line.productTerm).map((w) => (w.length > 4 ? w.slice(0, -1) : w));
-      const onTerm = (o) => stems.some((t) => String(o.name || '').toLowerCase().includes(t));
+      // Haku kertoo itse, onko vaihtoehto pyydettyä tuotetta (requested). Hylly- ja synonyymihaku ("kana" → broileri) osuu
+      // silloin oikein, vaikka nimessä ei lue sama sana, eikä pelkkä kirjolohi ole lohta. Ilman hakutietoa (kuratoitu tuotetyyppi,
+      // injektoitu haku) verrataan sanoja kuten ennenkin.
+      const onTerm = (o) => (typeof o.requested === 'boolean' ? o.requested : stems.some((t) => String(o.name || '').toLowerCase().includes(t)));
       try {
         found = await search(extra.length ? { ...line, claims: [...(line.claims || []), ...extra] } : line, draft.deliveryDate);
         if (extra.length && !found.some(onTerm)) { const plain = await search(line, draft.deliveryDate); if (plain.length) { found = plain; soft = extra; } }
@@ -158,9 +178,17 @@ export function createOrderingTools(deps = {}) {
       const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim) && (!c.needsAllergen || fit.some((o) => product(o.id)?.contains?.includes(c.needsAllergen))))
         .map((c) => ({ claim: c.claim, share: fit.filter((o) => o.labels?.includes(c.claim)).length / fit.length, ...c }))
         .filter((c) => fit.length >= 3 && c.share >= c.min && c.share <= c.max).map((c) => c.claim);
-      // Halvin nostetaan kärkeen vain tavallisista: maustettu tai poikkeava tuote ei ohita järjestystä halvimpana.
-      const regular = scored.filter((x) => x.regular).map((x) => x.o);
-      const cheapest = (regular.length ? regular : fit).reduce((a, b) => (b.price * b.qty < a.price * a.qty ? b : a));
+      // Halvin nostetaan kärkeen vain parhaan tyyppiryhmän tavallisista, joiden määrä tunnetaan: maustettu, poikkeava tai
+      // väärää tyyppiä oleva tuote ei ohita järjestystä halvimpana, eikä sipulinippu kilotarpeeseen.
+      // Ensimmäinen sivu näyttää vain pyydettyä tuotetta, kun sellaista on (haun requested): kaksi tuorehiivaa eikä kuivahiivaa
+      // kolmanneksi. Saman pääsanan muut tuotteet ja valmisteet jäävät "Näytä lisää" -sivulle, mitään ei pudoteta.
+      const first = scored.some((x) => x.o.requested === true) ? scored.filter((x) => x.o.requested === true) : scored;
+      const top0 = first[0].group;
+      const flat = (x) => !flavoured(x.o, line);
+      const pick = [(x) => x.regular && x.known, (x) => x.regular, (x) => x.group === top0 && x.known && flat(x), (x) => x.group === top0 && x.known, (x) => x.group === top0]
+        .map((f) => first.filter(f)).find((xs) => xs.length);
+      const cheapest = pick.map((x) => x.o).reduce((a, b) => (b.price * b.qty < a.price * a.qty ? b : a));
+      const groupOf = new Map(scored.map((x) => [x.o, x.group]));
       const seen = new Set((exclude[line.ref] || []).map(String));
       let top; let rest;
       if (seen.size) {
@@ -171,14 +199,14 @@ export function createOrderingTools(deps = {}) {
       } else {
         // Halvin tarpeen kattava vaihtoehto on aina ensimmäisellä sivulla, vaikka järjestys suosisi isompaa pakkausta.
         rest = fit;
-        top = fit.slice(0, size);
+        top = first.map((x) => x.o).slice(0, size);
         if (!top.includes(cheapest)) top[top.length - 1] = cheapest;
       }
       // Näytettävien sisällä yli kaksi kertaa halvimman hintainen vaihtoehto siirtyy muiden jälkeen
       // (peruna 20 kg näytti ensin 72,40 €:n säkin ja halvimman 13,30 € kolmantena). Muu järjestys säilyy.
       const floor = cheapest.price * cheapest.qty;
       const pricey = (o) => (Number.isFinite(floor) && floor > 0 && o.price * o.qty > 2 * floor ? 1 : 0);
-      top.sort((a, b) => pricey(a) - pricey(b));
+      top.sort((a, b) => groupOf.get(a) - groupOf.get(b) || pricey(a) - pricey(b));
       // more: tälle päivälle on vielä näyttämättömiä vaihtoehtoja seuraavalle sivulle.
       const more = rest.some((o) => !top.includes(o));
       // exact=false: yksikään tilattava vaihtoehto ei ole pyydettyä tuotetta (strutsinmuna -> viiriäisen munat). Kerrotaan ostajalle.

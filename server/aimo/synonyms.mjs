@@ -35,6 +35,10 @@ export const SHELVES = {
   kana: { label: 'broileri, kana', categories: ['18750', '41710'], names: ['broiler', 'kananpo', 'kana'] },
   broileri: { label: 'broileri, kana', categories: ['18750', '41710'], names: ['broiler', 'kananpo', 'kana'] },
   broiler: { label: 'broileri, kana', categories: ['18750', '41710'], names: ['broiler', 'kananpo', 'kana'] },
+  // Kanafilee on raakaa broilerin fileetä. Sanasto tuntee sanan vain kanasäilykkeistä ja leikkeleestä ("Kanafile vedessä").
+  // must: nimen pitää sisältää myös jokin näistä, eli broileria ilman fileetä (koivet, siivet) ei tarjota.
+  kanafilee: { label: 'broilerin filee', categories: ['18750', '41710'], names: ['broiler', 'kananpo', 'kana'], must: ['file'] },
+  kanafile: { label: 'broilerin filee', categories: ['18750', '41710'], names: ['broiler', 'kananpo', 'kana'], must: ['file'] },
   lohi: { label: 'lohi', categories: ['18701', '41720', '18702', '18708'], names: ['lohi', 'lohta', 'lohesta'] },
   nauta: { label: 'nauta', categories: ['18720', '41702', '18760'], names: ['naudan', 'nauta'] },
   porsas: { label: 'porsas', categories: ['18710', '41701'], names: ['porsaan', 'porsas', 'possu'] },
