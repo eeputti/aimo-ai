@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsApp-käyttöönoton jatko: token ja paikalliset asetukset (Codex)
+
+**Käyttäjän työnjako:** Codex hoitaa Metan, HTTPS-tunnelin ja palvelimen käynnistyksen; Claude Code tekee rinnakkain tilauskeskustelun kytkennän. Codex ei muokkaa Claudelle varattuja WhatsApp-/keskustelu-/tilaustyökalumoduuleja tai `server/config.mjs`:ää. Tarkempi tilanne ja muutospyynnöt ovat `docs/parallel/1.md`:ssä.
+
+**Valmiit vaiheet 1–2:** nykyiselle tokenille tehtiin yksi toteutunut vain lukeva puhelinnumerokutsu: HTTP 200 ja oikea numerotunniste. Uutta tokenia ei tarvita. `.env`:ssä ovat jo App Secret, 64 heksamerkin verify token ja tukiyhteys; arvot säilytetään, tiedosto on ohitettu ja oikeudet 0600. Salaisuuksia tai puhelinnumeroita ei kirjata repoon. Ensimmäinen verkkoyritys jäi hiekkalaatikon DNS-estoon ennen HTTP-kutsua.
+
+**Tarkistukset ja jatko:** `git fetch origin` ja `git pull --ff-only` onnistuivat, `main` oli ajan tasalla commitissa `7d63262`. Katalogi ja gateway-kanta löytyvät. Porttia 4748 käyttää erillinen verkkokauppapalvelin nykyisillä kannoilla; sitä ei pysäytetä. WhatsAppille käytetään porttia 4749. Vain lukevan apurin MCP-osoite/-token puuttuvat, joten ensimmäinen kuljetustesti tehdään kanavan `tuki`-vastauksella. Vastaanottaja, julkinen webhook, puhelimeen saapuva vastaus ja uuden kytkennän restart ovat vielä varmentamatta tässä jatkossa. Clauden keskeneräiset tiedostomuutokset säilytetään erillään. Dokumenttidiff ja `git diff --check` tarkistetaan ennen committia; sovelluskoodia ei muuteta tässä vaiheessa.
+
 ## 14.11.2026 — WhatsApp-token, testivastaanottaja, testilähetys ja profiililogo valmiit (Codex)
 
 **Varmennettu tulos:** Metan valtuutus valmistui yhdelle Test Messaging Account -tilille. Käyttäjän hyväksymä API-token tallennettiin paikalliseen `.env`:iin ja luettiin takaisin täsmällisen tallennuksen tarkistamiseksi; tiedoston oikeudet 0600. Olemassa olevat muut asetukset säilyivät. Käyttäjän antama oma numero lisättiin Metan testivastaanottajaksi, Meta lähetti WhatsApp-vahvistuskoodin ja käyttäjä suoritti vahvistuksen. Käyttöliittymä näyttää vahvistetun vastaanottajan. Numeroita, koodia tai tokenia ei kirjata repoon.
