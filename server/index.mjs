@@ -16,14 +16,15 @@ import { subscribe } from './bus.mjs';
 import { handleGateway, bootGateway } from './gateway/http.mjs';
 import { ledger as gatewayLedger } from './gateway/store.mjs'; // Aimo Agent Gateway: /v1, /mcp, /console, /.well-known, /openapi.json
 import { serveImage } from './images.mjs';
-import { staticAssetHeaders } from './static-assets.mjs';
 import { orderMode, setOrderMode } from './mode.mjs';
 import { packHint } from './packs.mjs';
 import { validatePlanning } from './planning.mjs';
 import { interpret as aimoInterpret, warm as aimoWarm, loadLexicon as aimoLexicon } from './aimo/index.mjs'; // Aimo-malli: vapaa teksti → rakenteinen pyyntö
 import { searchStorefront, reviewStorefront, validDeliveryDate } from './storefront.mjs';
+import { handleAssistantChat, assistantStatus } from './assistant.mjs'; // Tilausapuri: Danielin MCP-agentti sivulla /assistant.html
 
 const PUBLIC = path.join(ROOT, 'public');
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon' };
 
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
 const readBody = (req) => new Promise((resolve, reject) => { let data = ''; req.on('data', (c) => { data += c; if (data.length > 1e6) reject(new Error('liian suuri pyyntö')); }); req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(e); } }); req.on('error', reject); });
@@ -137,6 +138,8 @@ const routes = {
     if (!validDeliveryDate(body.deliveryDate) || !Array.isArray(body.lines) || !body.lines.length || body.lines.length > 80 || body.lines.some((l) => !l || typeof l.id !== 'string' || !Number.isFinite(l.qty) || l.qty <= 0 || l.qty > 999999) || new Set(body.lines.map((l) => l.id)).size !== body.lines.length) return json(res, 400, { error: 'Tarkista toimituspäivä ja ostoskorin määrät (1–80 eri tuotetta).' });
     json(res, 200, await reviewStorefront(body.lines, body.deliveryDate));
   },
+  'GET /api/assistant/status': (req, res) => json(res, 200, assistantStatus()),
+  'POST /api/assistant/chat': async (req, res) => handleAssistantChat(req, res, await readBody(req)),
   'GET /api/aimo/lexicon': (req, res) => { const l = aimoLexicon(); json(res, 200, { stats: l.stats, categories: [...l.categories.values()].sort((a, b) => b.size - a.size) }); },
 
   'GET /api/events': (req, res) => {
@@ -294,9 +297,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname.startsWith('/img/')) return await serveImage(res, url.pathname.slice(5));
     const file = path.normalize(path.join(PUBLIC, url.pathname === '/' ? 'index.html' : url.pathname));
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
-    const headers = staticAssetHeaders(file, fs.statSync(file));
-    if (headers.etag && req.headers['if-none-match'] === headers.etag) { res.writeHead(304, headers); return res.end(); }
-    res.writeHead(200, headers);
+    res.writeHead(200, { 'content-type': MIME[path.extname(file)] || 'application/octet-stream', 'cache-control': 'no-store' });
     fs.createReadStream(file).pipe(res);
   } catch (err) {
     console.error(err);

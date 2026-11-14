@@ -37,6 +37,7 @@ npm start                   # http://localhost:4747
 | `/.well-known/agent-gateway.json` | Discovery: operations, reason codes, clock |
 | `/.well-known/jwks.json` | Public key for verifying offers |
 | `/kitchen.html` | Demo client: a kitchen ordering agent (Ravintola Kulma) |
+| `/assistant.html` | Tilausapuri: chat with Daniel's shopping agent (Python MCP server on Render) through the Claude API MCP connector. Answers with one table: earliest delivery, order deadline, price, substitute. Needs `ANTHROPIC_API_KEY`, `ASSISTANT_MCP_URL`, `ASSISTANT_MCP_TOKEN` |
 
 The homepage uses local images, fonts and a fixed product snapshot. Product carousels and the assistant greeting open and close locally. Asset sources are recorded in `public/storefront-assets/sources.json`.
 

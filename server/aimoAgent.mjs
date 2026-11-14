@@ -88,3 +88,69 @@ export async function askAgent({ purpose, tier = 'fast', system, user, schema, m
     throw err;
   }
 }
+
+/**
+ * Keskustelu, jossa malli käyttää etä-MCP-palvelimen työkaluja (Claude API:n MCP connector, beta).
+ * Anthropic ottaa yhteyden MCP-palvelimeen palvelinpuolella; tämä funktio vain striimaa tekstin ja työkalukutsujen nimet.
+ * @param {object} o
+ * @param {string} o.purpose
+ * @param {string} o.system
+ * @param {{role: 'user'|'assistant', content: any}[]} o.messages
+ * @param {{name: string, url: string, token?: string}} o.mcp
+ * @param {(text: string) => void} [o.onText]
+ * @param {(toolName: string) => void} [o.onTool]
+ * @param {number} [o.maxTokens]
+ * @returns {Promise<{text: string, model: string, ms: number, toolCalls: number, usage: {input: number, output: number, cacheRead: number}}>}
+ */
+export async function chatWithMcp({ purpose, system, messages, mcp, onText, onTool, maxTokens = 16000 }) {
+  const t0 = performance.now();
+  const MCP_BETA = 'mcp-client-2025-11-20';
+  const base = {
+    model: modelFor('deep'),
+    max_tokens: maxTokens,
+    output_config: { effort: 'medium' },
+    system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+    mcp_servers: [{ type: 'url', url: mcp.url, name: mcp.name, ...(mcp.token ? { authorization_token: mcp.token } : {}) }],
+    tools: [{ type: 'mcp_toolset', mcp_server_name: mcp.name }],
+  };
+  const history = [...messages];
+  const usage = { input: 0, output: 0, cacheRead: 0 };
+  let text = ''; let toolCalls = 0; let msg; let useFallback = true;
+  try {
+    const { Anthropic, client } = await getClient();
+    // pause_turn: palvelinpuolen työkalusilmukka keskeytyi; jatketaan lähettämällä vastaus takaisin sellaisenaan.
+    for (let round = 0; round < 4; round++) {
+      const params = { ...base, messages: history, betas: useFallback ? [MCP_BETA, 'server-side-fallback-2026-07-01'] : [MCP_BETA], ...(useFallback ? { fallbacks: 'default' } : {}) };
+      let streamed = false;
+      try {
+        const stream = client.beta.messages.stream(params);
+        for await (const event of stream) {
+          if (event.type === 'content_block_start' && event.content_block.type === 'mcp_tool_use') { streamed = true; toolCalls += 1; onTool?.(event.content_block.name); }
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') { streamed = true; text += event.delta.text; onText?.(event.delta.text); }
+        }
+        msg = await stream.finalMessage();
+      } catch (err) {
+        // Fallback-beta ei ole käytettävissä tällä mallilla tai alustalla: sama pyyntö ilman sitä, jos mitään ei vielä striimattu.
+        if (useFallback && !streamed && err instanceof Anthropic.BadRequestError) { useFallback = false; round -= 1; continue; }
+        throw err;
+      }
+      const cacheRead = msg.usage?.cache_read_input_tokens || 0;
+      usage.input += (msg.usage?.input_tokens || 0) + cacheRead; usage.output += msg.usage?.output_tokens || 0; usage.cacheRead += cacheRead;
+      if (msg.stop_reason !== 'pause_turn') break;
+      history.push({ role: 'assistant', content: msg.content });
+    }
+    if (msg.stop_reason === 'refusal') throw new Error('Malli kieltäytyi vastaamasta');
+    if (msg.stop_reason === 'max_tokens') throw new Error('Vastaus katkesi (max_tokens)');
+    if (msg.stop_reason === 'pause_turn') throw new Error('Työkalukutsuja oli liikaa yhdelle vastaukselle');
+    const ms = Math.round(performance.now() - t0);
+    agentStats.calls += 1; agentStats.lastMs = ms;
+    agentStats.inputTokens += usage.input; agentStats.outputTokens += usage.output; agentStats.cacheReadTokens += usage.cacheRead;
+    const p = (agentStats.byPurpose[purpose] ||= { calls: 0, failed: 0, lastMs: null });
+    p.calls += 1; p.lastMs = ms;
+    return { text, model: msg.model, ms, toolCalls, usage };
+  } catch (err) {
+    agentStats.failed += 1; agentStats.lastError = String(err.message || err).slice(0, 200);
+    (agentStats.byPurpose[purpose] ||= { calls: 0, failed: 0, lastMs: null }).failed += 1;
+    throw err;
+  }
+}

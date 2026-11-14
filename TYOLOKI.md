@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — rinnakkaisten työvaiheiden yhdistäminen (Codex)
+
+- Yhdistetty etähaaran Danielin Tilausapuri `339bee8` sekä paikalliset kori-, haku-, sanelun määrämuunnos- ja budjettirajauksen poistocommitit. `TYOLOKI.md`:n molemmat lisäykset sekä palvelimen hakukorin ja Tilausapurin reitit säilyvät.
+- Hakutyövaiheen commitiin ehti samanaikaisen kuvien optimoinnin `static-assets.mjs`-kytkentä ilman kyseistä uutta moduulia. Yhdistämiscommitin palvelin pidetään siksi vanhassa itsenäisesti toimivassa staattisten tiedostojen tarjoilussa. Kuvatyövaiheen nykyinen importti ja tarjoilukoodi säilyvät työpuussa, moduuli ja muut kuvatiedostot jätetään sen omaan commitiin. Keskeneräistä työtä ei nollattu eikä piilotettu.
+- Tarkistukset ennen yhdistämistä: uuden korin oma selainvarmennus ja kuusi storetestiä; hakutyövaiheen eristetty QA koko tarpeesta korvaajan hyväksyntään ja maksuesikatseluun. Maksupalvelua ei ole kytketty, eikä tästä polusta tehty tilausta. Yhdistämiskonfliktien jälkeen palvelimen ja uuden Tilausapurin tiedostojen syntaksi sekä indeksin palvelinimporttien riippuvuudet tarkistettiin. Työpuun npm test 64/64 (sisältää myös muiden työvaiheiden paikalliset testit) ja aimo:eval 26/26, 0 mallikutsua. Oikeaa Danielin MCP-yhteyttä ei ajettu tässä työvaiheessa.
+
 ## 14.11.2026 — yksi hakupolku ja vain toimituspäivälle tilattavat tuotteet (Codex)
 
 **Käyttäjän päätös:** haku on päätoiminto, sanelumikrofoni kuuluu samaan kenttään, valmis tilaus nimetään tilausehdotukseksi ja reseptipolku on pieni Lisää reseptistä -oikotie. Tarve → yhteinen ostoskori → muutosten hyväksyntä → maksuvaihe. Toimituspäivälle sopimattomia tuotteita ei näytetä hakuvaihtoehtoina. Rinnakkaisen korichatin uudempi tarkennus: vanhaa keittiö-/agenttitilausta ei tuoda tähän koriin, sininen AI-kuvake säilyy, maksaminen on esikatselu ilman maksupalvelua.
@@ -56,6 +62,21 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 **Tarkistukset:** korin testit 6/6 (vertailusummat 1 534,73 / 1 918,40 euroa, lisäysten yhdistyminen, pysyvyys, päivälle siirto, virheellinen syöte, tuntematon vero ja grammantarkkuus). `npm test` ajon hetkellä 44/44 ja `npm run aimo:eval` 26/26, 0 mallikutsua. Omien JavaScript-tiedostojen syntaksi ja rajattu diff-tarkistus läpi. Lähdemanifestin 63/63 tiedoston koko ja SHA-256 täsmäävät. Selaimessa 1512×857, 375×812 ja 320×740: korin määrät ja summat, siirto 16.11. → 18.11. → 16.11., molemmat hakutriggereiden paikat ja korin AI-kuvake; ei vaakaylivuotoa. Puhelimen oikeaa mikrofonia ei testattu. Portin 4747 palvelinta tai tilauskantaa ei tässä vaiheessa käynnistetty uudelleen eikä nollattu.
 
 **Jatko:** tarkista muiden työvaiheiden valmistuttua yhdistetty hakupolku, korvaajan hyväksyntä ja maksuesikatselu eristetyssä ympäristössä, sitten yksi sovittu 4747-uudelleenkäynnistys säilyttäen kannat. Aidon maksu-/tilausjärjestelmän yhdistäminen jää erilliseksi työksi.
+## 14.11.2026 — Tilausapuri: Danielin agentti sivustolle (Claude Code, Danielin istunto)
+
+**Käyttäjän pyyntö:** Daniel halusi, että hänen ostosagenttiaan voi käyttää sivuston kautta.
+
+**Ratkaisu:** uusi sivu `/assistant.html` (yhteinen `aimo-shell.js`-kehys). Selain lähettää keskustelun reitille `POST /api/assistant/chat`; palvelin kutsuu Claudea Claude API:n MCP connectorilla (beta `mcp-client-2025-11-20`), ja Anthropic kutsuu Danielin Render-palvelimen työkaluja (`search_products`, `quote` ym.). Vastaus striimataan SSE:nä (`status`, `tool`, `text`, `done`, `error`) ja näytetään taulukkona: Tuote, Aikaisin toimitus, Tilaa viimeistään, Hinta (alv 0), Korvaava tuote. Kapealla näytöllä rivit ovat kortteja.
+
+- `server/aimoAgent.mjs`: uusi `chatWithMcp` (malli `config.deepModel` = Opus 5.5, effort `medium`, palvelinpuolen fallback `default` ja uusinta ilman sitä 400:lla, `pause_turn`-jatko enintään 4 kierrosta, samat laskurit `byPurpose.assistant_chat`). Kaikki mallikutsut kulkevat yhä tämän moduulin kautta.
+- `server/assistant.mjs` (uusi): syötteen tarkistus (enintään 20 viestiä, 4000 merkkiä, viimeinen käyttäjältä), järjestelmäohje tämän päivän päivämäärällä (Helsinki), Render-palvelun herätys `/healthz`-kutsulla ennen mallikutsua (ilmainen taso nukahtaa).
+- `server/index.mjs`: kaksi reittiä (`GET /api/assistant/status`, `POST /api/assistant/chat`) ja tuonti. `server/config.mjs` ja `.env.example`: `ASSISTANT_MCP_URL`, `ASSISTANT_MCP_TOKEN`. README:n osoitetaulukkoon rivi.
+- Uudet `public/assistant.html`, `assistant.js`, `assistant.css` (luokat `ta-`). Hakupaneeliin (`aimo-ask.js`) ja saneluun ei koskettu, koska Eelis työsti niitä samaan aikaan; linkki tai paneeliin kytkentä on Eeliksen päätettävissä.
+- **Kustannus:** kutsut maksetaan palvelimen `ANTHROPIC_API_KEY`-avaimelta (Opus 5.5, yksi kysymys = useita API-kierroksia työkalutuloksineen).
+
+**Tarkistukset:** `node --check` muutetuille tiedostoille. Päästä päähän -testi jäljiteltyä Claude API:a vasten (ei oikeaa avainta, 15/15): striimattu teksti merkilleen sama, työkalukutsut tilaviesteinä, pyynnössä `mcp_servers` (osoite, nimi, `authorization_token`) ja `mcp_toolset`, fallbackin 400-uusinta, `pause_turn`-jatko, virheellinen syöte 400 ilman API-kutsua, Markdown-taulukon muunnos ja HTML:n escapointi. `npm test` ei käynnistynyt Danielin koneella, koska `data/catalog.json` puuttuu (ei liity muutokseen). **Ei testattu:** oikea Claude API ja oikea MCP-yhteys Renderiin, sivun ulkoasu selaimessa.
+
+**Käyttöönotto:** lisää `.env`:iin `ASSISTANT_MCP_URL` (Render-osoite + `/mcp`, ilman tokenia) ja `ASSISTANT_MCP_TOKEN` (Danielilta), käynnistä palvelin uudelleen ja avaa `/assistant.html`.
 
 ## 14.11.2026 — Danielin MCP-palvelin päivitetty ja pysyvästi Renderissä (Claude Code, Danielin istunto)
 
