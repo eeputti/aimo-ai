@@ -2,6 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createCoordinationStore } from './coordination-store.mjs';
 export const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
 export const secret = () => crypto.randomBytes(32).toString('base64url');
 export class TeamError extends Error { constructor(code, message) { super(message); this.code = code; } }
@@ -172,5 +173,6 @@ export function openStore(filename, now = Date.now) {
       });
     },
   };
+  store.coordination = createCoordinationStore(store);
   return store;
 }

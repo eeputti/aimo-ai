@@ -7,6 +7,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { openStore } from '../src/store.mjs';
 import { createApp } from '../src/app.mjs';
+import { coordinatorConfig, createCoordinator } from '../src/coordinator.mjs';
+import { runOpenAIAgent } from '../src/openai-agent.mjs';
 async function fixture(t) {
   const store = openStore(':memory:');
   const alice = store.addMember('alice-gpt', 'Alice GPT', ['aimo-ai']);
@@ -26,9 +28,36 @@ async function fixture(t) {
   return { store, alice, bob, base, connect, post };
 }
 const data = (r) => { assert.equal(r.isError, undefined, JSON.stringify(r)); return r.structuredContent; };
+test('reported SDK activity triggers a bounded OpenAI job and replies through the existing mailbox', async (t) => {
+  const f = await fixture(t); let calls = 0;
+  const api = http.createServer(async (req, res) => {
+    assert.equal(req.url, '/v1/responses'); assert.equal(req.headers.authorization, 'Bearer test-openai-key');
+    let body = ''; for await (const chunk of req) body += chunk;
+    const input = JSON.parse(JSON.parse(body).input); assert.equal(input.request.subject, 'Review');
+    assert.ok(input.projectContext.tasks.some((task) => task.note === 'Rajapinta valmis, testaan.'));
+    calls++; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ status: 'completed', output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify({ summary: 'Testaus kesken', reply: 'Aja kirjautumistesti ennen luovutusta.' }) }] }] }));
+  });
+  api.listen(0, '127.0.0.1'); await once(api, 'listening');
+  t.after(async () => { api.closeAllConnections(); await new Promise((resolve) => api.close(resolve)); });
+  const coordinator = createCoordinator(f.store, { ...coordinatorConfig({}), mode: 'openai', apiKey: 'test-openai-key', model: 'test-model' }, {
+    log() {}, agent: (args) => runOpenAIAgent({ ...args, fetchImpl: (_url, init) => fetch(`http://127.0.0.1:${api.address().port}/v1/responses`, init) }),
+  });
+  const a = await f.connect(f.alice); const b = await f.connect(f.bob);
+  const task = data(await a.callTool({ name: 'claim_task', arguments: { project: 'aimo-ai', title: 'Login', resources: ['public/login.js'] } }));
+  data(await a.callTool({ name: 'report_progress', arguments: { project: 'aimo-ai', taskId: task.id, expectedRevision: task.revision, note: 'Rajapinta valmis, testaan.' } }));
+  const activity = data(await b.callTool({ name: 'get_agent_activity', arguments: { project: 'aimo-ai' } }));
+  const alice = activity.agents.find((m) => m.id === 'alice-gpt');
+  assert.equal(alice.lastSeen.last_tool, 'report_progress'); assert.ok(alice.lastReport); assert.equal(alice.tasks[0].note, 'Rajapinta valmis, testaan.');
+  data(await a.callTool({ name: 'send_message', arguments: { project: 'aimo-ai', recipient: 'team-coordinator', subject: 'Review', body: 'Mitä seuraavaksi?', requestKey: 'coordinator-e2e-1' } }));
+  await coordinator.tick(); await coordinator.tick(); assert.equal(calls, 1);
+  const inbox = data(await a.callTool({ name: 'read_messages', arguments: { project: 'aimo-ai' } }));
+  assert.match(inbox.messages.find((m) => m.sender === 'team-coordinator').body, /Aja kirjautumistesti/);
+  assert.equal(data(await a.callTool({ name: 'get_agent_activity', arguments: { project: 'aimo-ai' } })).jobs[0].status, 'succeeded');
+  assert.equal(data(await b.callTool({ name: 'get_agent_activity', arguments: { project: 'aimo-ai' } })).jobs.length, 0);
+});
 test('two real SDK clients discover tools and coordinate via authenticated Streamable HTTP', async (t) => {
   const f = await fixture(t); const a = await f.connect(f.alice); const b = await f.connect(f.bob);
-  assert.equal((await a.listTools()).tools.length, 9);
+  assert.equal((await a.listTools()).tools.length, 10);
   assert.equal(data(await a.callTool({ name: 'whoami', arguments: {} })).id, 'alice-gpt');
   data(await a.callTool({ name: 'send_message', arguments: { project: 'aimo-ai', recipient: 'bob-claude', subject: 'Checkout API', body: 'Please read commit abcdef123', requestKey: 'http-message-1', sender: 'pretend' } }));
   const inbox = data(await b.callTool({ name: 'read_messages', arguments: { project: 'aimo-ai' } }));

@@ -1,0 +1,28 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import http from 'node:http';
+import { once } from 'node:events';
+import { openStore } from '../src/store.mjs';
+import { createCoordinatorDashboard } from '../src/coordinator-web.mjs';
+test('live dashboard keeps state private, checks project/origin and notices revocation on the next poll', async (t) => {
+  const store = openStore(':memory:'); const key = store.addMember('alice', 'Alice', ['aimo-ai']);
+  const server = http.createServer(); server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  const port = server.address().port; const base = `http://127.0.0.1:${port}`;
+  server.on('request', createCoordinatorDashboard(store, port));
+  t.after(async () => { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); store.close(); });
+  const landing = await fetch(base); assert.equal(landing.status, 200); assert.match(await landing.text(), /Mitä tiimissä tapahtuu/);
+  assert.match(landing.headers.get('content-security-policy'), /frame-ancestors 'none'/);
+  const route = base + '/snapshot?project=aimo-ai'; const headers = { authorization: `Bearer ${key}` };
+  assert.equal((await fetch(route)).status, 401);
+  assert.equal((await fetch(route + '&token=' + key)).status, 401);
+  assert.equal((await fetch(route, { headers: { ...headers, origin: 'https://foreign.example' } })).status, 403);
+  assert.equal((await fetch(base + '/snapshot?project=private', { headers })).status, 403);
+  const before = await (await fetch(route, { headers })).json(); assert.equal(before.agents[0].lastSeen, null);
+  const task = store.claim('alice', { project: 'aimo-ai', title: 'Kirjautumissivu', resources: ['public/login.js'] });
+  store.progress('alice', { project: 'aimo-ai', taskId: task.id, expectedRevision: task.revision, note: 'Testaan kirjautumista.' });
+  const after = await (await fetch(route, { headers })).json();
+  assert.equal(after.agents[0].tasks[0].note, 'Testaan kirjautumista.'); assert.ok(after.agents[0].lastReport);
+  assert.ok(!JSON.stringify(after).includes(key));
+  store.revokeMember('alice'); assert.equal((await fetch(route, { headers })).status, 401);
+  assert.equal((await fetch(base + '/.env.coordinator')).status, 403);
+});
