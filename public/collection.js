@@ -18,7 +18,7 @@ function render() {
   const term = $('#collection-find').value.trim().toLocaleLowerCase('fi-FI');
   const matched = products.filter((p) => `${p.name} ${p.id}`.toLocaleLowerCase('fi-FI').includes(term));
   $('#collection-count').textContent = `${matched.length} tuotetta${term ? ` hakusanalla ”${$('#collection-find').value.trim()}”` : ''}`;
-  $('#collection-products').innerHTML = matched.slice(0, shown).map((p) => `<li><span class="collection-product-mark" aria-hidden="true">${esc(p.name.slice(0, 1))}</span><div><b>${esc(p.name)}</b><span>Tuotenumero ${esc(p.id)} · Myyntiyksikkö ${esc(p.unit)}</span></div></li>`).join('');
+  $('#collection-products').innerHTML = matched.slice(0, shown).map((p) => `<li><span class="collection-product-mark" aria-hidden="true">${esc(p.name.slice(0, 1))}</span><div><b>${esc(p.name)}</b><span>Tuotenumero ${esc(p.id)} · Myyntiyksikkö ${esc(p.unit)}</span></div><button type="button" class="solid-button" data-shop-product="${esc(p.id)}">Valitse tuote</button></li>`).join('');
   $('#collection-more').hidden = shown >= matched.length;
   if (matched.length > shown) $('#collection-more').textContent = `Näytä lisää (${Math.min(24, matched.length - shown)} tuotetta)`;
 }
@@ -53,3 +53,8 @@ if (!group) {
     $('#collection-error').textContent = 'Tuoteryhmää ei saatu ladattua. Kokeile sivun päivitystä.';
   }
 }
+
+document.querySelector('#collection-products')?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-shop-product]');
+  if (button) window.aimoAsk.open(button.dataset.shopProduct);
+});

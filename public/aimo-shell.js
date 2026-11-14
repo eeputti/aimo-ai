@@ -47,7 +47,7 @@
       <nav class="as-svc" aria-label="Valio Aimon palvelut">
         <a class="as-tab" href="https://www.valioaimo.fi/" target="_blank" rel="noopener">${I.plane}Valioaimo.fi</a>
         <a class="as-tab" href="https://pikatukku.valioaimo.fi/fi" target="_blank" rel="noopener">${I.store}Pikatukku</a>
-        <a class="as-tab active" aria-current="true" href="/agent.html">${I.truck}Toimitustukku</a>
+        <a class="as-tab active" aria-current="true" href="/">${I.truck}Toimitustukku</a>
         <a class="as-tab" href="https://valotilaus.fi/fi/all" target="_blank" rel="noopener">${I.box}VALO Tilauspalvelu</a>
         <a class="as-tab" href="https://minunaimo.valioaimo.fi/" target="_blank" rel="noopener">${I.chart}Minun Aimo</a>
       </nav>
@@ -58,7 +58,7 @@
       </div>
     </div></div>
     <div class="as-head"><div class="as-in">
-      <a class="as-logo" href="${compact ? '#' : '/agent.html'}" aria-label="Valio Aimo"><img src="/aimo-logo.png" alt="Valio Aimo" width="190" height="66"></a>
+      <a class="as-logo" href="${compact ? '#' : '/'}" aria-label="Valio Aimo"><img src="/aimo-logo.png" alt="Valio Aimo" width="190" height="66"></a>
       ${compact ? '' : `
       <nav class="as-nav" aria-label="Päävalikko">
         ${dd('products', '<button type="button" aria-haspopup="true" aria-expanded="false">Tuotteet</button>')}
@@ -93,7 +93,7 @@
   const MENU = {
     async user() {
       return `<h4>Junction TestUser</h4>
-        ${row('/agent.html', 'Agenttiportti', 'Hyväksynnät, mandaatit ja päätösketju')}
+        ${row('/console.html', 'Agenttiportti', 'Hyväksynnät, mandaatit ja päätösketju')}
         ${row('/kitchen.html', 'Keittiödemo', 'Asiakkaan tilausnäkymä: Ravintola Kulma')}
         ${row('/openapi.json', 'Rajapinta', 'OpenAPI-sopimus ostoagenteille')}
         ${row('/.well-known/agent-gateway.json', 'Portin kuvaus', 'Kyvykkyydet, avaimet ja valvonnan säännöt')}`;
@@ -107,24 +107,24 @@
         } catch { types = null; }
       }
       const lines = (s?.orders || []).flatMap((o) => o.lines || []);
-      return `${link('/agent.html#products', `${I.bars}Usein tilatut`, new Set(lines.map((l) => l.productId)).size || '')}
-        ${link('/agent.html#inbox', `${I.bell}Odottaa hyväksyntää`, s ? waitingOf(s).length : '')}
+      return `${link('/console.html#products', `${I.bars}Usein tilatut`, new Set(lines.map((l) => l.productId)).size || '')}
+        ${link('/console.html#inbox', `${I.bell}Odottaa hyväksyntää`, s ? waitingOf(s).length : '')}
         <hr>
         ${(types || []).map((t) => `<button type="button" class="as-link" data-type="${esc(t.fi)}"><span>${esc(t.fi)}</span><small>${t.total ?? ''}</small>${I.go}</button>`).join('') || empty('Tuoteryhmiä ei saatu ladattua.')}
-        <a class="as-more" href="/agent.html#products">Katso agenttien tilaamat tuotteet</a>`;
+        <a class="as-more" href="/console.html#products">Katso agenttien tilaamat tuotteet</a>`;
     },
     async orders() {
-      return `${link('/agent.html#inbox', 'Tilausten hallinta')}
-        ${link('/agent.html#mandate', 'Mandaatit')}
-        ${link('/agent.html#trail', 'Päätösketju')}
+      return `${link('/console.html#inbox', 'Tilausten hallinta')}
+        ${link('/console.html#mandate', 'Mandaatit')}
+        ${link('/console.html#trail', 'Päätösketju')}
         ${link('/console/watch', 'Raportit: taustavahti')}`;
     },
     async news() {
       const s = await load(); if (!s) return empty('Tapahtumia ei saatu ladattua.');
       const rows = s.ledger.filter((e) => NEWS[e.type]).slice(0, 6);
       return `<h4>Viimeisimmät tapahtumat</h4>
-        ${rows.map((e) => row(e.orderId ? `/approve.html?order=${encodeURIComponent(e.orderId)}` : '/agent.html#trail', NEWS[e.type], `${e.orderId ? `${esc(e.orderId)}, ` : ''}${esc(e.actor)}`, `<small>${hhmm(e.ts)}</small>`)).join('') || empty('Ei vielä tapahtumia.')}
-        <a class="as-more" href="/agent.html#trail">Koko päätösketju${s.chain ? `, ketju ${s.chain.valid ? 'ehjä' : 'rikki'}` : ''}</a>`;
+        ${rows.map((e) => row(e.orderId ? `/approve.html?order=${encodeURIComponent(e.orderId)}` : '/console.html#trail', NEWS[e.type], `${e.orderId ? `${esc(e.orderId)}, ` : ''}${esc(e.actor)}`, `<small>${hhmm(e.ts)}</small>`)).join('') || empty('Ei vielä tapahtumia.')}
+        <a class="as-more" href="/console.html#trail">Koko päätösketju${s.chain ? `, ketju ${s.chain.valid ? 'ehjä' : 'rikki'}` : ''}</a>`;
     },
     async date() {
       const s = await load(); if (!s) return empty('Toimituksia ei saatu ladattua.');
@@ -162,7 +162,7 @@
       return `<h4>Odottaa hyväksyntääsi</h4>
         ${w.map((o) => row(`/approve.html?order=${encodeURIComponent(o.orderId)}`, esc(o.orderId), `${esc(o.buyerName)}, ${o.status === 'pending_approval' ? `${o.lines?.length || 0} riviä` : 'lisäys tilaukseen'}`, `<b>${money(waitNet(o))}</b>`, 'wait')).join('') || empty('Kori on tyhjä: mikään ei odota hyväksyntää.')}
         ${w.length ? `<div class="as-total"><span>Yhteensä (alv 0 %)</span><b>${money(w.reduce((t, o) => t + waitNet(o), 0))}</b></div>` : ''}
-        <a class="as-more" href="/agent.html#inbox">Siirry hyväksymään</a>`;
+        <a class="as-more" href="/console.html#inbox">Siirry hyväksymään</a>`;
     },
   };
 

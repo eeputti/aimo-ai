@@ -59,6 +59,16 @@ async function alternatives(original, qty, date, item, cat) {
 }
 
 export async function searchStorefront(text, opts = {}) {
+  if (/^\d{3,15}$/.test(text.trim())) {
+    const p = loadCatalog().get(text.trim());
+    if (!p) throw new Error('Tuotenumeroa ei löydy tilattavasta valikoimasta. Hae tuotetta nimellä.');
+    const quantity = opts.patches?.find((patch) => patch.item === 0 && patch.patch?.quantity)?.patch.quantity || null;
+    if (quantity && (!Number.isFinite(quantity.value) || quantity.value <= 0 || quantity.value > 100000 || !['PCS', 'L', 'KG'].includes(quantity.unit) || !['sales', 'items'].includes(quantity.basis || 'sales'))) throw new Error('Tarkista tuotteen määrä ja yksikkö.');
+    return availableStorefront({
+      understood: { text, items: [{ raw: p.name, productTerm: p.name, quantity, claims: [], excludeAllergens: [], attributes: {} }], deliveryDate: null, unparsed: [], assumptions: [] },
+      cards: [{ status: 'ok', list: [p], chips: [] }], handoff: null, gateway: {}, trace: { confidence: 1, llmCalls: 0, via: 'product-id', ms: 0 },
+    }, opts);
+  }
   const r = await interpret(text, { ...opts, limit: 80 });
   return availableStorefront(r, opts);
 }

@@ -5,7 +5,7 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const money = (n) => n == null ? 'Hinta ei tiedossa' : `${Number(n).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/cart-workflow.css'; document.head.append(css);
 let review = null; let busy = false; let applying = false; let message = '';
-const signature = () => JSON.stringify([cart.get().selectedDate, cart.lines().map((p) => [p.id, p.qty, p.price])]);
+const signature = () => JSON.stringify([cart.get().selectedDate, cart.get().references[cart.get().selectedDate] || '', cart.lines().map((p) => [p.id, p.qty, p.price, p.vat])]);
 let checkedSignature = '';
 const post = async (url, body) => {
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -40,10 +40,10 @@ function paint() {
     button.dataset.wf = review?.ok && !pending() ? 'payment' : 'review';
     button.disabled = busy || !cart.lines().length;
     button.title = '';
-    button.textContent = busy ? 'TARKISTETAAN…' : button.dataset.wf === 'payment' ? 'SIIRRY MAKSAMAAN' : 'TARKISTA TILAUS';
+    button.textContent = busy ? 'TARKISTETAAN…' : button.dataset.wf === 'payment' ? 'JATKA VAHVISTAMAAN' : 'TARKISTA TILAUS';
     let note = content.querySelector('.cart-review-note');
     if (!note) { note = document.createElement('p'); note.className = 'cart-review-note'; note.setAttribute('role', 'status'); button.after(note); }
-    note.textContent = message || (review ? review.ok && !pending() ? 'Saatavuus, määrät ja hinnat tarkistettu. Voit siirtyä maksuvaiheeseen.' : 'Hyväksy muutokset tai ratkaise puuttuvat tuotteet ennen vahvistusta.' : 'Tarkistamme hinnat ja saatavuuden sekä etsimme tarvittaessa korvaajat.');
+    note.textContent = message || (review ? review.ok && !pending() ? 'Saatavuus, määrät ja hinnat tarkistettu. Voit vahvistaa demotilauksen.' : 'Hyväksy muutokset tai ratkaise puuttuvat tuotteet ennen vahvistusta.' : 'Tarkistamme hinnat ja saatavuuden sekä etsimme tarvittaessa korvaajat.');
   }
   observer.observe(content, { childList: true, subtree: true });
 }
@@ -74,11 +74,31 @@ content?.addEventListener('click', async (ev) => {
   if (action === 'payment') {
     await runReview();
     if (!review?.ok || pending() || checkedSignature !== signature()) return;
-    const totals = cart.totals();
-    let dialog = document.querySelector('#cart-payment-preview');
-    if (!dialog) { dialog = document.createElement('dialog'); dialog.id = 'cart-payment-preview'; dialog.setAttribute('aria-labelledby', 'cart-payment-title'); document.body.append(dialog); }
-    dialog.innerHTML = `<h2 id="cart-payment-title">Maksuvaiheen esikatselu</h2><p>${cart.lines().length} tuotetta, toimituspäivä ${cart.get().selectedDate.split('-').reverse().join('.')}</p><dl><div><dt>Ostokset (alv 0 %)</dt><dd>${money(totals.net)}</dd></div><div><dt>Yhteensä (sis. alv ja lisävaraus)</dt><dd>${money(totals.total)}</dd></div></dl><p>Maksupalvelua ei ole vielä yhdistetty. Tilausta tai maksua ei ole tehty.</p><button type="button" disabled>Maksa</button><form method="dialog"><button>Palaa ostoskoriin</button></form>`;
-    dialog.showModal(); return;
+    const before = signature(); const date = cart.get().selectedDate;
+    const lines = cart.lines().map((p) => ({ id: p.id, qty: p.qty, price: p.price, vat: p.vat }));
+    busy = true; paint();
+    try {
+      const draft = await post('/api/storefront/checkout', { deliveryDate: date, lines, reference: cart.get().references[date] || '' });
+      if (signature() !== before) throw new Error('Ostoskori muuttui. Tarkista tilaus uudelleen.');
+      let dialog = document.querySelector('#cart-payment-preview');
+      if (!dialog) { dialog = document.createElement('dialog'); dialog.id = 'cart-payment-preview'; dialog.setAttribute('aria-labelledby', 'cart-payment-title'); document.body.append(dialog); }
+      dialog.innerHTML = `<h2 id="cart-payment-title">Vahvista demotilaus</h2><p>Toimituspäivä ${date.split('-').reverse().join('.')}</p><ul>${draft.lines.map((p) => `<li>${esc(p.name)}: ${p.quantity} ${esc(p.salesUnitLabel)} — ${money(p.lineNet)}</li>`).join('')}</ul><dl><div><dt>Ostokset (alv 0 %)</dt><dd>${money(draft.totals.net)}</dd></div><div><dt>Yhteensä (sis. alv)</dt><dd>${money(draft.totals.gross)}</dd></div></dl><p>Tämä on testitilaus. Maksua tai toimitusta ei tehdä oikeaan Aimon kauppaan.</p><p role="alert" hidden></p><button type="button" class="solid-button" data-confirm-demo>Vahvista demotilaus</button><form method="dialog"><button>Palaa ostoskoriin</button></form>`;
+      const confirm = dialog.querySelector('[data-confirm-demo]');
+      confirm.addEventListener('click', async () => {
+        confirm.disabled = true;
+        const error = dialog.querySelector('[role="alert"]'); error.hidden = true;
+        try {
+          if (signature() !== before) throw new Error('Ostoskori muuttui. Palaa tarkistamaan tilaus.');
+          const { order } = await post('/api/storefront/checkout/confirm', { token: draft.token });
+          // Do not erase additions or edits made in another tab during confirmation.
+          if (signature() === before) cart.clear(date);
+          dialog.innerHTML = `<h2 id="cart-payment-title">Demotilaus vahvistettu</h2><p>Tilausnumero <strong>${esc(order.orderId)}</strong></p><p>${order.lines.length} tuotetta, ${money(order.totals.gross)} (sis. alv). Toimituspäivä ${date.split('-').reverse().join('.')}.</p><p>Tilaus tallennettiin demon yhteiseen tilauslokiin. Oikeaa maksua tai toimitusta ei tehty.</p><a href="/console.html#inbox">Näytä tilauslokissa</a><form method="dialog"><button>Jatka ostoksia</button></form>`;
+        } catch (e) { confirm.disabled = false; error.textContent = e.message; error.hidden = false; }
+      });
+      if (!dialog.open) dialog.showModal();
+    } catch (e) { message = e.message; }
+    finally { busy = false; paint(); }
+    return;
   }
   const old = cart.lines().find((p) => p.id === b.dataset.id); if (!old) return;
   if (action === 'move') { cart.move(b.dataset.date, old.id); await runReview(); return; }

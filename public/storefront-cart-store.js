@@ -96,14 +96,22 @@
       save();
     },
     async add(product, qty = 1, date = state.selectedDate) {
+      return this.addMany([{ product, qty }], date);
+    },
+    async addMany(entries, date = state.selectedDate, expected = null) {
       await ready;
-      if (!validDate(date) || !product?.id || !product.name || !Number.isFinite(number(qty)) || amount(number(qty)) <= 0 || number(qty) > 999999) throw new Error('Tarkista tuote ja määrä.');
-      const existing = lines(date).find((p) => p.id === String(product.id));
-      if (amount((existing?.qty || 0) + number(qty)) > 999999) throw new Error('Yhdistetty määrä ylittäisi enimmäismäärän 999 999.');
-      ensureDay(date);
-      if (existing) existing.qty = amount(existing.qty + number(qty));
-      else lines(date).push({ ...copy(product), id: String(product.id), qty: amount(number(qty)) });
-      state.selectedDate = date; save();
+      if (expected && (state.selectedDate !== date || JSON.stringify(lines(date)) !== expected.lines)) throw new Error('Ostoskori muuttui tarkistuksen aikana. Paina lisäystä uudelleen.');
+      if (!validDate(date) || !Array.isArray(entries) || !entries.length) throw new Error('Tarkista tuote ja määrä.');
+      const combined = copy(lines(date));
+      for (const { product, qty } of entries) {
+        if (!product?.id || !product.name || !Number.isFinite(number(qty)) || amount(number(qty)) <= 0 || number(qty) > 999999) throw new Error('Tarkista tuote ja määrä.');
+        const existing = combined.find((p) => p.id === String(product.id));
+        const total = amount((existing?.qty || 0) + number(qty));
+        if (total > 999999) throw new Error('Yhdistetty määrä ylittäisi enimmäismäärän 999 999.');
+        if (existing) Object.assign(existing, copy(product), { id: String(product.id), qty: total });
+        else combined.push({ ...copy(product), id: String(product.id), qty: total });
+      }
+      state.carts[date] = combined; state.selectedDate = date; save();
     },
   };
   const updateHeader = () => {

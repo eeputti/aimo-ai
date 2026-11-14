@@ -12,6 +12,9 @@
   let collectionLinksFor = () => [];
   let collectionBrowseRequest = () => false;
   const collectionsReady = import('/aimo-collections.js').then((module) => { collectionLinksFor = module.collectionLinksFor; collectionBrowseRequest = module.collectionBrowseRequest; }).catch(() => {});
+  let cartSelection = () => ({ enabled: false, missingQuantity: -1, entries: [] });
+  const cartActionsReady = import('/storefront-cart-actions.js');
+  const selectionReady = import('/aimo-cart-selection.js').then((m) => { cartSelection = m.cartSelection; });
   const deliveryReady = import('/delivery-date.js');
   let recipeContext = null;
   const storefrontCart = window.aimoCart || null;
@@ -182,7 +185,7 @@
   function render(r) {
     if (r.error) { orderable = false; main.innerHTML = `<p class="ask-warn">${esc(r.error)}</p>`; return; }
     const u = r.understood || {}; const items = u.items || [];
-    orderable = items.length > 0 && !r.handoff && !u.unparsed?.length && items.every((it, i) => it.quantity && r.cards?.[i]?.status === 'ok' && r.cards[i].list.length > 0);
+    orderable = cartSelection(r, selectedNeeds).enabled;
     last = r;
     if (!items.length) {
       const navigation = collectionNavigation({ productTerm: sent() });
@@ -230,6 +233,7 @@
     if (text.length < 2) { idle(); return; }
     const intent = await intentReady;
     await collectionsReady;
+    await selectionReady;
     await storefrontCart?.ready;
     if (mine !== seq || root.hidden) return;
     if (collectionBrowseRequest(text)) {
@@ -308,32 +312,28 @@
       catch { deliveryInput.value = storefrontCart.get().selectedDate; }
     });
   }
-  const cartProduct = (p) => ({ ...p, unit: p.unitLabel, image: `/img/${encodeURIComponent(p.id)}`, availableFrom: p.availability?.deliveryDate, taxUnknown: p.vat == null });
   async function addProducts(entries, date) {
-    await storefrontCart.ready;
-    const grouped = new Map();
-    for (const p of entries) {
-      const prev = grouped.get(p.id);
-      grouped.set(p.id, { ...p, qty: p.qty + (prev?.qty || 0) });
-    }
-    const rows = [...grouped.values()];
-    const existing = storefrontCart.lines(date);
-    const res = await fetch('/api/storefront/review', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deliveryDate: date, lines: rows.map((p) => ({ id: p.id, qty: p.qty + (existing.find((e) => e.id === p.id)?.qty || 0) })) }) });
-    const review = await res.json();
-    if (date !== storefrontCart.get().selectedDate) throw new Error('Toimituspäivä muuttui. Tarkista uudet hakutulokset ennen lisäämistä.');
-    if (!res.ok || !review.ok) throw new Error(review.error || 'Saatavuus muuttui. Hae tuotteet uudelleen.');
-    for (const p of rows) {
-      const checked = review.lines.find((l) => l.id === p.id).product;
-      await storefrontCart.add(cartProduct({ ...p, ...checked, quantityExplanation: p.quantityExplanation || checked.quantityExplanation }), p.qty, date);
-    }
+    const result = last; const generation = seq;
+    const { addReviewedProducts } = await cartActionsReady;
+    await addReviewedProducts(storefrontCart, entries, date, { beforeCommit: () => {
+      if (last !== result || seq !== generation || searchClosed) throw new Error('Haku muuttui. Tarkista tuotteet ennen lisäämistä.');
+    } });
   }
   const toAgent = async () => {
     voice?.cancel();
     if (storefrontCart) {
       if (!orderable || !last) return;
+      const selection = cartSelection(last, selectedNeeds);
+      if (selection.missingQuantity >= 0) {
+        const item = selection.missingQuantity;
+        const field = main.querySelector(`.ask-qed[data-item="${item}"] input`);
+        if (field) field.focus();
+        else main.querySelector(`[data-ask="qty"][data-item="${item}"]`)?.click();
+        return;
+      }
       const button = main.querySelector('.ask-go'); button.disabled = true;
       try {
-        const entries = last.cards.filter((_, i) => !selectedNeeds.has(i)).map((c) => c.list[0]);
+        const entries = selection.entries;
         if (entries.length) await addProducts(entries, last.deliveryDate);
         await close();
         location.href = '/cart.html#tarkista';
@@ -358,6 +358,8 @@
         if (!p) throw new Error('Hae tuote uudelleen.');
         await addProducts([p], last.deliveryDate);
         selectedNeeds.add(+btn.closest('[data-need]').dataset.need);
+        orderable = cartSelection(last, selectedNeeds).enabled;
+        const next = main.querySelector('.ask-go'); if (next) next.disabled = !orderable;
       } else {
         const res = await fetch('/api/add', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ productId: btn.dataset.add, qty: +btn.dataset.qty || 1 }) });
         if (!res.ok) throw new Error('Lisäys epäonnistui.');
@@ -629,6 +631,11 @@
   const sf = document.querySelector('.store-header .search');
   if (sf) attach({ box: sf, input: sf.querySelector('input'), icon: sf.querySelector('.icon') });
   const returnUrl = new URL(location.href);
+  const agentEntry = returnUrl.searchParams.get('shop') === 'agent';
+  if (agentEntry) {
+    returnUrl.searchParams.delete('shop');
+    history.replaceState(history.state, '', returnUrl.pathname + returnUrl.search + returnUrl.hash);
+  }
   const returnSearch = returnUrl.searchParams.get('ask');
   if (returnSearch && returnSearch.length <= 1000) {
     returnUrl.searchParams.delete('ask');
@@ -641,5 +648,9 @@
       }
     } catch { /* Ilman tallennusta palataan alkuperäiseen hakutekstiin. */ }
     open(returnSearch);
+  } else if (agentEntry) {
+    let pending = '';
+    try { pending = sessionStorage.getItem(HANDOFF_KEY) || ''; sessionStorage.removeItem(HANDOFF_KEY); } catch {}
+    open(pending);
   }
 })();

@@ -33,7 +33,8 @@ npm start                   # http://localhost:4747
 | `/` or `/gateway.html` | Static local copy of the Toimitustukku homepage, based on the 14 Nov 2026 reference |
 | `/cart.html` | Editable storefront cart based on the user's Toimitustukku cart; separate from kitchen proposals and agent orders |
 | `/recipes.html` | Own recipes and menus: image/Excel/text import, editable portions and ingredients, product alternatives for the chosen delivery date |
-| `/agent.html` | Console: run a buyer agent, approve, edit the mandate, read the audit trail |
+| `/agent` or `/agent.html` | Opens the same storefront shopping assistant and shared basket |
+| `/console.html` | Gateway diagnostics: run demo scenarios, approve, edit the mandate, read the audit trail |
 | `/approve.html?order=…` | The human approval view, built for a phone: what was asked, what is proposed, why it stopped, Approve / Reject |
 | `/openapi.json` | The contract (OpenAPI 3.1) |
 | `/mcp` | The same contract as MCP tools (Streamable HTTP, JSON-RPC) |
@@ -48,7 +49,7 @@ Reference product photos use small 400 px WebP copies with fingerprinted filenam
 
 Before presenting, run `npm run images` to prepare the current kitchen proposal and the first 12 catalogue matches for common demo searches. Use `npm run images -- --query "laktoositon kerma"` for a custom search or pass product/category IDs. This only downloads public photos into the ignored `data/img/` cache, without price API or language model calls. Running servers see newly cached photos without a restart once the updated image service is loaded. Previously unseen products can still need a slower first download, and some products have no public image.
 
-The header and search panel open the same browser-local storefront cart (`aimo.storefront.cart.v1`). Quantity edits, removal, delivery-date moves and the order reference persist in that browser. The cart never imports the kitchen proposal or existing gateway orders. The working cart starts empty and is filled through search. The real cart snapshot is retained separately as `referenceCart` for visual comparison; its product IDs may be absent from the challenge catalogue. An untouched legacy reference basket is retired automatically, while user edits and additions are preserved. Payment processing is not connected. The cart's **Lisää tuotteita** field uses the same AI search and microphone as the header, and the panel opens from the field that was used.
+The header and search panel open the same browser-local storefront cart (`aimo.storefront.cart.v1`). Quantity edits, removal, delivery-date moves and the order reference persist in that browser. The cart never imports the kitchen proposal or existing gateway orders. Product-card buttons, collection pages, recipe selections and the shopping assistant all use the same fresh-review basket update. Kokoa ostoskori opens a missing quantity field when needed, or continues with products explicitly selected by the user. The working cart starts empty and is filled through search. The real cart snapshot is retained separately as `referenceCart` for visual comparison; its product IDs may be absent from the challenge catalogue. An untouched legacy reference basket is retired automatically, while user edits and additions are preserved. After review, **Vahvista demotilaus** records a signed, idempotent demo order in the existing gateway ledger and displays its order number. Payment processing and real fulfilment are not connected. The cart's **Lisää tuotteita** field uses the same AI search and microphone as the header, and the panel opens from the field that was used.
 
 The search panel's **Katso tilausehdotus** shortcut opens the history-based kitchen proposal at `/kitchen.html`. Its expandable preview reads the saved proposal even when the browser-local cart is empty. The kitchen demo combines history, ordinary bookings and recipe demand, including new ingredients, yield factors and explicitly supplied usable inventory/incoming deliveries. See [kitchen planning inputs and limitations](docs/kitchen-planning.md). Run `npm test` for isolated planning and HTTP regression tests; the local catalogue is required, and the tests do not use live API keys or the running demo databases.
 
@@ -196,7 +197,7 @@ The gateway notices what is missing before the buyer does. For a buyer's most re
 ```
 server/gateway/   contract, service (search, quote, order), mandate, signing, store (ledger), clock, http (REST + MCP), buyerAgent (reference client)
 server/           catalog (search index), valioApi (price + availability, cached), substitutes, kitchen demo client
-public/           index.html / gateway.html (storefront), agent.html (console), approve.html (phone), kitchen.html (kitchen demo)
+public/           index.html / gateway.html (storefront), agent.html (shop entry), console.html (diagnostics), approve.html (phone), kitchen.html (kitchen demo)
 scripts/          build-catalog, fetch-data, demo-buyer
 ```
 

@@ -1,3 +1,4 @@
+import { addReviewedProducts } from './storefront-cart-actions.js';
 import { recipeRequirements, selectedRows, UNITS, portionsOK } from './recipe-model.js';
 
 const $ = (s) => document.querySelector(s);
@@ -140,18 +141,9 @@ async function addToCart() {
     const rows = selectedRows(result.cards, selections);
     if (!rows.length) throw new Error('Kaikki raaka-aineet löytyvät jo keittiöstä. Koriin ei lisätty tuotteita.');
     busy = true; $('#recipe-to-cart').disabled = true;
-    await cart.ready;
-    const existing = cart.lines(date);
-    const existingSignature = JSON.stringify(existing.map((p) => [p.id, p.qty]));
-    const review = await api('/api/storefront/review', { deliveryDate: date, lines: rows.map((p) => ({ id: p.id, qty: p.qty + (existing.find((e) => e.id === p.id)?.qty || 0) })) });
-    if (mine !== revision || snapshot !== result || dateInput.value !== date) throw new Error('Resepti tai toimituspäivä muuttui. Hae tuotteet uudelleen.');
-    if (existingSignature !== JSON.stringify(cart.lines(date).map((p) => [p.id, p.qty]))) throw new Error('Ostoskori muuttui tarkistuksen aikana. Paina lisäystä uudelleen.');
-    if (!review.ok) throw new Error('Saatavuus tai määrä muuttui. Hae tuotteet uudelleen ja tarkista vaihtoehdot.');
-    for (const p of rows) {
-      const checked = review.lines.find((l) => l.id === p.id)?.product;
-      if (!checked) throw new Error('Tuotteen tarkistus jäi kesken.');
-      await cart.add({ ...p, ...checked, unit: checked.unitLabel, image: `/img/${encodeURIComponent(p.id)}`, availableFrom: date, taxUnknown: checked.vat == null }, p.qty, date);
-    }
+    await addReviewedProducts(cart, rows, date, { beforeCommit: () => {
+      if (mine !== revision || snapshot !== result || dateInput.value !== date) throw new Error('Resepti tai toimituspäivä muuttui. Hae tuotteet uudelleen.');
+    } });
     location.href = '/cart.html#tarkista';
   } catch (err) { message(err.message); busy = false; renderShelf(); }
 }

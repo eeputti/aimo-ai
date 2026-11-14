@@ -6,14 +6,14 @@ const eur = (value) => value.toLocaleString('fi-FI', { minimumFractionDigits: 2,
 
 function product(p) {
   const tags = [p.novelty ? '<span class="product-tag novelty">Uutuus</span>' : '', p.oldPrice ? '<span class="product-tag">Tarjous</span>' : '', p.seasonal ? '<span class="product-tag seasonal">Kausituote</span>' : ''].join('');
-  return `<article class="product-card">
+  return `<article class="product-card" data-search-product="${esc(p.id)}">
     ${tags ? `<div class="product-tags">${tags}</div>` : ''}
     <div class="card-actions"><button type="button" class="round-icon" aria-label="Lisää tilauspohjalle">${icon('file-plus')}</button><button type="button" class="round-icon" aria-label="Lisää suosikiksi">${icon('star')}</button></div>
     <div class="product-picture">${p.image ? `<img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" width="176" height="132">` : ''}</div>
     <div class="product-name" title="${esc(p.name)}">${esc(p.name)}</div>
     <div class="product-code">${p.frozen ? icon('snow-flake') : ''}${esc(p.id)}${p.pack ? ` ${esc(p.pack)}` : ''}</div>
     <div class="active-price${p.oldPrice ? ' sale' : ''}"><strong>${eur(p.price)}</strong><small>/ ${esc(p.unit)}</small>${p.oldPrice ? `<del>${eur(p.oldPrice)}</del>` : ''}</div>
-    <div class="price-bottom"><div class="comparison">${p.comparison != null ? `${eur(p.comparison)} / ${p.comparisonUnit || 'kg'}<br>` : ''}${eur(p.price * (1 + (p.vat || 13.5) / 100))} / ${esc(p.unit)} (alv ${p.vat || 13.5} %)</div><button type="button" class="cart-button${p.unavailable ? ' notify' : ''}" aria-label="${p.unavailable ? 'Tilaa saatavuusilmoitus' : 'Lisää ostoskoriin tuote'} ${esc(p.name)}">${icon(p.unavailable ? 'bell' : 'shopping-cart')}</button></div>
+    <div class="price-bottom"><div class="comparison">${p.comparison != null ? `${eur(p.comparison)} / ${p.comparisonUnit || 'kg'}<br>` : ''}${eur(p.price * (1 + (p.vat || 13.5) / 100))} / ${esc(p.unit)} (alv ${p.vat || 13.5} %)</div><button type="button" class="cart-button${p.unavailable ? ' notify' : ''}" aria-label="${p.unavailable ? 'Tarkista saatavuus tuotteelle' : 'Valitse ostoskoriin tuote'} ${esc(p.name)}">${icon(p.unavailable ? 'bell' : 'shopping-cart')}</button></div>
     <div class="stock-area"><div class="stock"><span class="stock-dot${p.unavailable ? ' unavailable' : ''}"></span><span>${esc(p.stock)}</span>${p.substitutes ? '' : icon('clock')}</div>${p.substitutes ? `<button type="button" class="substitutes">${icon('clock')}Katso korvaavat</button>` : ''}</div>
   </article>`;
 }
@@ -63,6 +63,8 @@ async function render() {
 }
 
 document.addEventListener('click', (event) => {
+  const cart = event.target.closest('.product-card .cart-button, .product-card .substitutes');
+  if (cart) { window.aimoAsk?.open(cart.closest('[data-search-product]').dataset.searchProduct); return; }
   const next = event.target.closest('.rail-next');
   if (next) { const rail = next.parentElement.querySelector('.product-rail'); rail.scrollBy({ left: 280, behavior: 'smooth' }); }
   if (event.target.closest('.close-chat')) document.querySelector('.chat-intro').hidden = true;

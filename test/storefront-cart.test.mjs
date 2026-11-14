@@ -164,3 +164,20 @@ test('a failed quantity merge leaves both delivery baskets intact', async () => 
   await assert.rejects(cart.add({ id: 'bulk', name: 'Tuote', price: 1 }, 999999), /enimmäismäärän/);
   assert.equal(JSON.stringify(cart.get()), before);
 });
+
+test('a batch is atomic and refreshes current product prices on a merged line', async () => {
+  const { cart } = await fixture(new Map(), { reference: false });
+  await assert.rejects(cart.addMany([{ product: { id: 'one', name: 'One' }, qty: 1 }, { product: { id: 'bad' }, qty: -1 }]));
+  assert.equal(cart.lines().length, 0);
+  await cart.add({ id: 'one', name: 'One', price: 2 }, 1);
+  await cart.addMany([{ product: { id: 'one', name: 'One', price: 3 }, qty: 2 }]);
+  assert.equal(cart.lines()[0].qty, 3); assert.equal(cart.lines()[0].price, 3);
+});
+
+test('an asynchronous batch refuses a basket changed after its availability check', async () => {
+  const { cart } = await fixture(new Map(), { reference: false });
+  const old = JSON.stringify(cart.lines());
+  await cart.add({ id: 'one', name: 'One', price: 2 }, 1);
+  await assert.rejects(cart.addMany([{ product: { id: 'one', name: 'One', price: 2 }, qty: 2 }], cart.get().selectedDate, { lines: old }), /muuttui/);
+  assert.equal(cart.lines()[0].qty, 1);
+});
