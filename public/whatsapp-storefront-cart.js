@@ -9,9 +9,10 @@ let list = null; let priced = null; let busy = false; let reviewed = false; let 
 try { pending = JSON.parse(sessionStorage.getItem(storageKey)); } catch { /* read-only browsing still works */ }
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const money = (n) => n == null ? 'Hinta tarkistetaan' : `${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+// Luvut ja päivät päätyvät innerHTML:ään: muunnetaan aina luvuksi tai escapoidaan, vaikka palvelin ne jo tarkistaa.
+const money = (n) => n == null ? 'Hinta tarkistetaan' : `${Number(n).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const num = (n) => Number(n).toLocaleString('fi-FI', { maximumFractionDigits: 3 });
-const dateLabel = (iso) => iso.split('-').reverse().join('.');
+const dateLabel = (iso) => esc(String(iso).split('-').reverse().join('.'));
 const round = (n) => Math.round(n * 100) / 100;
 const claims = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
 const allergens = { AM: 'maidoton', AW: 'ei gluteeniviljoja', AE: 'munaton', AN: 'pähkinätön', AP: 'ei maapähkinää', AF: 'kalaton', AY: 'soijaton' };

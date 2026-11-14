@@ -3,6 +3,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Viestikatto numeroa kohden webhookin uusille viesteille: 10 minuutissa (60 s), 120 tunnissa ja 400 vuorokaudessa.
+export const MESSAGES_PER_HOUR = 120;
+export const MESSAGES_PER_DAY = 400;
 export const codeHash = (code) => crypto.createHash('sha256').update(code.trim()).digest('hex');
 export function phoneNumber(value) {
   const phone = String(value || '').replace(/^\+/, '');
@@ -72,8 +75,9 @@ export function openWhatsAppStore(filename, now = Date.now) {
     },
     enqueue(message) {
       if (db.prepare('SELECT id FROM inbox WHERE id=?').get(message.id)) return false;
-      const recent = db.prepare('SELECT count(*) n FROM inbox WHERE phone=? AND received>=?').get(message.phone, now() - 60_000).n;
-      if (recent >= 10) return false;
+      const count = (ms) => db.prepare('SELECT count(*) n FROM inbox WHERE phone=? AND received>=?').get(message.phone, now() - ms).n;
+      // Kustannusraja: yksi numero ei voi käynnistää loputtomasti mallikutsuja. Tavallinen keskustelu ei osu näihin.
+      if (count(60_000) >= 10 || count(3600_000) >= MESSAGES_PER_HOUR || count(86400_000) >= MESSAGES_PER_DAY) return false;
       const pair = message.text.match(/^yhdist[aä]\s+(\S+)\s*$/iu);
       db.prepare('INSERT INTO inbox(id,phone,text,kind,binding,received,sent_at) VALUES(?,?,?,?,?,?,?)').run(
         message.id, message.phone, pair ? codeHash(pair[1]) : message.text,

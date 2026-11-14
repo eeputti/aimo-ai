@@ -6,6 +6,7 @@ import { replyWithCartLink, withCartHandoffHint } from './cart-handoff.mjs';
 const PAGE = '/whatsapp/cart';
 const API = `${PAGE}/api`;
 const TTL = 24 * 3600_000;
+export const CHAT_PER_DAY = 200;
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const unavailable = () => fail(410, 'Korilinkki on vanhentunut tai ostoskori on suljettu. Pyydä WhatsAppissa uusi linkki.');
 const assets = new Map([
@@ -41,7 +42,7 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
     throw new Error('WHATSAPP_PUBLIC_URL tarvitsee julkisen HTTPS-alkuperän ilman polkua.');
   }
   const sign = (payload) => crypto.createHmac('sha256', secret).update(`whatsapp-cart-v1\0${payload}`).digest('base64url');
-  const requests = new Map();
+  const requests = new Map(); const daily = new Map();
   const issue = (member, list) => {
     const payload = Buffer.from(JSON.stringify({ binding: member.binding, draft: list.id, expires: now() + TTL })).toString('base64url');
     return `${base.origin}${PAGE}#${payload}.${sign(payload)}`;
@@ -116,8 +117,14 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
         const recent = requests.get(member.binding);
         const limit = recent && recent.until > now() ? recent : { until: now() + 60_000, count: 0 };
         if (limit.count >= 10) throw fail(429, 'Liian monta pyyntöä. Odota minuutti ja yritä uudelleen.');
+        // Linkki on voimassa vuorokauden: välitetty tai vuotanut linkki ei saa käynnistää rajattomasti mallikutsuja.
+        const today = daily.get(member.binding);
+        const day = today && today.until > now() ? today : { until: now() + 86400_000, count: 0 };
+        if (day.count >= CHAT_PER_DAY) throw fail(429, 'Ostoskorin muutosten päiväraja täyttyi. Jatka WhatsAppissa tai pyydä uusi linkki huomenna.');
         for (const [binding, window] of requests) if (window.until <= now()) requests.delete(binding);
+        for (const [binding, window] of daily) if (window.until <= now()) daily.delete(binding);
         limit.count++; requests.set(member.binding, limit);
+        day.count++; daily.set(member.binding, day);
         // A server-owned binding and expected draft version go through the existing serialized,
         // idempotent ordering bridge. An old link cannot edit or confirm a replacement draft.
         const result = await ordering.chat({ member, messageId: `cart:${member.binding}:${input.messageId}`, receivedAt: now(),

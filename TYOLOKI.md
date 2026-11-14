@@ -3,6 +3,15 @@
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
 
+## 15.11.2026 — WhatsApp-apurin väärinkäyttötestit ja korjaukset (Claude Code, abuse-tests)
+
+- **Käyttäjän pyyntö (Eelis klo 01.25):** testaa, voiko tilausapuria, korisivua ja demomaksua käyttää pahasti väärin, ja estä se. Kaikki kokeet paikallisesti eristetysti: väliaikaiset kannat ja avaimet, synteettiset asiakkaat, simuloitu Meta-lähetys, tyhjä `VALIO_API_KEY`, Workerille D1-jäljitelmä. Julkaistuihin palveluihin, käyttäjän kantoihin tai `.env`-tiedostoihin ei kirjoitettu.
+- **Uudet testit:** `test/whatsapp-abuse.test.mjs` (20) ja `deploy/cloudflare/test/abuse.test.mjs` (4). Oikean mallin keskustelut `eval/whatsapp-abuse-cases.mjs`, ajuri `scripts/whatsapp-abuse-eval.mjs`, jossa verkkoyhteys sallitaan vain mallipalveluun. Samat tapauskentät kuin itsekeskustelussa, joten selfplay-ajuri voi ajaa ne.
+- **Korjattu:** mallin vapaan tekstin tarkistin `server/whatsapp/model-guard.mjs`, kytketty `dialogue.mjs`:ään (3 kohtaa, Codexin #208-pyynnön jälkeen vapautuneessa varauksessa). Viestikatto numeroa kohden 120/h ja 400/vrk (`store.mjs`). Korisivun viestien päiväraja 200 (`cart-link.mjs`). Hinnan ja päivän escapointi korisivulla (`whatsapp-storefront-cart.js`).
+- **Tarkistukset:** koko `npm test` 320/320 ja Worker 24/24 uusimman origin/mainin (b2f94e1) päällä. Oikea malli (ennen viimeistä rebasea): 12 keskustelua, 47 kutsua, 0 kutsuvirhettä, 11/12. Ainoa poikkeama oli testin oma odotus, koska "joo vahvista" on tarkoituksella nimenomainen vahvistus. Tapauksen odotus korjattu, ajoa ei toistettu. Tilausmoottori, vahvistus, hinnat, asiakkuus ja korilinkki kestivät kaikki kokeet.
+- **Avoinna omistajilla:** keskitason Worker-demomaksun löydös maksupolkuchatille (taulu #214) ja matalat numerolomakkeen löydökset landing-chatille (#215). Yksityiskohdat vain taululla, koska repo voi olla julkinen. Korisivuchatille tiedoksi vapaan tekstin vahvistus (#227). Raportti `docs/parallel/whatsapp-abuse.md`.
+- **Käyttöönotto:** ei 4749-restarttia. Codexin käyttöönottochat ottaa commitin seuraavaan sovittuun päivitykseen.
+
 ## 15.11.2026 — itsekeskustelun laajennettu joukko X001–X100: virheet, murteet, kiire, kysymykset ja kellonajat (Claude Code, selfplay-100)
 
 - **Käyttäjän lisäpyyntö (klo 1.25, välitetty selfplay-100-sessiolle):** mahdollisimman monenlaisia testiasiakkaita. Pahoja virheitä tekevät, murteet ja kielimuodot, oudot viestit, kiireiset, kaikenlaiset kysymykset, eri kellonajat. Tarkistukset: kiire saa tilausajan ja aikaisimman päivän, apuri ei keksi toimitusmaksua, aukioloja tai maksutapoja, tervehdys vastaa kellonaikaa. Väärinkäyttötapaukset jätettiin erilliselle abuse-tests-sessiolle. Codexin 100 profiilin kokeessa ei ollut näitä polkuja, joten päällekkäisyyttä ei ole.
