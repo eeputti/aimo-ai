@@ -186,12 +186,12 @@ test('restart retains identity, history, deduplication and saved replies', async
   assert.equal(second.enqueue({ id: 'persistent', phone: PHONE, text: 'duplicate', sentAt: Date.now() }), false);
 });
 
-test('Meta sender uses configured endpoint, bearer and reply context; upstream errors are redacted', async () => {
+test('Meta sender uses configured endpoint and bearer, sends ordinary unquoted messages and redacts upstream errors', async () => {
   const send = createMetaSender(settings, async (url, options) => {
     assert.equal(url, 'https://graph.facebook.com/v23.0/12345/messages');
     assert.equal(options.headers.authorization, 'Bearer test-access');
     const body = JSON.parse(options.body);
-    assert.equal(body.to, PHONE); assert.equal(body.context.message_id, 'inbound'); assert.equal(body.text.body, 'Hei');
+    assert.equal(body.to, PHONE); assert.equal(Object.hasOwn(body, 'context'), false); assert.equal(body.text.body, 'Hei');
     return { ok: true, json: async () => ({ messages: [{ id: 'sent' }] }) };
   });
   assert.equal(await send(PHONE, 'Hei', 'inbound'), 'sent');

@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsAppin vapaa alusta aloitus, tervehdys ja lainaukseton vastaus (Codex)
+
+**Käyttäjän palaute:** kuvassa vastaus lainasi `moi`-viestiä ja jatkoi vanhaa maitolistaa. Käyttäjä haluaa DM Champin kaltaista asiointia, jossa esimerkiksi `tyhjää kaikki` aloittaa alusta. Odotuspalautteeksi hän tarkensi vain liikkuvat pisteet, ilman erillistä odotustekstiä tai ylimääräistä viestiä. Käytetään edellisen commitin Metan natiivia statusilmaisinta; mitään odotusviestiä ei lisätty.
+
+- **Nollaus:** tavalliset puhekieliset ilmaukset toimivat myös ilman mallia; mallin `reset`-reitti ymmärtää vapaammat alusta-aloitukset. Vain oman aktiivisen luonnoksen ja keskustelun tila nollataan. Uusi pysyvä keskustelujakso estää vanhan päivän, ruokavalion, tarjouksen ja valmiin tilauksen kuittauksen periytymisen. Vanhoja tilauksia tai muiden asiakkaiden tietoja ei poisteta. Sama nollausviesti ei uusinnassa tyhjennä myöhemmin syntynyttä uutta listaa.
+- **Tervehdys:** pelkkää `moi`-viestiä käsiteltäessä malli ei saa vanhaa listaa tai historiaa toistettavaksi. Mallivirheessä tai väärässä reitityksessä palautetaan lyhyt tervehdys. Varsinainen lista säilyy, ellei käyttäjä pyydä nollausta.
+- **Viestit:** `createMetaSender` ei enää lisää tekstiviestiin `context.message_id`-lainauskytkentää. Jonon ja pisteilmaisimen viestitunnisteet säilyvät. Muutokset henkilön 1 `server/whatsapp/`-tiedostoissa; keskusteluytimen ja tuotetyökalujen omistamiin tiedostoihin ei koskettu. Käyttöönotto ja Meta-asetukset säilyvät niitä hoitavassa chatissa.
+
+**Tarkistukset:** koko `npm test` **183/183 läpi**; kuusi uutta regressiota, myös oikean keskustelumoottorin nollaus ja vanhan vahvistuksen eristäminen. Oikea Claude, omat tilapäiset kannat/simuloidut hinnat: maitolista → tervehdys → vapaa nollaus → tyhjän listan TILAA → uusi voilista; neljä mallikutsua, ei mallivirheitä eikä tilausta. Tervehdyksen lisäkorjaus varmistettu oikealla mallilla: `Moi! Mitä tilattaisiin tänään?` ilman vanhaa listaa. Lähettäjän testi varmistaa lainauskytkennän puuttumisen. Syntaksit ja oma diff tarkistettu. Raportti `docs/parallel/whatsapp-reset.md`.
+
+**Käyttöönotto:** nykyiseen palvelimeen, tunnuksiin tai kantoihin ei koskettu. Valmis commit ilmoitetaan käyttöönottosessiolle samaa hallittua restartia varten. Pisteiden näkyminen ja uusi vastaustapa oikeassa puhelimessa odottavat käyttöönottoa ja puhelinvarmennusta.
+
 ## 14.11.2026 — WhatsApp-palvelintunnuksen rajatut oikeudet varmennettu (Codex)
 
 - Metan uudelleenlatauksen jälkeen `AimoDemo` näyttää täsmälleen kolme testiresurssia. Sovelluksen kehittäjäoikeus (sisältää Metan mukaan katselu-/testioikeuden), Test WhatsApp Accountin numeron katselu ja `Messages`, Test Messaging Accountin viestipohjien katselu. Molemmat WhatsApp-resurssit vain osittaisella oikeudella, ei `Everything`-pakettia tai muita yritysresursseja.

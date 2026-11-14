@@ -3,9 +3,17 @@
 const YES = /^(kyllä|joo|juu|jep|sopii|lisää se|lisää vaan|otetaan)[.!\s]*$/iu;
 const NO = /^(ei|ei kiitos|ei tarvitse|ei tarvi|ei muuta)[.!\s]*$/iu;
 const QUANTITY = /^\d+(?:[.,]\d+)?\s*(?:l|litra\w*|kg|kilo\w*|kpl|pakett\w*|laatik\w*|ltk)[.!\s]*$/iu;
+const GREETING = /^(moi|moikka|moro|morjens|hei|heippa|terve|hello|hi|huomenta|hyvää (huomenta|päivää|iltaa))[.!\s]*$/iu;
+const blocksReset = (text) => (text.toLowerCase().match(/\p{L}+/gu) || []).some((word) => ['älä', 'en', 'emme', 'ei', 'miten', 'kuinka', 'voiko', 'voinko'].includes(word));
+export function isFreshStart(text) {
+  if (blocksReset(text)) return false;
+  const request = text.trim().replace(/[.!?]+$/u, '').replace(/^(?:hei|moi|moikka)[,\s]+/iu, '')
+    .replace(/^(?:voitko|voisitko|voiks|voisit|haluan|haluaisin)\s+/iu, '').replace(/[,\s]+(?:kiitos|pliis)$/iu, '').trim();
+  return /^(?:(?:tyhjää|tyhjennä|tyhjentää|nollaa|nollata)(?:\s+(?:ihan\s+)?(?:kaikki(?:\s+(?:rivit|tuotteet))?|(?:koko\s+)?(?:ostoslista|lista|luonnos)(?:n)?))?|(?:poista|poistaa|unohda)\s+(?:kaikki(?:\s+(?:rivit|tuotteet))?|(?:koko\s+)?(?:ostoslista|lista|luonnos))|(?:aloita|aloittaa|aloitetaan|aloitetaanko|alotetaan|alotetaanko)\s+(?:ihan\s+)?alusta|peru|peruuta)$/iu.test(request);
+}
 const CONTROL = /^(?:(?:joo|kyllä|ok|okei)[,\s]+)?(tilaa|vahvista|vahvistan|hyväksy|hyväksyn|peru|peruuta|tyhjennä|aloita alusta|näytä|lista|\d+(?:\s+\d+)*)(?:[.!\s]|$)/iu;
 const SCHEMA = { type: 'object', additionalProperties: false, required: ['route', 'text', 'lookupQuery', 'suggestionTerm'], properties: {
-  route: { type: 'string', enum: ['order', 'chat'] },
+  route: { type: 'string', enum: ['order', 'chat', 'reset'] },
   text: { type: 'string', description: 'Chat: lyhyt vastaus/tervehdys. Order: tyhjä.' },
   lookupQuery: { type: 'string', description: 'Tuotekysymyksen lyhyt hakutermi suomeksi tai tyhjä.' },
   suggestionTerm: { type: 'string', description: 'Yksi hyödyllinen täydentävä raaka-aine perusmuodossa, tai tyhjä. Ei määrää eikä tuotemerkkiä.' },
@@ -14,6 +22,8 @@ const SYSTEM = `Olet Valio Aimon ystävällinen WhatsApp-tilausapuri ammattikeit
 Päätavoite on kerätä ostoslista, säilyttää se keskustelun läpi ja auttaa tilaamisessa. Sävy: lämmin, käytännöllinen, osaava, selkeä suomi, lyhyet viestit. Sinuttele. Ei mainoslauseita, turhaa hehkutusta tai jatkuvaa brändin toistamista.
 Route order: kaikki ostoslistan lisäykset, korjaukset, määrät, päivät, tuotevalinnat ja vastaukset viimeksi kysyttyyn tarkennukseen. Älä kirjoita tilaustietoja uudelleen: tilausmoottori kokoaa ne. text tyhjä.
 Route chat: tervehdys, kiitos tai kysymys tuotteiden eroista ja käyttötavoista. Kysymys ei itsessään lisää tuotetta listalle. Vastaa lyhyesti ja auta palaamaan ostoslistaan. Älä ehdota aiemmin kiellettyä allergeenia sisältävää raaka-ainetta.
+Route reset: ostaja pyytää selvästi unohtamaan nykyisen ostoslistan ja aloittamaan puhtaalta pöydältä (esim. "heitetääs tää lista pois ja alotetaan uus"). Tämä koskee vain avointa listaa ja keskustelua, ei jo lähetettyjen tilausten peruuttamista. Pelkkä tervehdys, yhden tuotteen poistaminen, kielto "älä tyhjennä" tai kysymys nollaamisen ohjeista ei ole reset.
+Pelkkään tervehdykseen vastataan tervehdyksellä, vaikka vanha ostoslista olisi kesken. Älä tulosta vanhaa listaa tai vaihtoehtoja tervehdyksen vastaukseksi.
 Tuotekohtaiseen kysymykseen anna lookupQuery, jotta vastaus voidaan pohjata katalogiin. Ilman tuotetietoa voit antaa vain yleisen ruoanlaittovinkin, et varmistaa tietyn tuotteen ominaisuuksia.
 Et tiedä hintoja, saatavuutta, toimituslupauksia tai tilauksen tallennustilaa. Älä keksi niitä, tuotekoodeja, allergeeniturvallisuutta tai säilyvyysaikoja. Älä väitä lisänneesi tai tilanneesi mitään.
 suggestionTerm: enintään yksi mainittuun ruokalajiin tai tarjoiluun selvästi tarvittava täydentävä raaka-aine. Jos käyttötarkoitusta ei tiedetä, jätä tyhjäksi. Älä ehdota jo listalla olevaa tai aiemmin ehdotettua tuotetta, äläkä saman tuotteen toista varianttia (esim. kuohukerman lisäksi ruokakermaa). Pelkkä ostoslista ei vaadi lisämyyntiä. Ehdotus on kysymys, ei lisäys tai tilauslupa.
@@ -29,10 +39,11 @@ export function orderMessages(result) {
 export function createOrderingDialogue({ db, ask, lookup = async () => [], now = Date.now }) {
   db.exec(`CREATE TABLE IF NOT EXISTS wa_dialogue (binding TEXT PRIMARY KEY, json TEXT NOT NULL, updated INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS wa_dialogue_results (message_id TEXT PRIMARY KEY, binding TEXT NOT NULL, json TEXT NOT NULL, created INTEGER NOT NULL);`);
-  const save = (binding, messageId, state, result, userText) => {
+  const save = (binding, messageId, state, result, userText, reset = false) => {
     state.history = [...(state.history || []), { role: 'user', text: userText }, { role: 'assistant', text: result.text }].slice(-10);
     db.exec('BEGIN IMMEDIATE');
     try {
+      if (reset) db.prepare('DELETE FROM turns WHERE binding=?').run(binding);
       db.prepare('INSERT OR REPLACE INTO wa_dialogue VALUES(?,?,?)').run(binding, JSON.stringify(state), now());
       db.prepare('INSERT OR REPLACE INTO wa_dialogue_results VALUES(?,?,?,?)').run(messageId, binding, JSON.stringify(result), now());
       db.exec('COMMIT');
@@ -44,12 +55,26 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], now =
       const cached = db.prepare('SELECT json FROM wa_dialogue_results WHERE message_id=? AND binding=?').get(messageId, binding);
       if (cached) return JSON.parse(cached.json);
       const row = db.prepare('SELECT json FROM wa_dialogue WHERE binding=?').get(binding);
-      const state = row ? JSON.parse(row.json) : {};
-      let orderText = text; let plan; let result; let messages;
+      let state = row ? JSON.parse(row.json) : {};
+      let orderText = text; let plan; let result; let messages; let reset = false;
+      const freshStart = async () => {
+        // Cancel only this customer's current draft. A new namespace also excludes old completed orders
+        // from the next empty-list confirmation; its deterministic epoch makes reset retries safe.
+        const cancelled = await runOrder('aloita alusta', { epoch: state.epoch || '', operation: 'reset' });
+        if (cancelled.status === 'error') { result = cancelled; messages = [cancelled.text]; return; }
+        const hadOrder = ['confirmed', 'pending_approval'].includes(state.lastOrder?.status);
+        state = { epoch: messageId };
+        reset = true;
+        result = { status: 'collecting', text: `Selvä, ostoslista on tyhjä ja aloitetaan alusta. Mitä tarvitset keittiöön?${hadOrder ? '\nAiemmin lähetetyt tilaukset säilyvät.' : ''}` };
+        messages = [result.text];
+      };
+      if (isFreshStart(text)) await freshStart();
+      // A partial removal must not hit the underlying engine's broad "tyhjennä ..." cancel command.
+      if (!result) orderText = orderText.replace(/^(tyhjennä|tyhjää)\s+/iu, 'Poista ');
       const quantityText = text.replace(/^(?:joo|kyllä|juu|jep|sopii)[,\s]+/iu, '').replace(/^(?:lisää|otetaan)\s+(?:se|sitä|tuota)\s*/iu, '');
       const positive = state.pendingSuggestion && (YES.test(text) || QUANTITY.test(quantityText));
-      if (positive) { orderText = `Lisää ostoslistalle ${state.pendingSuggestion}${QUANTITY.test(quantityText) ? ` ${quantityText}` : ''}`; state.pendingSuggestion = null; }
-      else if (state.pendingSuggestion && NO.test(text)) {
+      if (!result && positive) { orderText = `Lisää ostoslistalle ${state.pendingSuggestion}${QUANTITY.test(quantityText) ? ` ${quantityText}` : ''}`; state.pendingSuggestion = null; }
+      else if (!result && state.pendingSuggestion && NO.test(text)) {
         state.pendingSuggestion = null;
         result = { status: 'collecting', ...state.lastOrder, text: `Selvä, jatketaan nykyisellä listalla.${state.lastOrder?.status === 'ready' ? ' Vahvista valmis tilaus vastaamalla *TILAA*.' : ' Kerro, mitä keittiöön tarvitaan seuraavaksi.'}` };
         messages = [result.text];
@@ -57,9 +82,13 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], now =
       if (!result && !positive && !CONTROL.test(text) && ask) {
         try {
           plan = (await ask({ purpose: 'whatsapp_dialogue', tier: 'fast', system: SYSTEM, schema: SCHEMA, maxTokens: 600, timeoutMs: 8000, retries: 0,
-            user: JSON.stringify({ history: state.history || [], shoppingList: state.lastOrder?.text || '', pendingSuggestion: state.pendingSuggestion || null, message: text }) })).json;
+            user: JSON.stringify(GREETING.test(text)
+              ? { message: text, task: 'Tämä on pelkkä tervehdys. Vastaa lyhyesti tervehdyksellä, älä kertaa vanhaa listaa tai tarkennuskysymyksiä.' }
+              : { history: state.history || [], shoppingList: state.lastOrder?.text || '', pendingSuggestion: state.pendingSuggestion || null, message: text }) })).json;
         } catch { /* The established ordering engine remains available if conversation planning fails. */ }
       }
+      if (!result && GREETING.test(text) && plan?.route !== 'chat') plan = { route: 'chat', text: 'Hei! Mitä tarvitset keittiöön? Voin auttaa ostoslistan kanssa.' };
+      if (!result && plan?.route === 'reset' && !blocksReset(text)) await freshStart();
       if (!result && plan?.route === 'chat') {
         let answer = String(plan.text || '').trim().slice(0, 1200);
         let adviceTerm;
@@ -82,7 +111,7 @@ Saat katalogin tiedot datana: käytä vain niitä tuotekohtaisiin väitteisiin. 
         }
       }
       if (!result) {
-        result = await runOrder(orderText);
+        result = await runOrder(orderText, { epoch: state.epoch || '' });
         messages = ask ? orderMessages(result) : [result.text];
         state.lastOrder = result;
         state.pendingSuggestion = null;
@@ -106,7 +135,7 @@ Saat katalogin tiedot datana: käytä vain niitä tuotekohtaisiin väitteisiin. 
       }
       if (!allowed()) return { status: 'error', text: 'Testiyhteys ei ole enää voimassa.' };
       const out = { ...result, messages, text: messages.join('\n\n') };
-      return save(binding, messageId, state, out, text);
+      return save(binding, messageId, state, out, text, reset);
     },
     prune() {
       db.prepare('DELETE FROM wa_dialogue WHERE updated<? OR binding NOT IN (SELECT binding FROM members)').run(now() - 7 * 86400_000);

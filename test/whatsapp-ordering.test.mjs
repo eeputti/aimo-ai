@@ -5,6 +5,7 @@ import { createWhatsAppChannel } from '../server/whatsapp/channel.mjs';
 import { bootstrapDemoMember, createDemoOrderingChat, validateOrderingEnvironment } from '../server/whatsapp/ordering.mjs';
 import { createOrderingConversation } from '../server/order-conversation/index.mjs';
 import { openDraftStore } from '../server/order-conversation/store.mjs';
+import { createOrderingDialogue } from '../server/whatsapp/dialogue.mjs';
 
 const PHONE = '358401234567';
 const OTHER = '358409876543';
@@ -107,4 +108,37 @@ test('a failed ordering turn is retried with the same message id and the final f
   assert.match(sent[0][1], /käsittely ei nyt onnistunut/);
   assert.doesNotMatch(sent[0][1], /Tilausta ei ole tehty/);
   assert.equal(store.history(store.member(PHONE).binding).length, 0);
+});
+
+test('fresh start cancels the real draft, removes its delivery/diet/offer and excludes historical orders from new confirmations', async (t) => {
+  const store = openWhatsAppStore(':memory:'); t.after(() => store.close());
+  bootstrapDemoMember(store, { WHATSAPP_DEMO_PHONE: PHONE });
+  const drafts = openDraftStore(':memory:'); const conversations = []; let submitted = 0;
+  const handleTurn = createOrderingConversation({ store: drafts, now: () => Date.parse('2026-11-14T10:00:00Z'),
+    tools: {
+      suggest: async ({ draft }) => ({ issues: [], lines: draft.lines.map((l) => ({ ref: l.ref, options: [{ productId: 'milk', name: 'Laktoositon maito', salesUnits: 50, salesUnitLabel: 'kpl', lineNet: 100 }] })) }),
+      submit: async () => { submitted++; throw new Error('must not place an order'); },
+    },
+    interpretTurn: async ({ text }) => text === 'maitoa' ? { intent: 'order', deliveryDate: '2026-11-18', ops: [{ op: 'add', productTerm: 'maito', quantity: { value: 50, unit: 'L' }, claims: ['FREE_FROM_LACTOSE'] }] }
+      : { intent: 'order', ops: [{ op: 'add', productTerm: 'voi' }] },
+  });
+  const bridge = createDemoOrderingChat({ store, phoneId: 'test', loadOrdering: async () => ({
+    handleTurn: (args) => { conversations.push(args.conversationId); return handleTurn(args); },
+    dialogue: createOrderingDialogue({ db: store.db }), close() { drafts.close(); },
+  }) }); t.after(() => bridge.close());
+  const say = (messageId, text) => bridge.chat({ member: store.member(PHONE), messageId, receivedAt: Date.now(), messages: [{ content: text }] });
+  const old = await say('old-list', 'maitoa'); assert.equal(old.status, 'choosing');
+  const original = conversations[0];
+  drafts.save(original, { id: 'past-order', state: 'ordered', orderId: 'HISTORICAL-ORDER', lines: [] }, 'historical-result', {});
+  await say('reset-message', 'tyhjää kaikki');
+  assert.equal(drafts.active(original), null);
+  const noOrder = await say('empty-confirmation', 'TILAA');
+  assert.doesNotMatch(noOrder.text, /HISTORICAL-ORDER|on jo tallennettu/); assert.equal(submitted, 0);
+  const next = await say('new-list', 'voita');
+  assert.match(next.text, /Mille päivälle|allergioita|Kuinka paljon/);
+  assert.doesNotMatch(next.text, /50 l|- maito|Huomioitu:|18\.11/);
+  assert.notEqual(conversations.at(-1), original);
+  const fresh = drafts.get(next.draftId);
+  assert.equal(fresh.deliveryDate, null); assert.equal(fresh.diet.known, false); assert.equal(fresh.quote, null);
+  assert.equal(fresh.lines.length, 1); assert.equal(fresh.lines[0].productTerm, 'voi');
 });

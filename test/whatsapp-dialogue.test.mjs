@@ -1,19 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openWhatsAppStore } from '../server/whatsapp/store.mjs';
-import { createOrderingDialogue } from '../server/whatsapp/dialogue.mjs';
+import { createOrderingDialogue, isFreshStart } from '../server/whatsapp/dialogue.mjs';
 
 const ready = { status: 'ready', draftId: 'draft-1', revision: 2, text: '*Tilausluonnos*\nMaito 5 l, 12,34 €\n\nVahvista vastaamalla *TILAA*.' };
 function fixture(t, ask) {
   const store = openWhatsAppStore(':memory:'); t.after(() => store.close());
   store.db.prepare('INSERT INTO members VALUES(?,?,?,?)').run('358401234567', 'Testikeittiö', 'Testaaja', 'one');
-  const ordered = []; const looked = [];
+  const ordered = []; const orderOptions = []; const looked = [];
   const options = { db: store.db, ask, lookup: async (query) => { looked.push(query); return [{ name: 'Valio kuohukerma', contains: ['AM'] }]; } };
   const dialogue = createOrderingDialogue(options);
   let seq = 0;
   const turn = (text, extra = {}) => dialogue.respond({ binding: 'one', messageId: `m${++seq}`, text,
-    runOrder: async (input) => { ordered.push(input); return ready; }, ...extra });
-  return { store, dialogue, options, ordered, looked, turn };
+    runOrder: async (input, options) => { ordered.push(input); orderOptions.push(options); return ready; }, ...extra });
+  return { store, dialogue, options, ordered, orderOptions, looked, turn };
 }
 const plan = (route, extra = {}) => ({ json: { route, text: '', lookupQuery: '', suggestionTerm: '', ...extra } });
 
@@ -84,4 +84,62 @@ test('revoking the number clears conversational history and cached model replies
   f.store.revoke('358401234567');
   assert.equal(f.store.db.prepare('SELECT count(*) n FROM wa_dialogue').get().n, 0);
   assert.equal(f.store.db.prepare('SELECT count(*) n FROM wa_dialogue_results').get().n, 0);
+});
+
+test('fresh starts accept everyday Finnish but never a partial removal, negation or question about instructions', () => {
+  for (const text of ['tyhjää kaikki', 'Tyhjennä koko ostoslista!', 'nollaa kaikki', 'aloitetaan alusta', 'alotetaanko alusta?', 'voitko tyhjentää listan', 'moi, tyhjää kaikki pliis']) assert.equal(isFreshStart(text), true, text);
+  for (const text of ['moi', 'älä tyhjennä kaikkea', 'miten voin tyhjentää listan?', 'poista maito', 'tyhjennä maito', 'tyhjää kaikki paitsi voi']) assert.equal(isFreshStart(text), false, text);
+});
+
+test('reset clears only this conversation and persists a new order session; retry cannot clear a newer list', async (t) => {
+  const f = fixture(t, async () => plan('order', { suggestionTerm: 'kahvi' }));
+  await f.turn('se halvin maito');
+  f.store.db.prepare('INSERT INTO turns(binding,role,content,created) VALUES(?,?,?,?)').run('one', 'assistant', 'Vanha maitolista 50 l', Date.now());
+  f.store.db.prepare('INSERT INTO wa_dialogue VALUES(?,?,?)').run('other', '{"history":["other customer"]}', Date.now());
+  const reset = await f.turn('tyhjää kaikki');
+  assert.match(reset.text, /ostoslista on tyhjä/);
+  assert.equal(f.ordered.at(-1), 'aloita alusta');
+  assert.equal(f.orderOptions.at(-1).operation, 'reset');
+  const state = JSON.parse(f.store.db.prepare("SELECT json FROM wa_dialogue WHERE binding='one'").get().json);
+  assert.equal(state.epoch, 'm2'); assert.equal(state.lastOrder, undefined); assert.equal(state.pendingSuggestion, undefined);
+  assert.equal(state.suggested, undefined); assert.equal(state.history.length, 2);
+  assert.equal(f.store.history('one').length, 0);
+  assert.equal(f.store.db.prepare("SELECT json FROM wa_dialogue WHERE binding='other'").get().json, '{"history":["other customer"]}');
+  await f.turn('5 kg voita'); assert.equal(f.orderOptions.at(-1).epoch, 'm2');
+  const before = f.store.db.prepare("SELECT json FROM wa_dialogue WHERE binding='one'").get().json;
+  const reopened = createOrderingDialogue(f.options);
+  assert.deepEqual(await reopened.respond({ binding: 'one', messageId: 'm2', text: 'tyhjää kaikki' }), reset);
+  assert.equal(f.store.db.prepare("SELECT json FROM wa_dialogue WHERE binding='one'").get().json, before);
+});
+
+test('greetings never replay the old offer even if the model fails or routes the greeting to ordering', async (t) => {
+  for (const ask of [async () => plan('order'), async () => { throw new Error('model unavailable'); }]) {
+    const f = fixture(t, ask);
+    await f.turn('5 l maitoa'); const before = f.ordered.length;
+    const greeting = await f.turn('moi');
+    assert.match(greeting.text, /Hei!/); assert.doesNotMatch(greeting.text, /12,34|Tilausluonnos/);
+    assert.equal(f.ordered.length, before);
+  }
+});
+
+test('a pure greeting gives the model no old list or history to repeat and preserves the actual shopping list', async (t) => {
+  const f = fixture(t, async ({ user }) => {
+    const input = JSON.parse(user);
+    if (input.message !== 'moi') return plan('order');
+    assert.equal(input.history, undefined); assert.equal(input.shoppingList, undefined); assert.equal(input.pendingSuggestion, undefined);
+    return plan('chat', { text: 'Moi! Mitä tarvitset keittiöön?' });
+  });
+  await f.turn('50 l maitoa'); const before = f.ordered.length;
+  assert.equal((await f.turn('moi')).text, 'Moi! Mitä tarvitset keittiöön?');
+  assert.equal(f.ordered.length, before);
+  assert.equal(JSON.parse(f.store.db.prepare("SELECT json FROM wa_dialogue WHERE binding='one'").get().json).lastOrder.text, ready.text);
+});
+
+test('the model can recognize a conversational fresh start while a partial deletion stays a line edit', async (t) => {
+  const f = fixture(t, async () => plan('reset'));
+  await f.turn('heitetääs tää vanha lista pois ja alotetaan uus');
+  assert.equal(f.ordered.at(-1), 'aloita alusta');
+  const g = fixture(t, async () => plan('order'));
+  await g.turn('tyhjennä maito');
+  assert.equal(g.ordered.at(-1), 'Poista maito');
 });

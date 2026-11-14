@@ -67,8 +67,8 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       const ordering = await getRuntime();
       if (!livePermissions(customer).readProducts) return { text: 'Testiyhteys ei ole enää voimassa.' };
       ordering.ensureBuyer?.(customer);
-      const runOrder = (text) => ordering.handleTurn({ messageId, receivedAt, customer,
-        conversationId: `${phoneId}:${customer.customerId}:${current.binding}`,
+      const runOrder = (text, { epoch = '', operation = '' } = {}) => ordering.handleTurn({ messageId: operation ? `${messageId}:${operation}` : messageId, receivedAt, customer,
+        conversationId: `${phoneId}:${customer.customerId}:${current.binding}${epoch ? `:session:${epoch}` : ''}`,
         text,
       });
       const text = messages.at(-1)?.content || '';

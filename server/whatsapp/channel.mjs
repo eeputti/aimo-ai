@@ -61,12 +61,12 @@ export function replyChunks(messages) {
 }
 
 export function createMetaSender(settings, fetchImpl = fetch) {
-  return async (to, text, messageId) => {
+  return async (to, text) => {
     const res = await fetchImpl(`https://graph.facebook.com/${settings.apiVersion}/${settings.phoneId}/messages`, {
       method: 'POST', signal: AbortSignal.timeout(20_000),
       headers: { authorization: `Bearer ${settings.accessToken}`, 'content-type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to,
-        context: { message_id: messageId }, type: 'text', text: { preview_url: false, body: text } }),
+        type: 'text', text: { preview_url: false, body: text } }),
     });
     // Never expose upstream payloads/tokens in logs or customer replies.
     if (!res.ok) throw new Error(`META_HTTP_${res.status}`);
