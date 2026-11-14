@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { once } from 'node:events';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -9,6 +12,10 @@ import { openStore } from '../src/store.mjs';
 import { createApp } from '../src/app.mjs';
 import { coordinatorConfig, createCoordinator } from '../src/coordinator.mjs';
 import { runOpenAIAgent } from '../src/openai-agent.mjs';
+import { connectRunner } from '../src/runner-client.mjs';
+import { createLocalRunner } from '../src/runner.mjs';
+import { localRunnerState, git } from '../src/runner-local.mjs';
+import { runCli } from '../src/runner-process.mjs';
 async function fixture(t) {
   const store = openStore(':memory:');
   const alice = store.addMember('alice-gpt', 'Alice GPT', ['aimo-ai']);
@@ -28,6 +35,28 @@ async function fixture(t) {
   return { store, alice, bob, base, connect, post };
 }
 const data = (r) => { assert.equal(r.isError, undefined, JSON.stringify(r)); return r.structuredContent; };
+test('HTTP MCP handoff wakes one CLI child in an isolated Git worktree and returns review ownership', async (t) => {
+  const f = await fixture(t); const a = await f.connect(f.alice);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-runner-http-')); const repo = path.join(dir, 'repo'); fs.mkdirSync(repo);
+  git(repo, ['init']); git(repo, ['config', 'user.email', 'fixture@example.invalid']); git(repo, ['config', 'user.name', 'Fixture']);
+  fs.mkdirSync(path.join(repo, 'docs')); fs.writeFileSync(path.join(repo, 'docs/a.md'), 'Original source'); git(repo, ['add', '.']); git(repo, ['commit', '-m', 'fixture']);
+  const fake = path.join(dir, 'fake-cli.mjs'); fs.writeFileSync(fake, `let input='';for await(const c of process.stdin)input+=c;if(!input.includes('docs/a.md'))process.exit(2);console.log(JSON.stringify({type:'item.completed',item:{type:'agent_message',text:'Luin dokumentin. Ei muutoksia eikä testiajoa.'}}));`);
+  const settings = { url: new URL('/mcp', f.base), member: 'bob-claude', project: 'aimo-ai', key: f.bob, repo, state: path.join(dir, 'state'), provider: 'codex', access: 'read-only', paths: ['docs'], senders: ['alice-gpt'], timeoutMs: 5000, pollMs: 2000 };
+  const instanceId = crypto.randomUUID(); const journal = localRunnerState(settings.state, instanceId); const remote = await connectRunner(settings);
+  t.after(async () => { await remote.close(); journal.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const task = data(await a.callTool({ name: 'claim_task', arguments: { project: 'aimo-ai', title: 'Review the documentation', resources: ['docs/a.md'] } }));
+  data(await a.callTool({ name: 'handoff_task', arguments: { project: 'aimo-ai', taskId: task.id, expectedRevision: task.revision, to: 'bob-claude', note: 'Read only; return findings.' } }));
+  let calls = 0;
+  const runner = createLocalRunner(settings, remote, journal, { instanceId, log() {}, execute: (s, args) => { calls++; return runCli(s, { ...args, resolved: { executable: process.execPath, prefix: [fake] } }); } });
+  await runner.tick(); await runner.tick();
+  assert.equal(calls, 1); assert.equal(journal.pending().length, 0);
+  const state = data(await a.callTool({ name: 'get_project_state', arguments: { project: 'aimo-ai' } }));
+  assert.equal(state.tasks[0].owner, 'alice-gpt'); assert.equal(state.tasks[0].status, 'handed_off'); assert.equal(state.tasks[0].resources.length, 0);
+  const inbox = data(await a.callTool({ name: 'read_messages', arguments: { project: 'aimo-ai' } }));
+  const receipt = inbox.messages.filter((m) => m.sender === 'bob-claude'); assert.equal(receipt.length, 1);
+  assert.match(receipt[0].body, /Ei muutoksia/); assert.match(receipt[0].body, /EI GITHUBISSA/); assert.ok(!receipt[0].body.includes(f.bob));
+  assert.equal(fs.readFileSync(path.join(repo, 'docs/a.md'), 'utf8'), 'Original source'); assert.equal(f.store.db.prepare('SELECT COUNT(*) AS n FROM runner_runs').get().n, 1);
+});
 test('reported SDK activity triggers a bounded OpenAI job and replies through the existing mailbox', async (t) => {
   const f = await fixture(t); let calls = 0;
   const api = http.createServer(async (req, res) => {
@@ -57,7 +86,7 @@ test('reported SDK activity triggers a bounded OpenAI job and replies through th
 });
 test('two real SDK clients discover tools and coordinate via authenticated Streamable HTTP', async (t) => {
   const f = await fixture(t); const a = await f.connect(f.alice); const b = await f.connect(f.bob);
-  assert.equal((await a.listTools()).tools.length, 10);
+  assert.equal((await a.listTools()).tools.length, 13);
   assert.equal(data(await a.callTool({ name: 'whoami', arguments: {} })).id, 'alice-gpt');
   data(await a.callTool({ name: 'send_message', arguments: { project: 'aimo-ai', recipient: 'bob-claude', subject: 'Checkout API', body: 'Please read commit abcdef123', requestKey: 'http-message-1', sender: 'pretend' } }));
   const inbox = data(await b.callTool({ name: 'read_messages', arguments: { project: 'aimo-ai' } }));

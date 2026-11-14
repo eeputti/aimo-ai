@@ -62,7 +62,7 @@ test('two SQLite connections fence an expired worker and preserve queued jobs ac
   second.coordination.complete(two, 'two', result);
   assert.throws(() => second.coordination.complete(two, 'two', result), { code: 'JOB_LEASE_LOST' });
   assert.equal(f.store.readMessages('alice', { project: 'aimo-ai' }).messages.filter((m) => m.sender === settings.actor).length, 1);
-  assert.equal(fs.statSync(path.join(dir, 'team.db')).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(dir, 'team.db')).mode & 0o777, 0o600);
 });
 test('hourly rate budget persists and retries stop after three attempts', async (t) => {
   const f = fixture(t); let calls = 0;
@@ -91,7 +91,12 @@ test('revocation cancels queued jobs and blocks a reply if access disappears dur
 });
 test('failed output is private, provider error text is redacted and queue capacity is bounded', async (t) => {
   const f = fixture(t);
-  for (let i = 0; i < 101; i++) f.message();
+  for (let member = 0; member < 20; member++) {
+    const id = member ? 'load-' + member : 'alice';
+    if (member) f.store.addMember(id, id, ['aimo-ai']);
+    for (let i = 0; i < 5; i++) f.message(settings.actor, id);
+  }
+  f.message(settings.actor, 'bob');
   f.ingest();
   assert.equal(f.store.db.prepare("SELECT COUNT(*) AS n FROM coord_jobs WHERE status='queued'").get().n, 100);
   assert.equal(f.store.db.prepare("SELECT COUNT(*) AS n FROM coord_jobs WHERE error_code='QUEUE_FULL'").get().n, 1);

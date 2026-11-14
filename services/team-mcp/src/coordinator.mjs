@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { slug } from './store.mjs';
 import { runOpenAIAgent } from './openai-agent.mjs';
+import { dispatchPolicy, mayDispatch } from './dispatch.mjs';
 
 export function coordinatorConfig(env = process.env) {
   const mode = env.TEAM_COORDINATOR_MODE || 'observe';
@@ -11,7 +12,7 @@ export function coordinatorConfig(env = process.env) {
   if (!['observe', 'openai'].includes(mode) || !slug(project) || !slug(actor)) throw new Error('Invalid coordinator mode, project or member id');
   if (!Number.isInteger(port) || port < 1 || port > 65535 || !Number.isInteger(maxPerHour) || maxPerHour < 1 || maxPerHour > 1000) throw new Error('Invalid coordinator port or hourly run limit');
   if (mode === 'openai' && (!env.OPENAI_API_KEY || !env.TEAM_COORDINATOR_MODEL)) throw new Error('OpenAI mode requires OPENAI_API_KEY and TEAM_COORDINATOR_MODEL in the private environment');
-  return { mode, project, actor, port, maxPerHour, apiKey: env.OPENAI_API_KEY, model: env.TEAM_COORDINATOR_MODEL };
+  return { mode, project, actor, port, maxPerHour, apiKey: env.OPENAI_API_KEY, model: env.TEAM_COORDINATOR_MODEL, dispatch: dispatchPolicy(env) };
 }
 
 export function createCoordinator(store, settings, { agent = runOpenAIAgent, log = console.log } = {}) {
@@ -46,8 +47,9 @@ export function createCoordinator(store, settings, { agent = runOpenAIAgent, log
           tasks: state.tasks.slice(0, 40).map((t) => ({ id: t.id, title: t.title, owner: t.owner, status: t.status, note: t.note.slice(0, 800), commit: t.commit_sha, leaseExpired: t.leaseExpired })),
         };
         const timed = AbortSignal.timeout(45000);
-        const result = await agent({ apiKey: settings.apiKey, model: settings.model, job, context, signal: AbortSignal.any([...(signal ? [signal] : []), timed, revoked.signal]) });
-        store.coordination.complete(job, worker, result);
+        const policy = mayDispatch(job, settings.dispatch) ? settings.dispatch : undefined;
+        const result = await agent({ apiKey: settings.apiKey, model: settings.model, job, context, dispatch: policy, signal: AbortSignal.any([...(signal ? [signal] : []), timed, revoked.signal]) });
+        store.coordination.complete(job, worker, result, policy);
         log(`Agent job ${job.id}: succeeded`);
       } catch (err) {
         const code = /^[A-Z][A-Z0-9_]{0,79}$/.test(err.code || '') ? err.code : 'AGENT_FAILED';

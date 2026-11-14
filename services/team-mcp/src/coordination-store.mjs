@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { dispatchAssignments } from './dispatch.mjs';
 
 const error = (code) => Object.assign(new Error(code), { code });
 export function createCoordinationStore(store) {
@@ -6,6 +7,7 @@ export function createCoordinationStore(store) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS coord_presence(project TEXT NOT NULL,member TEXT NOT NULL,last_seen INTEGER NOT NULL,last_tool TEXT NOT NULL,PRIMARY KEY(project,member));
     CREATE TABLE IF NOT EXISTS coord_services(member TEXT PRIMARY KEY);
+    CREATE TABLE IF NOT EXISTS coord_assignments(task TEXT PRIMARY KEY,project TEXT NOT NULL,job TEXT NOT NULL,requester TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS coord_runtime(project TEXT PRIMARY KEY,actor TEXT NOT NULL,mode TEXT NOT NULL,last_tick INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS coord_offsets(project TEXT NOT NULL,actor TEXT NOT NULL,cursor INTEGER NOT NULL,PRIMARY KEY(project,actor));
     CREATE TABLE IF NOT EXISTS coord_jobs(id TEXT PRIMARY KEY,project TEXT NOT NULL,actor TEXT NOT NULL,requester TEXT NOT NULL,source_seq INTEGER UNIQUE NOT NULL,input TEXT NOT NULL,status TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,version INTEGER NOT NULL DEFAULT 0,lease_owner TEXT,lease_until INTEGER NOT NULL DEFAULT 0,due INTEGER NOT NULL,created INTEGER NOT NULL,updated INTEGER NOT NULL,summary TEXT,reply TEXT,error_code TEXT);
@@ -65,13 +67,19 @@ export function createCoordinationStore(store) {
           if (e.type !== 'message_sent' || e.actor === actor) continue;
           const message = db.prepare('SELECT * FROM messages WHERE project=? AND sender=? AND recipient=? AND seq=(SELECT json_extract(data,\'$.messageSeq\') FROM events WHERE seq=?)').get(project, e.actor, actor, e.seq);
           if (!message) continue; // broadcasts and other members' private messages never trigger runs
-          const requester = store.member(message.sender);
+          const meta = JSON.parse(db.prepare('SELECT data FROM events WHERE seq=?').get(e.seq).data);
+          const routed = meta.runnerTaskId && db.prepare(`SELECT a.requester FROM coord_assignments a JOIN runner_runs r ON r.task_id=a.task
+            WHERE a.task=? AND a.project=? AND r.member=? AND r.source=? AND r.state='finished' ORDER BY r.created DESC LIMIT 1`).get(meta.runnerTaskId, project, message.sender, actor);
+          const requesterId = routed?.requester || message.sender;
+          const requester = store.member(requesterId);
           if (!requester?.projects.includes(project)) continue;
           const pending = db.prepare("SELECT COUNT(*) AS n FROM coord_jobs WHERE project=? AND actor=? AND status IN ('queued','running')").get(project, actor).n;
+          const ownPending = db.prepare("SELECT COUNT(*) AS n FROM coord_jobs WHERE project=? AND actor=? AND requester=? AND status IN ('queued','running')").get(project, actor, requesterId).n;
+          const queueError = ownPending >= 5 ? 'REQUESTER_QUEUE_FULL' : pending >= 100 ? 'QUEUE_FULL' : null;
           const id = crypto.randomUUID();
           const created = db.prepare('INSERT OR IGNORE INTO coord_jobs(id,project,actor,requester,source_seq,input,status,due,created,updated,error_code) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-            .run(id, project, actor, message.sender, message.seq, JSON.stringify({ subject: message.subject, body: message.body }), pending < 100 ? 'queued' : 'failed', now(), now(), now(), pending < 100 ? null : 'QUEUE_FULL');
-          if (created.changes && pending >= 100) failedReply({ id, project, actor, requester: message.sender }, 'QUEUE_FULL');
+            .run(id, project, actor, requesterId, message.seq, JSON.stringify({ subject: message.subject, body: message.body }), queueError ? 'failed' : 'queued', now(), now(), now(), queueError);
+          if (created.changes && queueError) failedReply({ id, project, actor, requester: requesterId }, queueError);
         }
         db.prepare('INSERT INTO coord_offsets VALUES(?,?,?) ON CONFLICT(project,actor) DO UPDATE SET cursor=excluded.cursor').run(project, actor, events.at(-1)?.seq || cursor);
         return events;
@@ -97,11 +105,13 @@ export function createCoordinationStore(store) {
         return { ...db.prepare('SELECT * FROM coord_jobs WHERE id=?').get(job.id), input: JSON.parse(job.input) };
       });
     },
-    complete(job, worker, result) {
+    complete(job, worker, result, policy) {
       return tx(() => {
         const current = owns(job, worker);
         store.access(current.actor, current.project); store.access(current.requester, current.project);
-        replyToJob(current, `OpenAI-koordinaattorin vastaus\n\n${result.reply}`);
+        const tasks = dispatchAssignments(store, { ...current, input: JSON.parse(current.input) }, result, policy);
+        const dispatchNote = tasks.length ? '\n\nLuovutetut tehtävät:\n' + tasks.map((t) => `${t.id} -> ${t.owner}: ${t.title}`).join('\n') : '';
+        replyToJob(current, `OpenAI-koordinaattorin vastaus\n\n${result.reply}${dispatchNote}`);
         db.prepare("UPDATE coord_jobs SET status='succeeded',summary=?,reply=?,error_code=NULL,lease_owner=NULL,lease_until=0,updated=? WHERE id=?")
           .run(result.summary, result.reply, now(), job.id);
       });
@@ -109,6 +119,7 @@ export function createCoordinationStore(store) {
     fail(job, worker, code, retryable, retryAfterMs = 0) {
       return tx(() => {
         const current = owns(job, worker);
+        if (retryAfterMs > 900000) { retryable = false; code = 'OPENAI_RETRY_TOO_LONG'; retryAfterMs = 0; }
         const retry = retryable && job.attempts < 3;
         db.prepare('UPDATE coord_jobs SET status=?,error_code=?,lease_owner=NULL,lease_until=0,due=?,updated=? WHERE id=?')
           .run(retry ? 'queued' : 'failed', code, now() + Math.max(retryAfterMs, Math.min(60000, 5000 * 2 ** (job.attempts - 1))), now(), job.id);

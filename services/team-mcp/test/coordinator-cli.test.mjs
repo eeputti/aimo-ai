@@ -34,6 +34,8 @@ test('standalone process watches the same database, serves fresh activity and sh
   assert.equal(view.jobs[0].status, 'queued'); assert.equal(view.coordinator.online, true); assert.equal(view.coordinator.mode, 'observe');
   assert.equal(view.agents.find((a) => a.id === 'eelis-claude').tasks[0].note, 'Testaan määrän muuttamista.');
   assert.ok(!output.includes(key)); assert.ok(!output.includes('Tarkista suunnitelma.'));
-  child.kill('SIGTERM'); const [code] = await closed; assert.equal(code, 0);
+  child.kill('SIGTERM'); const [code] = await closed;
+  // Windows terminates the process directly; its SIGTERM exit code is platform-specific.
+  if (process.platform !== 'win32') assert.equal(code, 0);
   await assert.rejects(fetch(`http://127.0.0.1:${port}/snapshot?project=aimo-ai`));
 });

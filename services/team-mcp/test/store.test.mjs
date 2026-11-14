@@ -79,7 +79,7 @@ test('restart preserves credentials, messages, acknowledgement and task state', 
   const next = openStore(file); t.after(() => next.close());
   assert.equal(next.authenticate(key).id, 'alice'); assert.equal(next.state('alice', { project }).tasks.length, 1);
   assert.equal(next.readMessages('alice', { project }).messages.length, 0); assert.equal(next.readMessages('alice', { project, after: 0 }).messages[0].body, 'Persistent');
-  assert.equal(fs.statSync(file).mode & 0o777, 0o600);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(file).mode & 0o777, 0o600);
 });
 
 test('expired member keys stop authentication and allow abandoned work to be reclaimed', (t) => {
