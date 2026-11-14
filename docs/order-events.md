@@ -1,6 +1,6 @@
 # Vahvistettu tilaus Cloudflare Workeriin ja asiakkaan sähköposti
 
-Päätös 14.11.2026 (Eelis): WhatsApp-keskustelu ja tilausydin pysyvät nykyisellä Node-palvelimella. Kun asiakas vahvistaa tilauksen (TILAA) ja gateway merkitsee sen tilaan `confirmed`, Workeriin siirtyy **vain se tilaus**. Worker tallentaa sen D1:een ja lähettää asiakkaalle Peetun pohjaan perustuvan vahvistusviestin. Koko localhostia ei siirretä Workersiin.
+Päätös 14.–15.11.2026 (Eelis): WhatsApp-keskustelu ja tilausydin pysyvät nykyisellä Node-palvelimella. Asiakas avaa viestistä saman korin, tarkistaa sen ja vahvistaa demotilauksen erikseen selaimessa. Kun gateway merkitsee tilauksen tilaan `confirmed`, Workeriin siirtyy **vain se tilaus**. Worker tallentaa sen D1:een. Demomaksun ollessa käytössä sähköpostivahvistus odottaa maksusivun erillistä hyväksyntää. Koko localhostia ei siirretä Workersiin.
 
 ```
 WhatsApp → Node-palvelin (keskustelu, luonnos, tarjous, TILAA, gateway)
@@ -9,7 +9,10 @@ WhatsApp → Node-palvelin (keskustelu, luonnos, tarjous, TILAA, gateway)
          publish-orders.mjs --watch --order-events   (sama kone, 5 s välein)
               │ POST /api/order-events  (Bearer SYNC_TOKEN, HTTPS)
               ▼
-         Worker aimo-order-demo → D1 order_events → env.EMAIL.send → asiakas
+         Worker aimo-order-demo → D1 order_events + demo_payments
+                                      │ odottaa demomaksun hyväksyntää
+                                      ▼
+                               EMAIL tai Resend → testiasiakas
 ```
 
 ## Sopimus: `POST /api/order-events`
@@ -40,7 +43,8 @@ Vastaus: `{ "ok": true, "orderId": "...", "duplicate": false, "email": "<tila>" 
 |---|---|---|
 | `sent` | lähetetty kerran | ei yritä enää |
 | `not_requested` | ei vastaanottajaa | ei yritä enää |
-| `sender_missing` | Workerilta puuttuu `EMAIL`-binding tai `ORDER_EMAIL_FROM` | yrittää 5 s välein, kunnes lähettäjä on asetettu |
+| `awaiting_demo_payment` | tilaus odottaa erillistä demomaksun hyväksyntää | tapahtuma on tallessa; maksusivu jatkaa vahvistusta |
+| `sender_missing` | Workerilta puuttuu käyttökelpoinen sähköpostilähettäjä | yrittää 5 s välein, kunnes lähettäjä on asetettu |
 | `retry` | lähetys epäonnistui, yrityksiä jäljellä | yrittää uudelleen |
 | `sending` | toinen pyyntö lähettää juuri nyt | yrittää uudelleen |
 | `failed` | 3 yritystä käytetty | ei yritä enää |
@@ -65,3 +69,12 @@ Demossa lähetetään vain omiin, todellisiin testiosoitteisiin. Asiakkaan oikea
 ## Tarkistukset
 
 `npm --prefix deploy/cloudflare test` (8/8), `run typecheck`, `run build`. Testit kattavat yhden lähetyksen myös rinnakkaisissa uusinnoissa, puuttuvan lähettäjän ja myöhemmän uusinnan, kolmen yrityksen rajan, väärän avaimen, muun kuin vahvistetun tilauksen, virheellisen osoitteen ja otsakeinjektion, vastaanottajan pysymisen pois julkiselta reitiltä sekä julkaisijan tilausten valinnan. Lähetys on testattu simuloidulla `EMAIL`-bindingillä; oikeaa sähköpostia, julkaisua tai D1-migraatiota ei ole tehty.
+
+## Kori ja demomaksu 15.11.2026
+
+- Maksureitti on kytketty Workerin tilaustapahtumiin, listaan ja sähköpostivartioon. Uusien maksujen asetus on `DEMO_PAYMENTS_ENABLED` (`bindings.text("true")` nykyisessä cf-asetuksessa). Lisäävä `demo-payment.sql` on ajettava ennen tämän version käyttöönottoa. Jo lähetettyjä vahvistuksia ei siirretä maksuodotukseen, ja olemassa oleva maksuvartio säilyy vaikka uusien maksujen asetus suljetaan.
+- `CLOUDFLARE_DEMO_URL` asetetaan myös Node-tilauspalvelimelle. Palvelimen rakenteinen `confirmed` + `orderId` saa oman `checkout`-linkin. Asiakkaan viestistä tai vastaustekstistä ei poimita tilausnumeroa. `pending_approval` ei avaa maksamista.
+- Korin **Siirry demomaksuun** avaa `/demo-payment.html#ORDER_ID`. Maksusivu ratkaisee saman tilauksen allekirjoitetun linkin julkisesta synteettisestä tilausnäkymästä. Julkaisijan salainen avain ei siirry selaimeen. **Hyväksy demomaksu** tekee vain demomerkinnän; korttitietoja ei kerätä eikä rahaa veloiteta.
+- Nykyisen julkaisijan käynnistyksessä tarvitaan `--watch --order-events`. Ilman `--order-events-backfill` vanhoja tilauksia ei ilmoiteta uudelleen. `ORDER_EMAIL_TO` on valinnainen; ilman sitä maksusivu näyttää, ettei testisähköpostiosoitetta ole asetettu.
+- Aiemmasta Claude Coden keskeneräisestä vaiheesta säilytetty Resend-tuki käyttää `RESEND_API_KEY`-secretiä ja idempotenssiavainta `order-confirmation/ORDER_ID`. Testilähettäjä ilman omaa domainia toimii vain Resend-tilin omaan osoitteeseen. Jos `EMAIL` ja `ORDER_EMAIL_FROM` on asetettu, niitä käytetään ensin.
+- Integroitu Worker-ketju on testattu eristetyssä muistissa olevassa SQLite-kannassa ja simuloidulla lähettäjällä: **14/14** testiä. Julkaisija → tilausnäkymä → keskeytys → rinnakkaiset hyväksynnät → yksi sähköposti → uudelleenlataus säilyttää saman maksetun tilauksen. Ajantasainen käyttöönottokuittaus: `docs/parallel/whatsapp-checkout-completion.md`.

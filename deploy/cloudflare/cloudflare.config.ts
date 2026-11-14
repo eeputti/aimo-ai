@@ -8,7 +8,7 @@ export default defineConfig({
 		compatibilityDate: "2026-11-14",
 		entrypoint,
 		workersDev: true,
-		env: { DB: bindings.d1({ id: "fd216575-282d-48a4-a2f9-d01f528aab19", name: "aimo-order-demo" }), SYNC_TOKEN: bindings.secret() },
+		env: { DB: bindings.d1({ id: "fd216575-282d-48a4-a2f9-d01f528aab19", name: "aimo-order-demo" }), SYNC_TOKEN: bindings.secret(), DEMO_PAYMENTS_ENABLED: bindings.text("true") },
 		observability: { enabled: true, redactQueryString: true,
 			logs: { enabled: true, headSamplingRate: 0.1 },
 			traces: { enabled: true, headSamplingRate: 0.1 } },

@@ -68,6 +68,36 @@ test('without a configured sender the order waits, and a later retry sends it; f
   } finally { env.DB.db.close(); }
 });
 
+test('without a domain the order e-mail goes through Resend once, with its test sender and an idempotency key', async () => {
+  const env = { DB: d1(), SYNC_TOKEN: token, RESEND_API_KEY: 're_test_' + 'x'.repeat(24) };
+  const calls = [], realFetch = globalThis.fetch;
+  let fail = 1;
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url), init });
+    if (fail-- > 0) return new Response('{"message":"rate limited"}', { status: 429 });
+    return Response.json({ id: 'resend-1' });
+  };
+  try {
+    assert.equal((await (await post(env, event())).json()).email, 'retry');
+    assert.equal((await (await post(env, event())).json()).email, 'sent');
+    assert.equal((await (await post(env, event())).json()).email, 'sent');
+    assert.equal(calls.length, 2);
+    const { url, init } = calls[1];
+    assert.equal(url, 'https://api.resend.com/emails');
+    assert.equal(init.headers.authorization, `Bearer ${env.RESEND_API_KEY}`);
+    assert.equal(init.headers['idempotency-key'], 'order-confirmation/AGW-20261114-0001');
+    const body = JSON.parse(init.body);
+    assert.equal(body.from, 'Aimo tilausapuri <onboarding@resend.dev>');
+    assert.equal(body.to, 'testi@example.com');
+    assert.match(body.subject, /AGW-20261114-0001/); assert.ok(body.html && body.text);
+    assert.equal(row(env).email_message_id, 'resend-1'); assert.equal(row(env).email_attempts, 2);
+    // An onboarded Cloudflare domain still takes precedence over Resend.
+    const EMAIL = mailer(); Object.assign(env, { EMAIL, ORDER_EMAIL_FROM: 'tilaukset@demo.example' });
+    assert.equal((await (await post(env, event(order('AGW-20261114-0002')))).json()).email, 'sent');
+    assert.equal(EMAIL.sent.length, 1); assert.equal(calls.length, 2);
+  } finally { globalThis.fetch = realFetch; env.DB.db.close(); }
+});
+
 test('only authenticated, confirmed and valid order events are accepted', async () => {
   const env = { DB: d1(), SYNC_TOKEN: token, EMAIL: mailer(), ORDER_EMAIL_FROM: 'tilaukset@demo.example' };
   try {

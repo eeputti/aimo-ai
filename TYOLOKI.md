@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — WhatsApp-korista vahvistetun demotilauksen maksusivulle (Codex, yhdistäjächat)
+
+- **Käyttäjän päätös:** nykyinen localhost-tausta ja rajattu HTTPS-korilinkki → kaupan kori → tuotteiden/toimituspäivän tarkistus → erillinen demotilauksen vahvistus → demomaksu. Ei oikeaa maksupalvelua tai tuotannon Toimitustukku-tilausta.
+- Checkout-wrapper ja korin maksulinkki kytketty samaan tilauspalveluun. Vain rakenteinen `confirmed` + `orderId` avaa maksusivun; pending_approval tai legacy-luonnos ilman varmennettua tilaa ei saa maksulinkkiä. Korin sivu/kuittauksen reload on Claude Coden 5feefbc:stä, rakenteinen ID ja tilan säilyminen hänen 5e0a61f-korjauksestaan; omistettuja lähteitä ei muokattu päällekkäin. `docs/parallel/whatsapp-checkout-completion.md` sisältää sopimuksen ja tulokset.
+- Workerissä maksun rekisteröinti, pysyvä sähköpostivartio, maksureitti ja julkisen synteettisen tilausnäkymän maksutila käytössä. Aiemman Claude Coden Resend-vaiheen koodi/testi säilytetty; puuttuvaa sähköpostiavainta ei vaadita demomaksuun. Lisäävä D1-taulu luotu ja takaisinluettu. **Julkaistu Worker fcf60dc0-eb78-4571-8dfb-b956685d68d7:** health/tilaus-API/maksusivu 200, kaksi aiempaa tilausta säilyvät, tuntematon maksu 404. Nodeen lisätty vain julkinen maksusivualkuperä, asetustiedosto 0600.
+- **Tarkistukset:** erillinen 5e0a61f-pohjainen julkaisukopio, sovellustestit **257/257**, Worker **14/14**, tyypit/build/dry-run läpi. Chrome1280/375: oikea eristetty Node-kori/gateway → vahvistus → maksulinkki → keskeytys → hyväksyntä → reload, yksi tilaus/maksu/simuloitu sähköposti, ei JS-virheitä tai vaakaylivuotoa. Vahvistusuusinta säilyttää tilausnumeron ja maksulinkin. Käyttäjän kantoihin ei testikirjoituksia, ei oikeaa Meta-/Valio-/mallikutsua tai sähköpostia.
+- **Käyttöönottoraja:** Workerin julkaisu on valmis. Node-runtime ja jatkuvan julkaisijan `--order-events` otetaan seuraavaksi käyttöön yhdellä sovitulla prosessilla; dc65de4b-rolloutchat omistaa nykyisen 4749-restartin. Muut keskeneräiset työt on jätetty yhteiseen työpuuhun erilleen, eikä yhteistä haaraa vaihdettu. Tämä commit ei vielä väitä Node-puhelinpolun olevan uudessa versiossa.
+
 ## 15.11.2026 — WhatsApp: toimituspäivä ensin ja numeroidut tuotevaihtoehdot (Claude Code, päivä ensin -chat)
 
 - **Käyttäjän pyyntö (Eelis klo 00.30):** apuri kysyy ensin toimituspäivän, koska se on tärkein; tuotteet ehdotetaan selkeästi "1, 2, 3, tai 4 niin haen lisää vaihtoehtoja, jotka voisi toimittaa"; yksi fiksu idea kerrallaan.
