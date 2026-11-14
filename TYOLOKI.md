@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — Meta-sovellus luotu Roisku Median alle (Codex)
+
+**Tulos:** käyttäjä antoi erillisen luvan Meta Platform Terms / Developer Policies -hyväksyntään ja sovellus luotiin nimellä **Valio Aimo Tilausapuri** Roisku Median portfolioon. Sovelluksen dashboard ja WhatsApp-käyttötapaus näkyvät selaimessa; App ID `1829102204844975`. Sovellusta ei julkaistu tuotantoon. Aiemman merkinnän hyväksymisluvan odotus on päättynyt.
+
+**Käyttöönotto kesken:** Metan Welcome to the app dashboard -ikkuna ei reagoinut selainohjauksen sulkemiseen; käyttäjältä pyydettiin sen sulkemista selaimessa. Testinumeroa, tokenia, profiilikuvaa, webhookia tai oikeaa viestiketjua ei ole vielä varmennettu. Logon ja suomenkielisen apurin toive säilyy. Ei kirjautumistunnuksia tai muita salaisuuksia lokiin.
+
+**Tarkistukset:** oikea sovellusnimi, portfolio ja käyttötapaus varmistettu luontiyhteenvedosta ja dashboardista. Ennen dokumenttikirjausta `git fetch origin` ja puhtaan työpuun `git pull --ff-only` toivat toisen tekijän commitin `8c2a240`; sen muutokset säilytettiin. Dokumenttimuutoksen diff ja `git diff --check` läpi. Ei sovelluskoodimuutoksia, palvelimen restarttia, testiviestejä, malli-/Valio-kutsuja tai tilauksia. Seuraava askel: sulje Metan esittely, avaa WhatsAppin Customize/API Setup, varmista testinumero ja jatka ohjeen mukaisesti.
+
 ## 14.11.2026 — sivuston yhteinen ostoskori ja gatewayn demotilaus (Codex)
 
 **Käyttäjän pyyntö:** localhost:4747:n kananmunien Kokoa ostoskori ei toimi; yhdistä etusivun ja agentin erilliset ostopolut yhdeksi verkkokaupaksi. Toteutettu tässä erillisessä kloonissa verkkosivun muutos; WhatsAppin neljän henkilön osiin ei tehty muutoksia. Työn aikana haettu ja säilytetty muiden uudet suunnitelma-/työnjako-/Meta-asetuscommitit `ee466f0` ja `e68925b`.
