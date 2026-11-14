@@ -2,6 +2,21 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — graafiset ehdotukset tiiviistä ja luotettavasta ostoskorista (Codex)
+
+**Käyttäjän täsmennys:** ostoportaali helpottaa tarkistusta huomaamalla poikkeavan määrän ja perustelemalla sen. Käyttöliittymän pitää painottaa visuaalisuutta: tuotekuvat, pienet rivit, keltainen huomio juuri tuotteen kohdalla sekä erityisen selkeä muutoksen hyväksyntä. Ei erillistä näkyvää tekoälyelementtiä, suuria päätöskortteja tai ”sinun päätöksesi” -otsikkoa. Vihreä kertoo tarkistetusta asiasta, punainen varataan todelliselle esteelle. Huomioitu myös lokiin kirjattu keskipiste-erottimien kielto.
+
+- `design/aimo-ui-ehdotukset.html`: kolme klikattavaa vaihtoehtoa Aimon nykyisellä ilmeellä: **Huomio tuoterivillä**, **Yhteinen tarkistusnauha** ja **Tarkistus vahvistushetkellä**. Ensimmäinen on avustajan suositus; käyttäjä ei ole vielä valinnut toteutettavaa vaihtoehtoa.
+- Tuotekuvallinen ostoslista näyttää sekä myyntierät että litrat/kilot. Maito-rivin avattava perustelu näyttää historian, reseptitarpeen ja varaston laskelmana lähteineen. Kerman keltainen huomio näyttää 30 l → 6 l, vaikutuksen summaan ja vihreän **HYVÄKSY MUUTOS** -painikkeen. Alkuperäisen määrän voi myös säilyttää.
+- Hyväksyntä päivittää paikallisen määrän, summan ja tilavärin. Vaihtoehdot säilyttävät omat valintansa. Varsinainen tilauspainike näyttää vain paikallisen esimerkkiviestin.
+- `design/README.md`: suunnittelun perusteet, vaihtoehtojen erot, kuvien lähteet sekä luotettavan toteutuksen rajaukset. Kaikki luonnosten hinnat, myyntierät, historiatiedot, reseptit ja varastosaldot ovat havainnollistavia esimerkkitietoja. Ne eivät ole mitattuja tuloksia tai oikean keittiön tietoja.
+- Kuvat käytettiin olemassa olevasta julkisista lähteistä muodostetusta välimuistista. Fontit ja logo ovat nykyisestä etusivusta. Aineistot on upotettu alle 1 Mt:n fragmenttiin; ei uusia verkkolatauksia tai API-kutsuja. Voin kuvan CC BY-SA -lähde on kirjattu suunnittelun README:hen.
+
+**Tarkistukset:** JavaScriptin `node --check`, fragmentin rakenne (3 vaihtoehtoa, yksilölliset id:t, upotetut kuvat) ja esimerkkisummat läpi. Erillinen staattinen esikatselu portissa 4763: tuotekuvat näkyvät, maidon laskelma avautuu, 30 l → 6 l päivittää summan 282,90 € → 162,90 € ja avaa esimerkkivahvistuksen; alkuperäisen 30 l säilytys pitää summan ennallaan. Kolmannen vaihtoehdon ikkuna sulkeutuu ja avautuu uudelleen. Asettelut katsottu selaimessa 1024 px ja 320 px sisältöleveydellä; kaikissa kolmessa ei vaakaylivuotoa kapealla ruudulla. Muutos koskee luonnoksia, joten palvelintestejä, live-evaluaatiota tai demotilauksia ei ajettu.
+
+**Jäljellä:** valittavan mallin yhdistäminen oikeaan ostoskoriin sekä luotettavan poikkeamantunnistuksen rajojen ja lähteiden määrittely. Ostohistoria ei yksin ole kulutusta, eikä puuttuva tieto saa näyttää varmennetulta. Käynnissä olevaan palvelimeen, tilauskantaan tai rajapintoihin ei tehty muutoksia tässä työvaiheessa. Rinnakkaisen työvaiheen muutokset säilytetään erillään tästä commitista.
+
+
 ## 14.11.2026 — etusivun fiksu haku (Claude Code)
 
 **Käyttäjän päätös:** etusivusta (`/`, Toimitustukun ulkoasukopio) tehdään demon aloitusnäkymä, ja sen hakukenttä ymmärtää puhekielisen pyynnön. Valinnan jälkeen tilauksen hoitaa agentti portin kautta, ei etusivun oma ostoskori. Reseptihaku, allergeenirajaus omana toimintonaan ja live-hinnat rajattiin tästä työvaiheesta pois.
