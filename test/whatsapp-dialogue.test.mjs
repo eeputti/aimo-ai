@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openWhatsAppStore } from '../server/whatsapp/store.mjs';
 import { createOrderingDialogue, isFreshStart } from '../server/whatsapp/dialogue.mjs';
+import { normalizeOrderUnits, presentCollectingCart } from '../server/whatsapp/cart-presentation.mjs';
+import { createDemoOrderingChat } from '../server/whatsapp/ordering.mjs';
+import { openDraftStore } from '../server/order-conversation/store.mjs';
+import { createOrderingConversation } from '../server/order-conversation/index.mjs';
+import { createRuleInterpreter } from '../server/order-conversation/interpret.mjs';
+import { shoppingListView } from '../server/shopping-list/index.mjs';
+import { understand } from '../server/aimo/understand.mjs';
 
 const ready = { status: 'ready', draftId: 'draft-1', revision: 2, text: '*Tilausluonnos*\nMaito 5 l, 12,34 €\n\nVahvista vastaamalla *TILAA*.' };
 function fixture(t, ask) {
@@ -142,4 +149,135 @@ test('the model can recognize a conversational fresh start while a partial delet
   const g = fixture(t, async () => plan('order'));
   await g.turn('tyhjennä maito');
   assert.equal(g.ordered.at(-1), 'Poista maito');
+});
+
+function cartFixture(t, copy = { acknowledgement: 'Joo, laitetaan!', quantityQuestion: 'Kuinka paljon laitetaan {{products}}?' }) {
+  const store = openWhatsAppStore(':memory:');
+  const drafts = openDraftStore(':memory:');
+  const member = { phone: '358401234567', company: 'Testikeittiö', person: 'Testaaja', binding: 'cart-test' };
+  store.db.prepare('INSERT INTO members VALUES(?,?,?,?)').run(member.phone, member.company, member.person, member.binding);
+  const calls = [];
+  const ask = async (args) => {
+    calls.push({ ...args, input: JSON.parse(args.user) });
+    if (args.purpose === 'whatsapp_cart_reply') {
+      if (copy instanceof Error) throw copy;
+      return { json: copy };
+    }
+    return plan('order');
+  };
+  const handleTurn = createOrderingConversation({ store: drafts, now: () => Date.parse('2026-11-14T10:00:00Z'),
+    interpretTurn: createRuleInterpreter({ understand }), tools: { suggest() { throw new Error('All missing details must be collected first'); } } });
+  const bridge = createDemoOrderingChat({ store, phoneId: 'test-phone', loadOrdering: async () => ({ handleTurn,
+    dialogue: createOrderingDialogue({ db: store.db, ask }),
+    getShoppingList: ({ conversationId, customer }) => shoppingListView(drafts.active(conversationId), customer),
+    close: () => drafts.close(),
+  }) });
+  t.after(async () => { await bridge.close(); store.close(); });
+  let seq = 0;
+  const turn = (text, messageId = `cart-${++seq}`) => bridge.chat({ member, messageId, messages: [{ content: text }] });
+  return { turn, calls, list: () => bridge.getShoppingList(member) };
+}
+
+test('the real saved cart gets a natural acknowledgement, exact bullet rows and one question for only the missing quantities', async (t) => {
+  const f = cartFixture(t);
+  await f.turn('50 l maitoa, kananmunia ja kermaa');
+  await f.turn('ei');
+  const result = await f.turn('maanantaiksi', 'details');
+  assert.deepEqual(result.messages, ['Joo, laitetaan!', 'Ostoskorissasi nyt:\n- maito 50 l\n- kananmuna\n- kerma',
+    'Kuinka paljon laitetaan kananmunia ja kermaa?']);
+  const list = await f.list();
+  assert.equal(list.lines[0].quantity.value, 50); assert.equal(list.lines[1].quantity, null); assert.equal(list.lines[2].quantity, null);
+  const copyCall = f.calls.filter((c) => c.purpose === 'whatsapp_cart_reply').at(-1);
+  assert.equal(copyCall.input.missingQuantityCount, 2); assert.equal(copyCall.tier, 'deep');
+  const router = f.calls.filter((c) => c.purpose === 'whatsapp_dialogue').at(-1);
+  assert.equal(router.input.shoppingList.lines[0].quantity.value, 50);
+  assert.match(router.input.lastOrderReply, /Kuinka paljon/); assert.equal(router.tier, 'deep'); assert.ok(router.timeoutMs >= 45000);
+  const before = f.calls.length;
+  assert.deepEqual(await f.turn('maanantaiksi', 'details'), result);
+  assert.equal(f.calls.length, before);
+});
+
+test('a natural follow-up fills quantities in the same cart, and show does not pretend to update anything', async (t) => {
+  const f = cartFixture(t);
+  await f.turn('50 l maitoa, kananmunia ja kermaa');
+  const before = await f.list();
+  const result = await f.turn('kananmunia 100 kpl ja kermaa 5 dl');
+  const after = await f.list();
+  assert.equal(after.id, before.id); assert.ok(after.revision > before.revision);
+  assert.deepEqual(after.lines.map((line) => [line.productTerm, line.quantity.value, line.quantity.unit]),
+    [['maito', 50, 'L'], ['kananmuna', 100, 'PCS'], ['kerma', 0.5, 'L']]);
+  assert.match(result.text, /- kerma 0,5 l/); assert.doesNotMatch(result.text, /Kuinka paljon|Paljonko/);
+  assert.match(result.text, /Mille päivälle toimitus/); assert.match(result.text, /allergioita/);
+  const shown = await f.turn('näytä');
+  assert.equal(shown.messages[0].startsWith('Ostoskorissasi nyt:'), true);
+  assert.doesNotMatch(shown.text, /laitetaan!|päivitin/); assert.equal((await f.list()).revision, after.revision);
+});
+
+test('a failed or ungrounded copy model cannot change rows, invent quantities or claim order success', async (t) => {
+  for (const copy of [new Error('model unavailable'), { acknowledgement: 'Tilaus lähetetty, kaikki varmasti saatavilla!', quantityQuestion: 'Laitetaanko kermaa 50 l?' }]) {
+    const f = cartFixture(t, copy);
+    const result = await f.turn('50 l maitoa, kananmunia ja kermaa');
+    assert.equal(result.messages[0], 'Joo, päivitin ostoskorin!');
+    assert.match(result.messages[1], /- maito 50 l\n- kananmuna\n- kerma$/);
+    assert.match(result.messages[2], /^Kuinka paljon laitetaan kananmunia ja kermaa\?/);
+    assert.doesNotMatch(result.text, /kermaa 50|lähetetty|saatavilla/);
+  }
+});
+
+test('cart presentation preserves notes, errors, offers and confirmation instructions verbatim', async () => {
+  const result = { status: 'collecting', draftId: 'd1', revision: 1, text: 'Luonnoksessa nyt:\n- maito\n\nKuinka paljon: maito?' };
+  const shoppingList = { id: 'd1', revision: 1, lines: [{ ref: 'L1', productTerm: 'maito', quantity: null }] };
+  const ask = async () => { throw new Error('not called'); };
+  for (const status of ['ready', 'confirmed', 'pending_approval', 'error', 'rejected', 'choosing']) {
+    assert.equal(await presentCollectingCart({ result: { ...result, status }, shoppingList, ask }), null);
+  }
+  assert.equal(await presentCollectingCart({ result: { ...result, text: 'Tarkista määrä: maito.\n' + result.text }, shoppingList, ask }), null);
+  assert.equal(await presentCollectingCart({ result, shoppingList: { ...shoppingList, revision: 2 }, ask }), null);
+});
+
+test('quantity questions for arbitrary product labels stay grammatical and preserve the engine text', async () => {
+  const result = { status: 'collecting', draftId: 'd1', revision: 1,
+    text: 'Luonnoksessa nyt:\n- laktoositon ruokakerma\n\nKuinka paljon: laktoositon ruokakerma?' };
+  const shoppingList = { id: 'd1', revision: 1, lines: [{ ref: 'L1', productTerm: 'laktoositon ruokakerma', quantity: null }] };
+  const messages = await presentCollectingCart({ result, shoppingList,
+    ask: async () => ({ json: { acknowledgement: 'Selvä, lisäsin ostoskoriin.', quantityQuestion: 'Paljonko tarvitset näitä: {{products}}?' } }) });
+  assert.equal(messages[0], 'Selvä, lisäsin ostoskoriin.');
+  assert.equal(messages.at(-1), 'Paljonko tarvitset näitä: laktoositon ruokakerma?');
+});
+
+test('a conversational question receives the current saved cart and can clarify without mutating the order', async (t) => {
+  const current = { id: 'draft-1', revision: 3, deliveryDate: '2026-11-18',
+    lines: [{ ref: 'L1', productTerm: 'maito', quantity: { value: 30, unit: 'L' } },
+      { ref: 'L2', productTerm: 'kerma', quantity: { value: 0.5, unit: 'L' } }] };
+  const f = fixture(t, async ({ purpose, user, tier }) => {
+    const input = JSON.parse(user);
+    if (input.message !== 'kananmunat huomiseks, onnistuuks?') return plan('order');
+    assert.equal(purpose, 'whatsapp_dialogue'); assert.equal(tier, 'deep');
+    assert.deepEqual(input.shoppingList, current); assert.match(input.lastOrderReply, /Tilausluonnos/);
+    return plan('chat', { text: 'Nykyinen kori on keskiviikolle. Siirretäänkö koko kori huomiselle vai haluatko kananmunille erillisen tilauksen?' });
+  });
+  await f.turn('50 l maitoa');
+  const before = f.ordered.length;
+  const result = await f.turn('kananmunat huomiseks, onnistuuks?', { getShoppingList: () => current });
+  assert.match(result.text, /koko kori huomiselle/); assert.equal(f.ordered.length, before);
+});
+
+test('small physical units reach the interpreter as exact L/KG values and unspecified amounts stay unspecified', async (t) => {
+  assert.equal(normalizeOrderUnits('no vaiks 50 kananmunaa ja sit 5 dl kermaa'), 'no vaiks 50 kananmunaa ja sit 0,5 l kermaa');
+  assert.equal(normalizeOrderUnits('250 ml kermaa, 75 cl maitoa ja 1 500 g voita'), '0,25 l kermaa, 0,75 l maitoa ja 1,5 kg voita');
+  assert.equal(normalizeOrderUnits('2,5dl kermaa ja 0.5 kg voita'), '0,25 l kermaa ja 0.5 kg voita');
+  assert.equal(normalizeOrderUnits('kananmunia ja kermaa'), 'kananmunia ja kermaa');
+  assert.equal(normalizeOrderUnits('maito 50 l ja voi 5 kg, tuotetunnus 250ml-A'), 'maito 50 l ja voi 5 kg, tuotetunnus 250ml-A');
+  const f = fixture(t, async () => plan('order'));
+  await f.turn('50 kananmunaa ja sit 5 dl kermaa');
+  assert.equal(f.ordered[0], '50 kananmunaa ja sit 0,5 l kermaa');
+});
+
+test('a short answer with decilitres accepts the last suggested ingredient rather than losing its context', async (t) => {
+  const f = fixture(t, async ({ purpose }) => purpose === 'whatsapp_dialogue'
+    ? plan('chat', { lookupQuery: 'kuohukerma' }) : { text: 'Kuohukerma sopii vaahdotukseen.' });
+  await f.turn('Mikä kerma sopii vaahtoon?');
+  assert.equal(f.ordered.length, 0);
+  await f.turn('joo 5 dl');
+  assert.equal(f.ordered.at(-1), 'Lisää ostoslistalle kuohukerma 0,5 l');
 });

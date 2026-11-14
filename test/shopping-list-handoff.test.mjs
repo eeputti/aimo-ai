@@ -191,3 +191,31 @@ test('reset switches conversation epochs; old lists cannot reappear after a new 
   const stale = await f.post({ buyerId: old.buyerId, expectedList: version(old.shoppingList), messageId: crypto.randomUUID(), text: 'TILAA' });
   assert.equal(stale.status, 409); assert.equal(f.stats().submits, 0);
 });
+
+test('re-pairing the same sender gives a new buyer and never transfers the old company list or browser access', async (t) => {
+  const f = await fixture(t);
+  await f.whatsapp('20 l laktoositonta maitoa maanantaiksi', 'old-company-message');
+  const original = await f.get(); const oldMember = f.wa.member(PHONE);
+  assert.equal(original.shoppingList.lines[0].quantity.value, 20);
+  const invitation = f.wa.invite(PHONE, 'Uusi testiyritys', 'Uusi testaaja');
+  assert.match(await f.whatsapp(`YHDISTA ${invitation.code}`), /Uusi testaaja, Uusi testiyritys/);
+  const rebound = await f.get();
+  assert.notEqual(rebound.buyerId, original.buyerId);
+  assert.equal(rebound.shoppingList, null);
+  assert.equal(rebound.accounts.some((a) => a.buyerId === original.buyerId), false);
+  assert.equal((await fetch(f.base + LIST_ROUTE + '?buyerId=' + encodeURIComponent(original.buyerId))).status, 404);
+  assert.equal((await f.post({ buyerId: original.buyerId, expectedList: version(original.shoppingList), messageId: crypto.randomUUID(), text: 'TILAA' })).status, 404);
+  await assert.rejects(() => f.bridge.getShoppingList(oldMember), /voimassa/);
+  await f.whatsapp('voita 2 kg');
+  const fresh = await f.get();
+  assert.equal(fresh.shoppingList.lines.length, 1);
+  assert.equal(fresh.shoppingList.lines[0].productTerm, 'voi');
+  assert.equal(fresh.shoppingList.deliveryDate, null);
+  assert.equal(fresh.shoppingList.diet.known, false);
+  assert.equal(fresh.shoppingList.companyName, 'Uusi testiyritys');
+  // Replayed old-provider receipt cannot resurrect the previous customer binding.
+  await f.whatsapp('20 l laktoositonta maitoa maanantaiksi', 'old-company-message');
+  f.restartDrafts();
+  assert.deepEqual((await f.get()).shoppingList, fresh.shoppingList);
+  assert.equal(f.stats().submits, 0);
+});

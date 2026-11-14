@@ -26,7 +26,8 @@ test('product card clicks add to the selected basket, merge and persist; unavail
     addEventListener: (name, handler) => { if (name === 'click') click = handler; },
     createElement: () => ({ dataset: {}, setAttribute() {} }),
   } });
-  const moduleSource = fs.readFileSync(new URL('../public/storefront.js', import.meta.url), 'utf8').replace('export { product, rail };', '');
+  const moduleSource = fs.readFileSync(new URL('../public/storefront.js', import.meta.url), 'utf8')
+    .replace('export { product, rail };', '').replace(/^export\s+(?=(?:async\s+)?function\b)/gm, '');
   vm.runInContext(moduleSource, context);
   const html = vm.runInContext('product({ id: "card-test", name: "Testituote", price: 2.5, unit: "kpl" })', context);
   assert.match(html, /data-cart-product="card-test"/);

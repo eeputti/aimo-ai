@@ -147,7 +147,8 @@ function lineOf(a, qty, extra = {}) {
 function buildOption(buyer, need, kind, lines, ctx) {
   const net = money(lines.reduce((s, l) => s + l.lineNet, 0));
   const vat = money(lines.reduce((s, l) => s + l.lineNet * (l.vatRate / 100), 0));
-  const deliveryDate = lines.map((l) => l.availability.deliveryDate).filter(Boolean).sort().at(-1) || ctx.deliveryDate;
+  // Saatavuuspäivä on aikaisin mahdollinen: toimitusta ei aikaisteta asiakkaan pyytämästä.
+  const deliveryDate = [ctx.deliveryDate, ...lines.map((l) => l.availability.deliveryDate).filter(Boolean)].sort().at(-1);
   const cutoffs = lines.map((l) => l.closingTime).filter(Boolean).sort((x, y) => parseApiTime(x) - parseApiTime(y));
   const flags = [];
   if (deliveryDate > ctx.deliveryDate) flags.push('DELIVERY_DATE_SHIFT');
@@ -331,11 +332,13 @@ async function liveRecheck(payloads, reasons) {
   const requestedDeliveryDate = payloads.map((p) => p.requested.deliveryDate).sort()[0];
   const flat = payloads.flatMap((p) => p.lines.map((l) => ({ ...l, offerId: p.jti })));
   const live = await fetchQuotes(flat.map((l) => l.productId), requestedDeliveryDate, { fresh: true });
+  const deliveryDates = new Map(payloads.map((p) => [p.jti, p.deliveryDate]));
   const lines = [];
   for (const l of flat) {
     const p = cat.get(l.productId); const q = live.get(l.productId) || {};
     if (!q.price || q.price.error || Math.abs(q.price.net - l.unitPriceNet) > 0.004) reasons.push(reason('OFFER_STALE', 'block', { productId: l.productId, offered: l.unitPriceNet, current: q.price?.net ?? null }));
     else if (!q.avail || ['out', 'blocked', 'unknown'].includes(q.avail.status)) reasons.push(reason('OFFER_STALE', 'block', { productId: l.productId, availability: q.avail?.status || 'unknown' }));
+    else if (q.avail.date && q.avail.date > deliveryDates.get(l.offerId)) reasons.push(reason('OFFER_STALE', 'block', { productId: l.productId, offeredDeliveryDate: deliveryDates.get(l.offerId), earliestAvailableDate: q.avail.date }));
     else if (cutoffPassed(q.avail.closingTime)) reasons.push(reason('CUTOFF_PASSED', 'block', { productId: l.productId, closingTime: q.avail.closingTime, closingLabel: helsinkiLabel(q.avail.closingTime) }));
     else if (q.avail.amount != null && q.avail.amount < l.quantity) reasons.push(reason('INSUFFICIENT_STOCK', 'block', { productId: l.productId, available: q.avail.amount, needed: l.quantity }));
     lines.push({ ...l, name: p?.name || l.productId, salesUnitLabel: unitLabel(l.salesUnit), allergens: p?.contains || [], closingTime: q.avail?.closingTime || null });

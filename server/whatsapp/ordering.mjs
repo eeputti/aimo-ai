@@ -101,6 +101,7 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       });
       const text = messages.at(-1)?.content || '';
       const result = await (ordering.dialogue ? ordering.dialogue.respond({ binding: current.binding, messageId, text, runOrder,
+        getShoppingList: ({ epoch = '' } = {}) => ordering.getShoppingList?.({ conversationId: conversationId(customer, epoch), customer }) || null,
         allowed: () => livePermissions(customer).readProducts }) : runOrder(text));
       if (expectedList === undefined) return result;
       if (!livePermissions(customer).readProducts) throw Object.assign(new Error('Testiyhteys ei ole enää voimassa.'), { status: 403 });

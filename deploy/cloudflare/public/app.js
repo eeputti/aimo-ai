@@ -17,7 +17,7 @@ function render() {
   const key = JSON.stringify([data.orders, data.totalOrders, filter]);
   if (key === lastRendered) return;
   lastRendered = key;
-  $('order-count').textContent = data.totalOrders > data.orders.length ? `${data.totalOrders} tilausta · näytetään ${data.orders.length} uusinta` : `${data.totalOrders} ${data.totalOrders === 1 ? 'tilaus' : 'tilausta'} · päivittyy automaattisesti`;
+  $('order-count').textContent = data.totalOrders > data.orders.length ? `${data.totalOrders} tilausta, näytetään ${data.orders.length} uusinta` : `${data.totalOrders} ${data.totalOrders === 1 ? 'tilaus' : 'tilausta'}, päivittyy automaattisesti`;
   const orders = data.orders.filter(order => filter === 'all' || order.channel === filter);
   $('orders').replaceChildren();
   if (!orders.length) {
@@ -27,10 +27,12 @@ function render() {
   }
   for (const order of orders) {
     const article = element('article', undefined, 'order'), head = element('div', undefined, 'order-head'), info = element('div');
+    article.id = order.orderId;
+    const payment = order.demoPayment?.mode === 'demo' && ['pending', 'paid'].includes(order.demoPayment.status) ? order.demoPayment : null;
     const heading = element('div', undefined, 'order-heading');
     heading.append(element('h3', order.orderId), element('span', order.channel === 'whatsapp' ? 'WhatsApp' : 'Selaindemo', `channel${order.channel === 'browser-demo' ? ' browser' : ''}`));
-    info.append(heading, element('p', `Vastaanotettu ${time(order.createdAt)} · Toimitus ${date(order.deliveryDate)}`, 'order-meta'));
-    head.append(info, element('span', labels[order.status], `status ${order.status}`));
+    info.append(heading, element('p', `Vastaanotettu ${time(order.createdAt)}, toimitus ${date(order.deliveryDate)}`, 'order-meta'));
+    head.append(info, element('span', payment ? payment.status === 'paid' ? 'Demomaksu hyväksytty' : 'Odottaa demomaksua' : labels[order.status], `status ${payment ? payment.status === 'paid' ? 'confirmed' : 'pending_approval' : order.status}`));
     const body = element('div', undefined, 'order-body'), table = element('table'), thead = element('thead'), header = element('tr'), tbody = element('tbody');
     for (const title of ['Tuote', 'Määrä', 'Veroton summa']) header.append(element('th', title));
     thead.append(header);
@@ -43,6 +45,18 @@ function render() {
     table.append(thead, tbody); body.append(table);
     if (order.lineCount > order.lines.length) body.append(element('p', `Näytetään ${order.lines.length} / ${order.lineCount} tuoteriviä.`, 'truncated'));
     const total = element('div', 'Yhteensä alv 0 %', 'total'); total.append(element('strong', order.net === null ? '–' : currency(order.net))); body.append(total);
+    if (payment) {
+      const detail = element('div', undefined, 'payment-detail');
+      detail.append(element('p', payment.status === 'paid' ? 'Demomaksu on hyväksytty. Rahaa ei veloitettu.' : 'Vahvistussähköposti lähetetään demomaksun hyväksymisen jälkeen.'));
+      try {
+        const url = new URL(payment.url, location.origin);
+        if (url.origin === location.origin && url.pathname === '/demo-payment.html' && /^#AGW-\d{8}-\d{4,12}\.[A-Za-z0-9_-]{43}$/.test(url.hash)) {
+          const link = element('a', payment.status === 'paid' ? 'Näytä maksuvahvistus' : 'Avaa demomaksu', 'payment-link');
+          link.href = url.href; detail.append(link);
+        }
+      } catch { /* Invalid payment metadata never creates an external payment link. */ }
+      body.append(detail);
+    }
     article.append(head, body); $('orders').append(article);
   }
 }

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Ostoskori | Valio Aimo</title>
+  <link rel="stylesheet" href="/whatsapp/cart.css">
+  <script type="module" src="/whatsapp/cart.js"></script>
+</head>
+<body>
+  <header><img src="/whatsapp/cart/logo.svg" alt="Valio Aimo" width="120" height="40"><span>WhatsApp-tilausapuri</span></header>
+  <main>
+    <p class="eyebrow">Jatka tilausta</p>
+    <h1>Ostoskorisi</h1>
+    <p class="intro">Sama ostoskori kuin WhatsAppissa. Tarkista tuotteet ja toimituspäivä ennen vahvistamista.</p>
+    <p id="status" role="status">Ostoskoria ladataan…</p>
+    <section id="basket" aria-label="Ostoskorin sisältö" hidden>
+      <div class="details"><div><span>Asiakas</span><strong id="company"></strong></div><div><span>Toimituspäivä</span><strong id="delivery"></strong></div></div>
+      <ul id="lines"></ul>
+      <p id="diet"></p>
+      <button id="review" type="button">Tarkista tilaus</button>
+      <section id="review-panel" aria-label="Tilauksen yhteenveto" hidden><h2>Tarkista ja vahvista</h2><div id="reply" aria-live="polite"></div></section>
+      <form id="edit-form"><label for="message">Täydennä tai muuta tilausta</label><p class="hint">Voit valita ehdotetun tuotteen, muuttaa määrää tai kertoa toimituspäivän.</p><div class="input-row"><input id="message" maxlength="4000" autocomplete="off" placeholder="Esim. kermaa sittenkin 2 litraa" required><button type="submit">Lähetä</button></div></form>
+      <button id="confirm" type="button" hidden>Vahvista demotilaus</button>
+    </section>
+    <button id="retry" type="button" hidden>Yritä samaa pyyntöä uudelleen</button>
+    <p class="demo">Tämä on tilausdemo. Oikeaa maksua tai Valio-tilausta ei tehdä.</p>
+    <noscript>Salli JavaScript nähdäksesi WhatsAppissa kokoamasi ostoskorin.</noscript>
+  </main>
+</body>
+</html>
