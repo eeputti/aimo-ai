@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — keittiönäkymän tilapalkki pois (Claude Code)
+
+**Käyttäjän pyyntö:** Eelis halusi keittiönäkymän (`/kitchen.html`) yläpalkin alta pois rivin, jossa olivat merkit "Live: Aimo API", "Claude päällä" ja viimeisin vasteaika.
+
+- `public/app.js`: `renderStatus` ei enää piirrä tilamerkkejä.
+- `public/aimo-shell.js`: yhteinen kehys ei luo keittiösivulle `#modes`-riviä. Agenttikonsolin (`/agent.html`) oma tilarivi (`#chips`) on ennallaan.
+- Vasteaika näkyy edelleen "Miten tämä toimii" -välilehdellä. Simuloidusta tilasta (ei `VALIO_API_KEY`-avainta) ei ole enää näkyvää merkkiä keittiönäkymässä.
+
+**Tarkistukset:** `node --check` molemmille tiedostoille läpi. Selaimessa `http://localhost:4748/kitchen.html`: rivi on poissa, sivu latautuu ilman JavaScript-virheitä. Muita testejä ei ajettu.
+
+**Huomio:** commit sisältää vain tämän työvaiheen rivit. Työpuussa on muiden työvaiheiden commitoimattomia muutoksia, myös samassa `aimo-shell.js`-tiedostossa (etusivun haun siirto konsoliin), joita tämä commit ei sisällä.
+
 ## 14.11.2026 — keskipisteet pois koko projektista (Claude Code)
 
 **Käyttäjän päätös:** Eelis ei halua keskipistettä (U+00B7) erottimena missään. Älä lisää sitä uuteen käyttöliittymätekstiin, lokitulosteeseen, kommenttiin tai dokumenttiin. Käytä pilkkua tai jaa tieto omiin elementteihinsä.

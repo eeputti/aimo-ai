@@ -42,12 +42,6 @@ function renderStatus() {
   const d = state.d; if (!d) return;
   const p = d.proposal;
   $('#kitchen').textContent = d.kitchen ? `${d.kitchen.name}, ${d.kitchen.kind}` : '';
-  // Petrooli palvelupalkki: missä tilassa agentti pyörii.
-  const modes = [];
-  modes.push(d.mode.api === 'live' ? '<span class="chip live"><span class="dot"></span>Live: Aimo API</span>' : '<span class="chip sim" title="VALIO_API_KEY puuttuu: hinnat ja saatavuus ovat simuloituja">Simuloitu hinta ja saatavuus</span>');
-  modes.push(`<span class="chip" title="${d.mode.llm ? `Syvä: ${esc(d.mode.deepModel)}, nopea: ${esc(d.mode.fastModel)}` : 'ANTHROPIC_API_KEY puuttuu: reititys ja perustelut säännöillä'}">Claude ${d.mode.llm ? 'päällä' : 'pois'}</span>`);
-  if (state.last) modes.push(`<span class="chip ms" title="Viimeisin vasteaika palvelimella (${esc(state.last.via)})">⚡ ${ms(state.last.ms)}</span>`);
-  $('#modes').innerHTML = modes.join('');
   // Lila pääpalkki: toimituspäivä, tilausaikaraja ja tilauksen summa samaan tapaan kuin toimitustukussa.
   // Päivämääräkenttää ei piirretä uudelleen kesken valinnan.
   if (document.activeElement?.id === 'date') return;

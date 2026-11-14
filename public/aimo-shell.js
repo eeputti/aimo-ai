@@ -1,5 +1,5 @@
 // Yhteinen kehys (palvelupalkki + otsikkoalue) kaikille sivuille. Ladataan tavallisena skriptinä heti <body>:n alussa,
-// jotta sivun oma koodi (app.js, gateway.js) löytää elementit #modes, #kitchen, #status ja #chips, kun se käynnistyy.
+// jotta sivun oma koodi (app.js, gateway.js) löytää elementit #kitchen, #status ja #chips, kun se käynnistyy.
 // Käyttö: <script src="/aimo-shell.js" data-page="gateway | kitchen | approve"></script>
 (() => {
   const page = document.currentScript?.dataset.page || 'gateway';
@@ -68,7 +68,7 @@
       <form class="as-search" id="as-search" role="search" autocomplete="off">${I.search}<input id="as-q" type="text" placeholder="${SEARCH}" aria-label="${SEARCH}"><div class="as-pop as-sugg" id="as-sugg" hidden></div></form>
       <div class="as-right" id="status"></div>`}
     </div></div>
-    ${compact ? '' : `<div class="as-strip"><div class="as-in ${page === 'kitchen' ? 'modes' : 'chips'}" id="${page === 'kitchen' ? 'modes' : 'chips'}"></div></div>`}`;
+    ${compact || page === 'kitchen' ? '' : `<div class="as-strip"><div class="as-in chips" id="chips"></div></div>`}`;
   document.currentScript.replaceWith(el);
   if (compact) return;
 
