@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — rajaus: työstetään vain hakukenttää ja ostoskoria (Claude Code)
+
+**Käyttäjän päätös:** Eelis rajasi työn: fiksuksi tehdään vain etusivun hakukenttä ja ostoskori, kaikki muu pysyy samanlaisena kuin Toimitustukussa. Ensin hakukenttä. Uusia elementtejä, merkkejä tai paneeleja ei lisätä näiden kahden ulkopuolelle.
+
+- Alla kirjatut konsolin toimitusvarmuus- ja hiilijalanjälkimerkit (commit `c991ca2`) tehtiin ennen tätä rajausta. Niitä ei ole poistettu; Eelis ei ole vielä päättänyt, jäävätkö ne.
+- Koodia ei muutettu tässä kirjauksessa.
+
 ## 14.11.2026 — toimitusvarmuus ja hiilijalanjälki näkyviin tilausriveille, Danielin liittimen arvio (Claude Code)
 
 **Tausta:** Eelis sai Danielilta MCP-liittimen (Danielin `server.py` väliaikaisen `trycloudflare.com`-tunnelin takana, token osoitteessa). Liitin kytkettiin Claude Code -istuntoon ja kokeiltiin kolmella lukukutsulla: `ping` 200, `data_status` 17 546 tuotetta, 4 425 toimitusvarmuusriviä ja 11 033 hiilijalanjälkiriviä, `search_products` toimii. Hinta- ja saatavuuskutsuja ei tehty API-kiintiön vuoksi.
