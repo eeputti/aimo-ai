@@ -7,7 +7,8 @@ process.env.VALIO_API_KEY = '';
 process.env.ANTHROPIC_API_KEY = '';
 const { greetingFor, withGreeting, createOrderingDialogue } = await import('../server/whatsapp/dialogue.mjs');
 const { openWhatsAppStore } = await import('../server/whatsapp/store.mjs');
-const { createOrderingConversation } = await import('../server/order-conversation/index.mjs');
+const { createOrderingConversation, withoutClockWords } = await import('../server/order-conversation/index.mjs');
+const fs = await import('node:fs');
 const { openDraftStore } = await import('../server/order-conversation/store.mjs');
 
 // Marraskuussa Helsinki on UTC+2.
@@ -86,7 +87,8 @@ function addDays(iso, k) { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(
 const eggs = (date) => ({ intent: 'order', ...(date ? { deliveryDate: date } : {}), ops: [{ op: 'add', productTerm: 'kananmunat', quantity: { value: 50, unit: 'PCS', basis: 'items' }, claims: [], excludeAllergens: [] }] });
 
 test('tänään ei enää ehdi: kerrotaan aikaisin toimituspäivä ja tilausaikaraja, päivän vaihto numerolla', async () => {
-  const { say, calls, store } = rush({ 'tänään 50 kananmunaa ennen klo 7': eggs('2026-11-15') });
+  // Tulkki saa viestin ilman kellonaikaa (avain), kiire ja toive luetaan alkuperäisestä viestistä.
+  const { say, calls, store } = rush({ 'tänään 50 kananmunaa': eggs('2026-11-15') });
   const offer = await say('tänään 50 kananmunaa ennen klo 7');
   assert.equal(offer.status, 'collecting');
   assert.equal(offer.text, ['Tänään ei enää ehdi: kananmunat. Aikaisin toimitettava päivä on ma 16.11.', 'Vaihdetaanko koko tilauksen toimitus päivälle ma 16.11.?',
@@ -118,7 +120,7 @@ test('päivän vaihdosta kieltäytyminen pitää päivän eikä tarjoa samaa uud
 });
 
 test('kiire ilman päivää: päivä kysytään silti ensin, kiireen huomioiva kysymys', async () => {
-  const { say, calls } = rush({ 'heti 50 kananmunaa': eggs(null) });
+  const { say, calls } = rush({ '50 kananmunaa': eggs(null) }); // tulkki saa viestin ilman "heti"-sanaa
   const first = await say('heti 50 kananmunaa');
   assert.match(first.text, /\n\nMille päivälle toimitus\? Jos on kiire, kirjoita esim\. "huomenna", niin katson aikaisimman päivän, jolle ehtii\.$/);
   assert.equal(calls.suggest.length, 0);
@@ -130,4 +132,18 @@ test('huomiseksi ehtii: vaihtoehtojen yllä tilausaikaraja, ei päivän vaihtoa'
   assert.equal(r.status, 'choosing');
   assert.match(r.text, /Huomiselle ehtii tilata su 15\.11\. klo 12\.00 asti\.\nVastaa 1 tai 2\.$/);
   assert.doesNotMatch(r.text, /Toivoit toimitusta|Vaihdetaanko/);
+});
+
+test('kellonaika- ja kiiresanat eivät päädy tulkille tuotesanaksi, päiväsanat säilyvät', async () => {
+  const cases = [['tänään 50 kananmunaa ennen klo 7', 'tänään 50 kananmunaa'], ['huomenna aamulla 20 l maitoa', 'huomenna 20 l maitoa'],
+    ['20 l maitoa klo 7 mennessä', '20 l maitoa'], ['huomiseks aamuks 5 kg voita', 'huomiseks 5 kg voita'], ['50 kananmunaa ennen kello 7.30 huomenna', '50 kananmunaa huomenna'],
+    ['heti 20 l maitoa', '20 l maitoa'], ['kiireesti 5 kg voita huomiseksi', '5 kg voita huomiseksi'], ['nyt heti, 3 kg juustoa', '3 kg juustoa'],
+    ['aamupuuro 5 kg', 'aamupuuro 5 kg'], ['kiire!', 'kiire!']];
+  for (const [text, cleaned] of cases) assert.equal(withoutClockWords(text), cleaned, text);
+  // Oikea sääntötulkki, kun paikallinen katalogi on olemassa: ennen korjausta "kananmuna enne", "aamu maito" ja "eesti voi".
+  if (!fs.existsSync(new URL('../data/catalog.json', import.meta.url))) return;
+  const { understand } = await import('../server/aimo/understand.mjs');
+  for (const [text, term] of [['tänään 50 kananmunaa ennen klo 7', 'kananmuna'], ['huomenna aamulla 20 l maitoa', 'maito'], ['kiireesti 5 kg voita huomiseksi', 'voi']]) {
+    assert.deepEqual(understand(withoutClockWords(text), { now: new Date(at('10:00')) }).items.map((i) => i.productTerm), [term], text);
+  }
 });
