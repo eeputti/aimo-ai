@@ -2,6 +2,17 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — riippumaton WhatsApp–ostoslista–hyväksyntä-API:n loppuketju varmennettu (Codex, integraatiochatin valmis osuus)
+
+**Tekijä ja rajaus:** `Suunnittele tilauksen verkkokauppaintegraatio` -chat toteutti Danielin MCP-viestissä #35 hyväksymän erillisen testin `test/shopping-list-order-api.test.mjs` ja raportin `docs/parallel/shopping-list-order-api.md` (yhteinen tehtävä `750a63f3`, paikallinen `7ed54857`). Se luovutti nämä kaksi tiedostoa valmiina Git-vientiin. Sovelluslähteitä ei muutettu. Git-kokoaja luki toteutuksen/raportin, tarkisti eristyksen ja ajoi testit uudelleen ennen tätä rajattua tallennusta.
+
+- **Todellinen paikallinen ketju:** standalone-WhatsApp-palvelin → HMAC-varmennettu webhook → pysyvä jono ja sama tilausluonnos → GET `/api/assistant/whatsapp-list` ja POST `/api/assistant/whatsapp-list/chat` → nykyiset tuotetyökalut ja allekirjoitettu tarjous → erillinen TILAA → yrityksen hyväksyntä → saman gateway-tilauksen takaisinluku RESTistä, localhost-kaupasta ja audit-lokista.
+- **Uusinnat ja versiot:** kaksi samanaikaista samalla UUID:lla tehtyä TILAA-pyyntöä palauttaa saman tuloksen; yksi tilaus, yksi `ORDER_RECEIVED` ja yksi `ORDER_CONFIRMED`. Määräkorjaukset ja laktoosittomuus säilyvät kanavien välillä. Vanha revisio saa 409:n; nollauksen ja uuden listan jälkeen vanha vahvistusuusinta ei muuta uutta listaa. Asiakkuuden peruminen estää pääsyn 404:llä, cross-site- ja proxy-pyynnöt 403:lla.
+- **Tarkistukset tässä Git-kokoamisessa:** uusi testi **1/1 läpi**, noin 0,7 s; koko `npm test` **191/191 läpi, 0 ohitettua/virhettä**, noin 2,4 s. Syntaksi ja diff tarkistettu. Danielin aiempi sovellustoteutus `4d57190`/`48c4139` on jo yhdistetty; tämä tallennus lisää vain riippumattoman varmennuksen ja sen raportin.
+- **Eristys ja rajat:** omat väliaikaiset kannat ja satunnainen testipalvelinportti, simuloidut hinnat/saatavuus ja tyhjät malliavaimet. Lapsiprosessissa vain Metan lähetys-/statusvastaukset simuloidaan ja muu ulkoinen verkko estetään. Ei oikeita Meta-, malli- tai Valio-kutsuja, nykyisen palvelimen restarttia, ympäristömuutoksia tai käyttäjän kantojen nollausta. Testi todistaa gatewayn paikallisen demotilauksen; Valion tuotantotilausrajapintaa tai oikeaa puhelintoimitusta ei väitetä varmennetuksi.
+
+**Git ja jatko:** testi, tekijän raportti ja tämä lokimerkintä tallennetaan samaan rajattuun commitiin. Integraatiochatille ilmoitetaan pushattu SHA yhteisen tehtävän loppukuittausta varten. Muiden Cloudflare-, julkisen demon- ja tokeniraportit säilyvät niiden omistajille. Nykyisen palvelimen käyttöönotto ja oikean puhelimen varmennus ovat edelleen tokenikorjauschatin vastuulla.
+
 ## 14.11.2026 — WhatsAppin vastaamattomuus varmennettu nykyisestä jonosta ja Metasta (Codex, vastaustarkistuschat)
 
 - Käyttäjä pyysi tarkistamaan, vastaako WhatsApp, ja miksi se ei vastaa. Klo 22.29 tehdyt lukutarkistukset: paikallinen ja julkinen `/healthz` HTTP 200, 4749-prosessi käynnissä. **Klo 22.25.59 saapunut viesti vastaanotettiin ja vastaus tallennettiin, mutta kolme lähetysyritystä epäonnistuivat `META_HTTP_401`:een.** Viimeisin Metan hyväksymäksi merkitty vastaus on klo 21.58.34; puhelintoimitusta ei päätellä tästä.
