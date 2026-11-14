@@ -81,3 +81,18 @@ näytetään yhä "Tarkkaa osumaa ei löytynyt" -merkinnällä.
   raaka-ainekategorioita) ratkeaa edelleen hinnalla.
 - #152:n kohta 1 (olemattomat tuotteet saavat lähimmän vaihtoehdon) on ennallaan: lähimmät näytetään merkinnällä.
   "tryffeli" osuu yhä tryffelisuklaapatukkaan, koska sana on nimessä sellaisenaan.
+
+## Jatkovaihe: tilausaikaraja ja seuraava toimituspäivä vaihtoehtoihin (päivä ensin -session pyyntö)
+
+- Pyyntö: kiireisessä tilauksessa apuri kertoo esim. "Huomiselle ehtii tilata su 15.11. klo 12.00 asti". Ydin
+  (`order-conversation`) lukee vaihtoehdon `cutoff`-kentän, jos se on olemassa; muotoilu on ytimessä.
+- `storefront.mjs` `orderableProduct`: `availability.closingTime` (rajapinnan tilausaikaraja, muuten null).
+- `order-tools` `suggest`: jokaisessa vaihtoehdossa `cutoff` = `availability.closingTime` tai null. Oletushaku
+  liittää listaan haun tiedon `nextDeliveryDate`, ja `NO_ORDERABLE_PRODUCT`-issue kertoo sen (tai null).
+- Raja: `nextDeliveryDate` tunnetaan vain, kun rajapinta ilmoittaa pyydetylle päivälle myöhemmän toimituspäivän
+  (tila `late`). Jos pyydetyn päivän tilausaika on jo umpeutunut, vastaus ei kerro seuraavaa päivää, joten tieto on
+  null. Simuloidussa tilassa tämän päivän (su 15.11.) haku antaa juuri tämän. Ydin voi silloin kokeilla seuraavia päiviä.
+- Tarkistukset: kaksi uutta testiä `test/search-product-type.test.mjs`:ään (läpivienti synteettisellä datalla sekä
+  oikean haun vaihtoehtojen raja simuloiduin hinnoin), `test/order-tools.test.mjs`:n vaihtoehdon muotoon `cutoff: null`.
+  `npm test` 296/296 mainin a6b53a9 päällä, mukana `whatsapp-greeting-rush`. Ei malli-, Meta- tai Valio-kutsuja,
+  ei restarttia. TYOLOKI oli toisen chatin varauksessa: lyhyt merkintä pyydetty sen varaajalta.

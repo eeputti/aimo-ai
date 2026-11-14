@@ -139,3 +139,32 @@ test('selfplay-100:n hakulöydökset: pyydetty raaka-aine kärjessä tai kerrota
   // Olemattomat tai arvatut tuotteet: lähimmät vaihtoehdot näytetään, mutta niitä ei esitetä pyydettynä tuotteena.
   for (const [term, value, unit] of [['kuukivijogurtti', 5, 'KG'], ['strutsinmuna', 10, 'PCS'], ['kamelinmaito', 5, 'L']]) assert.equal((await suggest(term, value, unit))?.exact, false, term);
 });
+
+test('vaihtoehto kertoo tilausaikarajan, ja tyhjä tulos aikaisimman tunnetun toimituspäivän', async () => {
+  const { orderableProduct } = await import('../server/storefront.mjs');
+  const p = { id: 'k', name: 'Kerma', salesUnit: 'ST', litres: 1, lot: 0.01 };
+  const quote = { avail: { status: 'ok', date: '2026-11-16', amount: 100, closingTime: '2026-11-15T12:00:00' }, price: { net: 2, vatRate: 13.5 } };
+  assert.equal(orderableProduct(p, quote, '2026-11-16', { value: 5, unit: 'L' }).product.availability.closingTime, '2026-11-15T12:00:00');
+  assert.equal(orderableProduct(p, { ...quote, avail: { ...quote.avail, closingTime: undefined } }, '2026-11-16', { value: 5, unit: 'L' }).product.availability.closingTime, null);
+
+  const option = { id: 'k', name: 'Kerma 1 l', unit: 'ST', unitLabel: 'kpl', litres: 1, qty: 5, price: 2, labels: [], availability: { deliveryDate: '2026-11-16', closingTime: '2026-11-15T12:00:00' } };
+  let found = [option];
+  const tools = createOrderingTools({ search: async () => found, product: () => ({ hasAllergenData: true, contains: [] }), buyer: () => ({}), requestQuote: async () => ({}), placeOrder: async () => ({}) });
+  const customer = { customerId: 'c', buyerId: 'b', bindingVersion: 1, permissions: { readProducts: true } };
+  const draft = { id: 'd', deliveryDate: '2026-11-16', diet: { known: true, claims: [], excludeAllergens: [] }, lines: [{ ref: 'L1', productTerm: 'kerma', quantity: { value: 5, unit: 'L' }, claims: [], excludeAllergens: [] }] };
+  assert.equal((await tools.suggest({ customer, draft })).lines[0].options[0].cutoff, '2026-11-15T12:00:00');
+  found = Object.assign([], { nextDeliveryDate: '2026-11-18' });
+  assert.deepEqual((await tools.suggest({ customer, draft })).issues.map((x) => [x.code, x.nextDeliveryDate]), [['NO_ORDERABLE_PRODUCT', '2026-11-18']]);
+  found = [];
+  assert.equal((await tools.suggest({ customer, draft })).issues[0].nextDeliveryDate, null, 'ilman tietoa päivää ei arvata');
+});
+
+test('oikean haun vaihtoehdoissa on tilausaikaraja', { skip: !fs.existsSync(CATALOG) && 'data/catalog.json puuttuu' }, async () => {
+  process.env.AIMO_CATALOG = CATALOG;
+  const tools = createOrderingTools();
+  const customer = { customerId: 'c1', buyerId: 'demo-nordic', bindingVersion: 1, permissions: { readProducts: true } };
+  const r = await tools.suggest({ customer, draft: { id: 'd', deliveryDate: '2026-11-17', diet: { known: true, claims: [], excludeAllergens: [] },
+    lines: [{ ref: 'L1', productTerm: 'kerma', quantity: { value: 5, unit: 'L' }, claims: [], excludeAllergens: [] }] } });
+  assert.ok(r.lines[0].options.length);
+  for (const o of r.lines[0].options) assert.match(o.cutoff, /^2026-11-1[56]T\d{2}:\d{2}/, o.name);
+});

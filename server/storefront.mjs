@@ -33,7 +33,8 @@ export function orderableProduct(p, quote, date, quantity) {
     litres: p.litres ?? null, kg: p.kg ?? null, labels: p.labels || [], step: stepOf(p), qty,
     price: price.net, vat: price.vatRate, comparison: price.comparison ?? null, comparisonUnit: price.comparisonUnit ?? null,
     quantityExplanation: explainItemQuantity(p, quantity, qty),
-    availability: { status: 'ok', deliveryDate: date, stock: a.amount ?? null, source: a.source, checkedAt: a.fetchedAt || Date.now() },
+    // closingTime: tilausaikaraja tälle toimitukselle ("Huomiselle ehtii tilata su 15.11. klo 12.00 asti").
+    availability: { status: 'ok', deliveryDate: date, stock: a.amount ?? null, closingTime: a.closingTime || null, source: a.source, checkedAt: a.fetchedAt || Date.now() },
   } };
 }
 

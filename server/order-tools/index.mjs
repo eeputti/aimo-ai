@@ -95,7 +95,10 @@ async function defaultDeps() {
     // Säännöt ilman mallikutsua: luonnoksen rivi on jo rakenteinen.
     search: async (line, deliveryDate) => {
       const r = await storefront.searchStorefront(lineQuery(line), { deliveryDate, llm: false });
-      return r.cards[0]?.list || [];
+      // Tyhjän tuloksen aikaisin päivä, jolle sama haku löytää tilattavaa (rajapinnan saatavuudesta), kulkee listan mukana.
+      const list = r.cards[0]?.list || [];
+      list.nextDeliveryDate = r.cards[0]?.reason?.nextDeliveryDate || null;
+      return list;
     },
     product: (id) => cat.get(String(id)),
     buyer: (buyerId) => gwStore.buyers.byId(buyerId),
@@ -166,7 +169,8 @@ export function createOrderingTools(deps = {}) {
         fit = fit.filter((o) => !has(o));
       }
       let scored = scoreOptions(fit, line);
-      if (!scored.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref })); continue; }
+      // nextDeliveryDate: aikaisin päivä, jolle haku löytää tilattavaa, kun haku sen tietää (muuten null).
+      if (!scored.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: found.nextDeliveryDate || null })); continue; }
       // Asiakkaan selvä ehto (maustamaton) rajaa vaihtoehdot: maustettua ei tarjota edes halvimpana.
       if (wantsPlain(line)) {
         scored = scored.filter((x) => !flavoured(x.o, line));
@@ -214,6 +218,7 @@ export function createOrderingTools(deps = {}) {
         productId: String(o.id), name: o.name, brand: o.brand || null, salesUnits: o.qty, salesUnitLabel: o.unitLabel,
         covers: o.quantityExplanation ? { value: o.quantityExplanation.providedItems, unit: 'PCS' } : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
         unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
+        cutoff: o.availability?.closingTime || null, // tilausaikaraja; ydin muotoilee sen kiireisessä tilauksessa
         stock: o.availability?.stock ?? null, labels: o.labels || [], note: o.quantityExplanation?.text || null,
         why: o.substituteFor ? `Korvaa tuotteen ${o.substituteFor.name}` : null,
         warning: [soft.filter((c) => !o.labels?.includes(c)).length ? `Ei merkintää: ${soft.filter((c) => !o.labels?.includes(c)).map((c) => CLAIM_WORD[c] || c).join(', ')}` : null, diet.excludeAllergens.length && !product(o.id)?.hasAllergenData ? 'allergeenitieto puuttuu, tarkista itse' : null].filter(Boolean).join('; ') || null,
