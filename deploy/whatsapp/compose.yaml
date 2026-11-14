@@ -1,0 +1,38 @@
+name: aimo-whatsapp
+services:
+  whatsapp:
+    build:
+      context: ../..
+      dockerfile: deploy/whatsapp/Dockerfile
+    env_file: .env
+    environment:
+      WHATSAPP_PORT: "4749"
+      WHATSAPP_ORDERING_ENABLED: "true"
+      WHATSAPP_DB: /app/data/whatsapp/inbox.db
+      WHATSAPP_DRAFT_DB: /app/data/whatsapp/drafts.db
+      WHATSAPP_QUOTE_DB: /app/data/whatsapp/quotes.db
+      GATEWAY_DB: /app/data/whatsapp/gateway.db
+      AIMO_DB: /app/data/whatsapp/kitchen.db
+      AIMO_CATALOG: /app/data/catalog.json
+    ports:
+      - "127.0.0.1:${WHATSAPP_CONTAINER_PORT:-4759}:4749"
+    volumes:
+      - whatsapp-data:/app/data
+      - type: bind
+        source: ../../data/catalog.json
+        target: /app/data/catalog.json
+        read_only: true
+        bind:
+          create_host_path: false
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  whatsapp-data:

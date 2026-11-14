@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsAppin ennakkotarkistus ja erillinen käynnistyspaketti (Codex, alkuperäinen testinumerochat)
+
+**Työnjako:** käyttäjä pyysi edistämään muuta sovellusta WhatsApp-kytkennän rinnalla ja tarkensi, että Claude tekee oikean mallin/mock-API:n keskustelutestit, löydettyjen vikojen korjaukset ja selaimen varademon. Tämä osuus rajattiin käynnistys-/julkaisuvalmiuteen. Työ varattiin paikallisella koordinointitaululla (`3a8aa996`), ja rajauksesta ilmoitettiin Claudelle. Varattua `docs/parallel/1.md`:tä ei muokattu; tämän osuuden ohje ja varmennustila ovat `docs/whatsapp-deploy.md`:ssä.
+
+- `scripts/whatsapp-preflight.mjs`: vain lukeva asetusten tarkistus, selkokieliset virheet ja `--json` ilman avainten, numeroiden tai kantapolkujen tulostamista. Node-versio, Meta-asetusten olemassaolo/muoto, portti/tilauslippu, erilliset kirjoitettavat kantapolut (myös symboliset/kovat linkit), katalogin perusrakenne ja Ed25519-avain. Ilmoittaa sääntötulkista, simuloiduista hinnoista ja demokellosta. Ei avaa SQLite-kantoja tai tee verkkokutsuja; ei todista tokenin tai Metan lähetysoikeuden toimivuutta.
+- `deploy/whatsapp/start.mjs`: sama nykyinen WhatsApp-palvelin käynnistyy vasta hyväksytyn paikallisen tarkistuksen jälkeen; vain puuttuvat kantahakemistot luodaan. Olemassa olevia kantoja ei nollata. Ei korvaa yhden workerin käyttösääntöä prosessilukolla.
+- Dockerfile, rajattu build-konteksti, salaisuuksia sisältämätön asetuspohja ja Compose: Node 24, ei-root-käyttäjä, vain luettava sovellus, healthcheck, hallittu pysäytysaika, viisi erillistä kantaa ja gatewayn avain samalla nimetyllä levyllä. Katalogi liitetään koneelta vain luettavana, sitä tai challenge-aineistoa ei lähetetä buildiin. Kontin localhost-portti on oletuksena 4759 eikä se korvaa nykyistä 4749-palvelinta. Uuden varademon HTML on mukana, mutta Dockerin porttivälitys ei läpäise varademon tarkoituksellista loopback-rajausta; selaindemoon käytetään paikallista Node-käynnistystä.
+
+**Tarkistukset:** kuusi uutta testiä läpi. Oikea eristetty Node-palvelin käynnistettiin ja suljettiin kahdesti: sama numeroliitos, tallennettu vastaus, luonnoksen revisio, gatewayn demotilaus, keittiökannan tieto ja tarjouskannan testitieto säilyivät. Virheellinen konfiguraatio pysäyttää ennen kantojen luontia, ja tulosteen salaisuuksien vuotamattomuus on tarkistettu. WhatsAppiin liittyvä testiryhmä 27/27 läpi; Clauden uuden varademon kanssa viimeinen rajattu ryhmä 8/8 läpi, myös käynnistimen `/demo`-HTML-luku. Nykyisen paikallisen ympäristön ennakkotarkistus läpi (`ordering-demo`, portti 4749) ilman muutoksia. Syntaksit ja diff-tarkistus läpi; Compose-YAML jäsennetty ja suhteellinen build-polku tarkistettu.
+
+**Rajat ja jatko:** Dockeria tai sen daemonia ei ole tässä Codex-ympäristössä, joten imagea ei ole rakennettu eikä Compose-ajoa varmennettu. Tämä on merkitty käyttöohjeeseen erikseen; Node-testi ei ole konttiajon varmennus. Nykyisiä palvelimia, `.env`-tiedostoja, Meta-asetuksia, keskustelun/kanavan lähdekoodia tai demon kantoja ei muutettu. Ei oikeita Meta-, malli- tai Valio-kutsuja, julkaisua tai nykyisten tietojen siirtoa. Docker-käyttöönoton omistaja ajaa ohjeen build-/health-/restart-kokeen Docker-palvelimella ennen sen käyttöönottoa; nykyinen puhelinyhteyden korjaus jatkuu toisessa chatissa.
+
 ## 14.11.2026 — selaimen varademo samasta tilauskeskustelusta (Claude Code)
 
 **Miksi:** Metan 131005 estää vastaukset puhelimeen, eikä esto välttämättä aukea ennen demoa. Varademo näyttää saman tilauskeskustelun selaimessa ilman Metaa.

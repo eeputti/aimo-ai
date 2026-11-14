@@ -1,0 +1,17 @@
+**
+!package.json
+!package-lock.json
+!server/
+!server/**
+!public/
+!public/whatsapp-demo.html
+!scripts/
+!scripts/whatsapp-preflight.mjs
+!deploy/
+!deploy/whatsapp/
+!deploy/whatsapp/Dockerfile
+!deploy/whatsapp/start.mjs
+**/.env*
+**/*.pem
+**/*.db
+**/*.db-*
