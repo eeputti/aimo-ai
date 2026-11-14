@@ -17,3 +17,13 @@ CREATE TABLE IF NOT EXISTS order_events (
   email_updated_at INTEGER NOT NULL,
   email_message_id TEXT
 );
+
+-- Demo-only payment state. No real payment or card information is stored.
+CREATE TABLE IF NOT EXISTS demo_payments (
+  order_id TEXT PRIMARY KEY REFERENCES order_events(order_id),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'paid')),
+  amount_net_cents INTEGER NOT NULL CHECK (amount_net_cents >= 0),
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  paid_at INTEGER
+);
