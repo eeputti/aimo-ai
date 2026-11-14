@@ -2,6 +2,16 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — Meta-testinumero luotu, tavoitteena myöhemmin kaikille avoin numero (Codex)
+
+**Varmennettu tulos:** käyttäjä hyväksyi erikseen WhatsApp Business Platform / Cloud API -ehdot. Metan Step 1. Try it out näyttää Claim a WhatsApp test number Completed, Phone Number ID `1445585741976990` ja Messaging account ID `1045787755199877`. Tekninen numerotunniste sekä sivun esimerkin Graph API -versio `v25.0` tallennettiin olemassa olevaan paikalliseen, Gitin ohittamaan `.env`:iin muuttamatta sen muita asetuksia. Profiilikuvaa ei ole asetettu, testiviestiä ei ole lähetetty eikä WhatsApp-agentin päästä päähän -toimivuutta varmennettu.
+
+**Käyttäjän tarkennus:** apurin pitää lopulta palvella ketä tahansa sille viestittävää, ei vain etukäteen lisättyjä testaajia. Metan testinumerolta saa lähettää vain enintään viidelle vahvistetulle vastaanottajalle; avoimeen demoon tarvitaan oma yritysnumero ja käyttöönotto sen vaatimuksilla. Erillisen numeron saatavuutta kysyttiin käyttäjältä. Henkilökohtainen WhatsApp-numero annettiin vain Metan testivastaanottajaksi; sitä ei kirjata repoon tai siirretä yritysnumeroksi.
+
+**Token kesken:** käyttäjä valtuutti testitilin API-tokenin luonnin ja paikallisen tallennuksen. OAuthissa valittiin vain nykyiset erikseen valittavat WhatsApp-tilit; ainoana näkyy yllä oleva Test Messaging Account. Kaikkia nykyisiä/tulevia tilejä ei hyväksytty. Selainohjaus aikakatkaisi tilin valinnassa; käyttäjältä pyydettiin tämän rajatun valinnan ja Continue-vaiheen tekemistä. Tokenin valmistumista tai tallennusta ei ole varmennettu. `.env`:stä tarkistettiin vain asetusten olemassaolo: MCP-osoite/-token sekä WhatsAppin API-token, App Secret, verify token ja tukiyhteys puuttuvat.
+
+**Tarkistukset ja jatko:** selaimen luontitila ja tunnisteet luettu oikeasta Meta-sovelluksesta; `.env` varmistettu ohitetuksi ennen muutosta. Ei palvelimen restarttia, pakettimuutoksia, testitilauksia tai ulkoisia malli-/Valio-kutsuja. Muiden keskeneräiset keskustelu-/tuotetyökalut ja raportit säilyvät omissa työvaiheissään. Seuraavaksi tokenin rajattu valtuutus, oman testivastaanottajan vahvistus, taustapalvelimen puuttuvat asetukset ja HTTPS-webhook; avoimen numeron käyttöönotto erikseen. Metan MCP-työkalu selvitettiin vaihtoehdoksi epävarmalle selainohjaukselle, mutta sopivaa yhdistettävää pluginia ei löytynyt eikä uutta yhteyttä perustettu.
+
 ## 14.11.2026 — Meta-sovellus luotu Roisku Median alle (Codex)
 
 **Tulos:** käyttäjä antoi erillisen luvan Meta Platform Terms / Developer Policies -hyväksyntään ja sovellus luotiin nimellä **Valio Aimo Tilausapuri** Roisku Median portfolioon. Sovelluksen dashboard ja WhatsApp-käyttötapaus näkyvät selaimessa; App ID `1829102204844975`. Sovellusta ei julkaistu tuotantoon. Aiemman merkinnän hyväksymisluvan odotus on päättynyt.
