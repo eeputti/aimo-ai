@@ -6,6 +6,8 @@
 (() => {
   if (window.aimoAsk) return;
   const HANDOFF_KEY = 'aimo.ask';
+  const intentReady = import('/aimo-request-intent.js').catch(() => null);
+  let recipeContext = null;
   const storefrontCart = window.aimoCart || null;
   const PLACEHOLDER = 'Hae tuotteita tai kerro mitä tarvitset';
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -179,18 +181,56 @@
         <button type="button" class="ask-go"${orderable ? '' : ' disabled'}>${storefrontCart ? I.cart + 'Kokoa ostoskori' : I.truck + 'Tilaa agentin kautta'}</button>
       </div>`;
   }
+  async function fetchSearch(text, speech, deliveryDate, requestedPatches = []) {
+    const res = await fetch('/api/storefront/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, deliveryDate, llm: speech === true, patches: requestedPatches }) });
+    const r = await res.json();
+    return res.ok ? r : { error: r.error?.message || r.error || 'Haku epäonnistui' };
+  }
+  async function openRecipeRequest(routed, source, speech, mine) {
+    const context = recipeContext = { ...routed.recipe, productText: routed.productText, source, speech, productCount: 0 };
+    picked = null; override = null; patches = []; selectedNeeds.clear(); orderable = false; last = null;
+    recipes.hidden = false; root.classList.add('ask-recipe-mode');
+    root.querySelector('[data-card="recipe"] .ask-card-head').setAttribute('aria-expanded', 'true');
+    rinput.value = context.query;
+    portions = Number.isInteger(context.portions) && context.portions >= 1 && context.portions <= 2000 ? context.portions : 0;
+    pinput.value = portions || ''; pinput.placeholder = 'Määrä';
+    main.innerHTML = `<div class="ask-recipe-prompt"><p>${portions ? 'Valitse haluamasi resepti, niin kokoan raaka-aineet.' : 'Valitse resepti ja anna annosmäärä (1–2000).'}</p>${context.productText ? `<p>Mukana säilyvät myös: <b>${esc(context.productText)}</b></p>` : ''}</div>`;
+    await loadIdeas();
+    if (mine !== seq || root.hidden || recipeContext !== context || rinput.value !== context.query) return false;
+    const exact = ideas.find((idea) => idea.name.toLowerCase() === context.query.toLowerCase() || idea.id === context.query.toLowerCase());
+    if (exact) {
+      picked = exact; paintIdeas();
+      if (portions) return runRecipe();
+    }
+    requestAnimationFrame(() => { if (!root.hidden && recipeContext === context) recipes.scrollIntoView({ block: 'nearest', behavior: still() ? 'auto' : 'smooth' }); });
+    return true;
+  }
   let deepTimer;
   async function search(speech = false) {
     if (override && q.value.trim() !== override.label) { override = null; picked = null; paintIdeas(); }
     const text = sent(); const mine = ++seq;
     if (text.length < 2) { idle(); return; }
+    const intent = await intentReady;
+    if (mine !== seq || root.hidden) return;
+    if (!override && recipeContext?.label !== q.value) {
+      const routed = intent?.routeRequest(text);
+      if (routed?.recipe) return openRecipeRequest(routed, text, speech, mine);
+      recipeContext = null;
+    }
+    const context = recipeContext?.label === q.value ? recipeContext : null;
+    const offset = context?.productCount || 0;
+    const recipePatches = context?.productText ? patches.filter((p) => p.item >= offset).map(({ item, patch }) => ({ item: item - offset, patch })) : patches.map(({ item, patch }) => ({ item, patch }));
     let r;
     try {
       main.innerHTML = '<p class="ask-thinking">Tarkistan tuotteet ja saatavuuden…</p>';
-      const res = await fetch('/api/storefront/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, deliveryDate: storefrontCart?.get().selectedDate, llm: speech === true, patches: patches.map(({ item, patch }) => ({ item, patch })) }) });
-      r = await res.json();
-      if (!res.ok) r = { error: r.error?.message || r.error || 'Haku epäonnistui' };
-    } catch { r = { error: 'Hakupalveluun ei saatu yhteyttä.' }; }
+      r = await fetchSearch(text, speech, storefrontCart?.get().selectedDate, recipePatches);
+      if (context?.productText && !r.error) {
+        const products = await fetchSearch(context.productText, speech || context.speech, r.deliveryDate, patches.filter((p) => p.item < offset).map(({ item, patch }) => ({ item, patch })));
+        if (mine !== seq || root.hidden) return;
+        context.productCount = products.understood?.items?.length || 0;
+        r = intent.combineSearchResults(products, r);
+      }
+    } catch (error) { r = { error: error instanceof TypeError || error instanceof SyntaxError ? 'Hakupalveluun ei saatu yhteyttä.' : error.message || 'Hakupalveluun ei saatu yhteyttä.' }; }
     if (mine !== seq || root.hidden) return;
     render(r);
     // Säännöt eivät tunnistaneet sanaa: kirjoitustauon jälkeen kysytään kielimallilta. Vastaus tallentuu palvelimen
@@ -205,7 +245,7 @@
     }
     return !r.error;
   }
-  const setText = (text) => { q.value = text; q.focus({ preventScroll: true }); selectedNeeds.clear(); clearTimeout(timer); search(); };
+  const setText = (text) => { recipeContext = null; root.classList.remove('ask-recipe-mode'); q.value = text; q.focus({ preventScroll: true }); selectedNeeds.clear(); clearTimeout(timer); search(); };
   const cartProduct = (p) => ({ ...p, unit: p.unitLabel, image: `/img/${encodeURIComponent(p.id)}`, availableFrom: p.availability?.deliveryDate, taxUnknown: p.vat == null });
   async function addProducts(entries, date) {
     await storefrontCart.ready;
@@ -287,6 +327,7 @@
     sheet.style.maxHeight = `calc(100dvh - ${top}px)`;
     root.hidden = false; document.documentElement.classList.add('ask-open');
     origin?.querySelector('input')?.setAttribute('aria-expanded', 'true');
+    recipeContext = null; root.classList.remove('ask-recipe-mode');
     q.value = text; if (text) search(); else idle();
     loadReady();
     if (!still()) {
@@ -311,7 +352,7 @@
     origin?.querySelector('input')?.focus({ preventScroll: true });
   }
 
-  q.addEventListener('input', () => { seq++; orderable = false; selectedNeeds.clear(); patches = []; expanded.clear(); clearTimeout(timer); clearTimeout(deepTimer); main.innerHTML = '<p class="ask-thinking">Tarkistan tuotteet ja saatavuuden…</p>'; timer = setTimeout(search, 350); });
+  q.addEventListener('input', () => { recipeContext = null; root.classList.remove('ask-recipe-mode'); seq++; orderable = false; selectedNeeds.clear(); patches = []; expanded.clear(); clearTimeout(timer); clearTimeout(deepTimer); main.innerHTML = '<p class="ask-thinking">Tarkistan tuotteet ja saatavuuden…</p>'; timer = setTimeout(search, 350); });
   root.querySelector('.ask-bar').addEventListener('submit', (ev) => { ev.preventDefault(); toAgent(); });
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !root.hidden) close(); });
 
@@ -338,16 +379,32 @@
   }
   function runRecipe() {
     if (!picked) return;
-    const date = last?.deliveryDate || storefrontCart?.get().selectedDate;
+    if (!Number.isInteger(portions) || portions < 1 || portions > 2000) {
+      main.innerHTML = '<p class="ask-warn">Anna annosmäärä väliltä 1–2000 ennen raaka-aineiden laskemista.</p>'; orderable = false; return false;
+    }
+    const date = recipeContext?.deliveryText || last?.deliveryDate || storefrontCart?.get().selectedDate;
     const when = date || 'maanantaiksi';
     const label = `${picked.name} ${portions} annosta ${when}`;
     override = picked.pinned ? null : { label, title: `${picked.name}, ${portions} annosta`, text: `${picked.ingredients.map((g) => `${amountText(g.amount * portions)} ${g.unit === 'L' ? 'l' : 'kg'} ${g.name}`).join(', ')} ${when}` };
-    q.value = label; selectedNeeds.clear(); clearTimeout(timer); search();
+    if (recipeContext) recipeContext.label = label;
+    q.value = label; patches = []; selectedNeeds.clear(); clearTimeout(timer); return search();
   }
-  const setPortions = (n) => { portions = Math.min(2000, Math.max(1, Math.round(n) || portions)); pinput.value = portions; runRecipe(); };
+  let portionTimer;
+  const setPortions = (n) => {
+    clearTimeout(portionTimer);
+    portions = Number.isInteger(n) && n >= 1 && n <= 2000 ? n : 0;
+    pinput.value = portions || '';
+    runRecipe();
+  };
   rinput.addEventListener('input', () => { clearTimeout(ideaTimer); ideaTimer = setTimeout(loadIdeas, 420); });
   rinput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ideas.length) { ev.preventDefault(); picked = ideas[0]; paintIdeas(); runRecipe(); } });
-  pinput.addEventListener('input', () => { pinput.value = pinput.value.replace(/\D/g, ''); });
+  pinput.addEventListener('input', () => {
+    pinput.value = pinput.value.replace(/\D/g, '');
+    portions = parseInt(pinput.value, 10) || 0; orderable = false;
+    clearTimeout(portionTimer);
+    const value = pinput.value; const source = q.value; const selection = picked;
+    portionTimer = setTimeout(() => { if (!root.hidden && q.value === source && pinput.value === value && picked === selection) runRecipe(); }, 250);
+  });
   pinput.addEventListener('change', () => setPortions(parseInt(pinput.value, 10)));
   pinput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); pinput.blur(); } if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') { ev.preventDefault(); setPortions(bump(portions, ev.key === 'ArrowUp' ? 1 : -1)); } });
   pinput.addEventListener('focus', () => pinput.select());

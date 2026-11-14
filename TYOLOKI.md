@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — sanelun reseptiohjaus ja yhteisen koripolun käyttöönotto (Codex)
+
+**Käyttäjän päätös:** sanelusta pitää voida luetella tuotteita ja pyytää resepti samassa tarpeessa. Resepti avataan sovelluksen nykyiseen reseptihakuun ja annosmäärään (ei ulkoiselle sivustolle). Muut tuotteet säilyvät mukana. Ostoskorin ja hakuvaiheen yhteinen työ tehtiin Eeliksen erikseen valtuuttamalla chattien työnjaolla.
+
+- `public/aimo-request-intent.js`: yhteinen reititys kirjoitetulle ja sanelulle pyynnölle. Poimii reseptin, annosmäärän ja päiväilmauksen sekä säilyttää erillisen tuoteluettelon ennen reseptiä tai sen jälkeen. `combineSearchResults` yhdistää tuotteiden ja reseptin tulokset rivejä pudottamatta; ristiriitaiset toimituspäivät palautuvat käyttäjän ratkaistaviksi.
+- `public/aimo-ask.js/css`: reseptihaku avautuu oikealla hakusanalla, annosmäärä täyttyy vain jos se annettiin. Oma täsmäävä resepti valitaan valmiiksi; muista ehdotuksista käyttäjä valitsee sopivan. Puuttuvalla tai virheellisellä annosmäärällä ei lasketa oletuksena sataa annosta. Määrän kirjoitus laskee uudelleen 250 ms:n tauon jälkeen, eikä odota kentästä poistumista. Reseptin raaka-aineet ja muut tuotteet haetaan erikseen ja yhdistetään yhdeksi tarkistettavaksi koriehdotukseksi. Hakusuodattimien rivikohdistus säilyy. `aimo-voice.css` pitää myös uuden hakupaneelin ohjetekstin poissa kuuntelun aikana.
+- **Koriin lisäämisen vian syy:** vanha 4747-palvelin ei tuntenut uusien `/api/storefront/search`- ja `/review`-reittien toteutusta (404), vaikka selain sai jo uudet staattiset tiedostot. Rinnakkainen hakutyö yhdisti lisäykset uuteen koriin commitissa `6e278a7`; käynnistin palvelimen lopuksi kerran uudelleen samoilla `data/aimo.db`- ja `data/gateway.db`-kannoilla. Nyt tyhjät hakujen/tarkistusten validointipyynnöt palauttavat 400, `/cart.html` 200. 12 gateway-tilauksen ja kolmen aiemman keittiöehdotuksen tuoterivien ennen–jälkeen-SHA-256:t olivat täsmälleen samat. Käyttäjän selaimen koria ei muutettu.
+
+**Tarkistukset:** `npm test` 65/65, `aimo:eval` 26/26 ja `aimo:eval:spoken` 54/54, syntaksi ja diff-tarkistus. Reitityksen neljä testiä kattavat tavallisen listan, valmisruoan erottelun, reseptin ja annokset, sekapyynnön ja tulosten yhdistämisen. Eristetyssä 4762/4763-demossa omilla kannoilla ja simuloidulla puheella "100 kananmunaa ja resepti lohikeittoon 10 annosta" tuotti yhdeksän tarvetta ja siirtyi Kokoa ostoskori -napista yhteiseen koriin. Puheteksti pysyi piilossa kuunnellessa. Puuttuva annosmäärä jäi tyhjäksi, 375 px:n asettelussa ei vaakaylivuotoa. **Yksi oikea, vain lukeva päädemon haku:** "100 kananmunaa", ma 16.11. → 10 × M10 = 100, 17 × M6 = 102 ja 2 × M90 = 180; ensimmäinen vaihtoehto 10 rasiaa. Tällä live-haulla ei lisätty tuotteita eikä tehty tilausta.
+
+**Rajaus:** oikean mikrofonin puheentunnistustarkkuutta ei tässä testattu. Mielivaltaisen reseptin haku riippuu edelleen mallin ehdotuksista ja raaka-ainetiedot tarkistetaan ennen koriin lisäämistä. Maksupalvelua tai uutta automaattitilausta ei liitetty. Kappalemuunnos on commitissa `898547a`; tämä commit viimeistelee sen kanssa yhteisen sanelu-/reseptipolun.
+
 ## 14.11.2026 — demon tuotekuvat kevyiksi ja esilataus käyttöön (Codex)
 
 **Käyttäjän pyyntö:** selvitä kuvien hitaus ja nopeuta demoa. Syyt: puuttuva kuva etsittiin vasta selaimen pyynnöstä useasta ulkoisesta palvelusta, neljän haun jonossa; hidas GTIN-varatie oli ennen toimittajan lähimmän nimen hakua. Paikalliset tuotekuvat olivat jopa 2048 px ja 2,85 Mt, ja staattiset kuvat/fontit tarjoiltiin `no-store`-asetuksella.
