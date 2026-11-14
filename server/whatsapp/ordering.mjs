@@ -32,6 +32,23 @@ export function bootstrapDemoMember(store, env = process.env) {
 
 export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadOrdering } = {}) {
   let runtime; let pending;
+  const queues = new Map();
+  function serial(binding, work) {
+    const next = (queues.get(binding) || Promise.resolve()).then(work);
+    const tail = next.catch(() => {}); queues.set(binding, tail);
+    void tail.then(() => { if (queues.get(binding) === tail) queues.delete(binding); });
+    return next;
+  }
+  const epochOf = (binding) => {
+    if (!store.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wa_dialogue'").get()) return '';
+    const row = store.db.prepare('SELECT json FROM wa_dialogue WHERE binding=?').get(binding);
+    return row ? JSON.parse(row.json).epoch || '' : '';
+  };
+  const conversationId = (customer, epoch = epochOf(customer.bindingVersion)) =>
+    `${phoneId}:${customer.customerId}:${customer.bindingVersion}${epoch ? `:session:${epoch}` : ''}`;
+  const context = (current) => ({ customerId: customerId(current.binding), buyerId: buyerId(current.binding), bindingVersion: current.binding,
+    companyName: current.company, personName: current.person, source: 'demo',
+    deliverySites: [{ id: 'demo-keittio', label: 'Testikeittiö' }], permissions: { readProducts: true, placeOrders: true } });
   const livePermissions = (customer) => {
     const member = store.db.prepare('SELECT binding FROM members WHERE binding=?').get(customer?.bindingVersion || '');
     const allowed = !!member && customer.customerId === customerId(member.binding)
@@ -52,30 +69,51 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
     } };
   });
   const getRuntime = () => (pending ||= Promise.resolve().then(() => load(livePermissions)).then((value) => (runtime = value)));
-  return {
-    async chat({ member, messageId, receivedAt, messages }) {
+  const bridge = {
+    async getShoppingList(member) {
+      return serial(member?.binding, async () => {
+        const current = member?.phone && store.member(member.phone);
+        if (!current || current.binding !== member.binding) throw Object.assign(new Error('Testiyhteys ei ole voimassa.'), { status: 403 });
+        const ordering = await getRuntime(); const customer = context(current);
+        if (!livePermissions(customer).readProducts) throw Object.assign(new Error('Testiyhteys ei ole enää voimassa.'), { status: 403 });
+        return ordering.getShoppingList?.({ conversationId: conversationId(customer), customer }) || null;
+      });
+    },
+    chat(args) { return serial(args.member?.binding, () => bridge.chatTurn(args)); },
+    async chatTurn({ member, messageId, receivedAt, messages, expectedList }) {
       const current = member?.phone && store.member(member.phone);
       if (!current || current.binding !== member.binding || !messageId) {
         return { text: 'Testiyhteys ei ole voimassa. Pyydä ylläpitäjältä uusi yhdistäminen.' };
       }
-      const customer = {
-        customerId: customerId(current.binding), buyerId: buyerId(current.binding), bindingVersion: current.binding,
-        companyName: current.company, personName: current.person, source: 'demo',
-        deliverySites: [{ id: 'demo-keittio', label: 'Testikeittiö' }],
-        permissions: { readProducts: true, placeOrders: true },
-      };
+      const customer = context(current);
       const ordering = await getRuntime();
       if (!livePermissions(customer).readProducts) return { text: 'Testiyhteys ei ole enää voimassa.' };
+      if (expectedList !== undefined && !ordering.hasTurnResult?.({ messageId, customer })) {
+        const list = ordering.getShoppingList?.({ conversationId: conversationId(customer), customer }) || null;
+        if ((list?.id || null) !== (expectedList?.id || null) || (list?.revision ?? null) !== (expectedList?.revision ?? null)) {
+          throw Object.assign(new Error('Ostoslista muuttui toisessa kanavassa. Päivitä ja avaa lista uudelleen.'), { status: 409 });
+        }
+      }
       ordering.ensureBuyer?.(customer);
       const runOrder = (text, { epoch = '', operation = '' } = {}) => ordering.handleTurn({ messageId: operation ? `${messageId}:${operation}` : messageId, receivedAt, customer,
-        conversationId: `${phoneId}:${customer.customerId}:${current.binding}${epoch ? `:session:${epoch}` : ''}`,
+        conversationId: conversationId(customer, epoch),
         text,
       });
       const text = messages.at(-1)?.content || '';
-      return ordering.dialogue ? ordering.dialogue.respond({ binding: current.binding, messageId, text, runOrder,
-        allowed: () => livePermissions(customer).readProducts }) : runOrder(text);
+      const result = await (ordering.dialogue ? ordering.dialogue.respond({ binding: current.binding, messageId, text, runOrder,
+        allowed: () => livePermissions(customer).readProducts }) : runOrder(text));
+      if (expectedList === undefined) return result;
+      if (!livePermissions(customer).readProducts) throw Object.assign(new Error('Testiyhteys ei ole enää voimassa.'), { status: 403 });
+      // Capture reply + draft under the same per-customer queue. A later WhatsApp turn must not
+      // attach a newer revision to an older summary and accidentally authorize that newer list.
+      const shoppingList = ordering.getShoppingList?.({ conversationId: conversationId(customer), customer }) || null;
+      if (shoppingList && result.draftId && (shoppingList.id !== result.draftId || shoppingList.revision !== result.revision)) {
+        throw Object.assign(new Error('Ostoslista muuttui toisessa kanavassa. Päivitä ja avaa lista uudelleen.'), { status: 409 });
+      }
+      return { ...result, shoppingList };
     },
     prune() { runtime?.prune(); runtime?.dialogue?.prune(); },
     async close() { if (pending) (await pending).close(); },
   };
+  return bridge;
 }

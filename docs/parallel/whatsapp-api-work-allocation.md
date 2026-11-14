@@ -32,6 +32,8 @@ Ennen raporttien tallennusta etähaaraan tulivat Danielin toteutus `4d57190` ja 
 - Integraatiochat vahvisti tässä Git-kokoajan chatissa Danielin MCP-viestin #35 hyväksyneen sille erilliset `test/shopping-list-order-api.test.mjs`- ja `docs/parallel/shopping-list-order-api.md`-tiedostot: yhteinen tehtävä `750a63f3`, paikallinen `7ed54857`. Uusi varmennus käyttää oikeaa gatewayta/local-shopia allekirjoitetusta webhookista yhdeksi hyväksytyksi demotilaukseksi. Chatin 17/17 lähtötasoa ei lasketa uuden testin tulokseksi.
 - Integraatiochatin keskeneräistä raporttia tai tulevaa testitiedostoa ei sisällytetä tähän raportticommittiin. Git-vastaava tuo Danielin julkaistun koodin työpuuhun säilyttäen muiden työt; integraatiochat jatkaa vasta julkaistun API:n päällä. Danielin oma raportti erottaa 76 läpäistyä kohdistettua testiä kahdesta katalogin puuttumisen vuoksi ohitetusta testistä; tämä ei ole Git-kokoajan oma testitulos.
 
+Git-kokoaja tallensi omat kolme dokumenttia rajattuun commitiin `51c2cec` ja yhdisti etähaaran `de5b509`:n (sisältää `4d57190`, `48c4139` ja koordinaattorin viimeistelyn). Fast-forward pysähtyi uuden etälokimerkinnän vuoksi; työlokin yhdistämisessä säilytettiin molemmat itsenäiset merkinnät. Yhdistetyssä paikallisessa työpuussa **koko sovellustestisarja 190/190 ja Team MCP:n testit 39/39 läpi, ei ohituksia**. Käytössä eristetyt testikannat ja paikalliset testipalvelimet; ei oikeita Meta-, malli- tai Valio-kutsuja eikä nykyisten palvelinten restarttia. Tämä regressiovarmennus ei korvaa integraatiochatin erikseen ottamaa uuden API-ketjun riippumatonta testiä.
+
 ## Loppupään tehtävärajaus
 
 1. Pysyvä rakenteinen luonnos ja API-kytkentä nykyiseen verkkokaupan ostosapuriin.

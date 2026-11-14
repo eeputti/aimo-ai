@@ -1,6 +1,8 @@
 const $ = (id) => document.getElementById(id);
 let credential = '', project = '', timer, epoch = 0, pending;
 const date = (ms) => ms ? new Date(ms).toLocaleString('fi-FI') : 'Ei havaintoa';
+const status = (value) => ({ queued: 'Jonossa', running: 'Käsittelyssä', succeeded: 'Valmis', failed: 'Epäonnistui', cancelled: 'Peruttu', in_progress: 'Työn alla', blocked: 'Odottaa apua', handed_off: 'Odottaa vastaanottoa' })[value] || value;
+const eventName = (value) => ({ task_claimed: 'Työ aloitettu tai varaus uusittu', task_updated: 'Eteneminen päivitetty', task_handed_off: 'Työ luovutettu', board_updated: 'Tilannekuva päivitetty' })[value] || value;
 function el(tag, text, className) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (className) node.className = className; return node; }
 function notice(text, error = false) { $('notice').textContent = text; $('notice').classList.toggle('error', error); }
 function render(data) {
@@ -12,21 +14,21 @@ function render(data) {
     card.append(el('span', agent.tasks.length ? `${agent.tasks.length} ilmoitettua tehtävää` : 'Ei avointa työraporttia', 'badge'));
     card.append(el('p', `Viimeisin MCP-yhteys: ${date(agent.lastSeen?.last_seen)}`, 'muted'), el('p', `Viimeisin työraportti: ${date(agent.lastReport)}`, 'muted'));
     for (const task of agent.tasks) {
-      const block = el('div', undefined, 'task'); block.append(el('strong', task.title), el('p', task.status + (task.leaseExpired ? ' · varaus vanhentunut' : '')), el('p', task.note || 'Etenemistä ei ole vielä raportoitu.'));
+      const block = el('div', undefined, 'task'); block.append(el('strong', task.title), el('p', status(task.status) + (task.leaseExpired ? ' · varaus vanhentunut' : '')), el('p', task.note || 'Etenemistä ei ole vielä raportoitu.'));
       if (task.requestedResources.length) block.append(el('p', task.requestedResources.join(', '), 'muted'));
       card.append(block);
     }
     return card;
   }));
   $('jobs').replaceChildren(...(data.jobs.length ? data.jobs.map((job) => {
-    const card = el('article', undefined, 'card'); card.append(el('strong', `${job.status} · yrityksiä ${job.attempts}`), el('p', date(job.updated), 'muted'));
+    const card = el('article', undefined, 'card'); card.append(el('strong', `${status(job.status)} · yrityksiä ${job.attempts}`), el('p', date(job.updated), 'muted'));
     if (job.summary) card.append(el('p', job.summary));
     if (job.reply) card.append(el('p', job.reply, 'reply'));
     if (job.error_code) card.append(el('p', job.error_code, 'muted'));
     return card;
   }) : [el('p', 'Ei omia API-työpyyntöjä.', 'muted')]));
   $('events').replaceChildren(...(data.events.length ? data.events.map((event) => {
-    const card = el('div', undefined, 'card'); card.append(el('strong', `${event.actor} · ${event.type}`), el('p', date(event.created), 'muted')); return card;
+    const card = el('div', undefined, 'card'); card.append(el('strong', `${event.actor} · ${eventName(event.type)}`), el('p', date(event.created), 'muted')); return card;
   }) : [el('p', 'Ei vielä työraportteja.', 'muted')]));
 }
 async function poll(myEpoch) {

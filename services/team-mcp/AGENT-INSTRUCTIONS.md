@@ -14,6 +14,15 @@ Lisää nämä ohjeet jokaisen projektiin osallistuvan avustajan projektiohjeisi
 8. Muokkaa projektin yhteenvetoa `update_project_state`-kutsulla vain uusimman revision pohjalta. Säilytä muiden päätökset ja erota ehdotus varmennetusta tiedosta. GitHub on koodin lähde, MCP on koordinoinnin lähde.
 9. Palvelin ei herätä toista avointa Claude-/ChatGPT-keskustelua eikä päivitä sen kontekstia itsestään. Älä jää jatkuvaan kysely- tai agenttien vastaussilmukkaan. Ihminen käynnistää seuraavan työvaiheen, ellei erillistä ajavaa agenttipalvelua ole sovittu.
 
+## Jatkuva seuranta ja API-koordinaattori
+
+- Raportoi oman aktiivisen tehtävän eteneminen `report_progress`-kutsulla työn alkaessa, merkittävän välivaiheen tai esteen kohdalla ja valmistuessa. Pitkän työvaiheen aikana raportoi sopivissa välivaiheissa; kertaluonteinen kirjautuminen tai työn varaus ei kerro myöhemmästä etenemisestä. Käytä ajantasaista revisionumeroa ja uusi vuokra tarvittaessa.
+- Lue `get_agent_activity`, jos työkalu on liittimessä käytettävissä. Se erottaa viimeisen MCP-yhteyden ja työn raportoinnin. Vanhan palvelinprosessin aikana `get_project_state` ja `read_messages` toimivat edelleen. Älä päättele tyhjästä työraportista, ettei henkilö tee muualla työtä.
+- Kun käyttäjä pyytää koordinaattorilta analyysiä tai seuraavaa askelta ja erillinen daemon on käytössä, lähetä rajattu suora `send_message` projektiin `aimo-ai`, vastaanottajaksi `team-coordinator`. Käytä yksilöllistä `requestKey`:tä ja vain tehtävän kannalta tarpeellista sisältöä. OpenAI-tilassa pyyntö ja rajattu yhteinen projektitilanne lähetetään OpenAI APIin. Vastaus luetaan omasta postilaatikosta; analyysi ei ole varmennus suoritetusta koodimuutoksesta tai testistä.
+- Jos sovittuun työnkulkuun kuuluu automaattinen apu esteessä, raportoi `blocked` ja `blockedOn: "team-coordinator"`. Palvelimen normaali estemuistutus luo suoran pyynnön koordinaattorille. Koordinaattori ei ota tehtävän tiedostovarauksia tai muuta muiden tehtävien tilaa.
+- Koordinaattorin vastaus ei ole lupa uusiin ulkoisiin toimiin tai automaattiseen vastavuoroiseen malliketjuun. Käynnistä uusi API-työ vain uudesta käyttäjän/sovitun työnkulun tehtävästä. Yhteiset viestit tai toiselle ihmiselle osoitetut yksityisviestit eivät itsessään käynnistä mallia.
+- Käyttöönotto ja todelliset rajat: [koordinaattorin ohje](../../docs/team-coordinator.md). Näiden ohjeiden lisääminen projektiin ei käynnistä daemonia tai päivitä jo auki olevan chatin kontekstia.
+
 Esimerkki viestistä: "Checkout-rajapinta valmis commitissa abcdef123. POST /api/... odottaa nämä kentät: ... Testit 12/12. Muutoksia ei vielä julkaistu tuotantoon."
 
 ## Vastuun tulkinta
