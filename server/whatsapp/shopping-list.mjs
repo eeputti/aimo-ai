@@ -1,5 +1,6 @@
 // Local-demo handoff into the storefront assistant. Shares the existing draft and never copies
 // it to a browser cart. Production must supply Valio's authenticated customer resolver instead.
+import { createDemoBuyerResolver } from './demo-buyer.mjs';
 import { isLocal } from './web-demo.mjs';
 
 export const LIST_ROUTE = '/api/assistant/whatsapp-list';
@@ -17,9 +18,9 @@ async function readBody(req) {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
   catch { throw Object.assign(new Error('Virheellinen pyyntö.'), { status: 400 }); }
 }
-export function createShoppingListHandoff({ store, ordering, defaultPhone }) {
+export function createShoppingListHandoff({ store, ordering, defaultPhone, resolveBuyer = createDemoBuyerResolver() }) {
   const members = () => store.db.prepare('SELECT phone,binding,company,person FROM members ORDER BY company,person,binding').all();
-  const id = (member) => `whatsapp-demo-${member.binding}`;
+  const id = (member) => resolveBuyer(member).buyerId;
   const find = (buyerId) => members().find((member) => id(member) === buyerId);
   return {
     async handle(req, res, url) {
@@ -38,7 +39,7 @@ export function createShoppingListHandoff({ store, ordering, defaultPhone }) {
           const member = buyerId ? find(buyerId) : all.find((m) => m.phone === String(defaultPhone || '').replace(/^\+/, '')) || all[0];
           if (buyerId && !member) { json(res, 404, { error: 'Testiasiakkuutta ei löydy.' }); return true; }
           const shoppingList = member ? await ordering.getShoppingList(member) : null;
-          json(res, 200, { mode: 'local-demo', accounts: all.map((m) => ({ buyerId: id(m), companyName: m.company, personName: m.person })),
+          json(res, 200, { mode: 'local-demo', accounts: await Promise.all(all.map(async (m) => ordering.getAccount ? ordering.getAccount(m) : { buyerId: id(m), companyName: m.company, personName: m.person })),
             buyerId: member ? id(member) : null, shoppingList }); return true;
         }
         if (req.method === 'POST' && url.pathname === `${LIST_ROUTE}/chat`) {

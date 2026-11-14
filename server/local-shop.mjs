@@ -1,4 +1,5 @@
 // A local storefront for the WhatsApp demo's existing orders. Never starts a channel worker.
+import { createDemoBuyerResolver } from './whatsapp/demo-buyer.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { isLocal } from './whatsapp/web-demo.mjs';
 
@@ -6,18 +7,18 @@ const json = (res, status, body) => {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(JSON.stringify(body));
 };
-export function createLocalShop({ whatsappDb, defaultPhone, buyers }) {
+export function createLocalShop({ whatsappDb, defaultPhone, buyers, resolveBuyer = createDemoBuyerResolver() }) {
   function context() {
     // Read-only: opening this storefront must not recover jobs, pair a number or start a second worker.
     const db = new DatabaseSync(whatsappDb, { readOnly: true });
     let members;
     try { members = db.prepare('SELECT phone,binding,company,person FROM members').all(); }
     finally { db.close(); }
-    const existing = new Set(buyers().map((b) => b.id));
-    const accounts = members.map((m) => ({ buyerId: `whatsapp-demo-${m.binding}`, name: m.company, personName: m.person, deliverySite: 'Testikeittiö' }))
+    const existing = new Map(buyers().map((b) => [b.id, b]));
+    const accounts = members.map((m) => ({ buyerId: resolveBuyer(m).buyerId, name: existing.get(resolveBuyer(m).buyerId)?.name || m.company, personName: m.person, deliverySite: 'Testikeittiö' }))
       .filter((m) => existing.has(m.buyerId));
     const preferred = members.find((m) => m.phone === String(defaultPhone || '').replace(/^\+/, ''));
-    const defaultBuyerId = preferred && accounts.find((a) => a.buyerId === `whatsapp-demo-${preferred.binding}`)?.buyerId;
+    const defaultBuyerId = preferred && accounts.find((a) => a.buyerId === resolveBuyer(preferred).buyerId)?.buyerId;
     return { mode: 'local-demo', accounts, defaultBuyerId: defaultBuyerId || accounts[0]?.buyerId || null };
   }
   return {

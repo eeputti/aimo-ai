@@ -82,7 +82,7 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
       return withCartHandoffHint(result);
     },
     async handle(req, res, url) {
-      if (!assets.has(url.pathname) && url.pathname !== API && url.pathname !== `${API}/chat`) return false;
+      if (!assets.has(url.pathname) && url.pathname !== API && url.pathname !== `${API}/chat` && url.pathname !== `${API}/export`) return false;
       try {
         if (assets.has(url.pathname)) {
           if (req.method !== 'GET') throw fail(405, 'Method not allowed');
@@ -95,6 +95,11 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
           throw fail(403, 'Pyyntö ei tullut ostoskorisivulta.');
         }
         const { member, draftId } = authenticate(req);
+        if (req.method === 'GET' && url.pathname === `${API}/export`) {
+          const cart = await ordering.getStorefrontCart(member, draftId);
+          if (cart.id && cart.id !== draftId) throw unavailable();
+          json(res, 200, cart); return true;
+        }
         if (req.method === 'GET' && url.pathname === API) {
           const list = await ordering.getShoppingList(member);
           if (!list || list.id !== draftId) throw unavailable();
