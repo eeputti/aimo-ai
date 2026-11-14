@@ -2,6 +2,17 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — neljän ihmisen samanaikainen toteutus ja AI-promptit (Codex)
+
+**Käyttäjän päätös:** jaetaan WhatsApp-tilausapuri neljälle ihmiselle, jotka kaikki muokkaavat projektia samanaikaisesti omien AI-chattiensa kautta. Nimiä ei annettu, joten vastuut numeroitiin 1–4.
+
+- Uusi `TYONJAKO.md`: 1) WhatsApp, käyttöönotto ja kytkentä, 2) keskustelu ja pysyvä tilausluonnos, 3) tuotteet, tarjoukset ja demotilaus, 4) Valio-asiakassovitin sekä kokonaisuuden testit/demoketju. Jokaiselle rajatut tiedostot, valmis tulos ja kopioitava aloitusprompti.
+- Yhteinen v1-sopimus määrittelee lähettäjän/asiakkuuden kontekstin, keskustelun ja luonnosrevision sekä `suggest`, `quote` ja `submit` -rajat. Osia voi toteuttaa heti injektoiduilla testivastauksilla; henkilö 1 kytkee ne varhain yhteen. Sopimus on suunnitelma, moduuleja ei luotu tässä työvaiheessa.
+- `AGENTS.md`: jaetussa paikallisessa työpuussa yksi Git-kirjoittaja ja palvelimen käynnistysten omistaja. Muut raportoivat kukin omaan `docs/parallel/N.md`:hen; henkilö 1 kokoaa lokin ja commitoi valmiit vaiheet tekijöineen. Eri klooneille sallitaan omat haarat. `SUUNNITELMA.md`: linkki työnjakoon.
+- **Ajantasainen lähtötilanne:** toinen työvaihe on jo toteuttanut WhatsAppin vain lukevan kanavan commitissa `eda2d62`. Jakoa ei tehty vanhan oletuksen perusteella, että kanava puuttuisi kokonaan. Nykyinen kanava säilyy, kunnes erillinen tilauspolku on testattu; oikea Meta-puhelintesti ja Valion integraatiot ovat vielä avoimia.
+
+**Tarkistukset:** työpuu alussa puhdas, `main` ja `origin/main` commitissa `eda2d62`, `git fetch origin` onnistui. Nykyiset kanava-/runtime-/assistant-moduulit ja käyttöönotto-ohje luettu vastuiden kohdistamiseksi. Dokumenttidiff ja `git diff --check` läpi; sovelluskoodia ei muutettu eikä testisarjaa, ulkoisia API-kutsuja tai demotilauksia ajettu. Seuraava askel on jakaa aloituspromptit neljälle ihmiselle ja aloittaa omistetut osuudet rinnakkain.
+
 ## 14.11.2026 — WhatsAppin vain lukeva testikanava ja testihenkilön yhdistäminen (Codex)
 
 **Käyttäjän pyyntö:** toteuta nykyisestä agentista WhatsApp-yhteensopiva testiversio. Tehty virallisen Cloud API:n vastaanotin ja vastaukset nykyiselle Tilausapurille. Työn aikana haettu ja säilytetty uusi suuntapäätös `ce1521f`: oikea asiakastunnistus ja ostovaltuudet kuuluvat Valion palveluille. Paikallinen numeron/koodin yhdistäminen on vain testiasiakkaan tunnistusjäljitelmä, ei tuotannon kirjautumisratkaisu.

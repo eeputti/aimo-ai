@@ -4,6 +4,8 @@
 
 Pääkäyttöliittymäksi WhatsApp: ammattiostaja kirjoittaa tarpeensa, apuri kokoaa tilausluonnoksen, selvittää puuttuvat olennaiset tiedot, ehdottaa tuotteita ja pyytää ostajan hyväksynnän. Hyödynnetään olemassa olevaa tuotetulkintaa, katalogia, määrämuunnoksia sekä hinta-, saatavuus- ja tilauslogiikkaa.
 
+**Neljän ihmisen rinnakkaistoteutus:** [vastuut, tiedostojen omistus, yhteiset rajapinnat ja kopioitavat aloituspromptit](TYONJAKO.md). Jokainen työskentelee omalla vastuualueellaan; henkilö 1 omistaa kytkennän ja yhteisen työpuun Git-kirjoitukset.
+
 **Tämä korvaa alla olevan vanhan suunnitelman linjaukset "ei chattia", "ei avoimia kysymyksiä" ja tuotteiden automaattisesta valinnasta.** Vanha kilpailusuunnitelma säilyy historiana; sen tilanneväitteet pitää tarkistaa koodista. Alla oleva suunta kirjattiin ennen toteutusta. **Toteutuksen tila 14.11.2026:** WhatsAppin vain lukeva testikanava, palvelimelle tallennettu keskustelumuisti ja testinumeroiden koodiyhdistäminen on toteutettu; aitoa Meta-puhelintestiä ei ole vielä ajettu. Koodiyhdistäminen on tunnistusjäljitelmä, ei Valion asiakastunnistus. Rakenteinen tilausluonnos, tuotevalinnan hyväksyntä ja gateway-tilaus eivät vielä kuulu tähän kanavaan. Käyttöönotto ja rajat: [docs/whatsapp.md](docs/whatsapp.md).
 
 ### Keskustelun toiminta

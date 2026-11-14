@@ -24,6 +24,12 @@ Eelis pyysi 14.11.2026, että täällä tehtävä työ kirjataan GitHubiin, jott
 - Samassa projektikansiossa tiedostomuutokset näkyvät heti. Eri kloonissa hae uudet commitit ja päivitä puhdas työpuu komennolla `git pull --ff-only`.
 - Lue päivitetty `TYOLOKI.md` ja viimeisin diff ennen jatkamista. Älä tee päällekkäisiä muutoksia samaan tiedostoon selvittämättä ensin toisen työvaihetta.
 
+## Neljän ihmisen rinnakkaistyö (14.11.2026)
+
+- Käyttäjä pyysi jakamaan WhatsApp-tilausapurin neljälle samanaikaisesti työskentelevälle ihmiselle, jotka kaikki käyttävät AI-chatteja. Vastuut, tiedosto-omistus, yhteinen rajapintasopimus ja aloituspromptit ovat `TYONJAKO.md`:ssä. Noudata oman numerosi tiedostorajoja.
+- Samassa paikallisessa projektikansiossa vain henkilö 1 hoitaa Gitin kirjoittavat toimet, yhteiset pakettimuutokset ja palvelimen uudelleenkäynnistykset. Kukaan ei vaihda yhteisen työpuun haaraa toisten alta. Eri klooneissa jokaisella voi olla oma työhaara.
+- Kukin kirjoittaa työnsä ja tarkistuksensa omaan `docs/parallel/N.md`:hen. Henkilö 1 kokoaa valmistuneen vaiheen `TYOLOKI.md`:hen ja tekee sen commitin/pushin tekijän raportin ja tarkistetun diffin perusteella. Näin myös jokaisen valmistuneen vaiheen loki säilyy samassa commitissa ilman neljän chatin samanaikaista yleislokin muokkausta.
+
 ## Käynnistys ja tarkistukset
 
 - Node.js vähintään 22.13; `npm install`, ympäristöasetukset `.env.example`-mallin mukaan, `npm run fetch-data`, `npm run catalog`, `npm start`.
