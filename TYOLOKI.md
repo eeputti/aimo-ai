@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — tilausjulkaisija välittää tulevat demotilaukset maksusivulle (Codex, checkout-chat)
+
+- Käyttäjä antoi nimenomaisen luvan vaihtaa nykyisen PID50716-julkaisijan yhteen uuteen samoilla kannoilla ja avaimella, ilman vanhojen tilausten uudelleenlähetystä. Aiempi automaattisen hyväksyntätarkistuksen esto ratkaistiin tällä luvalla ennen uusintaa; ei kiertoreittiä.
+- Vanha50716 poistui ennen uutta **PID6303 / exec18947** -prosessia. Lähde135c1fd, `--watch --order-events`, ei backfilliä. Varmennettu yksi julkaisija, kaksi lähtötilauksen tunnusta, ei uutta tilausta vaihdon aikana, julkinenAPI200 ja samat kaksi tilausta. D1:n luku: order_events0, demo_payments0; vanhoja tilauksia ei lähetetty uudelleen eikä käyttäjän puolesta tehty tilausta/maksua/mailia. Raportti `docs/parallel/whatsapp-checkout-completion.md`.
+- Pilven uudempi landing-julkaisu23f5279/17bb1f8f säilytettiin, ei uutta Worker-deployta tai signup-watcherin muutosta. Node-checkoutin ja viimeisten keskustelukorjausten käyttöönotto on b717fb6b-chatin varauksessa; rinnakkaista restarttia ei tehty.
+- **Avoin löydös:** nykyinen julkinen WhatsApp-tunneli530/Error1033, ei cloudflared-prosessia; localhosthealth200. Kiireellinen tieto omistajalle viestissä206. Node-aktivointi ja tunnelin palautus odottavat omistajan kuittausta ja takaisinlukua. Maksupolkua puhelimessa ei vielä ilmoiteta toimivaksi. Muut paikalliset WIPit säilyvät; dokumenttitallennus erillisestä työpuusta.
+
 ## 15.11.2026 — 100 synteettisen asiakkaan itsekeskustelu WhatsApp-apurille: baseline, löydökset ja regressiot (Claude Code, selfplay-100)
 
 - **Käyttäjän pyyntö (Eelis klo 0.30, välitetty selfplay-100-sessiolle):** agentti, joka keskustelee apurin kanssa noin sadan eri asiakkaan roolissa ja tekee apurista fiksumman. Perusmallia ei kouluteta: parannus syntyy löydöksistä, regressiotapauksista ja omistajien tarkistetuista muutoksista. Codexin 484c55ac ajoi jo oman 100 profiilin loppukokeen, joten tämä sarja täydentää sitä vain puuttuvilla poluilla (Codexin ehdotus #118): päivä puuttuu tai vaihtuu, numeroidut vaihtoehdot ja 4 = lisää, valinta numerolla, annoslasku, 15 keittiötyyppiä, slangi ja kirjoitusvirheet, kärsimätön tai epäselvä ostaja, olemattomat tuotteet.
