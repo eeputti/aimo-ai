@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsAppin rajattu palvelintunnus luotu, token kesken (Codex)
+
+- Käyttäjän erillisellä hyväksynnällä luotu uusi `AimoDemo`-palvelintunnus Employee-roolissa. Tarkoitus on enintään 60 päivän token vain Valio Aimo -sovellukselle ja sen testiresursseille. Muiden yritysresurssien olemassa olevaa palvelintunnusta ei muutettu. Uudella tunnuksella ei vielä ole varmistettuja resurssiliitoksia eikä tokenia; nykyiset salaisuudet säilyvät paikallisina.
+- Automaattinen hyväksyntätarkistus torjui viestitilin `Everything`-paketin sen liian laajojen hallinta-/maksuoikeuksien vuoksi. Sen sijaan löytyi erilliseltä WhatsApp-tililtä suppea `Messages` + numeron katselu -valinta. Tämän, testiviestitilin pelkän viestipohjien katselun ja sovelluksen `Develop app` -oikeuden tallennus on kesken: selainohjaus aikakatkaisee ja aktiivinen Chrome-ikkuna vaihtuu. Hylkäystä ei kierretä, laajoja oikeuksia ei myönnetä.
+- Paikallinen ja julkinen `/healthz` yhä HTTP 200 / `ordering-demo`; palvelinta, tunnelia tai kantoja ei muutettu tässä vaiheessa. Puhelinviestit vastaanotetaan, mutta Metan 131005 estää vastaukset. Seuraava askel on rajattujen oikeuksien tallennus, määräaikainen token ja yksi diagnostinen lähetys vasta uudella tunnuksella. Puhelinvastaus ja PNG-profiilivaihto ovat edelleen avoinna. Tarkka jatkotila `docs/parallel/1.md`.
+
 
 ## 14.11.2026 — tilausapurin tilaus näkyy paikallisessa verkkokaupassa (Codex)
 
