@@ -3,6 +3,12 @@
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
 
+## 15.11.2026 — landing pagelle Valion fontit ja sininen korostus (Claude Code, landing-chat)
+
+- **Käyttäjän pyyntö:** valittu kenttä korostuu sinisellä oranssin sijaan, ja sivulla käytetään samoja Valion fontteja kuin paikallisessa kaupassa.
+- **Muutos (commit aff3a54, Worker-versio 169b93b7):** Matter (leipäteksti) ja National 2 Compressed (otsikot) kopioitiin `public/storefront-assets/`:sta Workerin `public/fonts/`-kansioon. Lähteet ovat jo kirjattuina `sources.json`:ssa. `landing.css` lataa fontit, ja kentän fokus on sininen. Rajapinta ja D1 ennallaan.
+- **Tarkistukset:** selaimessa 375 px: kaikki kolme fonttia latautuivat, fokusreuna sininen, ei vaakaylivuotoa. Workerin testit 20/20. Tuotannossa fontit 200 `font/otf` ja autentikoimaton lista 401.
+
 ## 15.11.2026 — WhatsApp-apurin väärinkäyttötestit ja korjaukset (Claude Code, abuse-tests)
 
 - **Käyttäjän pyyntö (Eelis klo 01.25):** testaa, voiko tilausapuria, korisivua ja demomaksua käyttää pahasti väärin, ja estä se. Kaikki kokeet paikallisesti eristetysti: väliaikaiset kannat ja avaimet, synteettiset asiakkaat, simuloitu Meta-lähetys, tyhjä `VALIO_API_KEY`, Workerille D1-jäljitelmä. Julkaistuihin palveluihin, käyttäjän kantoihin tai `.env`-tiedostoihin ei kirjoitettu.
