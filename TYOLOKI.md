@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — WhatsAppin pitkä korilinkki näkyy painikkeena "Avaa ostoskori" (Claude Code, korisivuchatti)
+
+- **Käyttäjän pyyntö (klo 01.25):** WhatsAppin linkki on liian pitkä; näkyviin esimerkiksi "Maksulinkki" tai "Avaa ostoskori". Koodista tarkistettu: WhatsAppiin lähtee vain korilinkki, demomaksun linkki on korisivulla.
+- **Päätös:** Metan interaktiivinen `cta_url`-viesti (muoto tarkistettu Metan nykyisestä ohjeesta). Token pysyy fragmentissa painikkeen takana eikä päädy lokeihin. Lyhyttä `/k/<koodi>`-polkua ei tehty: se vaatisi uuden pysyvän tunnisteen, mitätöinnit ja arvausrajan, ja koodi näkyisi tunnelin lokeissa. Se on varasuunnitelma vain, jos puhelinkoe näyttää `#`-osan katoavan.
+- **Toteutus:** `server/whatsapp/channel.mjs`: `createMetaSender` lähettää painikkeen, kun vastausosan viimeinen rivi on allekirjoitettu korilinkki ("Avaa ostoskori") tai demomaksulinkki ("Siirry maksamaan"). Metan 400-hylkäys → sama vastaus heti tekstinä linkin kanssa. `WHATSAPP_LINK_BUTTONS=false` palauttaa tekstin. Tallennettu vastaus, historia, `cart-link.mjs` ja `cart-handoff.mjs` ennallaan.
+- **Tarkistukset:** uusi `test/whatsapp-link-button.test.mjs` 5/5 (oikean korilinkkivastauksen täsmällinen `cta_url`-pyyntö, tekstinä pysyvät tapaukset, 400-varatie, muut virheet ilman toista lähetystä, asetus pois). WhatsApp-, korilinkki- ja OK-testit 43/43, koko `npm test` 266/266. Simuloitu Meta, ei oikeita viestejä.
+- **Avoinna:** painike ja fragmentin säilyminen oikeassa puhelimessa varmistetaan Codexin käyttöönoton restartin jälkeen. Raportti `docs/parallel/whatsapp-link-button.md`.
+
 ## 15.11.2026 — 100 asiakasprofiilia ajettu, tilauspolut ja keskustelulaadun löydökset korjattu (Codex, token-korjauschatti)
 
 - Oikea WhatsApp-webhook/jono/malli eristetyillä synteettisillä asiakkailla: 100/100 tarvekoria oikein, 95 korilinkin kautta tarkistettua demotilausta ilman duplikaattia, 5 perusteltua puuttuvan tuotteen estoa; 1034 onnistunutta mallikutsua, 0 API-/suoritusvirhettä. Ei Meta-lähetyksiä, Valio-kutsuja tai käyttäjäkantamuutoksia. Alkuperäisen toiminnallisen mittarin 95/100 jälkeen samoihin raakavuoroihin sovelletut tiukemmat laatukriteerit antoivat 71/100: 7 toistettua mieltymyskysymystä, 24 väärää linkkikieltoa selainkorissa, 5 päivä-ensin-virhettä (29 eri profiilia).

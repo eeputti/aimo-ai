@@ -60,19 +60,44 @@ export function replyChunks(messages) {
   return chunks;
 }
 
-export function createMetaSender(settings, fetchImpl = fetch) {
-  return async (to, text) => {
-    const res = await fetchImpl(`https://graph.facebook.com/${settings.apiVersion}/${settings.phoneId}/messages`, {
-      method: 'POST', signal: AbortSignal.timeout(20_000),
-      headers: { authorization: `Bearer ${settings.accessToken}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to,
-        type: 'text', text: { preview_url: false, body: text } }),
-    });
+// Signed links are long. A reply whose last line is one of these links is shown as a labelled button;
+// the URL and its fragment token stay behind the button instead of filling the chat.
+const LINK_BUTTONS = [
+  [/^https:\/\/[^\s/?#]+\/whatsapp\/cart#[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/, 'Avaa ostoskori'],
+  [/^https:\/\/[^\s/?#]+\/demo-payment\.html#AGW-\d{8}-\d{4,12}$/, 'Siirry maksamaan'],
+];
+export function linkButton(text) {
+  const lines = String(text || '').trimEnd().split('\n');
+  const url = lines.pop().trim();
+  const label = LINK_BUTTONS.find(([pattern]) => pattern.test(url))?.[1];
+  const body = lines.join('\n').trim().replace(/:$/, '.');
+  // Meta allows 1024 body characters; any other link stays as ordinary text.
+  if (!label || !body || body.length > 1024 || /https?:\/\//i.test(body)) return null;
+  return { body, label, url };
+}
+
+export function createMetaSender(settings, fetchImpl = fetch, { linkButtons = process.env.WHATSAPP_LINK_BUTTONS !== 'false' } = {}) {
+  const post = (to, message) => fetchImpl(`https://graph.facebook.com/${settings.apiVersion}/${settings.phoneId}/messages`, {
+    method: 'POST', signal: AbortSignal.timeout(20_000),
+    headers: { authorization: `Bearer ${settings.accessToken}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', recipient_type: 'individual', to, ...message }),
+  });
+  const messageId = async (res) => {
     // Never expose upstream payloads/tokens in logs or customer replies.
     if (!res.ok) throw new Error(`META_HTTP_${res.status}`);
     const data = await res.json();
     if (!data.messages?.[0]?.id) throw new Error('META_NO_MESSAGE_ID');
     return data.messages[0].id;
+  };
+  return async (to, text) => {
+    const button = linkButtons && linkButton(text);
+    if (button) {
+      const res = await post(to, { type: 'interactive', interactive: { type: 'cta_url', body: { text: button.body },
+        action: { name: 'cta_url', parameters: { display_text: button.label, url: button.url } } } });
+      // A rejected button (400) was not delivered: send the same reply with the plain link instead.
+      if (res.status !== 400) return messageId(res);
+    }
+    return messageId(await post(to, { type: 'text', text: { preview_url: false, body: text } }));
   };
 }
 
