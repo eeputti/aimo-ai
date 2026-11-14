@@ -1,10 +1,12 @@
-# Aimo Agent Gateway
+# Aimo tilausapuri ja Agent Gateway
 
-**The open front door for buyer agents at Valio Aimo: verifiable offers, spend-limited mandates, human sign-off when it matters, and a tamper-evident record of every decision.**
+**Current product direction (14 Nov 2026): a WhatsApp ordering assistant that remembers the active conversation, asks for missing requirements, proposes suitable products and requests approval before submitting an order.**
+
+WhatsApp integration is planned, not implemented. Valio is intended to own customer identification and ordering permissions through its own customer systems; the actual integration is unconfirmed. The existing gateway, catalogue, quantity conversions and price/availability checks form the backend foundation. See the current direction at the top of [SUUNNITELMA.md](SUUNNITELMA.md).
 
 Shared development context for Codex and Claude Code: [working instructions](AGENTS.md), [current status and work log](TYOLOKI.md), and [competition plan](SUUNNITELMA.md). Claude Code loads the shared instructions through [CLAUDE.md](CLAUDE.md). Record each completed work stage and its checks in the work log, then commit and push it to GitHub.
 
-Junction 2026, Valio Aimo challenge "Trusted Trade Agents". This is not a chatbot on top of the web shop. It is the Aimo-side interface that lets *any* buyer agent go from inquiry to commitment, with the buyer's own rules deciding what the agent may do alone.
+Junction 2026, Valio Aimo challenge "Trusted Trade Agents". The existing Agent Gateway is the Aimo-side interface that lets a buyer agent go from inquiry to commitment, with the buyer's own rules deciding what the agent may do alone. The WhatsApp assistant will add a conversational client to this foundation.
 
 ```
 buyer's agent ──► search_products ──► request_quote ──► place_order ──► confirmed

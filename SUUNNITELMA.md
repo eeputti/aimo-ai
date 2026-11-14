@@ -1,4 +1,51 @@
-# Voittosuunnitelma: Valio Aimo "Trusted Trade Agents" (Junction 2026)
+# Valio Aimo: WhatsApp-tilausapuri
+
+## Nykyinen suunta, käyttäjän päätös 14.11.2026
+
+Pääkäyttöliittymäksi WhatsApp: ammattiostaja kirjoittaa tarpeensa, apuri kokoaa tilausluonnoksen, selvittää puuttuvat olennaiset tiedot, ehdottaa tuotteita ja pyytää ostajan hyväksynnän. Hyödynnetään olemassa olevaa tuotetulkintaa, katalogia, määrämuunnoksia sekä hinta-, saatavuus- ja tilauslogiikkaa.
+
+**Tämä korvaa alla olevan vanhan suunnitelman linjaukset "ei chattia", "ei avoimia kysymyksiä" ja tuotteiden automaattisesta valinnasta.** Vanha kilpailusuunnitelma säilyy historiana; sen tilanneväitteet pitää tarkistaa koodista. Tässä työvaiheessa kirjataan suunta, WhatsApp-yhteyttä tai tunnistusta ei ole vielä toteutettu.
+
+### Keskustelun toiminta
+
+- Säilytetään palvelimella aktiivinen tilausluonnos: tuotteet, määrät ja yksiköt, ruokavalio- ja allergeenivaatimukset, toimituspäivä, toimituspaikka, ehdotukset ja käyttäjän valinnat. Lyhyt jatkoviesti kuten "eikun 30 litraa" muuttaa oikeaa riviä eikä aloita tilausta alusta.
+- Kysytään vain puuttuvaa tai ristiriitaista tietoa, lyhyesti. Aiemmassa saman tilauksen viestissä annettua toimituspäivää tai laktoosittomuutta ei kysytä uudelleen. Edellisen valmiin tilauksen vanhaa toimituspäivää ei siirretä uuteen tilaukseen.
+- Selvitetään tarpeen kannalta olennaiset vaatimukset (esimerkiksi laktoosittomuus ja maidon käyttötarkoitus). Laktoositon ei tarkoita maidotonta. Pysyvät asiakasmieltymykset erotetaan tilauskohtaisista vastauksista ja muistetaan vain sovitussa laajuudessa.
+- Näytetään muutama perusteltu tuotevaihtoehto ja pakkausmäärä suhteessa tarpeeseen. Tuote, pakkauskoko tai korvaaja ei tule hyväksytyksi pelkän mallin ehdotuksen perusteella.
+- Hinnat, allergeenit ja saatavuus tarkistetaan taustapalveluista. Puuttuva tieto säilyy puuttuvana. Toimituspäivän vaihto mitätöi aiemman saatavuusarvion; eri toimituspäivää ei hyväksytä hiljaisesti.
+- Ennen tilausta yhteenveto valituista tuotteista, määristä, hinnasta, toimituspaikasta ja päivästä. Hyväksyntä sidotaan juuri tähän luonnosversioon; muutos vaatii uuden hyväksynnän ja tuoreen tarkistuksen. "Joo" tarkentavaan kysymykseen ei ole tilauksen lähetyslupa.
+
+### Asiakkaan tunnistus on Valion vastuulla
+
+Käyttäjän tarkennus: Valion omasta asiakasrekisteristä ja tunnistuspalvelusta selvitetään WhatsApp-lähettäjän asiakkuus. Meille ei rakenneta oletuksena erillistä rekisteröintiä tai omaa kirjautumisratkaisua.
+
+- Integraation tavoite: WhatsApp-tunniste → Valion palvelu → varmennettu asiakas-/käyttäjätunniste, sallitut asiakkuudet ja toimituspaikat sekä tilausoikeudet. Valio määrittelee, milloin puhelinnumerotieto riittää ja milloin sen oma lisävarmistus tarvitaan.
+- Asiakasnumeroa, käyttöoikeuksia tai asiakkuuden vaihtoa ei päätetä kielimallilla tai käyttäjän vapaamuotoisella väitteellä. Asiakaskohtaiset hinnat ja tilaushistoria haetaan vain Valion vahvistamalle asiakkuudelle. Tuntematon tai epäselvä asiakkuus ohjataan Valion määrittelemään käsittelyyn ennen asiakastietojen näyttämistä tai tilaamista.
+- Valion rekisterin sisältöä, rajapinnan olemassaoloa tai saatavuutta ei ole varmennettu. Ensimmäisessä demossa voidaan käyttää selvästi merkittyä testiasiakasta ja Valio-tunnistuksen rajapintajäljitelmää; se ei todista oikeaa asiakastunnistusta.
+- Meta voi välittää käyttäjän business-scoped user ID:n (BSUID) ilman puhelinnumeroa. Kanavasovittimen on tuettava Metan toimittamaa tunnistetta ja Valion kanssa sovittavaa yhdistämistä, ei oletettava numeron olevan jokaisessa viestissä.
+
+### Tekninen suositus ensimmäiseen toteutukseen
+
+WhatsApp Business Platform / Cloud API → HTTPS-webhook → pysyvä viestijono → keskustelun käsittelijä ja tilausluonnos → nykyiset tuotetyökalut → vastaus WhatsAppiin.
+
+- Käytetään virallista Cloud API:a ja aloitetaan Metan testinumerolla. DM Champ voi toimia käyttöliittymävertailuna; sen maksullinen tili tai sisäisen toteutuksen selvittäminen ei ole tekninen edellytys.
+- Webhook tarkistaa Metan allekirjoituksen ja kohteena olevan yritysnumeron, tallentaa viestin/jonotyön ja kuittaa vasta pysyvän tallennuksen jälkeen. Sama viestitunniste käsitellään kerran. Toimitus-/lukukuittaukset erotetaan ostajan uusista viesteistä.
+- Käsittely järjestetään keskustelukohtaisesti; peräkkäiset viestit tai uusintatoimitukset eivät saa ylikirjoittaa uudempaa luonnosta tai aiheuttaa kaksoistilausta. Tilauksen lähetys käyttää nykyisen gatewayn idempotenssia sekä hyväksytyn luonnosversion tarkistusta.
+- Edge-funktio sopii vastaanottimeksi. Ensimmäisen version varsinainen käsittelijä voi käyttää nykyistä Node-palvelinta ja sen SQLite-/katalogiratkaisua. Hosting-alustaa ei ole valittu eikä koko palvelinta luvata siirtää edgeen sellaisenaan. Jonotyön pitää säilyä vastaanotinprosessin päättyessä.
+- Nopeuden ensimmäiset keinot: valmiina oleva palvelin, pieni keskustelumalli, lyhyet vastaukset, tarvittavien tuotetietojen rajaus ja hintakutsujen yhdistäminen. Nykyisen `/assistant.html`-polun Render-herätys ja raskas MCP-malliketju arvioidaan erikseen; edge ei yksin nopeuta niitä. Vasteajat mitataan oikealla viestiketjulla ennen lupauksia.
+- Asiakkaan viestistä avautuva 24 tunnin WhatsApp-palveluikkuna huomioidaan lähetyksessä. Sen ulkopuolella käytetään hyväksyttyjä viestipohjia. Keskustelumuisti ja WhatsAppin lähetyslupa ovat erillisiä asioita.
+
+### Ensimmäisen toimivan demon tavoite ja avoimet asiat
+
+Yksi testiasiakas lähettää oikeassa WhatsAppissa tuotepyynnön, vastaa puuttuvaan ruokavalio-/päiväkysymykseen, valitsee ehdotetuista tuotteista ja hyväksyy yhteenvedon. Tilaus tallentuu gatewayn demotilauslokiin kerran. Oikeaan Valion tilausjärjestelmään lähettämistä ei väitetä tehdyksi: challenge-API:ssa ei ole tilauspäätepistettä.
+
+Ennen tätä tarvitaan Meta-sovellus ja testinumero, palvelimen salaisuudet turvalliseen ympäristöön, julkinen HTTPS-vastaanotin, pysyvä jono/keskustelutila ja käsittelijä. Valion oikea tunnistus- ja tilausrajapinta ovat erilliset selvitettävät integraatiot. Kanavasta riippumaton keskusteluydin voidaan kehittää ja testata ilman niitä, erillään nykyisestä demokannasta.
+
+Lähteet tarkistettu 14.11.2026: [Meta Developer Hub, testinumerot](https://whatsappbusiness.com/developers/developer-hub/), [webhookit ja lähettäjän tunnisteet](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/overview), [viestityypit ja palveluikkuna](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages), [webhook-allekirjoitus](https://developers.facebook.com/docs/graph-api/webhooks/getting-started/?locale=de_DE), [DM Champin kokeilun ehdot](https://help.dmchamp.com/billing/free-trial/). DM Champin dokumentaatio kertoo agentin kokeilemisesta ennen tilauksen valintaa; seitsemän päivän kokeilu kuuluu vain osaan mainostarjouksista ja vaatii kortin.
+
+---
+
+## Aiempi kilpailusuunnitelma: Agent Gateway (historia)
 
 Koottu la 14.11. klo 00.50 Junction-alustan haastesivulta, osallistujaoppaasta ja haasteen datasta.
 Päivitetty la klo 01.00: mock-API ja esimerkkipolku on testattu oikeasti, ja suunnitelma on korjattu löydösten mukaan (ks. "Testattu oikeasti").

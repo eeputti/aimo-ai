@@ -2,6 +2,20 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — suunnanmuutos WhatsApp-tilausapuriin, Valio omistaa tunnistuksen (Codex)
+
+**Käyttäjän päätös:** pääkäyttöliittymäksi WhatsApp. Ostaja kirjoittaa tarpeensa; agentti säilyttää keskustelun tiedot, kysyy puuttuvat olennaiset vaatimukset (mm. laktoosittomuus ja toimituspäivä), ehdottaa tuotteita ja kokoaa hyväksyttävän tilauksen. Tuotteita tai toimituspäivää ei oleteta sopiviksi. Tämä korvaa aiemman "ei chattia / ei avoimia kysymyksiä" -suunnan. Käyttäjä tarkensi tunnistuksen: käytetään Valion omaa asiakasrekisteriä ja tunnistuspalvelua, ei lähtökohtaisesti rakenneta omaa kirjautumista. Valio määrittelee WhatsApp-lähettäjän yhdistämisen asiakkuuteen ja tilausoikeuksiin sekä mahdollisen lisävarmistuksen. Valion todellista rajapintaa ei ole vielä varmennettu.
+
+- `SUUNNITELMA.md`: nykyinen suunta ylimmäksi, vanha kilpailusuunnitelma merkitty historiaksi. Keskustelumuisti, käyttäjän tuotevalinnat, juuri tiettyyn luonnosversioon sidottu hyväksyntä ja Valion tunnistusvastuu kirjattu. Demossa mahdollinen tunnistusjäljitelmä erotetaan oikeasta asiakastunnistuksesta.
+- Tekninen suositus, ei vielä valittu hosting: virallinen WhatsApp Cloud API, nopeasti kuittaava HTTPS-vastaanotin (edge mahdollinen), pysyvä jono/keskustelutila ja nykyistä Node-taustaa hyödyntävä käsittelijä. Webhookien allekirjoitus, viestien deduplikointi, keskustelukohtainen järjestys ja tilausten idempotenssi huomioidaan. Pelkkä edge-siirto ei ratkaise mallin tai nukkuvan MCP-palvelimen viivettä.
+- `README.md`: uusi suunta ja toteuttamattoman WhatsApp-/Valio-tunnistusyhteyden tila näkyviin; gateway säilyy taustana. Nykyistä demoa tai sen tietokantoja ei muutettu.
+- **Koodista varmennettu:** `server/aimo/`, `server/storefront.mjs` ja gateway tarjoavat uudelleenkäytettävän pohjan. Nykyinen `server/assistant.mjs` käskee käyttämään seuraavaa arkipäivää päivän puuttuessa ja palauttamaan taulukon; `server/aimo/index.mjs` on suunniteltu ilman avoimia kysymyksiä; `runBuyerAgent` sisältää tilaukseen etenemisen. Niitä ei voi liittää uuteen keskusteluun sellaisinaan. Keskustelun tila, WhatsApp-kanava ja Valion asiakasintegraatio puuttuvat.
+- **Julkisista lähteistä varmennettu:** Meta tarjoaa testinumeroita; virallinen integraatio käyttää webhookeja ja viestirajapintaa; vapaa vastaus edellyttää avointa 24 h palveluikkunaa. Lähettäjän BSUID pitää huomioida, koska numero voi puuttua. DM Champin dokumentaatio mahdollistaa agentin kokeilemisen ennen maksullisen tilauksen valintaa; maksullista tiliä ei tarvita oman ratkaisun aloittamiseen. Lähdelinkit suunnitelmassa.
+
+**Tarkistukset:** lähtötilanteen `main` puhdas, `git fetch origin` onnistui oikeuslaajennuksella ja paikallinen/etähaara olivat samassa commitissa `c34a4a0`. Dokumenttimuutosten diff ja `git diff --check` tarkistettu. Sovelluskoodia ei muutettu, joten testi-, demo-, kielimalli- tai Valio-API-ajoja ei tehty. WhatsAppin päästä päähän -toimivuutta tai asiakastunnistusta ei ole testattu.
+
+**Seuraava askel:** toteuta erikseen testattava keskusteluydin ja Valio-asiakasrajapinnan sovitin; kytke sen jälkeen Meta-testinumero julkiseen vastaanottimeen. Meta-tili/testinumero, hosting, pysyvä jono ja Valion tunnistus-/tilausrajapintojen saatavuus ovat vielä avoimia. Tämä commit tallentaa päätökset ja toteutussuosituksen, ei valmista WhatsApp-agenttia.
+
 ## 14.11.2026 — suodatuschipit pois ja haku tuoteryhmiin (Codex)
 
 **Käyttäjän päätös:** kiireisen kokin haku auttaa löytämään sopivan tuotteen ja tarvittaessa selaamaan koko tuoteryhmää. Automaattisesti ehdotetut suodatuschipit pois; lähin ryhmä ensin, tarvittaessa yksi laajempi linkki. Käyttäjä täsmensi, ettei linkin tarvitse johtaa oikeaan Aimon kauppaan: tämä on demo ja tuotannossa kohde kytketään oikeaan collection-sivuun.
