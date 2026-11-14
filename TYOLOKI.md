@@ -2,6 +2,11 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsApp-palvelintunnuksen rajatut oikeudet varmennettu (Codex)
+
+- Metan uudelleenlatauksen jälkeen `AimoDemo` näyttää täsmälleen kolme testiresurssia. Sovelluksen kehittäjäoikeus (sisältää Metan mukaan katselu-/testioikeuden), Test WhatsApp Accountin numeron katselu ja `Messages`, Test Messaging Accountin viestipohjien katselu. Molemmat WhatsApp-resurssit vain osittaisella oikeudella, ei `Everything`-pakettia tai muita yritysresursseja.
+- Edellisen merkinnän epävarma tallennustila on ratkennut; sivu näytti vanhaa tilaa. Token ei vielä ole valmis: automaattinen hyväksyntätarkistus pysäytti `Generate token` -painalluksen uuden credentialin toimintakohtaisen hyväksynnän puuttumiseen. Käyttäjältä pyydetty sen edellyttämä uusi vahvistus, vaikka aiempi luontihyväksyntä oli annettu. Lähetysoikeus todetaan vasta uuden tokenin ja oikean puhelintestin jälkeen. Salaisuuksia ei tulostettu tai tallennettu Gitiin.
+
 ## 14.11.2026 — WhatsAppin luonteva mallidialogi, kirjoittaa-ilmaisin ja erilliset jatkoviestit (Codex)
 
 **Käyttäjän linjaus:** Valio Aimo -henkinen, ystävällinen ja luonteva asiointi; voi keskustella myös tuotteista ja käyttötavoista. Päätavoite on kerätä ostoslista. Lista ja hyödyllinen jatkokysymys voivat tulla erillisinä viesteinä. Kirjoittaa-ilmaisimen pitää näkyä heti saapuvan viestin jälkeen. Työ varattiin koordinointitaululla; Meta-asetukset, `.env` ja nykyisten palvelinten restartit jätettiin käyttöönottochatille.
