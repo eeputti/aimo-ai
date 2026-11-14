@@ -1,0 +1,17 @@
+node_modules/
+.env
+data/raw/product_data.json
+data/catalog.json
+data/packs.json
+data/img/
+data/image-index*.json
+data/*.db
+data/*.db-*
+.DS_Store
+.env.*
+!.env.example
+
+# Portin allekirjoitusavain ja challenge-aineisto eivät kuulu julkiseen repoon (aineiston käyttö on rajattu Junctioniin)
+data/*.pem
+data/raw/
+data/eval-oracle-cache.json

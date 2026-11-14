@@ -1,0 +1,188 @@
+{
+  "pass": 20,
+  "total": 20,
+  "avgMs": 426,
+  "clock": "2026-11-14T10:00:00+02:00",
+  "rows": [
+    {
+      "id": "brief-en",
+      "text": "I need 1,000 litres of lactose-free milk by Monday.",
+      "ok": true,
+      "got": "464306 × 1000 = 1010.00 €",
+      "status": "confirmed",
+      "ms": 117,
+      "errs": []
+    },
+    {
+      "id": "brief-fi",
+      "text": "Tarvitsen 1 000 litraa laktoositonta maitoa maanantaiksi",
+      "ok": true,
+      "got": "464306 × 1000 = 1010.00 €",
+      "status": "confirmed",
+      "ms": 70,
+      "errs": []
+    },
+    {
+      "id": "brief-cap",
+      "text": "I need 1,000 litres of lactose-free milk by Monday.",
+      "ok": true,
+      "got": "464306 × 1000 = 1010.00 €",
+      "status": "pending_approval",
+      "ms": 70,
+      "errs": []
+    },
+    {
+      "id": "milk-short",
+      "text": "1.000 l laktoositonta maitoa ma",
+      "ok": true,
+      "got": "464306 × 1000 = 1010.00 €",
+      "status": "confirmed",
+      "ms": 77,
+      "errs": []
+    },
+    {
+      "id": "milk-plain",
+      "text": "300 litraa maitoa maanantaiksi",
+      "ok": true,
+      "got": "469477 × 300 = 264.00 €",
+      "status": "confirmed",
+      "ms": 145,
+      "errs": []
+    },
+    {
+      "id": "milk-whole",
+      "text": "a hundred litres of whole milk on Monday",
+      "ok": true,
+      "got": "464073 × 100 = 164.00 €",
+      "status": "confirmed",
+      "ms": 127,
+      "errs": []
+    },
+    {
+      "id": "milk-organic",
+      "text": "luomu kevytmaitoa 40 litraa maanantaiksi",
+      "ok": true,
+      "got": "ei tilausta (oikein pysähtyi)",
+      "status": "–",
+      "ms": 21,
+      "errs": []
+    },
+    {
+      "id": "cream-en",
+      "text": "30 l whipping cream by Monday",
+      "ok": true,
+      "got": "465193 × 18 = 104.94 €",
+      "status": "confirmed",
+      "ms": 124,
+      "errs": []
+    },
+    {
+      "id": "cream-lf",
+      "text": "20 litraa laktoositonta kuohukermaa maanantaiksi",
+      "ok": true,
+      "got": "465193 × 12 = 69.96 €",
+      "status": "confirmed",
+      "ms": 69,
+      "errs": []
+    },
+    {
+      "id": "butter-kg",
+      "text": "20 kg voita maanantaiksi",
+      "ok": true,
+      "got": "464411 × 40 = 132.00 €",
+      "status": "confirmed",
+      "ms": 128,
+      "errs": []
+    },
+    {
+      "id": "butter-lf",
+      "text": "10 kg laktoositonta voita maanantaiksi",
+      "ok": true,
+      "got": "463437 × 20 = 66.20 €",
+      "status": "confirmed",
+      "ms": 74,
+      "errs": []
+    },
+    {
+      "id": "multi-fi",
+      "text": "20 kg voita ja 50 l kuohukermaa maanantaiksi",
+      "ok": true,
+      "got": "464411 × 40 = 132.00 € · 465193 × 29 = 169.07 €",
+      "status": "confirmed",
+      "ms": 81,
+      "errs": []
+    },
+    {
+      "id": "multi-oat",
+      "text": "60 l kaurajuomaa ja 10 kg sokeria maanantaiksi",
+      "ok": true,
+      "got": "468465 × 60 = 70.20 € · 460460 × 1 = 24.27 €",
+      "status": "confirmed",
+      "ms": 141,
+      "errs": []
+    },
+    {
+      "id": "rice",
+      "text": "25 kg basmatiriisiä maanantaiksi",
+      "ok": true,
+      "got": "473735 × 5 = 60.30 €",
+      "status": "confirmed",
+      "ms": 132,
+      "errs": []
+    },
+    {
+      "id": "pasta-gf",
+      "text": "10 kg gluteenitonta pastaa maanantaiksi",
+      "ok": true,
+      "got": "462324 × 20 = 42.00 €",
+      "status": "confirmed",
+      "ms": 150,
+      "errs": []
+    },
+    {
+      "id": "salmon",
+      "text": "50 kg lohifileetä maanantaiksi",
+      "ok": true,
+      "got": "ei tilausta (oikein pysähtyi)",
+      "status": "–",
+      "ms": 149,
+      "errs": []
+    },
+    {
+      "id": "date-shift",
+      "text": "200 litres of lactose-free milk by Sunday",
+      "ok": true,
+      "got": "464306 × 200 = 202.00 €",
+      "status": "pending_approval",
+      "ms": 71,
+      "errs": []
+    },
+    {
+      "id": "partial-arla",
+      "text": "100 litraa Arlan rasvatonta laktoositonta maitojuomaa maanantaiksi",
+      "ok": true,
+      "got": "462775 × 51 + 464401 × 49 = 184.97 €",
+      "status": "confirmed",
+      "ms": 2123,
+      "errs": []
+    },
+    {
+      "id": "default-mandate",
+      "text": "20 litraa laktoositonta maitoa maanantaiksi",
+      "ok": true,
+      "got": "464306 × 20 = 20.20 €",
+      "status": "pending_approval",
+      "ms": 30,
+      "errs": []
+    },
+    {
+      "id": "nonsense",
+      "text": "2 kg unicorn meat",
+      "ok": true,
+      "got": "ei tilausta (oikein pysähtyi)",
+      "status": "–",
+      "ms": 4621,
+      "errs": []
+    }
+  ]
+}

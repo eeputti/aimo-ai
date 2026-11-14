@@ -1,0 +1,25 @@
+{
+  "name": "aimo-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Aimo Agent Gateway (Junction 2026, Valio Aimo): avoin portti ostoagenteille. Allekirjoitetut tarjoukset, mandaatit, ihmisen hyväksyntä, audit trail.",
+  "scripts": {
+    "catalog": "node scripts/build-catalog.mjs && node scripts/build-packs.mjs",
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.mjs",
+    "dev": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env --watch-path=server server/index.mjs",
+    "reset": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/reset-demo.mjs",
+    "images": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/fetch-images.mjs",
+    "fetch-data": "node --env-file-if-exists=.env scripts/fetch-data.mjs",
+    "demo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/demo-buyer.mjs",
+    "aimo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/aimo.mjs",
+    "aimo:eval": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/aimo-eval.mjs",
+    "eval": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/eval.mjs"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0"
+  }
+}

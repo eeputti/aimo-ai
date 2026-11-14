@@ -1,0 +1,113 @@
+// AIMO-MALLIN KOHDISTUS: rakenteinen pyyntö → oikeat tuotteet Aimon katalogista + portin kutsut valmiina.
+// Tuotteet tulevat aina katalogista. Tämä kerros ei koskaan tuota tuotekoodia, jota katalogissa ei ole,
+// ja jos mikään ei täsmää, se sanoo sen suoraan (NO_MATCH) ja tarjoaa lähimmät löysennykset nappeina.
+import { loadCatalog } from '../catalog.mjs';
+import { loadLexicon, variants } from './lexicon.mjs';
+
+/** Esiintyykö sana (missä tahansa taivutusmuodossa) tuotteen suomen- tai englanninkielisessä nimessä? */
+const nameHas = (p, term) => { const en = (p.nameEn || '').toLowerCase(); return variants(term).some((v) => p._tokens.some((t) => t.includes(v)) || en.includes(v)); };
+
+let PRODUCT_TYPES = [];
+try { ({ PRODUCT_TYPES } = await import('../gateway/contract.mjs')); } catch { /* ilman porttia rajataan pelkällä kategorialla */ }
+
+const FAT_RE = { 'fat-free': /rasvaton/i, 'semi-skimmed': /kevyt/i, whole: /täys/i }; // suomenkielisestä nimestä: englanniksi "semi-skimmed" sisältää sanan "skimmed"
+const PORTION = /annos|portion|\d+\s*x\s*\d+\s*(cl|ml|g)\b/i; // annospakkaukset eivät vastaa litra- tai kilotarvetta
+const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu', MARINE_STEWARDSHIP_COUNCIL_LABEL: 'MSC', FAIR_TRADE_MARK: 'Reilu kauppa' };
+
+function filterSteps(item) {
+  const type = PRODUCT_TYPES.find((t) => t.id === item.productType);
+  const terms = (item.productTerm || '').split(' ').filter(Boolean);
+  const steps = [];
+  if (type) steps.push(['productType', (p) => type.categories.includes(p.category) && !(type.exclude && type.exclude.test(p.name))]);
+  else if (item.categories?.length) steps.push(['category', (p) => item.categories.includes(p.category)]);
+  else if (item.category) steps.push(['category', (p) => p.category === item.category]);
+  for (const c of item.claims) steps.push([`claim:${c}`, (p) => p.labels?.includes(c)]);
+  for (const a of item.excludeAllergens) steps.push([`excludeAllergen:${a}`, (p) => p.hasAllergenData && !p.contains.includes(a) && !(p.mayContain || []).includes(a)]);
+  if (item.countryOfOrigin) steps.push(['countryOfOrigin', (p) => p.country === item.countryOfOrigin]);
+  if (item.brand) steps.push(['brand', (p) => (p.brand || '').trim().toLowerCase() === item.brand.trim().toLowerCase()]);
+  if (item.attributes.fat) steps.push(['fat', (p) => FAT_RE[item.attributes.fat].test(p.name)]);
+  if (item.attributes.fatPercent != null) steps.push(['fatPercent', (p) => new RegExp(`(^|\\D)${String(item.attributes.fatPercent).replace('.', '[.,]')}\\s*%`).test(p.name)]);
+  if (item.attributes.treatment === 'uht') steps.push(['uht', (p) => /uht/i.test(p.name)]);
+  if (item.attributes.state === 'frozen') steps.push(['frozen', (p) => p.temp === 'frozen']);
+  if (item.attributes.pack?.unit === 'L') steps.push(['pack', (p) => p.litres && Math.abs(p.litres / (p.perSales || 1) - item.attributes.pack.value) < 0.01]);
+  if (item.quantity && item.quantity.unit !== 'PCS' && !/annos|portion/.test(item.raw)) steps.push(['notPortionPack', (p) => !PORTION.test(p.name)]);
+  // muut tuotesanat (esim. "rintafilee" pääsanan "broilerin" lisäksi) rajaavat nimen perusteella
+  return { steps, type, terms };
+}
+
+/**
+ * @param item understand()-tuloksen yksi rivi
+ * @returns {{status: 'ok'|'no_match', candidates: object[], total: number, funnel: object[], chips: object[], search: object}}
+ */
+export function resolveItem(item, opts = {}) {
+  const cat = loadCatalog();
+  const limit = opts.limit ?? 40;
+  const { steps, type, terms } = filterSteps(item);
+  let pool;
+  if (type || item.category) pool = cat.products;
+  else pool = item.productTerm ? cat.search(item.productTerm, { limit: 200 }).map((h) => h.product) : []; // tuntematon ryhmä: nimihaku koko katalogista
+  const funnel = [];
+  let relaxed = null;
+  for (const [name, fn] of steps) {
+    const next = pool.filter(fn);
+    funnel.push({ filter: name, remaining: next.length });
+    if (!next.length && pool.length) { relaxed = name; break; } // tämä ehto tyhjentäisi tuloksen: pysähdytään ja kerrotaan se
+    pool = next;
+  }
+  // tuotesanat nimessä: jos pääsanan lisäksi on tarkentavia sanoja, suositaan tuotteita joissa ne esiintyvät
+  if (terms.length && (type || item.category)) {
+    let narrowed = pool.filter((p) => terms.every((t) => nameHas(p, t)));
+    if (!narrowed.length) narrowed = pool.filter((p) => nameHas(p, terms.at(-1))); // "broilerin rintafilee": pääsana ratkaisee, jos kaikki sanat eivät osu
+    if (narrowed.length) { pool = narrowed; funnel.push({ filter: 'nameTerms', remaining: pool.length }); }
+  }
+  // järjestys: tuote, jolla on toimitusvarmuusdataa (= oikeasti tilattu) ja lyhyt nimi (= perustuote) ensin
+  const ranked = [...pool].sort((a, b) => (b.reliability != null) - (a.reliability != null) || a.name.length - b.name.length);
+  const status = relaxed || !ranked.length ? 'no_match' : 'ok';
+  return {
+    status,
+    reason: status === 'no_match' ? { code: 'NO_MATCH', failedFilter: relaxed, fi: relaxed ? `Yksikään tuote ei täytä ehtoa ${relaxed}. Näytetään lähimmät ilman sitä.` : 'Aimon valikoimasta ei löytynyt tätä tuotetta.', en: relaxed ? `No product satisfies ${relaxed}. Showing the closest ones without it.` : 'Nothing in the Aimo assortment matches.' } : undefined,
+    total: ranked.length,
+    candidates: ranked.slice(0, limit).map((p) => ({ id: p.id, name: p.name, brand: p.brand || null, unit: p.salesUnit, litres: p.litres ?? null, kg: p.kg ?? null, labels: p.labels || [] })),
+    funnel,
+    chips: chipsFor(item, ranked),
+    search: { productType: item.productType || undefined, query: item.productType ? undefined : item.productTerm || undefined, claims: item.claims.length ? item.claims : undefined, excludeAllergens: item.excludeAllergens.length ? item.excludeAllergens : undefined, countryOfOrigin: item.countryOfOrigin || undefined, brand: item.brand || undefined },
+  };
+}
+
+/** Tarkennusnapit (Zalando-malli): vain ne rajaukset, jotka oikeasti jakavat ehdokasjoukon. Nappi on valmis rakenteinen muutos, ei tekstikenttä. */
+function chipsFor(item, pool) {
+  if (pool.length < 2) return [];
+  const chips = [];
+  const share = (fn) => pool.filter(fn).length;
+  const add = (label, patch, n) => { if (n > 0 && n < pool.length) chips.push({ label, patch, matches: n }); };
+  if (!item.attributes.fat && (item.productType === 'milk' || item.category === '10400')) for (const [k, fi] of [['fat-free', 'Rasvaton'], ['semi-skimmed', 'Kevyt'], ['whole', 'Täys']]) add(fi, { attributes: { fat: k } }, share((p) => FAT_RE[k].test(p.name)));
+  for (const [code, fi] of Object.entries(CLAIM_FI)) if (!item.claims.includes(code) && !['LOW_LACTOSE', 'VEGETARIAN', 'MARINE_STEWARDSHIP_COUNCIL_LABEL', 'FAIR_TRADE_MARK'].includes(code)) add(fi[0].toUpperCase() + fi.slice(1), { claims: [...item.claims, code] }, share((p) => p.labels?.includes(code)));
+  if (!item.countryOfOrigin) add('Kotimainen', { countryOfOrigin: 'fi' }, share((p) => p.country === 'fi'));
+  if (!item.brand) {
+    const brands = new Map();
+    for (const p of pool) if (p.brand) brands.set(p.brand.trim(), (brands.get(p.brand.trim()) || 0) + 1);
+    for (const [b, n] of [...brands].sort((x, y) => y[1] - x[1]).slice(0, 3)) add(b, { brand: b }, n);
+  }
+  const packs = new Map();
+  for (const p of pool) if (p.litres) { const per = +(p.litres / (p.perSales || 1)).toFixed(2); packs.set(per, (packs.get(per) || 0) + 1); }
+  if (!item.attributes.pack) for (const [per, n] of [...packs].sort((x, y) => y[1] - x[1]).slice(0, 3)) add(`${String(per).replace('.', ',')} l pakkaus`, { attributes: { pack: { value: per, unit: 'L' } } }, n);
+  return chips.sort((a, b) => Math.abs(a.matches / pool.length - 0.5) - Math.abs(b.matches / pool.length - 0.5)).slice(0, 6); // tasaisimmin jakavat ensin
+}
+
+/** Koko pyyntö → portin kutsut: search_products-argumentit riveittäin ja valmis request_quote-runko. */
+export function toGateway(request, opts = {}) {
+  const resolved = request.items.map((it) => resolveItem(it, opts));
+  const needs = [];
+  request.items.forEach((it, i) => {
+    const r = resolved[i];
+    if (!r.candidates.length || !it.quantity) return;
+    needs.push({ ref: `need-${i + 1}`, candidates: r.candidates.map((c) => c.id), quantity: it.quantity, rank: opts.rank || 'price' });
+  });
+  return {
+    resolved,
+    requestQuote: needs.length ? { deliveryDate: request.deliveryDate || undefined, needs, maxOptions: 3 } : null,
+    blocked: request.items.map((it, i) => (!it.quantity ? { item: i, code: 'QUANTITY_MISSING' } : !resolved[i].candidates.length ? { item: i, code: 'NO_MATCH' } : null)).filter(Boolean),
+  };
+}
+
+export const lexiconStats = () => loadLexicon().stats;
