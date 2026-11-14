@@ -6,7 +6,17 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 - Käyttäjän pyyntö: ostoslistan rivit näkyvät ranskalaisilla viivoilla pallukoiden sijaan. Selaimen tilausapurin Markdown-muotoilija muodostaa listoista HTML-luetteloita; `public/assistant.css` asettaa niiden listamerkiksi tavallisen `-`-viivan. Rivien sisältö, lihavoinnit ja luettelorakenne säilyvät.
 - Tarkistus: oma diff ja `git diff --check` läpi. Pelkkä tyylimuutos, ei uusia testejä, mallikutsuja tai palvelimen uudelleenkäynnistystä. Ulkoasua ei tarkistettu selaimessa. Sivun päivitys lataa uuden tyylin.
-- Muiden kesken olevat WhatsApp- ja paikallisen verkkokaupan muutokset jätetty tämän commitin ulkopuolelle. Työvaraukset ja tarkka rajaus: `docs/parallel/shopping-list-format.md`.
+- Muiden kesken olevat WhatsApp- ja paikallisen verkkokaupan muutokset jätetty tämän commitin ulkopuolelle. Työvaraukset ja tarkka rajaus: `docs/parallel/shopping-list-format.md`. Pushin aikana GitHubiin tullut MCP-liittymisohje `6883f77` yhdistettiin säilyttäen molemmat lokimerkinnät; yhdistäminen ei muuta sovelluskoodia.
+
+## 14.11.2026 — tiimiläisten MCP-liittymisohje ja yhteinen osoite GitHubiin (Codex)
+
+**Käyttäjän pyyntö:** tallenna ohjeet ja yhteyslinkki GitHubiin Eelistä, Aleksia ja Peetua varten. Käyttäjä antoi nykyisen Cloudflare-originin; liittymisohjeessa käytetään sen `/mcp`-osoitetta. Avaimia ei pyydetty, luettu tai tallennettu Gitiin. Käyttäjän itse palvelinkoneellaan luomat kuusi Claude-/ChatGPT-jäsentä varmennettiin oikean Tiimialusta-liittimen jäsenlistasta. Tunniste ei itsessään varmista avustajan kirjautumista.
+
+- Uusi `docs/team-mcp-join.md`: nykyinen yhteinen MCP-osoite, kuuden tunnisteen taulukko, yksityisesti toimitettava jäsenavain, ChatGPT:n nykyinen Plugins-polku ja vanhempi Apps-polku, Claude-liitin, OAuth-kirjautuminen, whoami/projekti- ja viestitesti, yhteiset avustajaohjeet sekä ylläpitäjän PowerShell-komennot (`npm.cmd`) avaimen vaihtoon ja tunnelin käynnistykseen. Tilapäisyys, palvelinkoneen päälläolo ja osoitteen vaihdon vaikutus kerrottu. Juuriosoite ei ole erillinen tiimisivu.
+- Root README: helposti löydettävä liittymislinkki ja vanhentuneen "ei vielä julkaistu" -tilan korjaus nykyiseksi tunnelikokeiluksi. Palvelun README linkittää samaan liittymisohjeeseen, jotta nykyinen osoite ylläpidetään yhdessä paikassa.
+- Työ varattiin sekä paikalliselta taululta että oikean liittimen yhteiseltä taululta. Muiden uudet commitit db795e6:een asti haettiin ja säilytettiin. Sovelluskoodiin, käynnissä oleviin palvelimiin, jäsenavaimiin tai kantojen asetuksiin ei tehty muutoksia.
+
+**Varmennus:** oikean liittimen `whoami` palauttaa daniel-chatgpt / aimo-ai ja `get_project_state` kaikki kuusi uutta tunnistetta. Käyttäjän ilmoittaman originin julkinen OAuth resource -metadata palauttaa 200 ja täsmää dokumentoituun `/mcp`-osoitteeseen; autentikoimaton POST `/mcp` palauttaa 401. `/healthz` palautti tästä ympäristöstä 403 / Your request was blocked, joten sen onnistumista ei väitetä. Kaikki 16 tarkistettua paikallista dokumenttilinkkiä osoittavat olemassa olevaan kohteeseen, ohjeen kuusi jäsen-ID:tä ja yhteysosoitteen täsmääminen metadataan tarkistettu, `git diff --check` läpi. Pelkkää dokumenttimuutosta varten sovellustestejä ei ajettu. Muiden kuuden oikeaa Claude-/ChatGPT-kirjautumista tai viestitestiä ei ajettu heidän puolestaan.
 
 ## 14.11.2026 — WhatsAppin ennakkotarkistus ja erillinen käynnistyspaketti (Codex, alkuperäinen testinumerochat)
 
