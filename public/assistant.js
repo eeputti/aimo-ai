@@ -5,6 +5,8 @@
   const notice = $('#ta-notice'); const examples = $('#ta-examples');
   const history = []; // {role, content} – vain teksti, palvelin lisää työkalukutsut itse
   let busy = false;
+  let shoppingConversation = null;
+  let assistantAvailable = true;
 
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<i>$2</i>');
@@ -46,7 +48,7 @@
   }
 
   function setBusy(on) {
-    busy = on; sendBtn.disabled = on; input.disabled = on;
+    busy = on; sendBtn.disabled = on || (!assistantAvailable && !shoppingConversation); input.disabled = sendBtn.disabled;
     sendBtn.textContent = on ? 'Odota…' : 'Lähetä';
     if (!on) input.focus();
   }
@@ -79,21 +81,27 @@
     const status = (t) => { const s = reply.querySelector('.ta-status span:last-child'); if (s) s.textContent = t; };
     let answer = ''; let failed = false;
     try {
-      const r = await fetch('/api/assistant/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: history }) });
-      if (!r.ok || !r.headers.get('content-type')?.includes('text/event-stream')) {
-        const err = await r.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${r.status}`);
+      if (shoppingConversation) {
+        const result = await shoppingConversation.say(text.trim());
+        answer = result.text; reply.innerHTML = md(answer) || '<p>Ei vastausta.</p>';
+      } else {
+        const r = await fetch('/api/assistant/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: history }) });
+        if (!r.ok || !r.headers.get('content-type')?.includes('text/event-stream')) {
+          const err = await r.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${r.status}`);
+        }
+        await readSse(r, (event, d) => {
+          if (event === 'status' || event === 'tool') status(d.text);
+          else if (event === 'text') { answer += d.t; reply.innerHTML = md(answer) + '<p class="ta-status"><span class="ta-dot"></span><span>Kirjoitetaan</span></p>'; }
+          else if (event === 'error') { failed = true; reply.innerHTML = `<p class="ta-error">${esc(d.text)}</p>`; }
+          else if (event === 'done') reply.innerHTML = md(answer) || '<p>Ei vastausta.</p>';
+        });
       }
-      await readSse(r, (event, d) => {
-        if (event === 'status' || event === 'tool') status(d.text);
-        else if (event === 'text') { answer += d.t; reply.innerHTML = md(answer) + '<p class="ta-status"><span class="ta-dot"></span><span>Kirjoitetaan</span></p>'; }
-        else if (event === 'error') { failed = true; reply.innerHTML = `<p class="ta-error">${esc(d.text)}</p>`; }
-        else if (event === 'done') reply.innerHTML = md(answer) || '<p>Ei vastausta.</p>';
-      });
     } catch (err) {
       failed = true;
       reply.innerHTML = `<p class="ta-error">Yhteys epäonnistui: ${esc(err.message || err)}</p>`;
     }
+    if (failed) input.value = text;
     if (failed || !answer) history.pop(); // epäonnistunut kysymys ei jää historiaan; käyttäjä voi lähettää uudelleen
     else history.push({ role: 'assistant', content: answer });
     reply.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -104,10 +112,24 @@
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(input.value); } });
   examples.addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) ask(b.textContent); });
 
+  if (document.querySelector('meta[name="aimo-local-shop"]')) {
+    import('/whatsapp-shopping-list.js').then(({ mountWhatsAppList }) => mountWhatsAppList({ before: notice,
+      onOpen(conversation) {
+        if (busy) return;
+        shoppingConversation = conversation;
+        history.length = 0; log.replaceChildren(); examples.hidden = true; notice.hidden = true;
+        bubble('bot', md(conversation.text));
+        input.value = ''; setBusy(false);
+        void ask('näytä');
+      },
+    })).catch(() => { notice.hidden = false; notice.textContent = 'WhatsApp-listan avaaminen ei onnistunut. Päivitä sivu.'; });
+  }
+
   fetch('/api/assistant/status').then((r) => r.json()).then((s) => {
-    if (s.enabled) return;
+    assistantAvailable = s.enabled;
+    if (s.enabled || shoppingConversation) return;
     notice.hidden = false;
     notice.textContent = 'Tilausapuri ei ole käytössä tällä palvelimella: ANTHROPIC_API_KEY tai ASSISTANT_MCP_URL puuttuu .env-tiedostosta.';
-    setBusy(true); sendBtn.textContent = 'Ei käytössä';
+    setBusy(false); sendBtn.textContent = 'Ei käytössä';
   }).catch(() => {});
 })();

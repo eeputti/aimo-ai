@@ -3,6 +3,7 @@ import { openWhatsAppStore } from './store.mjs';
 import { createMetaSender, createMetaTypingIndicator, createWhatsAppChannel } from './channel.mjs';
 import { replyToAssistant } from '../assistant.mjs';
 import { bootstrapDemoMember, createDemoOrderingChat, validateOrderingEnvironment } from './ordering.mjs';
+import { createShoppingListHandoff } from './shopping-list.mjs';
 import { createWebDemo } from './web-demo.mjs';
 
 export const whatsappDbPath = () => process.env.WHATSAPP_DB || fileURLToPath(new URL('../../data/whatsapp.db', import.meta.url));
@@ -33,8 +34,9 @@ export function createConfiguredWhatsApp() {
     onPrune: () => ordering?.prune(), send: createMetaSender(settings), typing: createMetaTypingIndicator(settings) });
   // Selaindemo on olemassa vain tilaustilassa, jolloin kannat ovat eristetyt.
   const webDemo = ordering ? createWebDemo({ store, chat: ordering.chat }) : null;
+  const shoppingLists = ordering ? createShoppingListHandoff({ store, ordering, defaultPhone: process.env.WHATSAPP_DEMO_PHONE }) : null;
   return { ...channel,
-    async handle(req, res, url = new URL(req.url, 'http://localhost')) { return (await channel.handle(req, res, url)) || (webDemo ? webDemo.handle(req, res, url) : false); },
+    async handle(req, res, url = new URL(req.url, 'http://localhost')) { return (await channel.handle(req, res, url)) || (shoppingLists ? await shoppingLists.handle(req, res, url) : false) || (webDemo ? webDemo.handle(req, res, url) : false); },
     async close() {
       try { await channel.stop(); await ordering?.close(); }
       finally { store.close(); }
