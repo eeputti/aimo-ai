@@ -65,6 +65,10 @@ if (f.order?.suggestions?.length) {
   line(`   Ihminen lisäsi yhdellä napilla → ${g.addition?.status || g.error?.message}, uusi summa ${g.totals?.net?.toFixed(2)} €`);
 }
 
+// 10. Reseptistä ostoskori: annokset × resepti → raaka-ainerivit, jokainen kiinnitetty yhteen tuotteeseen. Ilman annosmäärää ei tilata mitään.
+await scenario('10. Reseptistä ostoskori: annokset × resepti, tuotteet kiinnitetty, ei korvaajia', { apiKey: 'demo-ravintola-kulma', text: 'Lohikeitto 100 annosta maanantaiksi' });
+await scenario('    Sama ilman annosmäärää → ei arvata, ei tilata', { apiKey: 'demo-ravintola-kulma', text: 'lohikeitto maanantaiksi' });
+
 if (a.order) {
   const trail = await (await fetch(`${baseUrl}/v1/orders/${a.order.orderId}/audit`, { headers: { authorization: 'Bearer demo-nordic-hotels' } })).json();
   line(`\n━━ Audit trail tilaukselle ${a.order.orderId}: ketju ${trail.chain.valid ? 'EHJÄ' : 'RIKKI'} (${trail.chain.entries} riviä)`);

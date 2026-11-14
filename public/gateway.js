@@ -44,7 +44,7 @@ function orderCard(o, { actions = true, link = true } = {}) {
     ${o.approval?.explanation && o.status === 'pending_approval' ? `<details class="ai-note"><summary><b>${{ approve: 'Tekoäly suosittelee: hyväksy', reject: 'Tekoäly suosittelee: hylkää', review: 'Tekoäly suosittelee: tarkista' }[o.approval.explanation.suggestion] || 'Tekoälyn selitys'}</b></summary><p class="small">${esc(o.approval.explanation.text)} ${esc(o.approval.explanation.suggestionWhy)}</p><p class="small muted">${esc(o.approval.explanation.model)}, päätös on sinun</p></details>` : ''}
     ${o.substitutions?.some((s) => s.modelNote) ? `<div class="ai-note"><p class="small">${o.substitutions.filter((s) => s.modelNote).map((s) => esc(s.modelNote)).join(' ')} <span class="muted">Korvaajan valitsi tekoäly portin tarkistamista vaihtoehdoista (${esc(o.substitutions.find((s) => s.modelNote).chosenBy)}).</span></p></div>` : ''}
     ${reasons.length ? `<ul class="why">${reasons.map((r) => `<li class="${r.severity}">${esc(reasonText(r))}<code>${esc(r.code)}</code></li>`).join('')}</ul>` : ''}
-    ${o.status === 'pending_approval' && actions ? `<div class="actions"><button class="btn primary big" data-act="approve" data-order="${o.orderId}">Hyväksy</button><button class="btn danger big" data-act="reject" data-order="${o.orderId}">Hylkää</button></div>` : ''}
+    ${o.status === 'pending_approval' && actions ? `<div class="actions"><button class="btn approve big" data-act="approve" data-order="${o.orderId}"><span aria-hidden="true">✓</span> Hyväksy tilaus</button><button class="btn danger big" data-act="reject" data-order="${o.orderId}">Hylkää</button></div>` : ''}
     <div class="small muted">${esc(o.orderId)}, ${dayTime(o.createdAt)}${link ? `, <a href="#" data-act="trail" data-order="${o.orderId}">päätösketju</a>${o.status === 'pending_approval' || o.pendingAddition ? `, <a href="/approve.html?order=${o.orderId}" target="_blank" rel="noopener">avaa puhelinnäkymä</a>` : ''}` : ''}</div>
   </article>`;
 }
@@ -67,7 +67,7 @@ function additionCard(o, actions) {
     <ul class="lines">${a.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span></li>`).join('')}</ul>
     <div class="small muted">+${money(a.addedNet)}, uusi summa olisi ${money(a.orderNetIfApproved)}${a.approval?.expiresAt ? ', tilaus pysyy ennallaan, jos et hyväksy' : ''}</div>
     <ul class="why">${a.reasons.filter((r) => r.severity === 'approval').map((r) => `<li class="${r.severity}">${esc(reasonText(r))}<code>${esc(r.code)}</code></li>`).join('')}</ul>
-    ${actions ? `<div class="actions"><button class="btn primary big" data-act="approve" data-order="${o.orderId}">Hyväksy lisäys</button><button class="btn danger big" data-act="reject" data-order="${o.orderId}">Hylkää lisäys</button></div>` : ''}
+    ${actions ? `<div class="actions"><button class="btn approve big" data-act="approve" data-order="${o.orderId}"><span aria-hidden="true">✓</span> Hyväksy lisäys</button><button class="btn danger big" data-act="reject" data-order="${o.orderId}">Hylkää lisäys</button></div>` : ''}
   </div>`;
 }
 
@@ -118,6 +118,7 @@ const SCENARIOS = [
   { buyer: 'nordic-hotels', text: '200 litres of lactose-free milk by Sunday', img: '464306', title: 'Toimitus ei ehdi', hint: 'Aikaisin toimitus on maanantai → kysytään päivän siirrosta' },
   { buyer: 'nordic-hotels', text: '50 litres of lactose-free milk by Monday', tamper: true, img: '464306', title: 'Muokattu tarjous', hint: 'Agentti puolittaa hinnan tarjouksessa → allekirjoitus ei täsmää → hylätään' },
   { buyer: 'kahvila-aalto', text: '20 litraa laktoositonta maitoa maanantaiksi', img: '464306', title: 'Uusi asiakas, oletusvaltuus', hint: 'Mikään ei lähde ilman kuittausta' },
+  { buyer: 'ravintola-kulma', text: 'Lohikeitto 100 annosta maanantaiksi', img: '463316', title: 'Reseptistä ostoskori', hint: 'Annokset × resepti → 8 raaka-ainetta kiinnitettyinä tuotteisiin → sama tarjous- ja valtuusketju' },
 ];
 const LEVELS = [['always', 'Aina kuittaus', 'Oletus. Mikään tilaus ei lähde ilman hyväksyntääsi.'], ['exceptions', 'Kuittaus vain poikkeuksissa', 'Tavallinen tilaus menee läpi. Eurokaton ylitys, korvaaja ja päivän siirto kysytään.'], ['autonomous', 'Itsenäinen sääntöjen sisällä', 'Agentti hyväksyy itse myös korvaajan, kun se pysyy säännöissä. Saat ilmoituksen.']];
 const S = { d: null, buyer: 'nordic-hotels', run: null, running: false, trail: null, askText: '', preview: null, patches: [] };
@@ -136,7 +137,7 @@ function renderAgent() {
   $('#agent').innerHTML = `
     <div class="panel-head"><h2>Ulkopuolinen ostoagentti</h2><span class="tag agent">vain julkinen REST-sopimus</span></div>
     <div class="scenarios">${SCENARIOS.map((s, i) => `<button class="scenario" data-act="scenario" data-i="${i}" title="${esc(S.d.buyers.find((b) => b.id === s.buyer)?.name || s.buyer)}, ${esc(s.hint)}" ${S.running ? 'disabled' : ''}><img src="/img/${s.img}" alt="" loading="lazy" onerror="this.remove()"><b>${esc(s.title)}</b><span>"${esc(s.text)}"</span></button>`).join('')}</div>
-    <form class="ask" id="ask"><input id="askText" value="${esc(S.askText || '')}" autocomplete="off" placeholder="Oma pyyntö, esim. 40 kg voita ja 20 l laktoositonta kermaa maanantaiksi" aria-label="Oma pyyntö agentille"><button class="btn" ${S.running ? 'disabled' : ''}>Lähetä agentille</button></form>
+    <form class="ask" id="ask"><input id="askText" value="${esc(S.askText || '')}" autocomplete="off" placeholder="Oma pyyntö, esim. 1000 litraa maitoa maanantaiksi tai lohikeitto 100 annosta" aria-label="Oma pyyntö agentille"><button class="btn" ${S.running ? 'disabled' : ''}>Lähetä agentille</button></form>
     <div id="aimoPreview" class="aimo" aria-live="polite">${previewHtml()}</div>
     <div class="buyer-pick" role="group" aria-label="Ostaja">${S.d.buyers.map((b) => `<button type="button" data-act="buyer" data-buyer="${b.id}" aria-pressed="${S.buyer === b.id}">${esc(b.name)}</button>`).join('')}</div>
     ${S.running ? '<p><span class="spinner"></span> Agentti asioi portin kanssa…</p>' : ''}
@@ -179,8 +180,22 @@ function renderContract() {
     <p class="small muted">Aimo-API: ${S.d.apiStats.calls} kutsua, ${S.d.apiStats.ids} tuotekyselyä</p>
     <button class="btn ghost" data-act="reset" style="justify-self:start">Nollaa portin demo</button>`;
 }
-const renderAll = () => { renderTop(); renderAgent(); renderInbox(); renderMandate(); renderTrail(); renderContract(); };
-async function refresh() { S.d = await api('/console/state'); if (S.trail) S.trail = await api(`/console/orders/${S.trail.orderId}/audit`).catch(() => null); renderAll(); }
+// Taustavahti: sama raportti kuin GET /console/watch. Paneeli näyttää myös arviot, joissa ei löytynyt mitään: hiljaisuus on tulos, ei tyhjä tila.
+function renderWatch() {
+  const el = $('#watch'); const w = S.watch; if (!el) return;
+  if (!w) { el.innerHTML = '<div class="panel-head"><h2>Taustavahti</h2></div><div class="empty">Vahdin raportti ei ole saatavilla.</div>'; return; }
+  const findings = w.buyers.flatMap((b) => b.findings.map((f) => ({ ...f, buyerName: b.buyerName }))).sort((a, b) => (a.at < b.at ? 1 : -1));
+  const evaluations = w.buyers.reduce((s, b) => s + b.evaluations, 0);
+  el.innerHTML = `<div class="panel-head"><h2>Taustavahti</h2><span class="tag ${findings.length ? 'warn' : 'ok'}">${evaluations} arviota, ${findings.length} puuttumista</span></div>
+    <p class="small muted">Vertaa jokaista tilausta ostajan omaan historiaan. Ei kielimallia. Voi vain siirtää tilauksen ihmiselle, ei vahvistaa eikä hylätä.</p>
+    <table class="watch-table"><thead><tr><th>Ostaja</th><th>Haut</th><th>Tarjoukset</th><th>Tilaukset</th><th>Arviot</th><th>Puuttui</th></tr></thead><tbody>
+    ${w.buyers.map((b) => `<tr><td><b>${esc(b.buyerName)}</b><div class="small muted">${b.lastSeen ? `viimeksi ${dayTime(b.lastSeen)}` : 'ei toimintaa'}</div></td><td class="num">${b.activity.searches}</td><td class="num">${b.activity.quotes}</td><td class="num">${b.activity.orders}</td><td class="num">${b.evaluations}</td><td class="num">${b.findings.length ? `<span class="tag warn">${b.findings.length}</span>` : '0'}</td></tr>`).join('')}
+    </tbody></table>
+    ${findings.length ? `<ul class="watch-findings">${findings.slice(0, 5).map((f) => `<li><span class="dot"></span><div><b>${esc(f.buyerName)}</b> <span class="small muted">${dayTime(f.at)}, ${esc(f.code)}</span><div>${esc(f.message)}</div>${f.orderId ? `<a href="#" class="small" data-act="trail" data-order="${esc(f.orderId)}">näytä päätösketju</a>` : ''}</div></li>`).join('')}</ul>` : '<div class="empty">Vahti ei ole puuttunut yhteenkään tilaukseen.</div>'}
+    <details class="small"><summary>Mitä vahti seuraa (sama teksti on sopimuksessa)</summary><ul class="watch-rules">${w.disclosure.checks.map((c) => `<li><span class="mono">${esc(c.code)}</span> ${esc(c.rule)}</li>`).join('')}</ul><p class="muted">${esc(w.disclosure.limits)} <a href="/.well-known/agent-gateway.json" target="_blank" rel="noopener">/.well-known/agent-gateway.json</a></p></details>`;
+}
+const renderAll = () => { renderTop(); renderAgent(); renderInbox(); renderWatch(); renderMandate(); renderTrail(); renderContract(); };
+async function refresh() { [S.d, S.watch] = await Promise.all([api('/console/state'), api('/console/watch').catch(() => null)]); if (S.trail) S.trail = await api(`/console/orders/${S.trail.orderId}/audit`).catch(() => null); renderAll(); }
 
 // ---------- Aimo-malli: esikatselu kirjoittaessa ----------
 // Näyttää ennen lähetystä, miten pyyntö ymmärrettiin: rivit, näkyvät oletukset ja tarkennusnapit.
@@ -196,6 +211,9 @@ function previewHtml() {
   const applied = (i) => S.patches.map((x, k) => ({ ...x, k })).filter((x) => x.item === i);
   const rows = u.items.map((it, i) => {
     const c = p.cards[i];
+    if (it.pinned) return `<li><div><b>${qty(it.quantity.value)} ${UNIT[it.quantity.unit]} ${esc(it.productTerm)}</b> <span class="muted">${qty(it.pinned.perPortion.value * (it.pinned.perPortion.value < 0.1 ? 1000 : 1))} ${it.pinned.perPortion.value < 0.1 ? (it.pinned.perPortion.unit === 'L' ? 'ml' : 'g') : UNIT[it.pinned.perPortion.unit]} / annos</span>
+        <span class="tag ${c.status === 'ok' ? 'ok' : 'bad'}">${c.status === 'ok' ? 'kiinnitetty tuote' : 'ei valikoimassa'}</span></div>
+      ${c.reason ? `<div class="small warn-text">${esc(c.reason.fi)}</div>` : `<div class="small muted">${esc(it.pinned.name)}, ${esc(it.pinned.productId)}</div>`}</li>`;
     const facts = [...it.claims.map((x) => CLAIM[x] || x), it.brand, it.countryOfOrigin === 'fi' ? 'kotimainen' : null, FAT[it.attributes.fat], it.attributes.pack ? `${qty(it.attributes.pack.value)} ${UNIT[it.attributes.pack.unit]} pakkaus` : null, ...it.excludeAllergens.map((a) => `ei allergeenia ${a}`)].filter(Boolean);
     return `<li>
       <div><b>${it.quantity ? `${qty(it.quantity.value)} ${UNIT[it.quantity.unit]} ` : ''}${esc(it.productTerm)}</b>${facts.length ? ` <span class="muted">${esc(facts.join(', '))}</span>` : ''}
@@ -208,11 +226,24 @@ function previewHtml() {
       </div></li>`;
   }).join('');
   const notes = u.assumptions.filter((a) => a.code !== 'UNKNOWN_WORD');
-  return `<div class="aimo-head"><b>Näin pyyntö ymmärrettiin</b><span class="small muted">${u.deliveryDate ? `toimitus ${day(u.deliveryDate)}, ` : ''}${p.trace.via === 'aimo-rules' ? 'säännöt + Aimon sanasto' : esc(p.trace.via)}, ${p.trace.llmCalls} mallikutsua, ${ms(p.trace.ms)}</span></div>
+  const ask = S.question;
+  return `${ask ? `<div class="aimo-ask" role="group" aria-label="Tarkentava kysymys"><b>Pitääkö tuotteen ${esc(ask.term)} olla jotain näistä?</b><div class="refine">${ask.chips.map((ch) => `<button type="button" data-act="answer" data-item="${ask.item}" data-k="${ch.k}">${esc(ch.label)}</button>`).join('')}<button type="button" class="plain" data-act="answer">Ei väliä: halvin sopiva</button></div></div>` : ''}<div class="aimo-head"><b>${p.recipe ? `Resepti: ${esc(p.recipe.name)}${p.recipe.portions ? ` × ${qty(p.recipe.portions)} annosta` : ''}` : 'Näin pyyntö ymmärrettiin'}</b><span class="small muted">${u.deliveryDate ? `toimitus ${day(u.deliveryDate)}, ` : ''}${p.trace.via === 'aimo-rules' ? 'säännöt + Aimon sanasto' : esc(p.trace.via)}, ${p.trace.llmCalls} mallikutsua, ${ms(p.trace.ms)}</span></div>
     ${rows ? `<ul class="aimo-items">${rows}</ul>` : ''}
-    ${notes.length ? `<ul class="aimo-notes small">${notes.map((a) => `<li>Oletus: ${esc(a.fi)}</li>`).join('')}</ul>` : ''}
-    ${p.handoff ? `<div class="small warn-text"><b>${esc(p.handoff.fi)}.</b>${u.unparsed.length ? ` Tuntematon: ${esc(u.unparsed.join(', '))}.` : ''} Agentti ei tilaa tällä pyynnöllä mitään.</div>` : ''}
+    ${notes.length ? `<ul class="aimo-notes small">${notes.map((a) => `<li>${a.code.startsWith('RECIPE_') ? '' : 'Oletus: '}${esc(a.fi)}</li>`).join('')}</ul>` : ''}
+    ${p.handoff ? `<div class="small warn-text"><b>${esc(p.handoff.fi)}.</b>${u.unparsed.length ? ` Tuntematon: ${esc(u.unparsed.join(', '))}.` : ''} Agentti ei tilaa tällä pyynnöllä mitään.</div>${p.handoff.code === 'PORTIONS_MISSING' ? `<div class="refine" role="group" aria-label="Valitse annosmäärä">${[20, 50, 100, 200].map((n) => `<button type="button" data-act="portions" data-n="${n}" aria-pressed="false">${n} annosta</button>`).join('')}</div>` : ''}` : ''}
     ${!p.handoff && p.gateway.blocked.some((b) => b.code === 'QUANTITY_MISSING') ? '<div class="small warn-text">Määrä puuttuu: lisää esim. "40 kg" tai "200 l", niin agentti voi pyytää tarjouksen.</div>' : ''}`;
+}
+// Tarkentava kysymys: esitetään vain, kun pyynnöstä puuttuu ruokavaliorajaus, joka oikeasti jakaa ehdokkaat (esim. maito: laktoositon vai ei).
+// Vastaus on yksi napinpainallus, ja se lähettää pyynnön saman tien. Kysymys esitetään kerran per pyyntö, eikä reseptille tai rajatulle riville.
+function openQuestion() {
+  const p = S.preview; if (!p || p.error || p.handoff || p.recipe || p.gateway.blocked.length) return null;
+  for (const [i, c] of p.cards.entries()) {
+    const it = p.understood.items[i];
+    if (it.claims.length || it.excludeAllergens.length || S.patches.some((x) => x.item === i)) continue;
+    const chips = c.chips.map((ch, k) => ({ ...ch, k })).filter((ch) => ch.patch.claims && ch.matches / c.total >= 0.2 && ch.matches / c.total <= 0.8);
+    if (chips.length) return { item: i, term: it.productTerm, chips };
+  }
+  return null;
 }
 let previewTimer; let previewSeq = 0;
 async function loadPreview() {
@@ -239,6 +270,13 @@ function consoleApp() {
     const b = ev.target.closest('[data-act]'); if (!b) return;
     const act = b.dataset.act;
     if (act === 'chip') { const ch = S.preview?.cards?.[+b.dataset.item]?.chips?.[+b.dataset.k]; if (!ch) return; S.patches.push({ item: +b.dataset.item, patch: ch.patch, label: ch.label }); return loadPreview(); }
+    if (act === 'answer') { // vastaus tarkentavaan kysymykseen: rajaus (tai ei mitään) ja pyyntö lähtee heti
+      const ch = b.dataset.k != null ? S.preview?.cards?.[+b.dataset.item]?.chips?.[+b.dataset.k] : null;
+      if (ch) S.patches.push({ item: +b.dataset.item, patch: ch.patch, label: ch.label });
+      S.question = null;
+      return runAgent(S.buyer, S.askText, false, S.patches.map(({ item, patch }) => ({ item, patch })));
+    }
+    if (act === 'portions') { const el = $('#askText'); S.askText = el.value = `${el.value.trim()} ${b.dataset.n} annosta`; S.patches = []; return loadPreview(); }
     if (act === 'unchip') { S.patches = S.patches.slice(0, +b.dataset.k); return loadPreview(); } // myöhemmät tarkennukset rakentuvat aiempien päälle
     if (act === 'scenario') { const s = SCENARIOS[+b.dataset.i]; return runAgent(s.buyer, s.text, !!s.tamper); }
     if (act === 'buyer') { S.buyer = b.dataset.buyer; renderAgent(); return renderMandate(); }
@@ -246,8 +284,18 @@ function consoleApp() {
     if (act === 'trail') { ev.preventDefault(); S.trail = await api(`/console/orders/${b.dataset.order}/audit`); renderTrail(); return $('#trail').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     if (act === 'reset') { if (!confirm('Nollataanko portin tilaukset, loki ja mandaatit demon alkutilaan?')) return; S.run = null; S.trail = null; await api('/console/reset', {}); return refresh(); }
   });
-  document.addEventListener('submit', (ev) => { if (ev.target.id !== 'ask') return; ev.preventDefault(); const v = $('#askText').value; runAgent(S.buyer, v, false, S.patches.map(({ item, patch }) => ({ item, patch }))); });
-  document.addEventListener('input', (ev) => { if (ev.target.id !== 'askText') return; S.askText = ev.target.value; S.patches = []; clearTimeout(previewTimer); previewTimer = setTimeout(loadPreview, 140); });
+  document.addEventListener('submit', async (ev) => {
+    if (ev.target.id !== 'ask') return; ev.preventDefault();
+    const v = $('#askText').value; if (S.running || !v.trim()) return;
+    if (v !== S.askText) { S.askText = v; S.patches = []; S.asked = null; } // teksti tuli yläpalkin hausta: tulkitaan se ensin
+    if (S.asked !== v) {
+      await loadPreview(); S.asked = v; S.question = openQuestion();
+      if (S.question) { const el = $('#aimoPreview'); el.innerHTML = previewHtml(); return el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    }
+    S.question = null;
+    runAgent(S.buyer, v, false, S.patches.map(({ item, patch }) => ({ item, patch })));
+  });
+  document.addEventListener('input', (ev) => { if (ev.target.id !== 'askText') return; S.askText = ev.target.value; S.patches = []; S.asked = null; S.question = null; clearTimeout(previewTimer); previewTimer = setTimeout(loadPreview, 140); });
   document.addEventListener('change', async (ev) => {
     const key = ev.target.dataset.m; if (!key) return;
     const raw = ev.target.value;

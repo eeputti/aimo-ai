@@ -94,7 +94,7 @@ export async function runBuyerAgent({ baseUrl, apiKey, text, tamper = false, pat
     const quote = await call('Pyydä tarjous', 'POST', '/v1/quotes', { ...rq, deliveryDate: target?.deliveryDate || rq.deliveryDate || today });
     const needs = quote.json.needs || [];
     const open = needs.filter((n) => !n.options?.length);
-    if (!quote.res.ok || !needs.length || open.length) { quote.step.note = quote.json.error?.message || `ei tarjottavaa: ${open.map((n) => `${n.ref} ${JSON.stringify(n.excludedSummary || {})}`).join(', ')}`; return finish('Portti ei voinut tarjota pyydettyä määrää kaikille riveille.'); }
+    if (!quote.res.ok || !needs.length || open.length) { quote.step.note = quote.json.error?.message || `ei tarjottavaa: ${open.map((n) => `${n.ref} ${JSON.stringify(n.excludedSummary || {})}`).join(', ')}`; return finish(open.length ? `Koria ei tilattu vajaana. Ei saatavilla pyydetylle päivälle: ${open.map((n) => `${aimo.json.understood.items[+n.ref.split('-')[1] - 1]?.productTerm || n.ref} (${Object.keys(n.excludedSummary || {}).join(', ') || 'ei tarjousta'})`).join('; ')}.` : 'Portti ei voinut tarjota pyydettyä määrää kaikille riveille.'); }
     quote.step.note = needs.map((n) => `${n.ref}: ${n.options.length} allekirjoitettua vaihtoehtoa, halvin ${n.options[0].totals.net.toFixed(2)} € (${n.options[0].lines.map((l) => `${l.productId} × ${l.quantity}`).join(' + ')})`).join(', ');
     let offers = needs.map((n) => n.options[0].offer);
     if (tamper) { // demotaan allekirjoituksen todennus: muutetaan hintaa ensimmäisen tarjouksen sisällä

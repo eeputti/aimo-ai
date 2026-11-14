@@ -169,6 +169,11 @@ Pitchiin: briefin oma lupaus on "in a fraction of the time it takes today". Vert
 2. **Sama tukussa:** rinnakkain sama viestikupla, nyt "Ainii, unohtui kerma: 10 litraa kuohukermaa samaan tilaukseen" ja vastaus "Lisätty, uusi summa 219,95 €" (oikea luku demon skenaariosta 6; tarkista ennen deckin tekoa). Tämä näyttää käytännössä, miten tuote toimii, ennen kuin mitään tekniikkaa on mainittu.
 3. **Ongelma ja ratkaisu:** ostajilla on kohta omat agentit, eikä toimitustukkua ole tehty niille. Me rakensimme oven: rajat, ihmisen hyväksyntä ja jälki jokaisesta päätöksestä.
 4. **Demo:** "1 000 litraa laktoositonta maitoa maanantaiksi" alusta loppuun, lopuksi "unohtui kerma" -lisäys.
+   - **Näkymätön tekoäly (sanotaan demon aikana, ei omaa diaa):** "Tässä ei ole chat-ikkunaa eikä AI-nappia. Tekoäly näkyy siinä, mitä tavalliset kentät osaavat." Kolme kohtaa, jotka näytetään ruudulta:
+     1. **Hakukenttä ymmärtää lauseen.** "1000 litraa maitoa maanantaiksi" → kenttä kysyy yhden asian, "Pitääkö olla laktoositon?", ja vastaus on yksi nappi. Muuta ei kysytä; loput oletukset näkyvät tekstinä.
+     2. **Hakukenttä ymmärtää reseptin.** "Lohikeitto 100 annosta maanantaiksi" → 8 raaka-ainetta, määrät laskettu annoksista, pakkaukset pyöristetty, 215,24 € (testiajon luku 14.11.; tarkista ennen deckin tekoa). Ilman annosmäärää ei tilata mitään.
+     3. **Taustavahti on hiljaa, kunnes jokin poikkeaa.** Sama ostaja tilaa 1 500 litraa, kun tavallinen määrä on 25 → vihreä Hyväksy-nappi ihmiselle, syy yhdellä lauseella. Vahti on kerrottu sopimuksessa: näkymätön, ei salainen.
+   - Yksi lause tekniikasta: säännöt ja Aimon oma sanasto hoitavat pyynnöt (0 mallikutsua), kielimalli kysytään vain, kun varmuus jää alle 0,6, ja siitäkin jää rivi lokiin.
 5. **Kontrollit ja poikkeukset:** mitä agentti päättää yksin, mikä menee ihmiselle, miten kirjataan.
 6. **Tarkkuus ja avoimuus:** X/20-luku ja standardit.
 7. **Tuotantopolku:** miten tämä kytketään toimitustukkuun.

@@ -42,6 +42,27 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 **Huomio:** commit sisältää vain tämän työvaiheen rivit. Työpuussa on muiden työvaiheiden commitoimattomia muutoksia, myös samassa `aimo-shell.js`-tiedostossa (etusivun haun siirto konsoliin), joita tämä commit ei sisällä.
 
+## 14.11.2026 — näkymätön tekoäly: reseptistä ostoskori, tarkentava kysymys, Vahti-paneeli, vihreä hyväksyntä (Claude Code)
+
+**Käyttäjän linjaus:** tekoäly ei näy omana elementtinään (ei chat-kuplaa, ei AI-nappia), vaan siinä, mitä tavalliset kentät osaavat. Sama lause lisättiin pitch deckin demokohtaan (`SUUNNITELMA.md`).
+
+- **Reseptistä ostoskori** (`server/aimo/recipes.mjs`, `server/aimo/index.mjs`): "Lohikeitto 100 annosta maanantaiksi" → raaka-ainerivit, määrä = annokset × määrä per annos. Jokainen rivi on kiinnitetty yhteen tuotekoodiin ja lähtee tarjouspyyntöön ehdolla `allowSubstitutes: false`. Tulkinnan vastauksessa on uusi kenttä `recipe`. Reseptejä on neljä (lohikeitto, mustikkarahka, kanacurry ja riisi, riisipuuro). **Oletus:** reseptit ja annoskoot ovat itse kirjoitettua demodataa, eivät asiakkaan reseptiikkaa.
+- **Tyhmien virheiden esto:** annosmäärä on pakollinen ja rajattu välille 1–2000; ilman sitä palautetaan `PORTIONS_MISSING` eikä tilata mitään (konsolissa annosnapit 20, 50, 100, 200). Jos yksikin raaka-aine puuttuu katalogista tai ei ole tilattavissa, koko kori jää tilaamatta ja viesti nimeää rivin (`buyerAgent.mjs`). Kielimallia ei kutsuta reseptipolulla. "lohikeittoa 10 kg" ei ole resepti vaan tavallinen tuotehaku.
+- **Miksi tuotteet kiinnitettiin:** vapaan tekstin haku valitsi halvimman osuman väärin, esim. "1 kg tilliä" → lakritsipastilli, "5 l kookosmaitoa" → rasvaton maito, "2 kg mustikkaa" → mustikkakeitto. Tätä yleisen polun vikaa ei korjattu tässä työvaiheessa.
+- **Tarkentava kysymys** (`public/gateway.js`): kun pyynnöstä puuttuu ruokavaliorajaus, joka jakaa ehdokkaat 20–80 % (esim. maito: laktoositon 25/73), konsoli kysyy ennen lähetystä "Pitääkö tuotteen maito olla jotain näistä?". Vastaus on yksi nappi ja lähettää pyynnön heti; "Ei väliä: halvin sopiva" ohittaa. Kysytään kerran per pyyntö, ei resepteille eikä valmiille skenaarionapeille. Toimii myös yläpalkin hausta.
+- **Vahti-paneeli** (`public/agent.html`, `gateway.js`, `gateway.css`): näyttää `GET /console/watch` -raportin: ostajittain haut, tarjoukset, tilaukset, arviot ja puuttumiset, viimeisimmät havainnot linkkeineen päätösketjuun sekä sopimuksen säännöt.
+- **Hyväksyntä:** Hyväksy-nappi on nyt vihreä (`.btn.approve`, #1a7f37, valkoinen teksti) ja leveämpi kuin Hylkää, konsolissa ja puhelinnäkymässä.
+- `scripts/demo-buyer.mjs`: skenaario 10 (resepti ja sama ilman annosmäärää).
+
+**Tarkistukset:** eristetty palvelin portissa 4752 omalla `GATEWAY_DB`- ja `AIMO_DB`-kannalla, live-mock-API. Lohikeitto 100 annosta → vahvistettu 215,24 €, 8 riviä (lohikuutio 2 × 5 kg, kerma 3 × 1,75 l); riisipuuro 40 → hyväksyntään (Kahvila Aalto); kanacurry 60 → 120,34 €; mustikkarahka 80 → 121,00 €; ilman annoksia → ei tilausta. Selaimessa: kysymys yläpalkin hausta → "Laktoositon" → tilaus hyväksyntään (1 010,00 €), Vahti-paneeli näyttää 1 500 litran havainnon, vihreä nappi puhelinnäkymässä. `npm run aimo:eval` 26/26, `npm test` 26/26. `npm run demo` -skriptiä ei ajettu.
+
+**Keskeneräistä ja huomiot:**
+
+- Käyttäjän palvelinta portissa 4747 ei käynnistetty uudelleen: palvelinpuolen muutokset (resepti) tulevat voimaan vasta uudelleenkäynnistyksessä, selainpuolen muutokset heti.
+- Reseptien tuotteet valittiin sen mukaan, mikä oli tilattavissa la 14.11. iltapäivällä oikealla kellolla. Tilausaikojen umpeuduttua (viimeistään su 15.11. klo 17.00) resepti pysähtyy turvallisesti, ellei `DEMO_NOW` ole päällä.
+- Portti hyväksyy pyydettyä aikaisemman toimituksen kysymättä: "perjantaiksi" pyydetty lohikeitto vahvistui toimitukseen ma 16.11. Tämä on portin aiempaa käytöstä kaikille pyynnöille, ei reseptin oma piirre; tuoretuotteilla se voi olla virhe.
+- Vahti-paneelin Haut-sarake on nolla, kun agentti käyttää tulkintareittiä eikä `search_products`-kutsua.
+
 ## 14.11.2026 — keskipisteet pois koko projektista (Claude Code)
 
 **Käyttäjän päätös:** Eelis ei halua keskipistettä (U+00B7) erottimena missään. Älä lisää sitä uuteen käyttöliittymätekstiin, lokitulosteeseen, kommenttiin tai dokumenttiin. Käytä pilkkua tai jaa tieto omiin elementteihinsä.
