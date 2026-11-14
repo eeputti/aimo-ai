@@ -28,9 +28,13 @@ html.ask-open { overflow: hidden; }
 /* otsakkeen hakukenttä avaimena */
 .ask-trigger { cursor: pointer; }
 .ask-trigger input { cursor: pointer; }
+.ask-trigger-active { visibility: hidden; }
 .ask-trigger-ai { display: inline-flex; flex: none; color: #1668e3; }
 
 /* hakurivi */
+.ask-bar-slot { height: 60px; }
+.ask-voice-active .ask-bar-slot { height: 44px; }
+.ask-bar-moving { position: fixed; z-index: 1; margin: 0; overflow: hidden; }
 .ask-bar { display: flex; align-items: center; gap: 14px; height: 60px; padding: 0 8px 0 18px; border: 2px solid var(--ask-petrol); border-radius: 6px; background: #fff; }
 .ask-ai { display: inline-flex; color: var(--ask-blue); }
 .ask-q { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: #000; font-family: inherit; font-size: 18px; font-weight: 400; line-height: 1.2; }

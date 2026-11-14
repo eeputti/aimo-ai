@@ -2,6 +2,17 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — ostoskorin hakukenttä liikkuu paneelin yläreunaan (Codex)
+
+**Käyttäjän pyyntö:** ostoskorin vasemman reunan Lisää tuotteita -kenttä siirtyy animoituna avautuvan hakunäkymän yläreunaan. Sen pitää näyttää samalta jatkuvalta kentältä.
+
+- `public/aimo-ask.js/css`: hakurivi liikkuu lähtökentän täsmällisestä suorakulmiosta paneelin hakuriviksi 420 ms:ssa, suljettaessa takaisin 280 ms:ssa. Rivi kelluu siirtymän ajan paneelin päällä; leveys ja korkeus muuttuvat ilman tekstin tai kuvakkeiden skaalausta. Alkuperäisen kentän paikka säilyy asettelussa mutta se on piilossa haun ollessa auki, joten ruudulle ei jää kahta samaa kenttää. Ostoskorin haku nousee otsakkeen alle, otsakkeen oma haku avautuu edelleen lähellä lähtöpaikkaansa.
+- Paneelin ja sisällön paljastus seuraavat kenttää. Keskeytetyt siirtymät siivotaan, nopea sulkeminen toimii ja fokus palautuu lähtökenttään. Vähennetyn liikkeen asetus ohittaa animaatiot. Sanelun riville säilyy sen oma korkeus.
+
+**Varmennus:** selaimessa `http://localhost:4747/cart.html`, 1440 × 1000 ja 375 × 812: lähtö-, väli- ja lopputila, saman hakurivin palautuminen paneeliin, sulkeminen myös kesken avautumisen, Enter-avaus, fokuksen ja `aria-expanded`-tilan palautus. Molemmissa leveyksissä 0 px vaakaylivuotoa, ei selaimen virheitä. JavaScriptin syntaksi ja muutoksen diff-tarkistus läpi. Yhteisen työpuun `npm test`: 69 muuta testiä läpi, HTTP-testin portti estyi hiekkalaatikossa; saman eristetyn HTTP-testin uusinta oikeuslaajennuksella läpi (5/5 alitesteineen). Käynnissä olevaa palvelinta, käyttäjän koria tai tilauksia ei muutettu. Staattinen muutos tulee käyttöön sivun päivityksellä.
+
+**Työnjako:** samassa työpuussa jatkuu reseptituonti ja toimituspäivän valinta, myös hakupaneelin tiedostoissa. Tähän commitiin rajataan vain animaation rivit ja tämä lokimerkintä; muiden muutokset säilytetään. Oikeaa puhetta tai hakurajapintaa ei ajettu tämän ulkoasumuutoksen tarkistukseen.
+
 ## 14.11.2026 — historiaan perustuva tilausehdotus takaisin hakupaneeliin (Codex)
 
 **Käyttäjän pyyntö:** Katso tilausehdotus -toiminnon pitää jälleen avata aiempien tilausten perusteella laadittu ehdotus. Yhteisen hakukorin uudistuksessa kortin linkki oli vaihdettu selaimen omaan koriin ja esikatselu lukemaan sen rivejä. Tyhjällä alkukorilla esikatselu katosi, vaikka keittiön historiaennuste oli yhä tallessa.

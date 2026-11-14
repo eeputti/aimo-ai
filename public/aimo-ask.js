@@ -50,11 +50,11 @@
     <div class="ask-dim" data-close="1"></div>
     <section class="ask-sheet" role="dialog" aria-modal="true" aria-label="Haku ja tilaaminen">
       <div class="ask-in">
-        <form class="ask-bar" autocomplete="off">
+        <div class="ask-bar-slot"><form class="ask-bar" autocomplete="off">
           <span class="ask-ai">${I.spark(22)}</span>
           <input class="ask-q" type="text" aria-label="Kirjoita mitä tarvitset" placeholder="Kirjoita mitä tarvitset, esim. 1000 litraa maitoa maanantaiksi">
           <button type="button" class="ask-x" data-close="1" aria-label="Sulje haku">${I.close}</button>
-        </form>
+        </form></div>
         <p class="ask-intro">Kerro tarve, tarkista ostoskori ja hyväksy tarvittavat muutokset.</p>
         <div class="ask-body">
           <aside class="ask-side">
@@ -87,6 +87,7 @@
       </div>
     </section>`;
   const sheet = root.querySelector('.ask-sheet'); const dim = root.querySelector('.ask-dim');
+  const bar = root.querySelector('.ask-bar'); const barSlot = root.querySelector('.ask-bar-slot');
   const q = root.querySelector('.ask-q'); const main = root.querySelector('.ask-main');
   const recipes = root.querySelector('.ask-recipes'); const ready = root.querySelector('.ask-ready'); const peek = root.querySelector('.ask-peek');
   // Nuoli avaa esikatselun; muu osa kortista vie historiaan perustuvaan ehdotukseen.
@@ -319,7 +320,44 @@
     }
   }
 
-  // Paneeli kasvaa hakukentän kohdalta: leikkausalue lähtee kentän reunoista ja avautuu koko paneelin kokoiseksi.
+  // Sama hakurivi liikkuu kentästä paneeliin. Se kelluu animaation ajan paneelin
+  // leikkausalueen päällä, jotta teksti ja mikrofoni eivät leikkaudu tai veny.
+  let motionId = 0; let closing = false; let motions = []; let dockBar = null;
+  const queryPlaceholder = q.placeholder;
+  const frame = (el) => {
+    if (!el) return null;
+    const b = el.getBoundingClientRect(); const s = getComputedStyle(el);
+    if (!b.width || !b.height) return null;
+    return { left: `${b.left}px`, top: `${b.top}px`, width: `${b.width}px`, height: `${b.height}px`,
+      borderRadius: s.borderRadius, borderColor: s.borderTopStyle === 'none' ? 'transparent' : s.borderColor,
+      boxShadow: s.boxShadow, paddingLeft: s.paddingLeft, paddingRight: s.paddingRight, gap: s.gap };
+  };
+  const stopMotion = () => {
+    motions.forEach((a) => a.cancel()); motions = [];
+    dockBar?.(); dockBar = null;
+  };
+  const animate = (el, frames, options) => {
+    const animation = el.animate(frames, { fill: 'both', ...options });
+    motions.push(animation); return animation.finished.catch(() => {});
+  };
+  function moveBar(from, to, duration, opening) {
+    const focus = bar.contains(document.activeElement);
+    root.append(bar); bar.classList.add('ask-bar-moving');
+    Object.assign(bar.style, to);
+    dockBar = () => {
+      const refocus = bar.contains(document.activeElement);
+      barSlot.append(bar); bar.classList.remove('ask-bar-moving'); bar.removeAttribute('style');
+      q.placeholder = queryPlaceholder;
+      if (refocus) q.focus({ preventScroll: true });
+    };
+    if (focus) q.focus({ preventScroll: true });
+    if (!q.value) q.placeholder = origin?.querySelector('input')?.placeholder || queryPlaceholder;
+    const easing = 'cubic-bezier(.22,.8,.25,1)';
+    const x = bar.querySelector('.ask-x');
+    animate(x, opening ? [{ opacity: 0, width: '0px' }, { opacity: 1, width: `${x.getBoundingClientRect().width}px` }]
+      : [{ opacity: 1 }, { opacity: 0, width: '0px' }], { duration, easing });
+    return animate(bar, [from, to], { duration, easing });
+  }
   const clipFrom = () => {
     const s = sheet.getBoundingClientRect(); const b = origin?.getBoundingClientRect();
     if (!b || !b.width) return 'inset(0 0 100% 0)';
@@ -327,13 +365,15 @@
     return `inset(${px(b.top - s.top)} ${px(s.right - b.right)} ${px(s.bottom - b.bottom)} ${px(b.left - s.left)} round 4px)`;
   };
   function open(text = '') {
-    if (!root.hidden) { if (text) setText(text); return; }
+    if (!root.hidden && !closing) { if (text) setText(text); return; }
+    const from = closing ? frame(bar) : frame(origin);
+    const id = ++motionId; stopMotion(); closing = false;
     if (!root.isConnected) document.body.append(root);
     const b = origin?.getBoundingClientRect();
-    // A lower field expands both upward and downward, leaving room to use the full search.
-    // clipFrom still starts at the exact field rectangle, including when it is in the cart toolbar.
+    // Ostoskorin kenttä nousee otsakkeen alle. Otsakkeen oma haku avautuu paikallaan.
     const viewportHeight = document.documentElement.clientHeight;
-    const top = Math.max(0, Math.min(Math.round((b?.top ?? 0) - 16), Math.max(16, viewportHeight - 560)));
+    const anchorTop = origin?.closest('.cart-tools') ? document.querySelector('.store-header')?.getBoundingClientRect().bottom ?? 0 : (b?.top ?? 16) - 16;
+    const top = Math.max(0, Math.min(Math.round(anchorTop), Math.max(0, viewportHeight - 560)));
     sheet.style.top = `${top}px`;
     // Paneeli alkaa hakukentän kohdalta, joten korkeus rajataan sen alle jäävään ruutuun: muuten alaosa jää näkymättömiin.
     sheet.style.maxHeight = `calc(100dvh - ${top}px)`;
@@ -342,24 +382,32 @@
     recipeContext = null; root.classList.remove('ask-recipe-mode');
     q.value = text; if (text) search(); else idle();
     loadReady();
-    if (!still()) {
-      const body = root.querySelector('.ask-body');
-      sheet.animate([{ clipPath: clipFrom() }, { clipPath: 'inset(0 0 0 0 round 0px)' }], { duration: 340, easing: 'cubic-bezier(.2,.8,.2,1)' });
-      dim.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' });
-      body.animate([{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], { duration: 260, delay: 120, easing: 'ease-out', fill: 'backwards' });
-    }
     q.focus({ preventScroll: true });
+    const to = frame(bar);
+    origin?.classList.add('ask-trigger-active');
+    if (!still() && from && to) {
+      const body = root.querySelector('.ask-body');
+      animate(sheet, [{ clipPath: clipFrom() }, { clipPath: 'inset(0 0 0 0 round 0px)' }], { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      animate(dim, [{ opacity: 0 }, { opacity: 1 }], { duration: 280, easing: 'ease-out' });
+      animate(body, [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 240, delay: 180, easing: 'ease-out' });
+      moveBar(from, to, 420, true).then(() => { if (id === motionId) stopMotion(); });
+    }
   }
   async function close() {
-    if (root.hidden) return;
+    if (root.hidden || closing) return;
+    const from = frame(bar); const id = ++motionId; stopMotion(); closing = true;
     voice?.cancel();
     seq++;
-    if (!still()) {
-      dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: 'forwards' });
-      await sheet.animate([{ clipPath: 'inset(0 0 0 0 round 0px)' }, { clipPath: clipFrom() }], { duration: 200, easing: 'cubic-bezier(.4,0,.8,.4)' }).finished.catch(() => {});
-      dim.getAnimations().forEach((a) => a.cancel());
+    const to = frame(origin);
+    if (!still() && from && to) {
+      animate(dim, [{ opacity: 1 }, { opacity: 0 }], { duration: 280 });
+      animate(sheet, [{ clipPath: 'inset(0 0 0 0 round 0px)' }, { clipPath: clipFrom() }], { duration: 280, easing: 'cubic-bezier(.4,0,.8,.4)' });
+      await moveBar(from, to, 280, false);
     }
+    if (id !== motionId) return;
+    stopMotion(); closing = false;
     root.hidden = true; document.documentElement.classList.remove('ask-open');
+    origin?.classList.remove('ask-trigger-active');
     origin?.querySelector('input')?.setAttribute('aria-expanded', 'false');
     origin?.querySelector('input')?.focus({ preventScroll: true });
   }
