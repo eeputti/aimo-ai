@@ -116,7 +116,7 @@ Reason codes are part of the contract (`/.well-known/agent-gateway.json`): an ag
 | Order cut-off already passed | The mock API still lists such products as available. The gateway compares `closingTime` to its own clock and excludes them (`CUTOFF_PASSED`). |
 | Partial stock | Keeps what is available and fills the rest with a substitute from the same product type with the same allergen profile; inside the mandate it confirms, otherwise it asks. |
 | No schedule line / zero stock | `NOT_DELIVERABLE`, substitute options offered. |
-| Supplier-stocked (Terminal) items | Quantity is unknown (999999). Flagged `STOCK_UNKNOWN`, never presented as confirmed stock. |
+| Quantity reported as 999999 | All Terminal (supplier-stocked) items and some Stock items. The real quantity is unknown. Flagged `STOCK_UNKNOWN`, never presented as confirmed stock. |
 | Requested date not possible | Offer carries the earliest date and `DELIVERY_DATE_SHIFT`; a human decides unless the mandate allows the shift. |
 | Price or stock changed after the offer | Re-checked live at `place_order`; `OFFER_STALE` → request a new quote. |
 | Tampered, expired, reused or someone else's offer | Rejected with `OFFER_INVALID_SIGNATURE`, `OFFER_EXPIRED`, `OFFER_ALREADY_USED`, `OFFER_WRONG_BUYER`. |

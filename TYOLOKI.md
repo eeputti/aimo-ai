@@ -2,6 +2,24 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — Danielin MCP-palvelin ja STOCK_UNKNOWN-lipun laajennus (Claude Code)
+
+**Tausta:** Daniel Turkkinen latasi GitHubiin commitissa `a38b854` kolme tiedostoa repojuureen: `server.py` (Python-MCP-palvelin Valion rajapinnalle: haku, tuotetiedot, hinnat, saatavuus), `test_tools.py` ja `server.cpython-311.pyc`. Tiedostot haettiin paikalliseen työpuuhun fast-forward-pullilla. Niitä ei ole muokattu, eikä niitä saa muokata ilman Eeliksen tai Danielin pyyntöä.
+
+**Havainnot Danielin koodista (ei korjattu):**
+
+- Palvelin on päällekkäinen gatewayn `/mcp`-liittymän lukupuolen kanssa; siinä ei ole tarjouksia, mandaatteja, hyväksyntää eikä audit-ketjua. Käyttötarkoitus on kysymättä Danielilta.
+- Tuntematon saldo päätellään kentästä `logisticModel == "Terminal"`, joten Stock-tuotteen 999999 näytetään oikeana saldona.
+- Pyydettyä aikaisempi toimituspäivä tulkitaan sopimattomaksi (`deliversOnRequestedDate: false`). Mock palauttaa aina 16.11., joten kysely päivälle 17.11. tai myöhemmälle hylkää kaiken.
+- Tilausaikaraja verrataan koneen oikeaan kelloon, ei gatewayn `DEMO_NOW`-kelloon.
+- Ilman `MCP_BEARER_TOKEN`-muuttujaa palvelin on avoin osoitteessa `0.0.0.0`. `.pyc` ja puuttuva `requirements.txt` kannattaa siivota Danielin kanssa.
+
+**Muutos gatewayssa (Eeliksen päätös):** `STOCK_UNKNOWN`-lippu nostetaan nyt aina, kun rivin saldoa ei tiedetä, ei vain Terminal-tuotteille (`server/gateway/service.mjs`, `buildOption`). Syy: `data/eval-oracle-cache.json`-näytteen 253 saatavilla olevasta rivistä 67 on Stock-tuotteita, joiden `availableAmount` on 999999; ne menivät tarjoukseen ilman merkintää. Lipun teksti (`contract.mjs`) ja README:n rivi päivitettiin vastaamaan tätä. Lippu on tiedottava: `mandate.mjs` ei lue sitä, joten hyväksyntäpäätökset eivät muutu.
+
+**Tarkistukset:** `node --check` muutetuille tiedostoille läpi, `git diff --check` läpi, `npm run aimo:eval` 26/26. Lipun uutta haaraa ei ajettu live-rajapintaa vasten (simulaattorin Stock-tuotteilla on aina saldo, eikä API-kutsuja tehty).
+
+**Keskeneräistä:** työpuussa on toisen työvaiheen commitoimattomia muutoksia (`server/planning.mjs`, `test/`, `package.json` ym.), joita tämä commit ei sisällä. Avoin kysymys: tarkoittaako 999999 Stock-tuotteella rajatonta vai tuntematonta saldoa.
+
 ## 14.11.2026 — yhteinen GitHub-tilannetallennus ja työskentelytapa
 
 **Käyttäjän päätös:** Eelis kehittää projektia myös Claude Codella ja haluaa täällä tehdyt muutokset sekä olennaiset päätökset GitHubiin. Jatkossa jokainen valmis työvaihe kirjataan tähän lokiin, commitoidaan ja pushataan yhteisten `AGENTS.md`-ohjeiden mukaan. `CLAUDE.md` tuo samat ohjeet ja lokin Claude Coden luettavaksi.

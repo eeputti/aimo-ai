@@ -149,7 +149,8 @@ function buildOption(buyer, need, kind, lines, ctx) {
   if (deliveryDate > ctx.deliveryDate) flags.push('DELIVERY_DATE_SHIFT');
   if (lines.length > 1) flags.push('PARTIAL_FILL_SPLIT');
   if (ctx.substitution) flags.push(ctx.substitution.withinPolicy ? 'SUBSTITUTION_WITHIN_POLICY' : 'SUBSTITUTION_OUTSIDE_POLICY');
-  if (lines.some((l) => !l.availability.stockKnown && l.availability.logisticModel === 'Terminal')) flags.push('STOCK_UNKNOWN');
+  // Rajapinta palauttaa 999999 myös osalle Stock-tuotteista, ei vain Terminal-tuotteille: lippu seuraa saldotietoa, ei logistiikkamallia.
+  if (lines.some((l) => !l.availability.stockKnown)) flags.push('STOCK_UNKNOWN');
   const covered = +lines.reduce((s, l) => s + l.covers, 0).toFixed(2);
   const draft = { lines, totals: { net }, deliveryDate, requestedDeliveryDate: ctx.deliveryDate, substitutions: ctx.substitution ? [ctx.substitution] : [] };
   const preview = evaluateMandate(buyer, draft);

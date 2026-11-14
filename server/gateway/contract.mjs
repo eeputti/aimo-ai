@@ -106,7 +106,7 @@ export const REASONS = {
   SUBSTITUTION_OUTSIDE_POLICY: { fi: 'Korvaava tuote ylittää korvaussäännöt', en: 'Substitute product is outside the substitution policy' },
   PARTIAL_FILL_SPLIT: { fi: 'Määrä täytetty usealla tuotteella', en: 'Quantity filled with more than one product' },
   DELIVERY_DATE_SHIFT: { fi: 'Aikaisin toimitus on pyydettyä myöhemmin', en: 'Earliest delivery is later than requested' },
-  STOCK_UNKNOWN: { fi: 'Toimittajan varastosta: tarkkaa saldoa ei tiedetä', en: 'Supplier-stocked: exact quantity unknown' },
+  STOCK_UNKNOWN: { fi: 'Tarkkaa saldoa ei tiedetä: rajapinta ei ilmoita määrää (999999)', en: 'Exact quantity unknown: the API reports no real amount (999999)' },
   // taustavahti (watch.mjs): vertaa tilausta ostajan omaan historiaan, voi vain siirtää ihmisen hyväksyntään
   UNUSUAL_QUANTITY: { fi: 'Määrä poikkeaa selvästi ostajan tavallisesta', en: 'Quantity is far above the buyer\'s typical order' },
   ORDER_SPLIT_UNDER_CAP: { fi: 'Sama tuote useassa tilauksessa, jotka yhdessä ylittävät tilauskohtaisen katon', en: 'Same product across several orders that together exceed the per-order cap' },
