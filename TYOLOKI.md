@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsApp-tukiviesti saapui, vastaus estyy Metassa (Codex, alkuperäisen chatin lukutarkistus)
+
+Käyttäjä ilmoitti tehneensä testin myös toisessa chatissa ja ettei vastausta tullut. Projektin WhatsApp-kannassa on saapunut tekstiviesti ja tallennettu vastaus, mutta lähetysuusinnat epäonnistuivat `META_HTTP_403`-virheeseen. Käyttöönottoa omistava `Jatka WhatsApp-käyttöönottoa` -chat selvittää samaa tapausta ja sai tarkemman Meta-virheen `131005: Access denied`. Vastaanotto siis toimii; puhelimeen saapuvaa vastausta ei ole varmennettu. Käyttäjältä ei pyydetty uutta viestiä tässä tarkistuksessa.
+
+Alkuperäisen chatin riippumattomat lukutarkistukset: USER-token on voimassa ja sidottu oikeaan sovellukseen; molemmat WhatsApp-oikeudet on myönnetty oikealle testitilille. Testinumero on `CONNECTED` / `VERIFIED` / `CLOUD_API` / `GREEN`, testitilin account review on `APPROVED` ja business verification `not_verified`. Nykyisen testitokenin ilmoitettu vanheneminen on 14.11. klo 21.00 Suomen aikaa. Nämä tarkistukset eivät ratkaise 403:n tarkkaa syytä tai todista lähetysoikeutta toimivaksi.
+
+Tässä vaiheessa ei muutettu Meta-asetuksia, luotu tunnuksia, lähetetty toista viestiä, käynnistetty palvelinta tai muokattu koodia. Löydökset lisättiin `docs/parallel/1.md`:hen käyttöönoton omistajalle. Aiempi paikallinen kytkentäehdotus jää ennalleen Clauden yhdistettäväksi. Dokumenttidiff ja `git diff --check` tarkistetaan; ohjelmistotestejä ei toisteta muuttumattomalle koodille. Seuraava askel on toisessa käyttöönottotyössä tehtävä tokenin/testitilin lähetyseston korjaus ja tämän jo saapuneen viestin vastauksen varmistaminen.
+
 ## 14.11.2026 — rinnakkaisten WhatsApp-käyttöönottojen yhdistäminen (Codex, alkuperäinen testinumerochat)
 
 **Nykyinen käyttöönotto:** havaittiin, että chatit `Luo WhatsApp-testinumero` ja `Jatka WhatsApp-käyttöönottoa` olivat käynnistäneet kaksi WhatsApp-workeria samalle kannalle. Uudemmassa chatissa käyttäjä oli varannut tilauskytkennän Claudelle ja käyttöönoton Codexille. Palautettiin Metan callback jälkimmäisen käyttöönoton osoitteeseen `https://tournaments-increasing-icq-statutes.trycloudflare.com/webhooks/whatsapp`. Julkinen ja paikallinen `/healthz` palauttivat 200 / `read-only-test`; GET-haaste täsmäsi ja Meta vahvisti aktiivisen callbackin takaisinluvussa. Alkuperäisen chatin portin 4758 palvelin ja `demanding-judy-sheep-need`-tunneli pysäytettiin hallitusti. Portin 4749 snapshot-palvelin ja sen tunneli jäivät käyntiin. Verkkokauppapalvelimiin tai niiden kantoihin ei koskettu.
