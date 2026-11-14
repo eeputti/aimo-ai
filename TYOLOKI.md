@@ -13,6 +13,13 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 **Työnjako:** samassa työpuussa jatkuu reseptituonti ja toimituspäivän valinta, myös hakupaneelin tiedostoissa. Tähän commitiin rajataan vain animaation rivit ja tämä lokimerkintä; muiden muutokset säilytetään. Oikeaa puhetta tai hakurajapintaa ei ajettu tämän ulkoasumuutoksen tarkistukseen.
 
+## 14.11.2026 — toimituspäiväikkuna ei avaudu uudelleen päivityksessä (Codex)
+
+**Käyttäjän pyyntö:** poista sivun päivityksen yhteydessä toistuva toimituspäivän asetusikkuna. Etusivun toimituspäiväpainike ohjasi osoitteeseen `/cart.html#toimituspaiva`, ja korin lataus avasi ikkunan aina tunnisteen perusteella.
+
+- `public/storefront-cart.js`: avauspyynnön tunniste poistetaan osoitteesta `history.replaceState`-kutsulla ennen ikkunan avaamista. Painikkeesta saavuttaessa ikkuna avautuu kerran; seuraava päivitys ei avaa sitä uudelleen. Osoitteen kyselyparametrit ja historian tila säilyvät. Päivävalintaan ja korin tallennukseen ei tehty muutoksia.
+- **Tarkistukset:** korin storetestit 9/9, JavaScriptin syntaksi ja `git diff --check` läpi. Varsinaisen koriskriptin ajaminen eristetyllä DOM-jäljitelmällä varmisti ensimmäisen avauksen, päivityksen ilman avausta sekä kyselyparametrien, historian tilan ja muiden ankkurien säilymisen. Oikeaa selainta tai tuotantopalvelinta ei tässä ympäristössä varmennettu. Muutos on staattinen JavaScript-korjaus.
+
 ## 14.11.2026 — historiaan perustuva tilausehdotus takaisin hakupaneeliin (Codex)
 
 **Käyttäjän pyyntö:** Katso tilausehdotus -toiminnon pitää jälleen avata aiempien tilausten perusteella laadittu ehdotus. Yhteisen hakukorin uudistuksessa kortin linkki oli vaihdettu selaimen omaan koriin ja esikatselu lukemaan sen rivejä. Tyhjällä alkukorilla esikatselu katosi, vaikka keittiön historiaennuste oli yhä tallessa.

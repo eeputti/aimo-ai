@@ -97,7 +97,11 @@ content.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.targe
 window.addEventListener('aimo:cart-change', render);
 try {
   await cart.ready; render();
-  if (location.hash === '#toimituspaiva') openDate();
+  if (location.hash === '#toimituspaiva') {
+    // Consume this navigation request so refreshing does not reopen the dialog.
+    history.replaceState(history.state, '', location.pathname + location.search);
+    openDate();
+  }
   const d = await (await fetch('/storefront-cart-data.json')).json();
   if (d.recommendations?.length) document.querySelector('#cart-recommendations').innerHTML = rail('🎄Tilaa joulutuotteet ennakkoon', d.recommendations, { link: 'Katso kaikki' });
 } catch (e) { content.textContent = e.message; }
