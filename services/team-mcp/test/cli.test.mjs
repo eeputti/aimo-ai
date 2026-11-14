@@ -34,3 +34,17 @@ test('a commit may be cited as shared only when a remote branch contains it', ()
   assert.equal(pushedCommit('HEAD', false, fake('  origin/HEAD -> origin/main\n  origin/main')).pushed, true);
   assert.throws(() => pushedCommit('nope', false, () => null), /ei löydy/);
 });
+
+test('status separates intended paths from active locks and gives the assignee an acceptance action', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'team-clarity-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const env = { TEAM_MCP_DB: path.join(dir, 'team.db') };
+  const cli = (...args) => run(args, env);
+  cli('join', '--id', 'alice'); cli('join', '--id', 'bob');
+  const task = JSON.parse(cli('claim', '--as', 'alice', '--title', 'MCP only', '--files', 'services/team-mcp', '--json'));
+  cli('handoff', '--as', 'alice', '--task', task.id, '--to', 'bob', '--note', 'Tests done; review next');
+  const status = cli('status', '--as', 'bob');
+  assert.match(status, /Aktiiviset tiedostovaraukset: ei varauksia/);
+  assert.match(status, /Tehtävän tiedostot: services\/team-mcp/);
+  assert.match(status, new RegExp(`Seuraava: bob: accept --task ${task.id.slice(0, 8)}`));
+});

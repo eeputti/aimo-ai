@@ -37,7 +37,7 @@ export function openStore(filename, now = Date.now) {
     const r = db.prepare('INSERT OR IGNORE INTO messages(project,sender,recipient,subject,body,request_key,created) VALUES(?,?,?,?,?,?,?)').run(project, actor, recipient || null, subject.slice(0, 200), body.slice(0, 12000), requestKey, now());
     if (r.changes) event(project, actor, 'message_sent', { messageSeq: Number(r.lastInsertRowid), recipient: recipient || 'project' });
   };
-  const taskView =({ paths_json, ...task }) => ({ ...task, requestedResources: JSON.parse(paths_json), resources: db.prepare('SELECT path,expires FROM leases WHERE task=? AND expires>?').all(task.id, now()).map((r) => ({ ...r })), leaseExpired: ['in_progress', 'blocked'].includes(task.status) && task.lease_until <= now() });
+  const taskView =({ paths_json, ...task }) => ({ ...task, requestedResources: JSON.parse(paths_json), resources: db.prepare('SELECT path,expires FROM leases WHERE task=? AND expires>?').all(task.id, now()).map((r) => ({ ...r })), leaseExpired: ['in_progress', 'blocked', 'handed_off'].includes(task.status) && task.lease_until <= now(), ownerAvailable: Boolean(member(task.owner)) });
   const store = {
     db, now, tx, member, access, close: () => db.close(),
     addMember(id, name, projects) {
@@ -139,6 +139,7 @@ export function openStore(filename, now = Date.now) {
         if (!task || task.owner !== actor) deny('FORBIDDEN', 'Only the task owner can hand it off');
         if (task.revision !== expectedRevision) deny('REVISION_CONFLICT', 'Read the latest task revision before updating');
         if (['done', 'released', 'handed_off'].includes(task.status)) deny('CLOSED_TASK', 'Task is closed or already handed off');
+        if (task.lease_until <= now()) deny('LEASE_EXPIRED', 'Claim the task again before handing it off');
         const sha = commitSha || task.commit_sha;
         db.prepare('UPDATE tasks SET owner=?,status=?,note=?,revision=revision+1,lease_until=?,updated=?,commit_sha=? WHERE id=?').run(to, 'handed_off', note, now() + holdMinutes * 60_000, now(), sha, taskId);
         db.prepare('DELETE FROM leases WHERE task=?').run(taskId);
@@ -152,7 +153,10 @@ export function openStore(filename, now = Date.now) {
       access(actor, project);
       return {
         project, serverTime: now(), board: db.prepare('SELECT * FROM boards WHERE project=?').get(project) || { project, summary: '', revision: 0 },
-        tasks: db.prepare('SELECT * FROM tasks WHERE project=? ORDER BY updated DESC LIMIT 100').all(project).map(taskView),
+        // Keep every open reservation visible, even after more than 100 newer completed tasks.
+        tasks: db.prepare(`SELECT * FROM tasks WHERE project=? AND status NOT IN ('done','released')
+          UNION ALL SELECT * FROM (SELECT * FROM tasks WHERE project=? AND status IN ('done','released') ORDER BY updated DESC,id LIMIT 100)
+          ORDER BY updated DESC,id`).all(project, project).map(taskView),
         members: db.prepare('SELECT id,name,projects FROM members WHERE disabled=0 AND key_expires>?').all(now()).filter((m) => JSON.parse(m.projects).includes(project)).map(({ id, name }) => ({ id, name })),
         events: db.prepare("SELECT seq,actor,type,data,created FROM events WHERE project=? AND type<>'message_sent' ORDER BY seq DESC LIMIT 30").all(project).map((r) => ({ ...r, data: JSON.parse(r.data) })),
       };

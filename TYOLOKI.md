@@ -10,6 +10,32 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 **Yhä avoin:** Meta 131005 estää lähettämisen myös suorissa vertailukutsuissa; restart ei korjaa tilin käyttöoikeutta. Aitoa puhelinvastausta tai tilausta ei ole varmennettu, PNG-profiilivaihto on kesken. Edellisen lokimerkinnän commit-ilmoituksen odotus on tällä päivityksellä päättynyt. Tarkka jatkotila `docs/parallel/1.md`.
 
+## 14.11.2026 — Team MCP:n tehtävänjaon selkeytys (Codex / erillinen pilvichat)
+
+**Rajaus:** käyttäjä pyysi selkeyttämään MCP-palvelimen tehtävänjakoa ja kielsi sovelluksen sekä ostosapuriagentin tiedostojen muuttamisen. Muutokset vain `services/team-mcp/` ja tämä lokimerkintä. Ei palvelinten käynnistyksiä, tuotantokantojen muutoksia tai sovelluksen riippuvuuspäivityksiä.
+
+- Komentorivin tilannekuva näyttää omistajan, tilan, varauksen määräajan, aktiiviset tiedostovaraukset, alkuperäisen tiedostorajauksen ja seuraavan toimenpiteen. Vanhentuneet tai käytöstä poistetun omistajan tehtävät erotetaan aktiivisista tehtävistä. Luovutuksessa vastaanottaja ja vastaanottokomento näkyvät erikseen.
+- Kaikki avoimet tehtävät säilyvät tilannekuvassa; 100 tehtävän raja koskee nyt vain suljettua historiaa. Vanha aktiivinen varaus ei katoa uusien valmistuneiden töiden alle.
+- `leaseExpired` kattaa myös vanhentuneet luovutukset; `ownerAvailable` kertoo onko omistajan tunniste käytettävissä. Vanhentuneen tehtävän luovutus torjutaan ennen uudelleenvaraamista, kuten etenemisraportointikin.
+- Palvelun README:ssä vastuu- ja tilataulukko. Yksi tehtävä = yksi tulos, vastuullinen tunniste ja valmistumiskriteeri. Esteen auttaja ei peri vastuuta; luovutuksen vastaanottaja varaa tiedostot ennen jatkamista. Avustajaohjeet ja MCP-työkalukuvaus vastaavat tätä.
+
+**Tarkistukset:** palvelun `npm test` 21/21 läpi (kolme uutta regressiotestiä: vanha avoin tehtävä yli 100 suljetun jälkeen, vanhentunut luovutus / poistettu omistaja / myöhäisen luovutuksen torjunta, komentorivin vastaanotto-ohje ja tiedostovarausten erottelu). Integroinnissa säilytettiin rinnakkain tullut tunnelikokeilucommit `214f5bd`; yhdistetyn version testit 25/25 läpi. `git diff --check` läpi. Riippuvuudet asennettiin vain palvelun omaan node_modules-hakemistoon; lockfile ei muuttunut.
+
+**Käyttöönotto / koordinointiraja:** työ tehtiin erillisessä pilvikloonissa; sen paikallinen tehtävävaraus ei näy käyttäjän koneen kannassa. Muiden chattien pitää hakea commit ja lukea tämä loki. Yhteistä HTTPS-palvelua tai oikeita asiakasliittimiä ei julkaistu tai testattu tässä työssä. Paikallinen CLI käyttää muutoksia päivityksen jälkeen; käynnissä oleva MCP-palvelin tarvitsee hallitun uudelleenkäynnistyksen omistajaltaan.
+
+## 14.11.2026 — Team MCP:n yhden komennon Cloudflare-tunnelikokeilu (Codex)
+
+**Käyttäjän päätös:** Renderin sijasta ensin nopea Cloudflare-tunnelikokeilu; pysyvää hostingia ei vielä valita. Tämä työ tehtiin erillisessä pilvikloonissa. Toisen koneen verkkokauppa-, WhatsApp- tai koordinointiprosesseja ja kantoja ei muutettu. Muiden uudet commitit edb9b91 ja 1e58b43 haettiin ja säilytettiin.
+
+- Uusi `npm --prefix services/team-mcp run tunnel`: käynnistää cloudflaredin ja nykyisen autentikoidun MCP-sovelluksen yhtenä valvottuna kokonaisuutena. Saadun Quick Tunnel -osoitteen origin asetetaan OAuthin issueriin ja resourceen automaattisesti muuttamatta `.env`:iä. Ei Cloudflare-tiliä tai API-avainta. Node-palvelin sidotaan loopbackiin; varattu portti torjutaan ennen tunnelin käynnistystä. Sama oletuskanta ja jäsenet kuin paikallisella CLI:llä. Ctrl+C tai tunnelin loppuminen sulkee paikallisen HTTP-palvelimen.
+- README: Windowsin cloudflared-asennus, projektijuuren komennot, omat jäsenavaimet, OAuth-yhdistäminen, ympäristömuuttujien käsittely ja uuden satunnaisen osoitteen vaatima uudelleenyhdistäminen. Avaimia ei luotu tai toimitettu tavallisena chat-viestinä, eikä salaisuuksia lisätty Gitiin.
+- Uusi polku käyttää samoja `config`-, `store`- ja `createApp`-moduuleja kuin tavallinen palvelin. Pääpaketin riippuvuuksia tai verkkokaupan/WhatsAppin sovelluskoodia ei muutettu. Uusia npm-riippuvuuksia ei lisätty.
+
+**Tarkistukset:** Team MCP:n **22/22 testiä läpi**, mukaan lukien neljä uutta: simuloidun cloudflared-prosessin osoite → oikean HTTP-sovelluksen julkiset OAuth-metatiedot ja autentikoimattoman MCP:n 401; varatun portin suojaus; puuttuva binääri / ennenaikainen loppuminen / aikakatkaisu; käynnissä olevan tunnelin loppuminen ja HTTP-portin vapautus. Virhelokin api.trycloudflare.com-osoitetta ei tulkita onnistuneeksi tunneliksi. Syntaksi ja `git diff --check` tarkistettu. Oikea cloudflared 2026.11.0 ladattiin virallisesta GitHub-julkaisusta työskentelyhakemistoon ja uusi CLI ajettiin sillä; virhepolku sulki palvelimen hallitusti.
+
+**Käyttöönotto estyi tässä ympäristössä:** cloudflaredin suora yhteys api.trycloudflare.com:443:een palauttaa connection refused; saman API:n POST normaalin HTTPS-proxyn kautta palauttaa 403 / Your request was blocked. Julkista tunneliosoitetta ei saatu, eikä oikeita ChatGPT-/Claude-liittimiä kytketty. Verkon rajoituksia ei kierretty. Käyttäjä saa ajaa yllä olevat komennot omalla koneellaan; oikea tunnelin yli kulkeva pilviyhteys on vielä varmennettava. Tässä pilvikloonissa ei jäänyt palvelinta tai tunnelia käyntiin. Käynnistystestin verkkotarkistus ei ole automaattisen hyväksyntätarkistuksen hylkäys.
+
+
 ## 14.11.2026 — WhatsApp-lähetyseston lisärajaus, tilauslogiikka erillään (Codex)
 
 **Uusi näyttö:** 131005 toistuu myös Hello World -pohjalla sekä API-version, appsecret_proofin, vastaanottajamuodon ja eksplisiittisen testitilin valinnan vertailuissa. Meta ei hyväksynyt yhtäkään vertailulähetystä. Tokenin omistajan sovellusrooli on ylläpitäjä, vastaanottaja vastaa vahvistettua numeroa, ja molemmat WhatsApp-oikeudet näkyvät Metassa Ready for testing. Numeron tila CONNECTED/VERIFIED/LIVE, PIN pois päältä. Varsinaista Metan resursoikeus-/tilieston juurisyytä ei vielä väitetä ratkaistuksi. Ei maksutapa- tai rekisteröintimuutoksia.
@@ -38,6 +64,23 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 **Tarkistukset:** palvelun `npm test` **18/18** (aiemmat 14 + 4 uutta). Uudet: kaksi oikeaa MCP SDK -asiakasta HTTP:n yli ajavat ketjun varaus → este → viesti → luovutus → vastaanotto → valmis, mukaan lukien väärän omistajan ja vastaanottamattoman tehtävän torjunnat; store-testi luovutuksen rajoille ja vanhenemiselle; kaksi komentoriviagenttia samalla kantatiedostolla; commitin etähaaratarkistus. Lisäksi kaksi oikeaa erillistä prosessia väliaikaisella kannalla ja oikealla Gitillä: samanaikaisesta varauksesta samaan tiedostoon toinen sai `FILE_BUSY`, pushaamaton commit torjuttiin, etähaaran commit hyväksyttiin ja vastaanottajan `start` näytti luovutuksen ja viestin. Tässä ajossa `start` näytti myös toisen Claude Code -chatin sillä välin tekemän kytkentäcommitin uusimpana lokina. `node --check`, `git diff --check` läpi. Verkkokaupan testejä ei ajettu, koska sen koodi ei muuttunut.
 
 **Ei tehty / rajat:** palvelinta ei käynnistetty eikä julkaistu, oikeita Claude-/ChatGPT-liittimiä ei kytketty. Codex ei ole vielä käyttänyt taulua. Varaukset ovat edelleen neuvoa antavia. `TYONJAKO.md`:n tiedosto-omistukset ja yhden Git-kirjoittajan sääntö ovat ennallaan.
+
+## 14.11.2026 — tilauskeskustelu ajettu oikealla mallilla ja mock-API:lla, neljä korjausta (Claude Code)
+
+**Käyttäjän pyyntö:** saada tilausapuri valmiiksi sillä aikaa, kun Codex hoitaa Metan ja restartin. Kytkentä ajettiin ensimmäistä kertaa mallitulkilla (`claude-haiku-5-5`) ja oikealla Valio-mock-API:lla: kanava → silta → tilauskeskustelu → tuotetyökalut → gateway, ilman Metaa, eristetyissä väliaikaisissa kannoissa. Käynnissä olevaan palvelimeen, sen kantoihin tai Meta-asetuksiin ei koskettu.
+
+**Tulos:** 10 keskustelua, 37 mallikutsua, ei yhtään putoamista sääntöihin, 1–3 s per viesti (TILAA ja toistot alle 0,5 s). Kuusi demotilausta, ei kaksoistilauksia. Puhekieli ("nyt tarvii 1000 litraa maitoo ku on juhlat maanantaina"), nimellä valinta ("se halvin maito ja tavallinen suolaamaton voi"), poisto ja lisäys samassa viestissä, päivän vaihto ja peruutus toimivat. "tilaa heti äläkä kysele" ei ohittanut tarkistuslistaa. Maidoton + maito ei tarjonnut mitään, kuten pitää.
+
+**Löydetyt viat ja korjaukset** (`server/order-tools/index.mjs`, `server/order-conversation/index.mjs`):
+
+- Koko tilauksen ruokavaliomerkintä vei väärään tuotteeseen: gluteeniton + tilli tarjosi maustesuolaa, koska merkinnällä rajattu haku palautti saman tuoteryhmän muita merkittyjä tuotteita. Nyt jos yksikään merkitty osuma ei ole pyydettyä tuotetta, näytetään pyydetty tuote ja "Ei merkintää" vain niille, joilta merkintä puuttuu. Rivin oma vaatimus ("gluteenitonta tilliä") kulkee yhä haun omaa polkua eikä muuttunut.
+- Kärkeen nousi kalliita erikoistuotteita: 1000 l maitoa → 2,5 dl:n laktoosittomat tölkit 2 859,57 €, voi → ruskistettu voi 215,55 €. Yli kaksi kertaa mediaanihintainen vaihtoehto järjestetään nyt perustuotteiden jälkeen. Mitään ei pudoteta, ja halvin on yhä aina kolmen joukossa.
+- Pakkausmäärä ohitti raaka-ainehyllyn: "3 laatikkoa banaaneja" tarjosi banaanijogurttia, koska työkalujen hakuteksti käytti sanaa "pakkausta", jota jäsennin ei tunne yksiköksi. Sana on nyt "pakettia".
+- Tekstit: "Ei tilattavaa tuotetta päivälle su 15.11." ISO-päivän sijaan, "gluteeniton" ei toistu muodossa "ei gluteeniviljoja", eikä yhteenveto näytä "3 kpl (3 kpl)".
+
+**Tarkistukset:** `npm test` 150/150, kolme uutta regressiota (hintapoikkeama, pakkaussana oikealla haulla, merkinnän ohjautuminen). Korjaukset varmistettu uusinta-ajolla oikealla mallilla ja mock-API:lla.
+
+**Ei korjattu, tiedossa:** peruna 20 kg näyttää ensin 72,40 €:n säkin ja halvimman 13,30 € kolmantena. Vastauksen loppuvihje on aina "maitoa 30 litraa" tai "poista voi", vaikka tilauksessa ei olisi niitä. "kiitos" tulostaa yhteenvedon uudelleen. Malli kirjasi "gluteeniton" kerran merkinnäksi ja kerran allergeenikielloksi: lopputulos on turvallinen, mutta sanamuoto vaihtelee. Pitkien vastausten pilkkominen jätettiin tekemättä: pisin vastaus oli 744 merkkiä (raja 3 800), ja pilkkominen toisi osittaisen lähetyksen uusintariskin. Oikeaa WhatsApp-ketjua tilaustilassa ei ole vieläkään ajettu.
 
 ## 14.11.2026 — tilauskeskustelu kytketty WhatsApp-kanavaan (Claude Code)
 

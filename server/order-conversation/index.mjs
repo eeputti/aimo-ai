@@ -9,7 +9,8 @@ const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
 const ALLERGEN_FI = { AM: 'maidoton', AW: 'ei gluteeniviljoja', AE: 'munaton', AN: 'pähkinätön', AP: 'ei maapähkinää', AF: 'kalaton', AY: 'soijaton', AC: 'ei äyriäisiä', AS: 'ei seesamia', BC: 'ei selleriä', BM: 'ei sinappia' };
 const DIET_QUESTION = 'Onko allergioita tai ruokavalioita huomioitavana (esim. laktoositon, gluteeniton, maidoton, pähkinätön)? Vastaa "ei", jos ei ole.';
-const dietLabel = (d) => [...d.claims.map((c) => CLAIM_FI[c]), ...d.excludeAllergens.map((a) => ALLERGEN_FI[a] || `ei allergeenia ${a}`)].filter(Boolean).join(', ');
+// Gluteeniton-merkintä ja gluteeniviljojen kielto ovat ostajalle sama asia: näytetään kerran.
+const dietLabel = (d) => [...d.claims.map((c) => CLAIM_FI[c]), ...d.excludeAllergens.filter((a) => !(a === 'AW' && d.claims.includes('FREE_FROM_GLUTEN'))).map((a) => ALLERGEN_FI[a] || `ei allergeenia ${a}`)].filter(Boolean).join(', ');
 // Vahvistus tunnistetaan koodissa, ei mallilla. Pelkkä "joo" ei ole tilauslupa.
 const CONFIRM = /^(tilaa|vahvista|vahvistan|hyväksy|hyväksyn|(kyllä|joo|ok|okei)[,\s]+(tilaa|vahvista|vahvistan))[\s.!]*$/iu;
 const VAGUE_YES = /^(joo|kyllä|ok|okei|jep|juu|selvä|hyvä|sopii)[\s.!]*$/iu;
@@ -90,7 +91,7 @@ function apply(draft, turn, customer, today) {
 function summary(draft, q, customer) {
   const site = customer.deliverySites?.find((s) => s.id === draft.deliverySiteId);
   const warn = (ref) => { const w = draft.lines.find((l) => l.ref === ref)?.selectedWarning; return w ? `\n   Huom: ${w}` : ''; };
-  const rows = q.lines.map((l, i) => `${i + 1}. ${l.name}: ${num(l.salesUnits)} ${l.salesUnitLabel}${l.covers ? ` (${qty(l.covers)})` : ''}, ${eur(l.lineNet)}${warn(l.ref)}`);
+  const rows = q.lines.map((l, i) => `${i + 1}. ${l.name}: ${num(l.salesUnits)} ${l.salesUnitLabel}${l.covers && !(l.covers.unit === 'PCS' && l.covers.value === l.salesUnits) ? ` (${qty(l.covers)})` : ''}, ${eur(l.lineNet)}${warn(l.ref)}`);
   const diet = dietLabel(draft.diet);
   const cutoff = q.lines.map((l) => l.cutoffLabel).filter(Boolean)[0];
   return [`*Tilausluonnos*, toimitus ${dateLabel(draft.deliveryDate)}${site ? `, ${site.label}` : ''}`, ...(diet ? [`Huomioitu: ${diet}`] : []), ...rows, `Yhteensä ${eur(q.totals.net)} (alv 0 %)`,

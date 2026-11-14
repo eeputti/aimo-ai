@@ -4,6 +4,36 @@ Yhteinen projektipostilaatikko, tehtävä- ja tiedostovaraukset sekä projektin 
 
 Palvelu toimii erillään verkkokaupasta. Sen omat riippuvuudet ja lockfile ovat tässä hakemistossa; sivuston package.json tai tilauskannat eivät muutu.
 
+## Selkeä tehtävänjako
+
+Yksi tehtävä tarkoittaa yhtä rajattua tulosta ja sillä on yksi vastuullinen avustajatunniste.
+Käytä eri chatille omaa tunnistetta, jos asiakas sallii erilliset yhteydet. Paikallisesti
+voit luoda esimerkiksi `codex-mcp` ja `claude-tests` komennolla `join`.
+Kirjoita otsikkoon tavoite ja kuvaukseen valmistumiskriteeri sekä työn ulkopuolelle jäävät asiat.
+Varaa vain muokkaamasi tiedostot; koko projektikansion varaus estää rinnakkaistyön.
+
+| Tila | Kuka jatkaa? | Tiedostot ja seuraava toimi |
+|---|---|---|
+| `in_progress` | `owner` | Omistaja tekee työn ja uusii varauksen ennen määräaikaa. |
+| `blocked` | `owner`; nimetty auttaja ratkaisee esteen | Varaus säilyy. Auttajalle ilmoittaminen ei siirrä omistusta. |
+| `handed_off` | `owner` on vastaanottaja, joka ei ole vielä aloittanut | Tiedostovaraukset ovat vapaat. Vastaanottaja käyttää `accept` / `claim_task(taskId)` ennen muokkausta; tiedostot varataan uudelleen konfliktitarkistuksella. |
+| Varaus vanhentunut tai omistaja poistettu käytöstä | Kuka tahansa projektin jäsen voi yrittää ottaa työn | Lue muistiinpanot ja commit, sitten `accept` / `claim_task(taskId)`. Älä aloita ennen onnistunutta varausta. |
+| `done` | Ei jatkajaa | Tulos on valmis; varaukset vapautuvat. Uusi työ saa uuden tehtävän. |
+| `released` | Ei aktiivista vastuuhenkilöä | Työ jätettiin kesken; varaukset vapautuvat. Jatko luodaan uutena tehtävänä viitaten vanhaan. |
+
+`status` näyttää omistajan, tilan, aktiiviset tiedostovaraukset, tehtävään kuuluvat
+alkuperäiset tiedostot ja seuraavan toimenpiteen. `requestedResources` kertoo työn rajauksen;
+`resources` kertoo juuri nyt voimassa olevat varaukset. Vanhentunutta omistajuutta ei pidä
+lukea aktiiviseksi työksi. Kaikki avoimet tehtävät näkyvät, lisäksi viimeiset 100 suljettua.
+
+Luovutuksen muistiinpanoon: **tehty, tarkistettu, jäljellä, commit**. Luovutuksen vastaanottaja
+on vastuussa seuraavasta vaiheesta vasta otettuaan työn vastaan. Vanha omistaja ei jatka
+muokkausta luovutuksen jälkeen. Vanhenneen varauksen omistajan on varattava tehtävä uudelleen
+ennen luovutusta. Varaus on aina neuvoa antava, ei tiedostojärjestelmän lukko.
+
+Eri koneiden paikalliset kannat eivät jaa tehtävätilannetta. Yhteinen tehtävänjako vaatii
+saman HTTPS-palvelimen; GitHub välittää koodin ja työlokin, ei paikallisia varauksia.
+
 ## Paikallinen käyttö ilman palvelinta
 
 Samalla koneella ja samassa projektikansiossa työskentelevät avustajat (esimerkiksi Codex ja Claude Code) voivat käyttää taulua suoraan komentoriviltä. Palvelinta, liitintä tai `npm ci`:tä ei tarvita: komento käyttää samaa kantaa ja samaa logiikkaa kuin MCP-palvelin.
@@ -40,6 +70,30 @@ Suorita jäsenkomennot itse ylläpitäjän terminaalissa. Jokainen add-member n�
 Jos sovellus jakaa yhden MCP-liittimen usean keskustelun kesken, keskustelut käyttävät samaa tunnistetta ja kuittauskursoria. Eri tunnisteet edellyttävät erikseen autentikoitavia yhteyksiä, jos asiakassovellus sallii ne. Palvelin ei tunnista keskusteluikkunaa automaattisesti.
 
 Oletusosoite omalla koneella on `http://127.0.0.1:4750/mcp`. Terveystarkistus on `/healthz`. Oletuskanta on palvelun `data/team-mcp.db`. Se luodaan automaattisesti; tuotekatalogia, Valion APIa tai olemassa olevaa verkkokauppapalvelinta ei tarvita. Sama osoite localhostissa eri tiimiläisten koneilla ei tarkoita samaa palvelinta.
+
+## Nopea Cloudflare-tunnelikokeilu
+
+Tässä kokeilussa Node-palvelin ja Cloudflare-tunneli toimivat samalla koneella. Renderiä, Cloudflare-tiliä, omaa verkkotunnusta tai Cloudflaren API-avainta ei tarvita. Asenna ensin Node 22.13+ sekä [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/). Windowsissa PowerShell:
+
+```powershell
+winget install --id Cloudflare.cloudflared --exact
+```
+
+Avaa asennuksen jälkeen uusi terminaali projektin juuressa. Jos paikallisia muutoksia ei ole, päivitä ensin `git pull --ff-only`. Aja:
+
+```bash
+npm --prefix services/team-mcp ci
+npm --prefix services/team-mcp run admin -- add-member --id daniel-chatgpt --name "Daniel / ChatGPT" --projects aimo-ai
+npm --prefix services/team-mcp run tunnel
+```
+
+Jos jäsen on jo luotu, älä suorita add-member-komentoa uudelleen. Hae tarvittaessa uusi avain `npm --prefix services/team-mcp run admin -- rotate-key --id daniel-chatgpt` -komennolla (mitätöi tämän jäsenen vanhat yhteydet). Jäsenavaimen näkee vain omassa terminaalissa; syötä se MCP-liittimen OAuth-kirjautumissivulle. Luo muille avustajille omat jäsenet `add-member`-komennolla toisessa terminaalissa.
+
+`run tunnel` tulostaa **MCP-osoitteen** muodossa `https://satunnainen-nimi.trycloudflare.com/mcp`. Lisää tämä sama osoite kaikkien avustajien mukautettuun MCP-liittimeen ja valitse OAuth. Käynnistys asettaa julkisen OAuth-osoitteen automaattisesti ja sitoo palvelimen vain `127.0.0.1`:een. `.env`:n `TEAM_MCP_PUBLIC_URL` ja `TEAM_MCP_HOST` ohitetaan vain tämän komennon ajaksi; tiedostoja ei muuteta. Olemassa olevaa portissa 4750 toimivaa palvelinta ei julkaista vahingossa: varattu portti keskeyttää käynnistyksen.
+
+Pidä terminaali ja kone käynnissä. **Ctrl+C sulkee sekä tunnelin että MCP-palvelimen.** Uusi käynnistys antaa uuden osoitteen, jolloin liittimet on yhdistettävä uudelleen. Kanta ja jäsenet säilyvät `data/team-mcp.db`:ssä. Tunneli ei siirrä paikallista kantaa muiden koneiden kanssa samaan paikkaan: kaikkien on käytettävä juuri tätä yhtä MCP-osoitetta. Komento ei käynnistä verkkokauppaa tai WhatsApp-palvelinta.
+
+Jos `cloudflared` ei löydy PATHista, määritä `CLOUDFLARED_BIN` sen koko tiedostopoluksi. Quick Tunnel ei toimi kaikissa verkoissa; Cloudflaren yhteyksien on oltava sallittuja. Käyttäjän oma `~/.cloudflared/config.yaml` voi myös estää Quick Tunnelin; tarkista silloin [Cloudflaren kokeiluohje](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/). Käynnistysskripti ei muuta omia Cloudflare-asetuksiasi. Tämä on tilapäinen testi ilman saatavuustakuuta.
 
 ## Kaikille yhteinen HTTPS-palvelin
 
@@ -91,7 +145,7 @@ OAuth käyttää joko julkista PKCE-asiakasta (`none`) tai SDK:n confidential cl
 | Työkalu | Tulos |
 |---|---|
 | `whoami` | Todellinen avustajatunniste ja sallitut projektit. Lähettäjää ei voi valita argumenteissa. |
-| `get_project_state` | Projektin yhteenveto, jäsenet, viimeiset 100 tehtävää varauksineen ja viimeiset 30 tehtävä-/yhteenvetotapahtumaa. Ei yksityisviestejä. |
+| `get_project_state` | Projektin yhteenveto, jäsenet, kaikki avoimet ja viimeiset 100 suljettua tehtävää varauksineen ja viimeiset 30 tehtävä-/yhteenvetotapahtumaa. Ei yksityisviestejä. |
 | `send_message` | Projektille tai jäsenelle viesti. Vaadittu `requestKey` estää saman viestin uusinnan; saman avaimen eri sisältö hylätään. |
 | `read_messages` | Omat vastaanotetut, projektin yhteiset ja itse lähetetyt viestit. Enintään 50/sivu; jatka `nextCursor`-arvosta. |
 | `ack_messages` | Kuittaa käsitelty `through`-kursori omalle tunnisteelle. Ei poista viestejä. |

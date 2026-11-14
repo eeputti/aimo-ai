@@ -9,6 +9,7 @@
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/main.mjs",
+    "tunnel": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/tunnel.mjs",
     "admin": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/admin.mjs",
     "team": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.mjs",
     "test": "node --disable-warning=ExperimentalWarning --test test/*.test.mjs"

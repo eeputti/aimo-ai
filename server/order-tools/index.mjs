@@ -12,6 +12,7 @@ const UNIT_WORD = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLARIFY = [{ claim: 'FREE_FROM_LACTOSE', min: 0.2, max: 0.8 }];
 const issue = (code, fi, extra = {}) => ({ code, message: fi, ...extra });
 const validQuantity = (q) => q && Number.isFinite(q.value) && q.value > 0 && q.value <= 100000 && ['L', 'KG', 'PCS'].includes(q.unit);
+const dayLabel = (iso) => new Intl.DateTimeFormat('fi-FI', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'numeric' }).format(new Date(`${iso}T12:00:00Z`));
 const validDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
 
 /** Tarjous sidotaan sisältöön: sama hash vain, jos asiakas, päivä, toimituspaikka, tuotteet ja määrät ovat samat. */
@@ -22,9 +23,11 @@ export function draftHash(customer, draft) {
 }
 
 /** Hakuteksti nykyiselle tulkinnalle: määrä, ruokavaatimukset ja tuotesana. Tuotenumero haetaan sellaisenaan. */
+// Myyntipakkauksen sanan pitää olla jäsentimen tuntema yksikkö (paketti). Tuntematon sana luettiin tuotesanaksi,
+// jolloin raaka-aineen oma hylly ohittui: "3 pakkausta banaani" tarjosi banaanijogurttia.
 export function lineQuery(line) {
   const q = line.quantity;
-  const amount = q ? `${String(q.value).replace('.', ',')} ${q.unit === 'PCS' && q.basis !== 'items' ? 'pakkausta' : UNIT_WORD[q.unit]} ` : '';
+  const amount = q ? `${String(q.value).replace('.', ',')} ${q.unit === 'PCS' && q.basis !== 'items' ? 'pakettia' : UNIT_WORD[q.unit]} ` : '';
   const claims = (line.claims || []).map((c) => CLAIM_WORD[c]).filter(Boolean).join(' ');
   return `${amount}${claims ? `${claims} ` : ''}${line.productTerm}`.trim();
 }
@@ -38,6 +41,11 @@ const words = (text) => String(text || '').toLowerCase().replace(/[®™%&(),+]/
 export function rankOptions(found, line) {
   const term = words(line.productTerm).map((w) => (w.length > 4 ? w.slice(0, -1) : w)); // taivutus: kerma ~ kerman, maito ~ maitoa
   const need = line.quantity?.value || 0;
+  // Yli kaksi kertaa tavallisen (mediaani) hintainen vaihtoehto, kuten erikoistuote tai annospakkaus, ei kuulu kärkeen.
+  // Mediaani eikä halvin: yksi poikkeuksellisen halpa tuote ei saa pudottaa kaikkia muita.
+  const cost = (o) => (Number.isFinite(o.price) && o.price > 0 ? o.price * o.qty : null);
+  const costs = found.map(cost).filter((c) => c !== null).sort((x, y) => x - y);
+  const typical = costs.length ? costs[Math.floor((costs.length - 1) / 2)] : Infinity;
   const score = (o) => {
     const brand = words(o.brand);
     // Kuvailevat sanat, jotka eivät ole merkki, koko, ruokavaliomerkintä tai itse tuote: "kolme sipulia", "mansikka".
@@ -47,7 +55,7 @@ export function rankOptions(found, line) {
     const fit = (over > 0.5 ? 2 : over > 0.1 ? 1 : 0) + (o.qty > 30 ? 2 : o.qty > 12 ? 1 : 0);
     // Yksi kuvaileva sana (lajike, tuotesarja) ei vielä tee tuotteesta maustettua. Näin haun oma hyllyjärjestys säilyy.
     // Isossa tilauksessa kaikki vaihtoehdot ovat kymmeniä eriä: silloin vähemmän käsiteltäviä eriä ensin.
-    return [extras >= 2 ? 1 : 0, fit, o.qty > 30 ? o.qty : 0];
+    return [extras >= 2 || (cost(o) !== null && cost(o) > 2 * typical) ? 1 : 0, fit, o.qty > 30 ? o.qty : 0];
   };
   return found.map((o, i) => ({ o, i, s: score(o) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.s[2] - b.s[2] || a.i - b.i).map((x) => x.o);
 }
@@ -105,11 +113,16 @@ export function createOrderingTools(deps = {}) {
     // Rivin oma vaatimus (line.claims, line.excludeAllergens) on tiukka: varmentamaton ei kelpaa.
     const diet = { claims: draft.diet?.claims || [], excludeAllergens: draft.diet?.excludeAllergens || [] };
     for (const line of draft.lines) {
-      let found; let warning = null;
+      let found; let soft = [];
       const extra = diet.claims.filter((c) => !(line.claims || []).includes(c));
+      // Merkinnällä rajattu haku voi palauttaa saman tuoteryhmän muita merkittyjä tuotteita, kun itse tuotteella ei ole
+      // merkintää (gluteeniton + tilli antoi maustesuolaa). Jos yksikään osuma ei ole pyydettyä tuotetta, näytetään
+      // pyydetty tuote ja kerrotaan puuttuva merkintä tuotekohtaisesti.
+      const stems = words(line.productTerm).map((w) => (w.length > 4 ? w.slice(0, -1) : w));
+      const onTerm = (o) => stems.some((t) => String(o.name || '').toLowerCase().includes(t));
       try {
         found = await search(extra.length ? { ...line, claims: [...(line.claims || []), ...extra] } : line, draft.deliveryDate);
-        if (!found.length && extra.length) { found = await search(line, draft.deliveryDate); if (found.length) warning = `Ei merkintää: ${extra.map((c) => CLAIM_WORD[c] || c).join(', ')}`; }
+        if (extra.length && !found.some(onTerm)) { const plain = await search(line, draft.deliveryDate); if (plain.length) { found = plain; soft = extra; } }
       } catch { issues.push(issue('SEARCH_FAILED', `Tuotehaku ei onnistunut: ${line.productTerm}. Hintoja tai saatavuutta ei näytetä.`, { ref: line.ref })); continue; }
       let fit = found.filter((o) => !unsafe(product(o.id), line));
       if (diet.excludeAllergens.length) {
@@ -117,7 +130,7 @@ export function createOrderingTools(deps = {}) {
         fit = fit.filter((o) => !has(o));
       }
       fit = rankOptions(fit, line);
-      if (!fit.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${draft.deliveryDate}: ${line.productTerm}.`, { ref: line.ref })); continue; }
+      if (!fit.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref })); continue; }
       const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim)).map((c) => ({ claim: c.claim, share: fit.filter((o) => o.labels?.includes(c.claim)).length / fit.length, ...c }))
         .filter((c) => fit.length >= 3 && c.share >= c.min && c.share <= c.max).map((c) => c.claim);
       // Halvin tarpeen kattava vaihtoehto on aina kolmen joukossa, vaikka järjestys suosisi isompaa pakkausta.
@@ -130,7 +143,7 @@ export function createOrderingTools(deps = {}) {
         unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
         stock: o.availability?.stock ?? null, labels: o.labels || [], note: o.quantityExplanation?.text || null,
         why: o.substituteFor ? `Korvaa tuotteen ${o.substituteFor.name}` : null,
-        warning: [warning, diet.excludeAllergens.length && !product(o.id)?.hasAllergenData ? 'allergeenitieto puuttuu, tarkista itse' : null].filter(Boolean).join('; ') || null,
+        warning: [soft.filter((c) => !o.labels?.includes(c)).length ? `Ei merkintää: ${soft.filter((c) => !o.labels?.includes(c)).map((c) => CLAIM_WORD[c] || c).join(', ')}` : null, diet.excludeAllergens.length && !product(o.id)?.hasAllergenData ? 'allergeenitieto puuttuu, tarkista itse' : null].filter(Boolean).join('; ') || null,
       })) });
     }
     return { lines, issues };

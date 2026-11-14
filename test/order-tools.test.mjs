@@ -61,6 +61,9 @@ test('suggest antaa enintään kolme vaihtoehtoa, pyytää tarkennuksen vain jak
   assert.equal(down.issues[0].code, 'SEARCH_FAILED');
   assert.equal(down.lines.length, 0);
   assert.equal(lineQuery(line('a', { claims: ['FREE_FROM_LACTOSE'] })), '20 l laktoositon maito');
+  // Myyntipakkaukset sanalla, jonka jäsennin tuntee yksiköksi; yksittäiset kappaleet sanalla kpl.
+  assert.equal(lineQuery({ productTerm: 'banaani', quantity: { value: 3, unit: 'PCS' } }), '3 pakettia banaani');
+  assert.equal(lineQuery({ productTerm: 'kananmuna', quantity: { value: 100, unit: 'PCS', basis: 'items' } }), '100 kpl kananmuna');
 });
 
 test('koko tilauksen ruokavalio: sisältävä pois, puuttuva allergeenitieto näkyy varoituksena, merkintä on pehmeä', async () => {
@@ -72,6 +75,17 @@ test('koko tilauksen ruokavalio: sisältävä pois, puuttuva allergeenitieto nä
   // Halvin on aina näkyvissä, vaikka se ei olisi järjestyksen kärjessä.
   const pricey = fakes({ search: async () => [found('2'), found('5'), found('6'), found('7', [], { price: 1 })] });
   assert.deepEqual((await pricey.tools.suggest({ customer, draft: draftOf([line('a')]) })).lines[0].options.map((o) => o.productId), ['2', '5', '7']);
+  // Merkinnällä rajattu haku palautti saman ryhmän muita tuotteita (gluteeniton + tilli → maustesuola): näytetään pyydetty tuote,
+  // ja puuttuva merkintä kerrotaan vain niille, joilta se puuttuu.
+  const dill = fakes({ search: async (l) => (l.claims.includes('FREE_FROM_GLUTEN') ? [found('9', ['FREE_FROM_GLUTEN'], { name: 'KNORR Umami maustesuola 1kg' })]
+    : [found('2', [], { name: 'GREENS 1KG TILLI' }), found('5', ['FREE_FROM_GLUTEN'], { name: 'Tilli kuivattu 100 g gluteeniton' })]) });
+  const dillOptions = (await dill.tools.suggest({ customer, draft: draftOf([line('a', { productTerm: 'tilli' })], { diet: { claims: ['FREE_FROM_GLUTEN'], excludeAllergens: [] } }) })).lines[0].options;
+  assert.deepEqual(dillOptions.map((o) => [o.productId, o.warning]), [['2', 'Ei merkintää: gluteeniton'], ['5', null]]);
+  // Kun merkitty osuma on pyydetty tuote, toista hakua ei tehdä eikä merkitsemättömiä näytetä.
+  let searches = 0;
+  const milk = fakes({ search: async (l) => { searches++; return l.claims.includes('FREE_FROM_LACTOSE') ? [found('2', ['FREE_FROM_LACTOSE'], { name: 'Valio Eila maitojuoma 1 l laktoositon' })] : [found('5', [], { name: 'Valio kevytmaito 1 l' })]; } });
+  const milkOptions = (await milk.tools.suggest({ customer, draft: draftOf([line('a')], { diet: { claims: ['FREE_FROM_LACTOSE'], excludeAllergens: [] } }) })).lines[0].options;
+  assert.deepEqual([milkOptions.map((o) => o.productId), searches], [['2'], 1]);
   // Rivin oma kielto on tiukka: varmentamaton ei kelpaa.
   const strict = await tools.suggest({ customer, draft: draftOf([line('a', { excludeAllergens: ['AM'] })]) });
   assert.deepEqual(strict.lines[0].options.map((o) => o.productId), ['2']);
@@ -168,6 +182,12 @@ test('vaihtoehtojen järjestys: perustuote ennen maustettua ja sopiva pakkaus en
   const yoghurt = [o('Valiojogurtti® 1 kg mansikka vanilja', 10, 1), o('Valio luonnonjogurtti 1 kg', 10, 1)];
   assert.equal(rankOptions(yoghurt, { productTerm: 'jogurtti', quantity: { value: 10, unit: 'KG' } })[0].name, 'Valio luonnonjogurtti 1 kg');
   assert.equal(rankOptions(yoghurt, { productTerm: 'mansikka vanilja jogurtti', quantity: { value: 10, unit: 'KG' } })[0].name, 'Valiojogurtti® 1 kg mansikka vanilja');
+  // Yli kaksi kertaa halvimman hintainen erikoistuote tai annospakkaus ei nouse kärkeen, vaikka eriä olisi vähemmän.
+  const priced = (name, qty, size, price) => ({ ...o(name, qty, size), price });
+  const milk = [priced('Valio Eila® kevytmaitojuoma 2,5 dl UHT laktoositon', 267, 3.75, 10.71), priced('Valio rasvaton maito 1 l ESL', 1000, 1, 0.88), priced('Valio kevytmaito 1 l ESL', 1000, 1, 1)];
+  assert.deepEqual(rankOptions(milk, { productTerm: 'maito', quantity: { value: 1000, unit: 'L' } }).map((x) => x.name), [milk[1].name, milk[2].name, milk[0].name]);
+  const browned = [priced('Jokilaakson Juusto Ruskistettu Voi 1,2kg', 9, 1.2, 23.95), priced('Valio voi 500 g suolaamaton', 20, 0.5, 3.3)];
+  assert.equal(rankOptions(browned, { productTerm: 'voi', quantity: { value: 10, unit: 'KG' } })[0].name, 'Valio voi 500 g suolaamaton');
 });
 
 test('oikea haku ja gateway simuloidulla rajapinnalla: vaihtoehdot, tarjous ja yksi demotilaus', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
@@ -175,6 +195,10 @@ test('oikea haku ja gateway simuloidulla rajapinnalla: vaihtoehdot, tarjous ja y
   const { orders } = await import('../server/gateway/store.mjs');
   seedBuyers();
   const tools = createOrderingTools();
+  // Pakkausmäärä ei saa ohittaa raaka-aineen omaa hyllyä: banaani on banaania, ei banaanijogurttia.
+  const { searchStorefront } = await import('../server/storefront.mjs');
+  const bananas = (await searchStorefront(lineQuery({ productTerm: 'banaani', quantity: { value: 3, unit: 'PCS' } }), { deliveryDate: '2026-11-16', llm: false })).cards[0]?.list || [];
+  assert.ok(bananas.length && bananas.every((x) => /^(LUOMU )?BANAANI/.test(x.name)), bananas.map((x) => x.name).join(' | '));
   const real = { ...customer, buyerId: 'ravintola-kulma' };
   const draft = draftOf([line('a', { claims: ['FREE_FROM_LACTOSE'] }), line('b', { productTerm: 'kananmuna', quantity: { value: 100, unit: 'PCS', basis: 'items' } })]);
   const s = await tools.suggest({ customer: real, draft });
