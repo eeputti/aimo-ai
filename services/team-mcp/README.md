@@ -4,7 +4,25 @@ Yhteinen projektipostilaatikko, tehtävä- ja tiedostovaraukset sekä projektin 
 
 Palvelu toimii erillään verkkokaupasta. Sen omat riippuvuudet ja lockfile ovat tässä hakemistossa; sivuston package.json tai tilauskannat eivät muutu.
 
-## Paikallinen käyttöönotto
+## Paikallinen käyttö ilman palvelinta
+
+Samalla koneella ja samassa projektikansiossa työskentelevät avustajat (esimerkiksi Codex ja Claude Code) voivat käyttää taulua suoraan komentoriviltä. Palvelinta, liitintä tai `npm ci`:tä ei tarvita: komento käyttää samaa kantaa ja samaa logiikkaa kuin MCP-palvelin.
+
+```bash
+npm run team -- join --id claude-code --name "Claude Code"
+npm run team -- start --as claude-code
+npm run team -- claim --as claude-code --title "Ostoskorin korjaus" --files public/cart-workflow.js
+npm run team -- block --as claude-code --task 4855c582 --note "Tarvitsen restartin" --on codex
+npm run team -- handoff --as claude-code --task 4855c582 --to codex --note "Tehty ja testattu, restart jäljellä" --commit HEAD
+npm run team -- accept --as codex --task 4855c582
+npm run team -- done --as codex --task 4855c582 --note "Restart tehty, healthz 200" --commit HEAD
+```
+
+`npm run team -- help` listaa kaikki komennot. `start` hakee ensin etähaaran ja näyttää eron siihen, commitoimattomat tiedostot ja uusimman `TYOLOKI.md`-otsikon, sitten avoimet tehtävät ja lukemattomat viestit. `handoff` ja `done` hyväksyvät `--commit`-arvon vain, jos commit on jossakin etähaarassa; `--allow-unpushed` ohittaa tarkistuksen ja lisää merkintään tekstin EI GITHUBISSA.
+
+Paikallisessa käytössä tunniste on `--as`-arvo (tai `TEAM_AGENT`), eikä sitä varmenneta: jokainen, joka pääsee kantatiedostoon, on jo ylläpitäjä. Älä avaa tätä kantaa verkkolevyltä tai jaa sitä koneiden välillä; eri koneet käyttävät alla kuvattua HTTPS-palvelinta. Palvelin ja komentorivi voivat käyttää samaa kantaa yhtä aikaa.
+
+## Paikallinen palvelin
 
 Node 22.13 tai uudempi:
 
@@ -78,7 +96,8 @@ OAuth käyttää joko julkista PKCE-asiakasta (`none`) tai SDK:n confidential cl
 | `read_messages` | Omat vastaanotetut, projektin yhteiset ja itse lähetetyt viestit. Enintään 50/sivu; jatka `nextCursor`-arvosta. |
 | `ack_messages` | Kuittaa käsitelty `through`-kursori omalle tunnisteelle. Ei poista viestejä. |
 | `claim_task` | Uusi tehtävä tai olemassa olevan taskId:n varaus/uusinta, oletus 30 min, enintään 120 min. |
-| `report_progress` | Omistajan tilanne, uusinta, `blocked`, `done` tai `released`; vaatii ajantasaisen `expectedRevision`-arvon. |
+| `report_progress` | Omistajan tilanne, uusinta, `blocked`, `done` tai `released`; vaatii ajantasaisen `expectedRevision`-arvon. `blocked` lähettää esteestä viestin: `blockedOn`-jäsenelle suoraan, muuten koko projektille. Varaus säilyy. |
+| `handoff_task` | Luovuttaa oman tehtävän toiselle jäsenelle: omistus siirtyy, tiedostovaraukset vapautuvat ja vastaanottaja saa suoran viestin, jossa on muistiinpano, commit ja tehtävän tunniste. Vastaanottaja ottaa työn `claim_task`-kutsulla samalla `taskId`:llä; siihen asti tehtävä on tilassa `handed_off` eikä sitä voi päivittää. Tehtävä on varattu vastaanottajalle 120 minuuttia, sen jälkeen kuka tahansa voi ottaa sen. |
 | `update_project_state` | Yhteisen yhteenvedon päivitys ajantasaisen revision pohjalta. |
 
 Varaus `server/ordering` estää palvelimessa toisen varauksen myös polulle `server/ordering/checkout.mjs`. Eri tehtävien päällekkäisyys torjutaan myös saman jäsenen osalta. Varaukset ovat neuvoa antavia eivätkä estä OS-/Git-muokkauksia. Vanheneminen sallii tehtävän uudelleenvaraamisen; suljettua tehtävää ei avata uudelleen vaan luodaan uusi. Tehtävän alkuperäiset tiedostopolut säilyvät, vaikka vanhentuneen varauksen joku muu ottaisi. `get_project_state` näyttää erikseen aktiiviset resurssivaraukset ja alkuperäiset `requestedResources`-polut.
@@ -111,6 +130,6 @@ MCP ei avaa tai herätä tiimiläisten ChatGPT-/Claude-keskusteluja eikä muuta 
 npm test
 ```
 
-Testit käyttävät oikeaa MCP SDK -asiakasta, paikallisia HTTP-yhteyksiä ja erillistä SQLite-kantaa. Niissä testataan kahden avustajatunnisteen keskustelu, private/broadcast-erottelu, idempotenssi, projektirajaus, tiedostovarausten konfliktit, vanheneminen ja uudelleenkäynnistys sekä OAuth discovery, PKCE, consent/CSRF, refresh rotation ja revokointi. Oikeaa ChatGPT- tai Claude-tiliä ei ole kytketty automaattitesteissä eikä hostingia julkaistu.
+Testit käyttävät oikeaa MCP SDK -asiakasta, paikallisia HTTP-yhteyksiä ja erillistä SQLite-kantaa. Niissä testataan kahden avustajatunnisteen keskustelu, koko yhteistyöketju (varaus, este, luovutus, vastaanotto, valmis) sekä MCP:n että komentorivin kautta, private/broadcast-erottelu, idempotenssi, projektirajaus, tiedostovarausten konfliktit, vanheneminen ja uudelleenkäynnistys sekä OAuth discovery, PKCE, consent/CSRF, refresh rotation ja revokointi. Oikeaa ChatGPT- tai Claude-tiliä ei ole kytketty automaattitesteissä eikä hostingia julkaistu.
 
 Viralliset lähteet: [MCP SDK ja Streamable HTTP](https://ts.sdk.modelcontextprotocol.io/server), [ChatGPT-liittimien OAuth](https://developers.openai.com/plugins/build/auth), [Clauden remote MCP -liittimet](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).

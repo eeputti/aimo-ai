@@ -92,3 +92,29 @@ test('expired member keys stop authentication and allow abandoned work to be rec
   const nextKey = store.addMember('new-member', 'New', [project]); assert.ok(nextKey);
   assert.equal(store.claim('new-member', { project, taskId: task.id }).owner, 'new-member');
 });
+
+test('blockers reach inboxes once; handoff moves ownership, frees files and holds the task for the recipient', (t) => {
+  const { store, advance } = fixture(t); store.addMember('carol', 'Carol', [project]);
+  const task = store.claim('alice-gpt', { project, title: 'Wiring', resources: ['server/whatsapp'] });
+  const blocked = store.progress('alice-gpt', { project, taskId: task.id, expectedRevision: task.revision, status: 'blocked', note: 'Token missing' });
+  assert.equal(store.readMessages('carol', { project }).messages[0].subject, 'Este: Wiring');
+  assert.throws(() => store.progress('alice-gpt', { project, taskId: task.id, expectedRevision: blocked.revision, status: 'blocked', note: 'x', blockedOn: 'outsider' }), /not available/);
+  assert.throws(() => store.handoff('alice-gpt', { project, taskId: task.id, expectedRevision: blocked.revision, to: 'alice-gpt', note: 'x' }), /another member/);
+  assert.throws(() => store.handoff('alice-gpt', { project, taskId: task.id, expectedRevision: blocked.revision, to: 'outsider', note: 'x' }), /not available/);
+  assert.throws(() => store.handoff('alice-gpt', { project, taskId: task.id, expectedRevision: task.revision, to: 'bob-claude', note: 'x' }), /latest task/);
+  const handed = store.handoff('alice-gpt', { project, taskId: task.id, expectedRevision: blocked.revision, to: 'bob-claude', note: 'Ready for restart', commitSha: 'abcdef123' });
+  assert.equal(handed.owner, 'bob-claude'); assert.equal(handed.leaseExpired, false);
+  assert.equal(store.readMessages('carol', { project }).messages.length, 1, 'handoff message is private to the recipient');
+  assert.equal(store.readMessages('bob-claude', { project }).messages.at(-1).subject, 'Luovutus: Wiring');
+  assert.throws(() => store.handoff('bob-claude', { project, taskId: task.id, expectedRevision: handed.revision, to: 'carol', note: 'x' }), /already handed off/);
+  assert.throws(() => store.claim('carol', { project, taskId: task.id }), /owns/);
+  assert.equal(store.claim('carol', { project, title: 'Freed file', resources: ['server/whatsapp/a.mjs'], leaseMinutes: 1 }).owner, 'carol');
+  assert.throws(() => store.claim('bob-claude', { project, taskId: task.id }), /reserved by carol/);
+  advance(60_001);
+  assert.equal(store.claim('bob-claude', { project, taskId: task.id }).status, 'in_progress');
+  // A handoff nobody picks up does not stay locked forever.
+  const second = store.claim('alice-gpt', { project, title: 'Orphan' });
+  const orphan = store.handoff('alice-gpt', { project, taskId: second.id, expectedRevision: second.revision, to: 'bob-claude', note: 'x' });
+  advance(120 * 60_000 + 1);
+  assert.equal(store.claim('carol', { project, taskId: orphan.id }).owner, 'carol');
+});

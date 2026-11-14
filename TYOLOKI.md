@@ -2,6 +2,27 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — avustajien työnvaraus, esteet ja luovutus käyttöön paikallisesti (Claude Code)
+
+**Käyttäjän pyyntö:** selvitä, miten projektin AI-agentit jakavat työn ja pysyvät ajan tasalla, mikä on toteutettu ja mikä oikeasti käytössä, ja tee toimiva tapa varata työ, ilmoittaa esteistä, luovuttaa valmis osuus ja löytää ajantasainen tieto GitHubista. Meta-asetuksiin, WhatsApp-käyttöönottoon, `.env`-tiedostoihin ja palvelinten käynnistyksiin ei koskettu.
+
+**Havaittu lähtötilanne:** koordinointi tapahtui kokonaan `TYOLOKI.md`:n, `docs/parallel/N.md`:n ja commit-viestien kautta. `services/team-mcp/` oli toteutettu ja testattu (commit `49240a0`), mutta ei käytössä: kantaa ei ollut luotu, palvelin ei ollut käynnissä portissa 4750, riippuvuuksia ei ollut asennettu, hostingia ei ole valittu eikä yhtään avustajaa ollut liitetty. Palvelusta puuttui myös luovutus: tehtävän saattoi vain sulkea, ja `blocked` näkyi vain tehtävälistassa, ei kenenkään viesteissä. Tämän päivän kaksi rinnakkaista WhatsApp-palvelinta samalla kannalla ja päällekkäinen kytkentäehdotus syntyivät ilman yhteistä varausta.
+
+**Päätökset:**
+
+- Samalla koneella työskentelevät Codex ja Claude Code käyttävät taulua komentoriviltä (`services/team-mcp/src/cli.mjs`, `npm run team`), joka kirjoittaa suoraan samaan SQLite-kantaan samalla logiikalla kuin MCP-palvelin. Syy: tämä toimii heti ilman hostingia, liitintä tai palvelimen käynnistystä. Paikallinen tunniste (`--as`) on luottamukseen perustuva, koska kantatiedostoon pääsevä on jo ylläpitäjä. Eri koneiden tiimiläiset tarvitsevat yhä julkaistun HTTPS-palvelimen; se on tekemättä.
+- Este (`blocked`) lähettää viestin nimetylle jäsenelle tai koko projektille, kerran per raportti. Varaus säilyy, jotta toinen ei aloita samaa tiedostoa esteen aikana.
+- Luovutus (`handoff_task` / `handoff`) siirtää omistuksen, vapauttaa tiedostovaraukset ja lähettää vastaanottajalle viestin samassa transaktiossa. Vastaanotto on erillinen `claim_task`/`accept`; ennen sitä tehtävää ei voi päivittää. Vastaanottajalle varattu aika on 120 min, minkä jälkeen kuka tahansa saa ottaa työn.
+- Komentorivin `handoff` ja `done` hyväksyvät commitin vain, jos se on jossakin etähaarassa (`NOT_PUSHED` muuten). `--allow-unpushed` merkitsee työn tekstillä EI GITHUBISSA. `start` hakee etähaaran ja näyttää jälkeenjäämisen, commitoimattomat tiedostot ja GitHubin uusimman lokiotsikon ennen taulua ja viestejä.
+- GitHub pysyy tiedon lähteenä (koodi, `TYOLOKI.md`, `docs/parallel/N.md`). Taulua ei viedä GitHubiin erillisenä tilannetiedostona, koska se vanhenisi ja aiheuttaisi yhdistämisristiriitoja; taulu viittaa committeihin.
+- `AGENTS.md`:n MCP-osio korvattu käytännön ohjeella ja komentotaulukolla. `services/team-mcp/README.md` ja `AGENT-INSTRUCTIONS.md` päivitetty; MCP-työkaluja on nyt yhdeksän.
+
+**Käytössä nyt:** paikallinen kanta `services/team-mcp/data/team-mcp.db` (Gitin ohittama, 0600) on luotu tunnisteilla `claude-code` ja `codex`. Tämä työvaihe varattiin ja kuitattiin taulun kautta, ja Codexille jätettiin tauluun viesti käyttöönotosta. Codexin käynnissä olevat chatit näkevät sen vasta, kun ne lukevat päivitetyn `AGENTS.md`:n ja ajavat `start`; taulu ei herätä toista chattia.
+
+**Tarkistukset:** palvelun `npm test` **18/18** (aiemmat 14 + 4 uutta). Uudet: kaksi oikeaa MCP SDK -asiakasta HTTP:n yli ajavat ketjun varaus → este → viesti → luovutus → vastaanotto → valmis, mukaan lukien väärän omistajan ja vastaanottamattoman tehtävän torjunnat; store-testi luovutuksen rajoille ja vanhenemiselle; kaksi komentoriviagenttia samalla kantatiedostolla; commitin etähaaratarkistus. Lisäksi kaksi oikeaa erillistä prosessia väliaikaisella kannalla ja oikealla Gitillä: samanaikaisesta varauksesta samaan tiedostoon toinen sai `FILE_BUSY`, pushaamaton commit torjuttiin, etähaaran commit hyväksyttiin ja vastaanottajan `start` näytti luovutuksen ja viestin. Tässä ajossa `start` näytti myös toisen Claude Code -chatin sillä välin tekemän kytkentäcommitin uusimpana lokina. `node --check`, `git diff --check` läpi. Verkkokaupan testejä ei ajettu, koska sen koodi ei muuttunut.
+
+**Ei tehty / rajat:** palvelinta ei käynnistetty eikä julkaistu, oikeita Claude-/ChatGPT-liittimiä ei kytketty. Codex ei ole vielä käyttänyt taulua. Varaukset ovat edelleen neuvoa antavia. `TYONJAKO.md`:n tiedosto-omistukset ja yhden Git-kirjoittajan sääntö ovat ennallaan.
+
 ## 14.11.2026 — tilauskeskustelu kytketty WhatsApp-kanavaan (Claude Code)
 
 **Käyttäjän pyyntö:** jatka tilauskeskustelun kytkentää, tarkista työpuun aiempi kytkentäehdotus, testaa ja vie GitHubiin. Codex hoitaa Metan lähetyseston ja restartin. Tässä työvaiheessa ei muutettu Meta-asetuksia, käynnistetty palvelinta, lähetetty viestejä tai koskettu `.env`-tiedostoihin ja käynnissä oleviin kantoihin.

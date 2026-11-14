@@ -104,7 +104,7 @@ curl -s localhost:4747/v1/products/search -H 'authorization: Bearer demo-nordic-
 
 ## Tiimin yhteinen MCP
 
-Claude-, ChatGPT- ja muiden MCP-avustajien projektiviestit, tehtävävaraukset ja yhteinen tilannekuva toimivat erillisessä [Team MCP -palvelussa](services/team-mcp/README.md). Palvelulla on oma OAuth-kirjautuminen, avustajakohtaiset tunnukset, pysyvä SQLite-kanta ja Dockerfile. Se ei tarvitse verkkokaupan tuotekatalogia tai malliavaimia eikä käynnistä muiden avustajien keskusteluja automaattisesti. Käyttöönotto vaatii yhden yhteisen HTTPS-hostingin; sitä ei ole vielä valittu tai julkaistu.
+Claude-, ChatGPT- ja muiden MCP-avustajien projektiviestit, tehtävävaraukset ja yhteinen tilannekuva toimivat erillisessä [Team MCP -palvelussa](services/team-mcp/README.md). Palvelulla on oma OAuth-kirjautuminen, avustajakohtaiset tunnukset, pysyvä SQLite-kanta ja Dockerfile. Se ei tarvitse verkkokaupan tuotekatalogia tai malliavaimia eikä käynnistä muiden avustajien keskusteluja automaattisesti. Eri koneiden välinen käyttö vaatii yhden yhteisen HTTPS-hostingin; sitä ei ole vielä valittu tai julkaistu. Samalla koneella työskentelevät avustajat käyttävät samaa taulua jo nyt komentoriviltä ilman palvelinta: varaus, este, luovutus ja valmistuminen on kuvattu [AGENTS.md](AGENTS.md):ssä.
 
 ## WhatsApp-testikanava
 

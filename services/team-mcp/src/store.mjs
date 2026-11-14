@@ -32,7 +32,12 @@ export function openStore(filename, now = Date.now) {
   const member = (id) => { const m = db.prepare('SELECT * FROM members WHERE id=? AND disabled=0 AND key_expires>?').get(id, now()); return m ? { id: m.id, name: m.name, projects: JSON.parse(m.projects), keyExpires: m.key_expires } : null; };
   const access = (actor, project) => { const m = member(actor); if (!m || !m.projects.includes(project)) deny('FORBIDDEN', 'Project not available to this identity'); return m; };
   const event = (project, actor, type, data) => db.prepare('INSERT INTO events(project,actor,type,data,created) VALUES(?,?,?,?,?)').run(project, actor, type, JSON.stringify(data), now());
-  const taskView = ({ paths_json, ...task }) => ({ ...task, requestedResources: JSON.parse(paths_json), resources: db.prepare('SELECT path,expires FROM leases WHERE task=? AND expires>?').all(task.id, now()).map((r) => ({ ...r })), leaseExpired: ['in_progress', 'blocked'].includes(task.status) && task.lease_until <= now() });
+  // Must run inside a transaction. recipient undefined = project broadcast.
+  const notify = (project, actor, recipient, subject, body, requestKey) => {
+    const r = db.prepare('INSERT OR IGNORE INTO messages(project,sender,recipient,subject,body,request_key,created) VALUES(?,?,?,?,?,?,?)').run(project, actor, recipient || null, subject.slice(0, 200), body.slice(0, 12000), requestKey, now());
+    if (r.changes) event(project, actor, 'message_sent', { messageSeq: Number(r.lastInsertRowid), recipient: recipient || 'project' });
+  };
+  const taskView =({ paths_json, ...task }) => ({ ...task, requestedResources: JSON.parse(paths_json), resources: db.prepare('SELECT path,expires FROM leases WHERE task=? AND expires>?').all(task.id, now()).map((r) => ({ ...r })), leaseExpired: ['in_progress', 'blocked'].includes(task.status) && task.lease_until <= now() });
   const store = {
     db, now, tx, member, access, close: () => db.close(),
     addMember(id, name, projects) {
@@ -103,20 +108,43 @@ export function openStore(filename, now = Date.now) {
         return taskView(db.prepare('SELECT * FROM tasks WHERE id=?').get(id));
       });
     },
-    progress(actor, { project, taskId, expectedRevision, status = 'in_progress', note, commitSha, leaseMinutes = 30 }) {
+    progress(actor, { project, taskId, expectedRevision, status = 'in_progress', note, commitSha, leaseMinutes = 30, blockedOn }) {
       access(actor, project);
+      if (blockedOn) access(blockedOn, project);
       return tx(() => {
         const task = db.prepare('SELECT * FROM tasks WHERE id=? AND project=?').get(taskId, project);
         if (!task || task.owner !== actor) deny('FORBIDDEN', 'Only the task owner can update it');
         if (task.revision !== expectedRevision) deny('REVISION_CONFLICT', 'Read the latest task revision before updating');
         if (task.status === 'done' || task.status === 'released') deny('CLOSED_TASK', 'Task is already closed');
+        if (task.status === 'handed_off' && status !== 'released') deny('NOT_ACCEPTED', 'Claim the handed-off task with its taskId before updating it');
         if (status !== 'released' && task.lease_until <= now()) deny('LEASE_EXPIRED', 'Claim the task again before updating');
+        // A blocker must reach the others' inboxes, not only the task list: one message per blocked report.
+        if (status === 'blocked') notify(project, actor, blockedOn, `Este: ${task.title}`, note, `blocked:${taskId}:${task.revision}`);
         const closed = status === 'done' || status === 'released';
         const expiry = closed ? now() : now() + leaseMinutes * 60_000;
         db.prepare('UPDATE tasks SET status=?,note=?,revision=revision+1,lease_until=?,updated=?,commit_sha=? WHERE id=?').run(status, note, expiry, now(), commitSha || task.commit_sha, taskId);
         if (closed) db.prepare('DELETE FROM leases WHERE task=?').run(taskId);
         else db.prepare('UPDATE leases SET expires=? WHERE task=?').run(expiry, taskId);
         event(project, actor, 'task_updated', { taskId, status, commitSha: commitSha || null });
+        return taskView(db.prepare('SELECT * FROM tasks WHERE id=?').get(taskId));
+      });
+    },
+    // Hand a finished part to another member: ownership moves, file reservations are freed and the
+    // recipient gets a direct message in the same transaction. The recipient accepts with claim(taskId).
+    handoff(actor, { project, taskId, expectedRevision, to, note, commitSha, holdMinutes = 120 }) {
+      access(actor, project); access(to, project);
+      if (to === actor) deny('INVALID_RECIPIENT', 'Hand off to another member');
+      return tx(() => {
+        const task = db.prepare('SELECT * FROM tasks WHERE id=? AND project=?').get(taskId, project);
+        if (!task || task.owner !== actor) deny('FORBIDDEN', 'Only the task owner can hand it off');
+        if (task.revision !== expectedRevision) deny('REVISION_CONFLICT', 'Read the latest task revision before updating');
+        if (['done', 'released', 'handed_off'].includes(task.status)) deny('CLOSED_TASK', 'Task is closed or already handed off');
+        const sha = commitSha || task.commit_sha;
+        db.prepare('UPDATE tasks SET owner=?,status=?,note=?,revision=revision+1,lease_until=?,updated=?,commit_sha=? WHERE id=?').run(to, 'handed_off', note, now() + holdMinutes * 60_000, now(), sha, taskId);
+        db.prepare('DELETE FROM leases WHERE task=?').run(taskId);
+        event(project, actor, 'task_handed_off', { taskId, from: actor, to, commitSha: sha || null });
+        const paths = JSON.parse(task.paths_json);
+        notify(project, actor, to, `Luovutus: ${task.title}`, `${note}\n\nTehtävä: ${taskId}\nCommit: ${sha || 'ei commitia, työ ei ole GitHubissa'}${paths.length ? `\nTiedostot: ${paths.join(', ')}` : ''}\nOta vastaan: claim_task taskId=${taskId}`, `handoff:${taskId}:${task.revision}`);
         return taskView(db.prepare('SELECT * FROM tasks WHERE id=?').get(taskId));
       });
     },

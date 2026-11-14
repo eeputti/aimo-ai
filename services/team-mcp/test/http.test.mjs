@@ -28,7 +28,7 @@ async function fixture(t) {
 const data = (r) => { assert.equal(r.isError, undefined, JSON.stringify(r)); return r.structuredContent; };
 test('two real SDK clients discover tools and coordinate via authenticated Streamable HTTP', async (t) => {
   const f = await fixture(t); const a = await f.connect(f.alice); const b = await f.connect(f.bob);
-  assert.equal((await a.listTools()).tools.length, 8);
+  assert.equal((await a.listTools()).tools.length, 9);
   assert.equal(data(await a.callTool({ name: 'whoami', arguments: {} })).id, 'alice-gpt');
   data(await a.callTool({ name: 'send_message', arguments: { project: 'aimo-ai', recipient: 'bob-claude', subject: 'Checkout API', body: 'Please read commit abcdef123', requestKey: 'http-message-1', sender: 'pretend' } }));
   const inbox = data(await b.callTool({ name: 'read_messages', arguments: { project: 'aimo-ai' } }));
@@ -39,6 +39,37 @@ test('two real SDK clients discover tools and coordinate via authenticated Strea
   data(await a.callTool({ name: 'report_progress', arguments: { project: 'aimo-ai', taskId: task.id, expectedRevision: task.revision, status: 'done', note: 'Fixed', commitSha: 'abcdef123' } }));
   assert.equal(data(await b.callTool({ name: 'get_project_state', arguments: { project: 'aimo-ai' } })).tasks[0].commit_sha, 'abcdef123');
   const denied = await b.callTool({ name: 'get_project_state', arguments: { project: 'private' } }); assert.equal(denied.isError, true);
+});
+test('two SDK clients run the whole cooperation: reserve, report a blocker, hand off, accept and finish', async (t) => {
+  const f = await fixture(t); const a = await f.connect(f.alice); const b = await f.connect(f.bob); const p = 'aimo-ai';
+  const call = async (c, name, args) => data(await c.callTool({ name, arguments: { project: p, ...args } }));
+  const task = await call(a, 'claim_task', { title: 'Ordering wiring', resources: ['server/whatsapp'] });
+  // Blocker: the member who can unblock gets it in the inbox, nobody else's reservation changes.
+  const blocked = await call(a, 'report_progress', { taskId: task.id, expectedRevision: task.revision, status: 'blocked', note: 'Need the restart window', blockedOn: 'bob-claude' });
+  assert.equal(blocked.status, 'blocked'); assert.equal(blocked.resources.length, 1);
+  let inbox = await call(b, 'read_messages', {});
+  assert.equal(inbox.messages.length, 1); assert.match(inbox.messages[0].subject, /^Este: Ordering wiring/); assert.equal(inbox.messages[0].recipient, 'bob-claude');
+  await call(b, 'ack_messages', { through: inbox.nextCursor });
+  assert.equal((await call(b, 'get_project_state', {})).tasks[0].status, 'blocked');
+  const stillBusy = await b.callTool({ name: 'claim_task', arguments: { project: p, title: 'Overlap', resources: ['server/whatsapp/channel.mjs'] } });
+  assert.match(stillBusy.content[0].text, /FILE_BUSY/);
+  // Handoff: ownership and the commit move, files are freed, the recipient is told.
+  const notMine = await b.callTool({ name: 'handoff_task', arguments: { project: p, taskId: task.id, expectedRevision: blocked.revision, to: 'alice-gpt', note: 'x' } });
+  assert.match(notMine.content[0].text, /FORBIDDEN/);
+  const handed = await call(a, 'handoff_task', { taskId: task.id, expectedRevision: blocked.revision, to: 'bob-claude', note: 'Wiring done, 20/20 tests. Restart remains.', commitSha: 'abcdef1234' });
+  assert.equal(handed.owner, 'bob-claude'); assert.equal(handed.status, 'handed_off'); assert.deepEqual(handed.resources, []);
+  inbox = await call(b, 'read_messages', {});
+  assert.equal(inbox.messages.length, 1); assert.match(inbox.messages[0].body, /abcdef1234/); assert.match(inbox.messages[0].body, new RegExp(task.id));
+  const late = await a.callTool({ name: 'report_progress', arguments: { project: p, taskId: task.id, expectedRevision: handed.revision, note: 'Still mine?' } });
+  assert.match(late.content[0].text, /FORBIDDEN/);
+  const early = await b.callTool({ name: 'report_progress', arguments: { project: p, taskId: task.id, expectedRevision: handed.revision, status: 'done', note: 'Skip accept' } });
+  assert.match(early.content[0].text, /NOT_ACCEPTED/);
+  const accepted = await call(b, 'claim_task', { taskId: task.id });
+  assert.equal(accepted.status, 'in_progress'); assert.equal(accepted.resources[0].path, 'server/whatsapp'); assert.equal(accepted.commit_sha, 'abcdef1234');
+  const done = await call(b, 'report_progress', { taskId: task.id, expectedRevision: accepted.revision, status: 'done', note: 'Restarted and verified', commitSha: '1234567abc' });
+  const state = await call(a, 'get_project_state', {});
+  assert.equal(state.tasks[0].status, 'done'); assert.equal(state.tasks[0].commit_sha, '1234567abc'); assert.equal(done.resources.length, 0);
+  assert.deepEqual(state.events.map((e) => e.type).reverse(), ['task_claimed', 'task_updated', 'task_handed_off', 'task_claimed', 'task_updated']);
 });
 test('anonymous callers see OAuth discovery, not tools or member data; host and origin are enforced', async (t) => {
   const f = await fixture(t);

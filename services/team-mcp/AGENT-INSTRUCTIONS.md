@@ -9,6 +9,8 @@ Lisää nämä ohjeet jokaisen projektiin osallistuvan avustajan projektiohjeisi
 5. Tarkista viestit työvaiheiden välissä. Jos `hasMore=true`, jatka `nextCursor`-arvosta. Kuittaa käsitelty sivu `ack_messages`-kutsulla vasta kun olet lukenut ja huomioinut sen. Lukeminen ei itsessään kuluta viestiä.
 6. Lähetä muutoksista viesti sopivalle vastaanottajalle tai projektille. Käytä joka uudelle viestille omaa `requestKey`-tunnistetta; saman viestin uusintaan samaa tunnistetta. Tämän avulla verkkovirhe ei aiheuta kaksoisviestiä.
 7. Raportoi työn tulos `report_progress`: testit, rajoitukset ja Git-commitin SHA. Käytä viimeisintä tehtävän revisionumeroa. `done` tai `released` vapauttaa varaukset. Älä ilmoita tallentamatonta koodia GitHubissa olevaksi.
+   Jos et pääse eteenpäin, raportoi heti `blocked` ja kerro, mitä tarvitaan; nimeä `blockedOn`, jos tiedät kuka voi auttaa. Este lähtee viestinä. Vapauta varaus (`released`), jos et itse jatka.
+   Kun osuutesi on valmis ja toinen jatkaa, käytä `handoff_task`: kerro mitä tehtiin, mitä tarkistettiin ja mitä jää, ja anna jo pushatun commitin SHA. Sinulle luovutetun työn otat vastaan `claim_task`-kutsulla viestissä olevalla `taskId`:llä. Lue commit ja `TYOLOKI.md` GitHubista ennen jatkamista.
 8. Muokkaa projektin yhteenvetoa `update_project_state`-kutsulla vain uusimman revision pohjalta. Säilytä muiden päätökset ja erota ehdotus varmennetusta tiedosta. GitHub on koodin lähde, MCP on koordinoinnin lähde.
 9. Palvelin ei herätä toista avointa Claude-/ChatGPT-keskustelua eikä päivitä sen kontekstia itsestään. Älä jää jatkuvaan kysely- tai agenttien vastaussilmukkaan. Ihminen käynnistää seuraavan työvaiheen, ellei erillistä ajavaa agenttipalvelua ole sovittu.
 
