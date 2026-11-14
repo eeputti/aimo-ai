@@ -1,12 +1,14 @@
 // Static homepage reference, captured from Toimitustukku on 14 November 2026.
-// Prices, cart badges and stock labels are presentation data. No order API is called.
+// Prices and stock labels are presentation data. Basket additions do not place orders.
+const cardProducts = new Map();
 const icon = (name) => `<span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/${name}.svg')"></span>`;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const eur = (value) => value.toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 
 function product(p) {
+  cardProducts.set(String(p.id), { ...p });
   const tags = [p.novelty ? '<span class="product-tag novelty">Uutuus</span>' : '', p.oldPrice ? '<span class="product-tag">Tarjous</span>' : '', p.seasonal ? '<span class="product-tag seasonal">Kausituote</span>' : ''].join('');
-  return `<article class="product-card">
+  return `<article class="product-card" data-cart-product="${esc(p.id)}">
     ${tags ? `<div class="product-tags">${tags}</div>` : ''}
     <div class="card-actions"><button type="button" class="round-icon" aria-label="Lisää tilauspohjalle">${icon('file-plus')}</button><button type="button" class="round-icon" aria-label="Lisää suosikiksi">${icon('star')}</button></div>
     <div class="product-picture">${p.image ? `<img src="${esc(p.image)}" alt="${esc(p.name)}" loading="lazy" width="176" height="132">` : ''}</div>
@@ -62,7 +64,28 @@ async function render() {
     ${feature('recipes', 'Tuo reseptisi Minun Aimoon', 'Ihastu katelaskuriin ja tilaa tuotteet helposti!', 'Kokeile heti', 'summer reverse')}`;
 }
 
-document.addEventListener('click', (event) => {
+document.addEventListener('click', async (event) => {
+  const button = event.target.closest('.product-card .cart-button');
+  if (button) {
+    const p = cardProducts.get(button.closest('[data-cart-product]').dataset.cartProduct);
+    let status = button.closest('.product-card').querySelector('[data-cart-feedback]');
+    if (!status) {
+      status = document.createElement('p');
+      status.dataset.cartFeedback = '';
+      status.setAttribute('role', 'status');
+      button.closest('.product-card').append(status);
+    }
+    if (p?.unavailable) { status.textContent = 'Tuote ei ole saatavilla. Valitse toinen tuote.'; return; }
+    button.disabled = true;
+    try {
+      if (!window.aimoCart || !p) throw new Error('Ostoskori ei ole käytettävissä. Lataa sivu uudelleen.');
+      await window.aimoCart.ready;
+      await window.aimoCart.add(p, p.step || 1, window.aimoCart.get().selectedDate);
+      status.textContent = 'Lisätty ostoskoriin.';
+    } catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+    return;
+  }
   const next = event.target.closest('.rail-next');
   if (next) { const rail = next.parentElement.querySelector('.product-rail'); rail.scrollBy({ left: 280, behavior: 'smooth' }); }
   if (event.target.closest('.close-chat')) document.querySelector('.chat-intro').hidden = true;

@@ -17,6 +17,37 @@ async function fixture(storage = new Map(), { reference = true } = {}) {
   return { cart: window.aimoCart, requests, events, storage };
 }
 
+test('product card clicks add to the selected basket, merge and persist; unavailable items stay out', async () => {
+  const f = await fixture(new Map(), { reference: false });
+  f.cart.select('2026-11-20');
+  let click;
+  const context = vm.createContext({ window: { aimoCart: f.cart }, document: {
+    querySelector: () => null,
+    addEventListener: (name, handler) => { if (name === 'click') click = handler; },
+    createElement: () => ({ dataset: {}, setAttribute() {} }),
+  } });
+  const moduleSource = fs.readFileSync(new URL('../public/storefront.js', import.meta.url), 'utf8').replace('export { product, rail };', '');
+  vm.runInContext(moduleSource, context);
+  const html = vm.runInContext('product({ id: "card-test", name: "Testituote", price: 2.5, unit: "kpl" })', context);
+  assert.match(html, /data-cart-product="card-test"/);
+  let feedback;
+  const card = { dataset: { cartProduct: 'card-test' }, querySelector: () => feedback, append: (node) => { feedback = node; } };
+  const button = { closest: () => card };
+  const event = { target: { closest: () => button } };
+  await click(event); await click(event);
+  assert.equal(f.cart.lines()[0].qty, 2);
+  assert.equal(f.cart.get().selectedDate, '2026-11-20');
+  assert.equal(feedback.textContent, 'Lisätty ostoskoriin.');
+  assert.equal(button.disabled, false);
+  const reloaded = await fixture(f.storage, { reference: false });
+  assert.equal(reloaded.cart.lines()[0].qty, 2);
+  vm.runInContext('product({ id: "unavailable", name: "Loppunut", price: 1, unavailable: true })', context);
+  card.dataset.cartProduct = 'unavailable';
+  await click(event);
+  assert.equal(f.cart.lines().length, 1);
+  assert.match(feedback.textContent, /ei ole saatavilla/);
+});
+
 test('reference basket reproduces the real cart totals and never fetches agent orders', async () => {
   const f = await fixture(); const t = f.cart.totals();
   assert.equal(t.count, 10); assert.equal(t.net, 1534.73);

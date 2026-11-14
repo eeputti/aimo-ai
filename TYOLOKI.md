@@ -513,3 +513,9 @@ GitHubin `main` ja paikallinen `HEAD` olivat etäpäivityksen jälkeen samassa c
 - `.claude/launch.json` sisältää aiemman Claude-istunnon väliaikaiseen hakemistoon osoittavan `GATEWAY_DB`-polun portin 4751 testipalvelimelle. Tarkista tai vaihda polku ennen asetuksen käyttöä toisella koneella tai uuden istunnon jälkeen.
 - `SUUNNITELMA.md` sisältää aiempien työvaiheiden havaintoja ja avoimia kohtia; varmista niiden ajantasaisuus koodista ennen uuden korjauksen aloittamista.
 - Kun jatkat Claude Codessa, lue `CLAUDE.md`, tämä loki ja viimeisin commit. Jos käytät eri kloonia, päivitä ensin puhdas työpuu komennolla `git pull --ff-only`.
+
+## 14.11.2026 — etusivun tuotekorttien ostoskori (Codex)
+
+- Käyttäjä ei voinut lisätä tuotteita ostoskoriin: storefront.js:n tuotekorttien painikkeilta puuttui tapahtumankäsittely. Kytketty kortit olemassa olevaan aimoCart-koriin valitulle toimituspäivälle, lisätty palaute ja virheilmoitus. Saatavuudeltaan puuttuvaa tuotetta ei lisätä. Sama komponentti palvelee korin suosituksia. Ei tilauskutsuja eikä demokannan nollausta.
+- Lisätty regressiotesti kortin painallukselle, toistuvalle lisäykselle, valitulle päivälle, tallennuksen säilymiselle ja puuttuvalle saatavuudelle. Ostoskoritestit 10/10 läpi. Tuotehaun 9 tarkistusta läpi, mutta testitiedoston loppusiivous epäonnistuu EPERM-virheeseen myös oikeuslaajennuksella. Syntaksi ja git diff --check läpi. HTTP-etusivu vastaa 200; oikeaa selainta ei testattu.
+- Ennen työtä main d20e017, kuudessa public-tiedostossa aiempia muutoksia ja .vscode/ uutena. Ne säilytetään eikä sisällytetä tähän commitiin. GitHubin main on edellä (fetch: 49a0827); työpuuta ei päivitetty keskeneräisten muutosten päälle. Push tarkistetaan erikseen, ja mahdollinen fast-forward-este ilmoitetaan käyttäjälle.
