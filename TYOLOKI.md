@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsApp-token, testivastaanottaja, testilähetys ja profiililogo valmiit (Codex)
+
+**Varmennettu tulos:** Metan valtuutus valmistui yhdelle Test Messaging Account -tilille. Käyttäjän hyväksymä API-token tallennettiin paikalliseen `.env`:iin ja luettiin takaisin täsmällisen tallennuksen tarkistamiseksi; tiedoston oikeudet 0600. Olemassa olevat muut asetukset säilyivät. Käyttäjän antama oma numero lisättiin Metan testivastaanottajaksi, Meta lähetti WhatsApp-vahvistuskoodin ja käyttäjä suoritti vahvistuksen. Käyttöliittymä näyttää vahvistetun vastaanottajan. Numeroita, koodia tai tokenia ei kirjata repoon.
+
+- Valittiin Metan **Hello World** -viestipohja oletuksena tarjotun tilausvahvistuksen tilalle. Käyttöliittymä kuittasi lähetyksen Completed / Message sent. Tämä todistaa Metan hyväksymän testilähetyksen; saapumista vastaanottajan puhelimeen, oman webhookin toimintaa tai apurin vastausta ei vielä varmennettu.
+- Käyttäjän pyytämä Valio Aimo -logo asetettiin **WhatsApp-testinumeron profiilikuvaksi** Graph API:n kautta. Lähde on projektin `public/storefront-assets/logo.svg`: se renderöitiin valkoiselle 1024 × 1024 -pohjalle alkuperäinen logo säilyttäen, tarkistettiin kuvana ja ladattiin Metan resumable upload -rajapintaan. Profiilin kirjoitus onnistui ja kuvan URL varmistettiin erillisellä profiilin takaisinluvulla. Väliaikainen PNG ja latausistunnon tiedot ovat omassa `/private/tmp/aimo-whatsapp-profile-*`-kansiossa.
+- Käyttäjällä ei ole erillistä apurin numeroa/SIM:iä. Selitetty, että viestit kulkevat Metasta palvelimelle; testinumero toimii nykyisessä rajatussa kokeilussa. Kaikille avoin käyttöönotto edellyttää omaa numeroa, jonka omistus voidaan vahvistaa. Uutta numeroa ei hankittu.
+
+**Avoin seuraava vaihe:** `.env`:stä puuttuvat vielä App Secret, webhookin verify token, tukiyhteys ja nykyisen vain lukevan apurin MCP-osoite/-token. Julkista HTTPS-webhookia ei ole kytketty eikä palvelinta käynnistetty tässä työvaiheessa. Meta-sovelluksen nimi on Valio Aimo Tilausapuri; testinumeron asiakkaalle näkyvää nimeä tai koko apurin suomenkielistä toimintaa ei vielä varmennettu. Testitoken on lyhytaikainen, pidemmän käytön tunnus tehdään erikseen.
+
+**Tarkistukset:** Metan vastaanottajavahvistus ja testilähetyksen kuittaus luettu selaimesta; tokenin paikallinen tallennus, `.env`:n Git-ohitus ja tiedosto-oikeudet tarkistettu. Profiilikuva varmennettu oikealla Meta-API:n kirjoituksella ja takaisinluvulla. Dokumenttidiff ja `git diff --check` läpi; sovelluskoodi säilyi ennallaan, joten ohjelmistotestejä ei ajettu. Muiden samanaikaisesti valmistuneet commitit `01b6e8a`, `49a0827` ja `d218818` säilytettiin; niiden toteutuksia ei kytketty tähän kanavaan tässä vaiheessa. Ei Valio-/mallikutsuja tai tilauksia.
+
 ## 14.11.2026 — Meta-testinumero luotu, tavoitteena myöhemmin kaikille avoin numero (Codex)
 
 **Varmennettu tulos:** käyttäjä hyväksyi erikseen WhatsApp Business Platform / Cloud API -ehdot. Metan Step 1. Try it out näyttää Claim a WhatsApp test number Completed, Phone Number ID `1445585741976990` ja Messaging account ID `1045787755199877`. Tekninen numerotunniste sekä sivun esimerkin Graph API -versio `v25.0` tallennettiin olemassa olevaan paikalliseen, Gitin ohittamaan `.env`:iin muuttamatta sen muita asetuksia. Profiilikuvaa ei ole asetettu, testiviestiä ei ole lähetetty eikä WhatsApp-agentin päästä päähän -toimivuutta varmennettu.

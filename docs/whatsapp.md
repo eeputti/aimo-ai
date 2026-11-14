@@ -7,7 +7,7 @@ WhatsApp on nykyisen Tilausapurin toinen viestikanava: sama malliasiakas ja sama
 ## 1. Meta ja testinumero
 
 1. Luo [Meta App Dashboardissa](https://developers.facebook.com/apps) sovellus WhatsApp-käyttötapauksella ja yhdistä yritysportfolion WhatsApp Business -tiliin.
-2. Avaa **API Setup**, valitse testinumero ja lisää testiin osallistuvat vastaanottajanumerot Metan ohjeiden mukaan. Lähetä ensin Metan oma testiviesti ja vastaa siihen.
+2. Avaa **API Setup** tai uuden näkymän **Customize → Basic setup → Step 1. Try it out**. Valitse testinumero, lisää omat testivastaanottajat numerolistaan ja vahvista ne Metan lähettämillä koodeilla. Testinumerolta voi lähettää enintään viidelle vahvistetulle vastaanottajalle. Kaikille avoimeen demoon tarvitaan myöhemmin oma yritysnumero, jonka omistus voidaan vahvistaa SMS:llä tai puhelulla. Valitse yhteystestiksi **Hello World**, lähetä se ja vastaa siihen omassa WhatsAppissasi. Apurin viestit kulkevat Metasta palvelimelle; apurilla ei tarvitse olla omaa fyysistä puhelinta.
 3. Tallenna **Phone number ID** (tekninen tunniste, ei puhelinnumero) ja käyttöoikeustoken palvelimen salaisiin ympäristöasetuksiin. Testin tilapäinen token vanhenee; pidempään käyttöön luo system user -token tarvittavin `whatsapp_business_messaging`-oikeuksin. Tilin/numeron hallinta voi vaatia lisäksi `whatsapp_business_management`-oikeuden.
 4. Ota sovelluksen **App Secret** asetuksiin ja luo erillinen satunnainen webhookin verify token, esimerkiksi `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
 
