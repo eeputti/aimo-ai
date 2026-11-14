@@ -7,12 +7,13 @@
   if (window.aimoAsk) return;
   const HANDOFF_KEY = 'aimo.ask';
   const intentReady = import('/aimo-request-intent.js').catch(() => null);
+  const quantityReady = import('/aimo-search-quantity.js');
   const deliveryReady = import('/delivery-date.js');
   let recipeContext = null;
   const storefrontCart = window.aimoCart || null;
   const PLACEHOLDER = 'Hae tuotteita tai kerro mitä tarvitset';
   const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  const num = (n) => String(+(+n).toFixed(2)).replace('.', ',');
+  const num = (n) => String(+(+n).toFixed(4)).replace('.', ',');
   const money = (n) => `${(+n).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
   const svg = (d, size = 20, fill = false) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" ${fill ? 'fill="currentColor"' : 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'} aria-hidden="true">${d}</svg>`;
   const I = {
@@ -56,7 +57,6 @@
           <input class="ask-q" type="text" aria-label="Kirjoita mitä tarvitset" placeholder="Kirjoita mitä tarvitset, esim. 1000 litraa maitoa maanantaiksi">
           <button type="button" class="ask-x" data-close="1" aria-label="Sulje haku">${I.close}</button>
         </form></div>
-        <p class="ask-intro">Kerro tarve, tarkista ostoskori ja hyväksy tarvittavat muutokset.</p>
         ${storefrontCart ? '<label class="ask-delivery">Toimituspäivä<input class="ask-delivery-input" type="date" required aria-label="Haun toimituspäivä"></label>' : ''}
         <div class="ask-body">
           <aside class="ask-side">
@@ -145,16 +145,16 @@
     const ok = card?.status === 'ok' && card.total > 0;
     const all = expanded.has(i);
     const list = (card?.list || card?.top || []).slice(0, all ? 80 : opt.max);
-    const fixed = [...(it.claims || []).map((c) => CLAIM[c] || c), it.brand, it.countryOfOrigin === 'fi' ? 'kotimainen' : null].filter(Boolean).filter((c) => !patches.some((p) => p.item === i && p.label.toLowerCase() === String(c).toLowerCase()));
-    const on = patches.map((p, k) => (p.item === i ? `<button type="button" class="ask-filter on" data-unfilter="${k}" aria-pressed="true">${I.check}${esc(p.label)}</button>` : '')).join('');
+    const fixed = [...(it.claims || []).map((c) => CLAIM[c] || c), it.brand, it.countryOfOrigin === 'fi' ? 'kotimainen' : null].filter(Boolean).filter((c) => !patches.some((p) => p.item === i && p.label?.toLowerCase() === String(c).toLowerCase()));
+    const on = patches.map((p, k) => (p.item === i && p.label ? `<button type="button" class="ask-filter on" data-unfilter="${k}" aria-pressed="true">${I.check}${esc(p.label)}</button>` : '')).join('');
     const more = (card?.chips || []).filter((c) => !patches.some((p) => p.item === i && p.label === c.label)).map((c) => `<button type="button" class="ask-filter" data-filter="${i}:${esc(c.label)}" aria-pressed="false">${esc(c.label)}${c.matches == null ? '' : `<small>${c.matches}</small>`}</button>`).join('');
-    const count = ok ? (card.total === 1 ? '1 tilattava tuote' : `${card.total} tilattavaa tuotetta`) : esc(card?.reason?.fi || 'Ei sopivia tuotteita');
-    return `<article class="ask-need${ok ? '' : ' miss'}" data-need="${i}">
+    const term = it.productTerm || it.label || it.raw;
+    return `<article class="ask-need" data-need="${i}">
       <div class="ask-nhead">
-        <div class="ask-line">${it.quantity ? `<span class="ask-qty">${num(it.quantity.value)} ${UNIT[it.quantity.unit] || ''}</span>` : opt.edit ? `<button type="button" class="ask-plus" data-ask="qty" data-item="${i}">${I.plus}Lisää määrä</button>` : ''}<b>${esc(it.productTerm || it.label || it.raw)}</b>
-          <span class="ask-count"><i class="ask-dot${ok ? '' : ' no'}"></i>${count}</span></div>
+        <div class="ask-line"><b>${esc(term)}</b>${opt.edit ? `<button type="button" class="ask-plus${it.quantity ? ' ask-quantity' : ''}" data-ask="qty" data-item="${i}" aria-label="${it.quantity ? 'Muuta' : 'Lisää'} tuotteen ${esc(term)} määrä">${it.quantity ? `${num(it.quantity.value)} ${it.quantity.unit === 'PCS' ? it.quantity.basis === 'items' ? 'kpl' : 'pakkausta' : UNIT[it.quantity.unit]}<small>Muuta</small>` : `${I.plus}Lisää määrä`}</button>` : it.quantity ? `<span class="ask-qty">${num(it.quantity.value)} ${UNIT[it.quantity.unit] || ''}</span>` : ''}</div>
         ${ok && (card.list || card.top || []).length > opt.max ? `<button type="button" class="ask-all" data-all="${i}">${all ? 'Näytä vähemmän' : `Katso hakutulokset${I.go}`}</button>` : ''}
       </div>
+      ${!ok ? `<p class="ask-no-products">Kokeile toista hakusanaa tai toimituspäivää.</p>` : ''}
       ${fixed.length || on || more ? `<div class="ask-chips">${fixed.map((c) => `<span class="ask-chip">${I.check}${esc(c)}</span>`).join('')}${on}${more}</div>` : ''}
       ${list.length ? `<div class="ask-rail${all ? ' all' : ''}">
         <button type="button" class="ask-arrow prev" data-rail="-1" aria-label="Edelliset tuotteet">${I.left}</button>
@@ -171,20 +171,25 @@
     const u = r.understood || {}; const items = u.items || [];
     orderable = items.length > 0 && !r.handoff && !u.unparsed?.length && items.every((it, i) => it.quantity && r.cards?.[i]?.status === 'ok' && r.cards[i].list.length > 0);
     last = r;
+    if (!items.length) {
+      main.innerHTML = '<div class="ask-empty"><p>Kokeile tuotteen nimeä, esimerkiksi maito.</p></div>';
+      return;
+    }
     const edit = !override && !r.recipe;
     const max = items.length > 2 ? 4 : 12; // reseptissä monta riviä: vähemmän tuotteita / rivi, jotta hintakyselyt pysyvät kurissa
-    const notes = (u.assumptions || []).filter((a) => !['QUANTITY_MISSING', 'DATE_MISSING'].includes(a.code)).map((a) => a.fi).filter(Boolean);
+    const notes = (u.assumptions || []).filter((a) => !['QUANTITY_MISSING', 'DATE_MISSING', 'UNKNOWN_WORD'].includes(a.code)).map((a) => a.fi).filter(Boolean);
+    const count = new Set((r.cards || []).flatMap((card) => (card.list || card.top || []).map((p) => p.id))).size;
     main.innerHTML = `
       <div class="ask-head">
-        ${override || r.recipe?.name ? `<h2>${override ? esc(override.title) : `${esc(r.recipe.name)}, ${r.recipe.portions} annosta`}</h2>` : ''}
-        ${r.deliveryDate ? `<span class="ask-date">${I.cal}${day(r.deliveryDate)}${r.dateAssumed ? ' (valittu toimituspäivä)' : ''}</span>` : edit && items.length ? `<span class="ask-dayadd"><button type="button" class="ask-plus" data-ask="date">${I.cal}Lisää toimituspäivä</button></span>` : ''}
+        <div class="ask-heading">${override || r.recipe?.name ? `<h2>${override ? esc(override.title) : `${esc(r.recipe.name)}, ${r.recipe.portions} annosta`}</h2>` : ''}
+          ${count ? `<p class="ask-count"><i class="ask-dot"></i>Löysin sinulle ${count === 1 ? '1 tuotteen' : `${count} tuotetta`}.</p>` : ''}</div>
+        ${!storefrontCart && r.deliveryDate ? `<span class="ask-date">${I.cal}${day(r.deliveryDate)}</span>` : !storefrontCart && edit ? `<span class="ask-dayadd"><button type="button" class="ask-plus" data-ask="date">${I.cal}Lisää toimituspäivä</button></span>` : ''}
         ${override ? `<span class="ask-aitag">${I.spark(14)}Tekoälyn ehdotus, tarkista tuotteet</span>` : ''}
       </div>
-      ${items.length ? `<div class="ask-needs${r.recipe ? ' compact' : ''}">${items.map((it, i) => need(it, r.cards?.[i], i, { max, edit })).join('')}</div>` : `<p class="ask-warn">${esc(r.summary || 'En löytänyt tuotepyyntöä.')}</p>`}
-      ${u.unparsed?.length ? `<p class="ask-warn">En ymmärtänyt: ${esc(u.unparsed.join(', '))}</p>` : ''}
+      <div class="ask-needs${r.recipe ? ' compact' : ''}">${items.map((it, i) => need(it, r.cards?.[i], i, { max, edit })).join('')}</div>
       ${notes.length ? `<ul class="ask-notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
       <div class="ask-foot">
-        <span>${storefrontCart ? (orderable ? 'Hinnat ilman arvonlisäveroa. Kokoan jokaiselle tarpeelle sopivan tuotteen. Tarkista valinnat ostoskorissa.' : 'Voit lisätä tuotteita yksitellen. Lisää määrät ja tarkista puuttuvat tarpeet ennen koko korin valmistelua.') : r.gateway?.requestQuote ? 'Hinta ilman arvonlisäveroa. Tarjouksen ja hyväksynnän hoitaa agentti.' : items.length ? 'Lisää määrä, niin agentti voi pyytää tarjouksen.' : ''}</span>
+        <span>${storefrontCart ? 'Hinnat ilman arvonlisäveroa.' : r.gateway?.requestQuote ? 'Hinta ilman arvonlisäveroa. Tarjouksen ja hyväksynnän hoitaa agentti.' : ''}</span>
         <button type="button" class="ask-go"${orderable ? '' : ' disabled'}>${storefrontCart ? I.cart + 'Kokoa ostoskori' : I.truck + 'Tilaa agentin kautta'}</button>
       </div>`;
   }
@@ -310,12 +315,18 @@
       try {
         const entries = last.cards.filter((_, i) => !selectedNeeds.has(i)).map((c) => c.list[0]);
         if (entries.length) await addProducts(entries, last.deliveryDate);
+        await close();
         location.href = '/cart.html#tarkista';
       } catch (e) { button.disabled = false; main.insertAdjacentHTML('beforeend', `<p class="ask-warn">${esc(e.message)}</p>`); }
       return;
     }
     const text = sent(); if (!text) return;
-    try { sessionStorage.setItem(HANDOFF_KEY, text); } catch { /* ilman tallennusta konsoli avautuu tyhjänä */ }
+    try {
+      const { quantityLabel } = await quantityReady;
+      const refinements = patches.map((p) => ({ ...p, label: p.label || (p.patch.quantity ? `${num(p.patch.quantity.value)} ${quantityLabel(p.patch.quantity)}` : 'Tarkennus') }));
+      sessionStorage.setItem(`${HANDOFF_KEY}.patches`, JSON.stringify({ text, patches: refinements }));
+      sessionStorage.setItem(HANDOFF_KEY, text);
+    } catch { /* ilman tallennusta konsoli avautuu tyhjänä */ }
     location.href = '/agent.html';
   };
 
@@ -508,7 +519,30 @@
   pinput.addEventListener('change', () => setPortions(parseInt(pinput.value, 10)));
   pinput.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); pinput.blur(); } if (ev.key === 'ArrowUp' || ev.key === 'ArrowDown') { ev.preventDefault(); setPortions(bump(portions, ev.key === 'ArrowUp' ? 1 : -1)); } });
   pinput.addEventListener('focus', () => pinput.select());
-  root.addEventListener('click', (ev) => {
+  function saveQuantity(box) {
+    const input = box.querySelector('input');
+    const value = Number(input.value.trim().replace(',', '.'));
+    if (!Number.isFinite(value) || value <= 0 || value > 100000) {
+      input.setCustomValidity('Anna määrä, joka on suurempi kuin 0 ja enintään 100 000.');
+      input.reportValidity(); input.focus(); return;
+    }
+    const [unit, basis] = box.querySelector('select').value.split(':');
+    const item = +box.dataset.item;
+    patches = patches.filter((p) => !(p.item === item && p.patch.quantity));
+    patches.push({ item, patch: { quantity: { value, unit, ...(basis ? { basis } : {}) } } });
+    selectedNeeds.delete(item);
+    search();
+  }
+  root.addEventListener('input', (ev) => {
+    if (ev.target.closest('.ask-qed') && ev.target.matches('input')) ev.target.setCustomValidity('');
+  });
+  root.addEventListener('keydown', (ev) => {
+    const box = ev.target.closest('.ask-qed');
+    if (!box) return;
+    if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); saveQuantity(box); }
+    if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); render(last); main.querySelector(`[data-item="${box.dataset.item}"]`)?.focus(); }
+  });
+  root.addEventListener('click', async (ev) => {
     if (ev.target.closest('[data-close]')) { close(); return; }
     if (ev.target.closest('.ask-go')) { toAgent(); return; }
     const hit = (sel) => ev.target.closest(sel);
@@ -524,15 +558,26 @@
     if (rail) { const t = rail.parentElement.querySelector('.ask-tiles'); t.scrollBy({ left: +rail.dataset.rail * Math.max(220, t.clientWidth * 0.8), behavior: still() ? 'auto' : 'smooth' }); return; }
     const dayBtn = hit('[data-day]');
     if (dayBtn) { setText(`${q.value.trim()} ${dayBtn.dataset.day}`); return; }
-    const unit = hit('[data-unit]');
-    if (unit) { // määrä kirjoitetaan hakuun tuotesanan eteen, jolloin se näkyy ja on muokattavissa kuten käsin kirjoitettu
-      const box = unit.closest('.ask-qed'); const n = String(box.querySelector('input').value).replace(',', '.'); if (!(+n > 0)) { box.querySelector('input').focus(); return; }
-      const term = box.dataset.term; const text = q.value.trim(); const at = term ? text.toLowerCase().indexOf(term.toLowerCase()) : -1; const amount = `${n.replace('.', ',')} ${unit.dataset.unit}`;
-      setText(at >= 0 ? `${text.slice(0, at)}${amount} ${text.slice(at)}` : `${amount} ${text}`); return;
-    }
+    const save = hit('[data-save-quantity]');
+    if (save) { saveQuantity(save.closest('.ask-qed')); return; }
+    const cancel = hit('[data-cancel-quantity]');
+    if (cancel) { const item = cancel.closest('.ask-qed').dataset.item; render(last); main.querySelector(`[data-item="${item}"]`)?.focus(); return; }
     const ask = hit('[data-ask]');
     if (ask?.dataset.ask === 'date') { ask.parentElement.innerHTML = `<span class="ask-pills">${dayPills()}</span>`; return; }
-    if (ask?.dataset.ask === 'qty') { const it = last?.understood?.items?.[+ask.dataset.item]; const span = document.createElement('span'); span.className = 'ask-qed'; span.dataset.term = it?.productTerm || ''; span.innerHTML = '<input type="text" inputmode="decimal" value="10" aria-label="Määrä"><button type="button" data-unit="l">l</button><button type="button" data-unit="kg">kg</button><button type="button" data-unit="kpl">kpl</button>'; ask.replaceWith(span); const inp = span.querySelector('input'); inp.focus(); inp.select(); return; }
+    if (ask?.dataset.ask === 'qty') {
+      const result = last; const item = +ask.dataset.item; const it = result?.understood?.items?.[item];
+      if (!it) return;
+      const { quantityChoices, quantityLabel } = await quantityReady;
+      if (last !== result || !ask.isConnected) return;
+      const { hint, options } = quantityChoices(it, result.cards?.[item]?.list || []);
+      const key = (q) => `${q.unit}${q.basis ? `:${q.basis}` : q.unit === 'PCS' ? ':sales' : ''}`;
+      const current = it.quantity;
+      if (current && !options.some((o) => key(o) === key(current))) options.push({ ...current, label: quantityLabel(current) });
+      const selected = current ? key(current) : key(options[0]);
+      const box = document.createElement('div'); box.className = 'ask-qed'; box.dataset.item = item;
+      box.innerHTML = `<p class="ask-quantity-hint" id="ask-quantity-hint-${item}">${esc(hint)}</p><div class="ask-quantity-fields"><input type="text" inputmode="decimal" maxlength="12" value="${current ? num(current.value) : ''}" placeholder="Määrä" aria-label="Määrä tuotteelle ${esc(it.productTerm)}" aria-describedby="ask-quantity-hint-${item}"><select aria-label="Määrän yksikkö tuotteelle ${esc(it.productTerm)}">${options.map((o) => `<option value="${key(o)}"${key(o) === selected ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select><button type="button" data-save-quantity>Tallenna</button><button type="button" class="ask-quantity-cancel" data-cancel-quantity>Peruuta</button></div>`;
+      ask.replaceWith(box); const input = box.querySelector('input'); input.focus(); input.select(); return;
+    }
 
     const example = ev.target.closest('[data-example]');
     if (example) { setText(example.dataset.example); return; }

@@ -317,7 +317,7 @@ function openQuestion() {
   const p = S.preview; if (!p || p.error || p.handoff || p.recipe || p.gateway.blocked.length) return null;
   for (const [i, c] of p.cards.entries()) {
     const it = p.understood.items[i];
-    if (it.claims.length || it.excludeAllergens.length || S.patches.some((x) => x.item === i)) continue;
+    if (it.claims.length || it.excludeAllergens.length || S.patches.some((x) => x.item === i && !x.patch.quantity)) continue;
     const chips = c.chips.map((ch, k) => ({ ...ch, k })).filter((ch) => ch.patch.claims && ch.matches / c.total >= 0.2 && ch.matches / c.total <= 0.8);
     if (chips.length) return { item: i, term: it.productTerm, chips };
   }
@@ -366,6 +366,11 @@ function consoleApp() {
     if (ev.target.id !== 'ask') return; ev.preventDefault();
     const v = $('#askText').value; if (S.running || !v.trim()) return;
     if (v !== S.askText) { S.askText = v; S.patches = []; S.asked = null; } // teksti tuli yläpalkin hausta: tulkitaan se ensin
+    try {
+      const handed = JSON.parse(sessionStorage.getItem('aimo.ask.patches'));
+      sessionStorage.removeItem('aimo.ask.patches');
+      if (handed?.text === v && Array.isArray(handed.patches)) { S.patches = handed.patches; S.asked = null; }
+    } catch { /* Ilman tallennettuja tarkennuksia käytetään konsolin omaa tulkintaa. */ }
     if (S.asked !== v) {
       await loadPreview(); S.asked = v; S.question = openQuestion();
       if (S.question) { const el = $('#aimoPreview'); el.innerHTML = previewHtml(); return el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }

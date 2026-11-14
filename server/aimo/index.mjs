@@ -10,6 +10,7 @@ import { loadLexicon } from './lexicon.mjs';
 import { detectRecipe, expandRecipe } from './recipes.mjs';
 import { learn } from './synonyms.mjs';
 import { loadCatalog } from '../catalog.mjs';
+import { quantityBasisFor } from '../itemQuantities.mjs';
 
 export const LLM_THRESHOLD = 0.6;
 // Sama teksti ei maksa toista mallikutsua: tulos (myös tyhjä) muistetaan prosessin ajan.
@@ -92,6 +93,12 @@ export async function interpret(text, opts = {}) {
     if (typeof patch.brand === 'string') it.brand = patch.brand;
     if (patch.countryOfOrigin === 'fi') it.countryOfOrigin = 'fi';
     if (patch.attributes && typeof patch.attributes === 'object') it.attributes = { ...it.attributes, ...patch.attributes };
+    const q = patch.quantity;
+    if (!recipe && q && typeof q.value === 'number' && Number.isFinite(q.value) && q.value > 0 && q.value <= 100000 && ['L', 'KG', 'PCS'].includes(q.unit) && (q.basis == null || ['items', 'sales'].includes(q.basis))) {
+      it.quantity = { value: q.value, unit: q.unit };
+      if (q.unit === 'PCS') it.quantity.basis = quantityBasisFor({ ...it, quantity: q }, 'kpl');
+      req.assumptions = req.assumptions.filter((a) => !(a.item === item && ['QUANTITY_MISSING', 'UNIT_ASSUMED', 'INDIVIDUAL_ITEMS'].includes(a.code)));
+    }
     req.assumptions = req.assumptions.filter((a) => !(a.item === item && a.code === 'FAT_NOT_SPECIFIED' && it.attributes.fat));
   }
   const gw = toGateway(req, opts);
