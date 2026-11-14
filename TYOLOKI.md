@@ -11,6 +11,21 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 **Tarkistukset:** `node --check` kolmelle JavaScript-tiedostolle, `npm test`, haku merkkien luokkanimillä ei löydä osumia. Selaimessa ei katsottu.
 
+## 14.11.2026 — mallikutsut yhden Aimo-agentti-moduulin taakse (Claude Code)
+
+**Käyttäjän pyyntö:** Eelis pyysi kokoamaan Clauden kutsut yhden Aimo-agentti-moduulin taakse, jotta "Valion oma agentti" on yksi paikka ja mallin voi vaihtaa siitä.
+
+- **Uusi `server/aimoAgent.mjs`:** ainoa tiedosto, joka tuo `@anthropic-ai/sdk`:n. Omistaa asiakkaan, mallivalinnan (`modelFor('fast' | 'deep')`), kutsuasetukset ja laskurit (`agentStats`, myös tehtävittäin `byPurpose`). Yksi funktio `askAgent({ purpose, tier, system, user, schema, maxTokens, timeoutMs, retries, onToken })` palauttaa `{ text, json, model, ms, stopReason, usage }`.
+- **Kutsujat** antavat vain ohjeen, syötteen ja skeeman: `server/llm.mjs` (syvä tarkistus, reititys, vastaus striimattuna, reseptiehdotukset), `server/aimo/model.mjs` (pyynnön tulkinta) ja `server/gateway/advisor.mjs` (korvaajan valinta, hyväksynnän selitys). Ohjetekstit, skeemat, tarkistukset mallin vastaukselle ja `MODEL_CALL`-lokirivit ovat ennallaan. Vanhat laskurit (`llmStats`, `modelStats`, `advisorStats`) ja funktioiden nimet säilyivät, joten kutsuvaa koodia ei muutettu.
+- **Käytöserot:** kolmen asiakkaan sijaan yksi (1 uusintayritys, 120 s aikakatkaisu). Tulkinta (6 s, ei uusintoja) ja portin neuvonantaja (4 s, ei uusintoja) antavat rajansa kutsukohtaisesti kuten ennen. `llmStats.lastError` täyttyy nyt kaikista keittiötehtävien virheistä, ei vain syvän tarkistuksen. Kieltäytyminen ja katkennut vastaus heittävät saman virheen kaikissa tehtävissä.
+- `ANTHROPIC_API_KEY`, `DEEP_MODEL` ja `FAST_MODEL` toimivat kuten ennen. `agentStats` ei vielä näy missään reitissä tai näkymässä.
+
+**Tarkistukset:** `node --check`, `git diff --check`, `npm test` 26/26, `npm run aimo:eval` 26/26. Yksi oikea mallikutsu jokaisesta tehtävästä väliaikaisilla testikannoilla, kuusi kutsua, kaikki onnistuivat: reititys, striimattu vastaus (11 palaa), reseptiehdotukset (6 ruokaa, `claude-haiku-5-5`), pyynnön tulkinta ("20 litraa laktoositonta kermaa perjantaiks" → kerma, FREE_FROM_LACTOSE, 20 L, 20.11.), hyväksynnän selitys ja syvä tarkistus.
+
+**Tarkistamatta:** korvaajan valintaa (`pickSubstitute`) ei kutsuttu oikealla mallilla; se käyttää samaa `ask`-funktiota kuin hyväksynnän selitys. Aikakatkaisu- ja virhepolkuja ei pakotettu esiin. Käyttöliittymää ei katsottu selaimessa. Käynnissä oleva palvelin vaatii uudelleenkäynnistyksen.
+
+**Seuraava askel, jos mallia halutaan vaihtaa:** toisen toimittajan tai Danielin oman mallin kytkentä tehdään `askAgent`-funktion sisään. Rakenteinen JSON-vastaus ja striimaus ovat ne kaksi asiaa, jotka korvaavan mallin pitää tukea.
+
 ## 14.11.2026 — Danielin agentin osat porttiin: kokonaiset sanat haussa, suodattimet, agenttiohje (Claude Code)
 
 **Tausta:** Eelis pyysi katsomaan Danielin repon `DanielTurkkinen/valio-aimo-agent` ja yhdistämään sen tähän projektiin niin, että Danielin agentti korvaisi Clauden. Repossa on yksi commit: sama `server.py` kuin tämän repon juuressa (lisänä tunnus osoitteessa `?token=`), `test_tools.py`, README ja `requirements.txt`.

@@ -2,7 +2,7 @@
 // "Oma malli" ei ole erikseen koulutettu verkko, vaan valmis kielimalli (Claude Haiku) + Aimon datasta generoitu
 // toimialakortti + tiukka tulosskeema + tarkistus Aimon sanastoa vasten. Sama rakenne kuin DM Champilla ja
 // Zalando Assistantilla: kielimalli tulkitsee, tuotteet ja faktat tulevat aina omasta datasta.
-import { config, llmEnabled } from '../config.mjs';
+import { askAgent, warmAgent, agentEnabled, modelFor } from '../aimoAgent.mjs';
 import { loadLexicon, conceptOf } from './lexicon.mjs';
 
 export const CLAIM_CODES = ['FREE_FROM_LACTOSE', 'LOW_LACTOSE', 'FREE_FROM_GLUTEN', 'VEGAN', 'VEGETARIAN', 'EU_ORGANIC_FARMING', 'MARINE_STEWARDSHIP_COUNCIL_LABEL', 'FAIR_TRADE_MARK'];
@@ -71,35 +71,24 @@ Jokainen viestin tuote on rivinä tai mainittu kohdassa unclear. Palauta vain sk
   return cardCache;
 }
 
-let clientPromise;
-const getClient = () => (clientPromise ||= import('@anthropic-ai/sdk').then(({ default: Anthropic }) => new Anthropic({ apiKey: config.anthropicKey, maxRetries: 1, timeout: 20_000 })));
 export const modelStats = { calls: 0, lastMs: null, cacheReadTokens: 0, rejectedTerms: 0 };
 
 /** Lämmitys käynnistyksessä: SDK ja sanasto muistiin, ettei demon ensimmäinen kutsu ole hitain. */
-export async function warm() { loadLexicon(); if (llmEnabled()) await getClient(); }
+export async function warm() { loadLexicon(); await warmAgent(); }
 
 /**
  * Kielimallin tulkinta. Tulos tarkistetaan Aimon sanastoa vasten: tuotesana, jota katalogi ei tunne, ei mene läpi
  * vaan päätyy kohtaan unparsed. Kielimalli ehdottaa, koodi päättää.
  */
 export async function interpretWithModel(text, now) {
-  if (!llmEnabled()) return null;
-  const client = await getClient();
-  const t0 = performance.now();
+  if (!agentEnabled()) return null;
   const today = new Intl.DateTimeFormat('fi-FI', { timeZone: 'Europe/Helsinki', weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-  const msg = await client.messages.create({
-    model: config.fastModel,
-    max_tokens: 1024,
-    thinking: { type: 'disabled' },
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: REQUEST_SCHEMA } },
-    system: [{ type: 'text', text: domainCard(), cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: `Nykyhetki (Europe/Helsinki): ${today}\n\nOstajan viesti:\n${text}` }],
-  }, { timeout: 6000, maxRetries: 0 }); // hidas malli ei saa jumittaa tilausta: aikakatkaisun jälkeen jatketaan säännöillä
-  if (msg.stop_reason === 'refusal' || msg.stop_reason === 'max_tokens') throw new Error(`Kielimalli ei palauttanut tulkintaa (${msg.stop_reason})`);
+  // Hidas malli ei saa jumittaa tilausta: aikakatkaisun jälkeen jatketaan säännöillä.
+  const r = await askAgent({ purpose: 'interpret_request', system: domainCard(), user: `Nykyhetki (Europe/Helsinki): ${today}\n\nOstajan viesti:\n${text}`, schema: REQUEST_SCHEMA, timeoutMs: 6000, retries: 0 });
   modelStats.calls += 1;
-  modelStats.lastMs = Math.round(performance.now() - t0);
-  modelStats.cacheReadTokens += msg.usage?.cache_read_input_tokens || 0;
-  const out = JSON.parse(msg.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+  modelStats.lastMs = r.ms;
+  modelStats.cacheReadTokens += r.usage.cacheRead;
+  const out = r.json;
 
   const lex = loadLexicon();
   const items = []; const unparsed = [...(out.unclear || [])];
@@ -119,5 +108,5 @@ export async function interpretWithModel(text, now) {
       brand, countryOfOrigin: it.countryOfOrigin === 'fi' ? 'fi' : null, attributes: it.fat ? { fat: it.fat } : {}, quantity,
     });
   }
-  return { intent: out.intent, items, deliveryDate: /^\d{4}-\d{2}-\d{2}$/.test(out.deliveryDate || '') ? out.deliveryDate : null, unparsed, via: config.fastModel, modelMs: modelStats.lastMs };
+  return { intent: out.intent, items, deliveryDate: /^\d{4}-\d{2}-\d{2}$/.test(out.deliveryDate || '') ? out.deliveryDate : null, unparsed, via: modelFor('fast'), modelMs: modelStats.lastMs };
 }

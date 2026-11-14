@@ -6,35 +6,26 @@
 // AVOIMUUS: jokainen mallikutsu kirjataan samaan hash-ketjutettuun lokiin (MODEL_CALL): malli, tarkoitus, syötteen tiiviste,
 // vastaus, kesto, tokenit ja se, käyttikö koodi vastausta.
 import crypto from 'node:crypto';
-import { config, llmEnabled } from '../config.mjs';
+import { askAgent, agentEnabled, modelFor } from '../aimoAgent.mjs';
 import { ledger } from './store.mjs';
 
 const TIMEOUT_MS = 4000;
-let clientPromise;
-const getClient = () => (clientPromise ||= import('@anthropic-ai/sdk').then(({ default: Anthropic }) => new Anthropic({ apiKey: config.anthropicKey })));
 export const advisorStats = { calls: 0, used: 0, failed: 0, lastMs: null, inputTokens: 0, outputTokens: 0 };
 
 /** Yksi rakenteinen mallikutsu + lokirivi. Palauttaa {out, log} tai null (pois päältä, virhe, aikakatkaisu). */
 async function ask(purpose, system, facts, schema, refs) {
-  if (!llmEnabled()) return null;
+  if (!agentEnabled()) return null;
   const t0 = performance.now();
   const input = JSON.stringify(facts);
-  const base = { purpose, model: config.fastModel, inputSha256: crypto.createHash('sha256').update(system + input).digest('hex').slice(0, 16) };
+  const base = { purpose, model: modelFor('fast'), inputSha256: crypto.createHash('sha256').update(system + input).digest('hex').slice(0, 16) };
   try {
-    const client = await getClient();
-    const msg = await client.messages.create({
-      model: config.fastModel,
-      max_tokens: 700,
-      thinking: { type: 'disabled' },
-      output_config: { effort: 'low', format: { type: 'json_schema', schema } },
-      system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-      messages: [{ role: 'user', content: input }],
-    }, { timeout: TIMEOUT_MS, maxRetries: 0 });
-    if (msg.stop_reason !== 'end_turn') throw new Error(`stop_reason ${msg.stop_reason}`);
-    const out = JSON.parse(msg.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+    const r = await askAgent({ purpose, system, user: input, schema, maxTokens: 700, timeoutMs: TIMEOUT_MS, retries: 0 });
+    if (r.stopReason !== 'end_turn') throw new Error(`stop_reason ${r.stopReason}`);
+    const out = r.json;
+    const tokens = { in: r.usage.input, out: r.usage.output };
     const ms = Math.round(performance.now() - t0);
-    advisorStats.calls += 1; advisorStats.lastMs = ms; advisorStats.inputTokens += msg.usage.input_tokens + (msg.usage.cache_read_input_tokens || 0); advisorStats.outputTokens += msg.usage.output_tokens;
-    return { out, log: (used, note) => { if (used) advisorStats.used += 1; ledger.append('model', 'MODEL_CALL', { ...base, ms, tokens: { in: msg.usage.input_tokens + (msg.usage.cache_read_input_tokens || 0), out: msg.usage.output_tokens }, output: out, usedByCode: used, note }, refs); } };
+    advisorStats.calls += 1; advisorStats.lastMs = ms; advisorStats.inputTokens += tokens.in; advisorStats.outputTokens += tokens.out;
+    return { out, log: (used, note) => { if (used) advisorStats.used += 1; ledger.append('model', 'MODEL_CALL', { ...base, ms, tokens, output: out, usedByCode: used, note }, refs); } };
   } catch (err) {
     advisorStats.failed += 1;
     ledger.append('model', 'MODEL_CALL', { ...base, ms: Math.round(performance.now() - t0), error: String(err.message || err).slice(0, 140), usedByCode: false, note: 'malli ei vastannut ajoissa: jatkettiin säännöillä' }, refs);
@@ -65,7 +56,7 @@ export async function pickSubstitute(options, { original, need, buyer, quoteId }
   const chosen = pool.find((o) => o.optionId === r.out.optionId);
   if (!chosen) { r.log(false, 'malli viittasi vaihtoehtoon, jota portti ei tarjonnut: hylätty'); return options; }
   chosen.substitution.modelNote = String(r.out.why).slice(0, 240);
-  chosen.substitution.chosenBy = config.fastModel;
+  chosen.substitution.chosenBy = modelFor('fast');
   r.log(true, chosen === options[0] ? 'sama kuin sääntöjen järjestys' : 'malli vaihtoi järjestystä sääntöjen sisällä');
   return [chosen, ...options.filter((o) => o !== chosen)];
 }
@@ -90,5 +81,5 @@ export async function explainApproval(order, buyer) {
   const r = await ask('explain_approval', EXPLAIN_SYSTEM, facts, EXPLAIN_SCHEMA, { buyerId: buyer.id, orderId: order.orderId });
   if (!r) return null;
   r.log(true, 'näytetään hyväksyjälle; päätös on ihmisen');
-  return { text: String(r.out.summary).slice(0, 400), suggestion: r.out.suggestion, suggestionWhy: String(r.out.suggestionWhy).slice(0, 200), model: config.fastModel };
+  return { text: String(r.out.summary).slice(0, 400), suggestion: r.out.suggestion, suggestionWhy: String(r.out.suggestionWhy).slice(0, 200), model: modelFor('fast') };
 }

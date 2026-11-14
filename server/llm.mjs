@@ -1,22 +1,18 @@
-// Claude-kytkentä. Kaksi nopeutta:
-//  - iso malli (DEEP_MODEL, oletus claude-opus-5-5) syvälle agentille taustalla: saa ajatella rauhassa
-//  - pieni malli (FAST_MODEL, oletus claude-haiku-5-5) reititykseen ja lyhyisiin vastauksiin: ajattelu pois, matala effort
+// Keittiönäkymän kielimallitehtävät: syvä tarkistus, reititys, lyhyt vastaus ja reseptiehdotukset.
+// Tässä on vain tehtävien ohjeet ja skeemat. Itse mallikutsun tekee Aimo-agentti (aimoAgent.mjs):
+//  - 'deep' (DEEP_MODEL) syvälle tarkistukselle taustalla: saa ajatella rauhassa
+//  - 'fast' (FAST_MODEL) reititykseen ja lyhyisiin vastauksiin: ajattelu pois, matala effort
 // Ilman ANTHROPIC_API_KEY:tä mitään täältä ei kutsuta ja sovellus toimii sääntöpohjaisesti.
-import { config } from './config.mjs';
+import { askAgent } from './aimoAgent.mjs';
 
-let clientPromise;
-async function getClient() {
-  if (!clientPromise) clientPromise = import('@anthropic-ai/sdk').then(({ default: Anthropic }) => ({ Anthropic, client: new Anthropic({ apiKey: config.anthropicKey, maxRetries: 1, timeout: 120_000 }) }));
-  return clientPromise;
-}
 export const llmStats = { calls: 0, lastMs: null, cacheReadTokens: 0, lastError: null };
 
-const textOf = (msg) => msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-function check(msg) {
-  if (msg.stop_reason === 'refusal') throw new Error('Malli kieltäytyi vastaamasta');
-  if (msg.stop_reason === 'max_tokens') throw new Error('Vastaus katkesi (max_tokens)');
-  llmStats.cacheReadTokens += msg.usage?.cache_read_input_tokens || 0;
-  return msg;
+async function run(task) {
+  try {
+    const r = await askAgent(task);
+    llmStats.calls += 1; llmStats.lastMs = r.ms; llmStats.cacheReadTokens += r.usage.cacheRead;
+    return r;
+  } catch (err) { llmStats.lastError = String(err.message || err); throw err; }
 }
 
 // ---------- Syvä tarkistus ----------
@@ -39,27 +35,8 @@ const REVIEW_SCHEMA = {
 };
 
 export async function deepReview(facts) {
-  const { Anthropic, client } = await getClient();
-  const t0 = performance.now();
-  const params = {
-    model: config.deepModel,
-    max_tokens: 16000,
-    thinking: { type: 'adaptive' },
-    output_config: { effort: 'high', format: { type: 'json_schema', schema: REVIEW_SCHEMA } },
-    system: [{ type: 'text', text: DEEP_SYSTEM, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: JSON.stringify(facts) }],
-  };
-  let msg;
-  try {
-    // Palvelinpuolen fallback: jos turvaluokitin hylkää pyynnön, API ajaa sen varamallilla saman kutsun sisällä.
-    msg = await client.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }).finalMessage();
-  } catch (err) {
-    if (!(err instanceof Anthropic.BadRequestError)) { llmStats.lastError = String(err.message || err); throw err; }
-    msg = await client.messages.stream(params).finalMessage(); // malli tai alusta ei tue fallback-betaa
-  }
-  llmStats.calls += 1;
-  llmStats.lastMs = Math.round(performance.now() - t0);
-  return { ...JSON.parse(textOf(check(msg))), model: msg.model };
+  const r = await run({ purpose: 'deep_review', tier: 'deep', system: DEEP_SYSTEM, user: JSON.stringify(facts), schema: REVIEW_SCHEMA, maxTokens: 16000 });
+  return { ...r.json, model: r.model };
 }
 
 // ---------- Nopea reititin ----------
@@ -98,19 +75,8 @@ const ROUTE_SCHEMA = {
 };
 
 export async function routeWithLLM(text, cartLines) {
-  const { client } = await getClient();
-  const t0 = performance.now();
-  const msg = check(await client.messages.create({
-    model: config.fastModel,
-    max_tokens: 1024,
-    thinking: { type: 'disabled' },
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: ROUTE_SCHEMA } },
-    system: [{ type: 'text', text: ROUTER_SYSTEM, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: `Tilauksen rivit:\n${cartLines}\n\nViesti: ${text}` }],
-  }));
-  llmStats.calls += 1;
-  llmStats.lastMs = Math.round(performance.now() - t0);
-  return JSON.parse(textOf(msg)).actions || [];
+  const r = await run({ purpose: 'route', system: ROUTER_SYSTEM, user: `Tilauksen rivit:\n${cartLines}\n\nViesti: ${text}`, schema: ROUTE_SCHEMA });
+  return r.json.actions || [];
 }
 
 // ---------- Lyhyt vastaus kysymykseen, striimattuna ----------
@@ -119,23 +85,8 @@ const ANSWER_SYSTEM = `Olet Valio Aimon tilausavustaja ammattikeittiölle. Vasta
 Vastaa suomeksi, 1–3 virkettä, suoraan asiaan. Käytä vain faktoissa olevia tuotteita, määriä, hintoja ja päivämääriä. Jos vastaus ei löydy faktoista, sano se suoraan äläkä arvaa: hinnat ja saatavuus tulevat aina Aimon rajapinnasta, ei sinulta. Älä lupaa tehneesi muutoksia; muutokset tekee erillinen toiminto.`;
 
 export async function answerQuestion(question, facts, onToken) {
-  const { client } = await getClient();
-  const t0 = performance.now();
-  const stream = client.messages.stream({
-    model: config.fastModel,
-    max_tokens: 1024,
-    thinking: { type: 'disabled' },
-    output_config: { effort: 'low' },
-    system: [{ type: 'text', text: ANSWER_SYSTEM, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: `Faktat:\n${JSON.stringify(facts)}\n\nKysymys: ${question}` }],
-  });
-  for await (const event of stream) {
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') onToken(event.delta.text);
-  }
-  const msg = check(await stream.finalMessage());
-  llmStats.calls += 1;
-  llmStats.lastMs = Math.round(performance.now() - t0);
-  return textOf(msg);
+  const r = await run({ purpose: 'answer', system: ANSWER_SYSTEM, user: `Faktat:\n${JSON.stringify(facts)}\n\nKysymys: ${question}`, onToken });
+  return r.text;
 }
 
 // ---------- Reseptiehdotukset hakupaneeliin ----------
@@ -166,17 +117,6 @@ const RECIPE_SCHEMA = {
   },
 };
 export async function suggestRecipes(query) {
-  const { client } = await getClient();
-  const t0 = performance.now();
-  const msg = check(await client.messages.create({
-    model: config.fastModel,
-    max_tokens: 3000,
-    thinking: { type: 'disabled' },
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: RECIPE_SCHEMA } },
-    system: [{ type: 'text', text: RECIPE_SYSTEM, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: `Haku: ${query}` }],
-  }));
-  llmStats.calls += 1;
-  llmStats.lastMs = Math.round(performance.now() - t0);
-  return { ideas: JSON.parse(textOf(msg)).ideas || [], model: msg.model, ms: llmStats.lastMs };
+  const r = await run({ purpose: 'recipe_ideas', system: RECIPE_SYSTEM, user: `Haku: ${query}`, schema: RECIPE_SCHEMA, maxTokens: 3000 });
+  return { ideas: r.json.ideas || [], model: r.model, ms: r.ms };
 }
