@@ -29,6 +29,10 @@ const CHEAPEST = /^(?:(?:otetaan|ota|laita|valitse|se|joo)\s+)*(?:halvin|halvint
 // tilausjärjestelmä kertoo vain toimituspäivän ja tilausaikarajan.
 const RUSH = /(?:^|[\s,.!?])(?:tänään|tänää|heti|nyt\s+heti|asap|kiire\p{L}*|pikaisesti|pikana|mahd(?:ollisimman)?\.?\s+pian|aikaisin\s+mahdollinen)(?=$|[\s,.!?])/iu;
 const TIME_WISH = /(?:ennen|viimeistään)\s+(?:klo|kello)\s*\d{1,2}(?:[.:]\d{2})?|(?:klo|kello)\s*\d{1,2}(?:[.:]\d{2})?\s*(?:mennessä|asti)|(?:huomenna\s+)?aamu(?:lla|ks(?:i|een)?|päivällä|seitsemäksi)|aamuun|iltapäivällä/iu;
+// Kellonaika- ja kiireilmaukset poistetaan tulkille menevästä tekstistä: ne eivät ole tuotetietoa, ja sääntötulkki luki ne
+// muuten tuotesanaan ("kananmuna enne kelt", "aamu maito"). Päiväsanat (tänään, huomenna) säilyvät.
+const CLOCK_WORDS = /(?<![\p{L}\d])(?:(?:ennen|viimeistään)\s+)?(?:klo|kello)\s*\d{1,2}(?:[.:]\d{2})?(?:\s*(?:mennessä|asti|aikaan))?(?![\p{L}\d])|(?<![\p{L}\d])(?:aamu(?:lla|ks(?:i|een)?|päivällä|seitsemäksi|seitsemään)?|aamuun|iltapäivällä|nyt\s+heti|heti|kiire(?:esti|ellä|ellisesti|ellinen|ellistä|ellisenä)?|asap|pikaisesti|pikana|mahd(?:ollisimman)?\.?\s+pian)(?![\p{L}\d])[,!]?/giu;
+export const withoutClockWords = (text) => { const cleaned = String(text || '').replace(CLOCK_WORDS, ' ').replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim(); return cleaned || String(text || ''); };
 const RUSH_DATE_QUESTION = 'Mille päivälle toimitus? Jos on kiire, kirjoita esim. "huomenna", niin katson aikaisimman päivän, jolle ehtii.';
 const DATE_YES = /^(?:1[.)]?|kyllä|joo|juu|jep|ok|okei|sopii|vaihda|vaihdetaan|käy)(?:[,\s]+(?:kiitos|vaan|vain|sopii|käy|vaihda|vaihdetaan|se))*[.!\s]*$/iu;
 const DATE_NO = /^(?:2[.)]?|ei|ei kiitos|pidetään|pidä|ei käy)(?:[,\s]+(?:kiitos|pidetään|pidä|se|sama|päivä))*[.!\s]*$/iu;
@@ -362,7 +366,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
             : cheapest ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: cheapest }] } : null;
         const turn = dateAnswer || choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
           ? { op: 'update', ref, addClaims: [draft.pending.claim] } : { op: 'no_preference', ref }) }
-          : await interpretTurn({ text: t, draft: structuredClone(draft), today, now: now(), receivedAt, context }));
+          : await interpretTurn({ text: withoutClockWords(t), draft: structuredClone(draft), today, now: now(), receivedAt, context }));
         const moreAsked = wantsMore || Boolean(choosing && (turn.ops || []).some((o) => o.op === 'more' && (!o.ref || o.ref === choosing.refs[0])));
         const notes = apply(draft, turn, customer, today);
         draft.turn += 1;

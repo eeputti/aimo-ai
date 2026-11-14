@@ -23,6 +23,11 @@ Tehtävä 23f1d218. Eeliksen lisäpyyntö 15.11.2026 klo 01.25 (välitetty Whats
 - Koko sarja puhtaassa worktreessa `origin/main` 2ddc0a9 + tämä vaihe: 289/289, 0 ohitettua.
 - Oikea malli (`node --env-file=.env`, tyhjä `VALIO_API_KEY`, väliaikaiset kannat ja avain, ei Metaa eikä vahvistusta), vastaanottohetki asetettu: 3 keskustelua, 8 vuoroa, 13 mallikutsua, 0 virhettä. Klo 20.30 "huomenta! tarvis 50 kananmunaa" → `Iltaa! Joo, päivitin ostoskorin!` ja päiväkysymys; klo 07.15 "moro" → `Moro!`; klo 02.10 "Hyvää päivää" → `Moi!`. "tänään 50 kananmunaa ennen klo 7" → `Tänään ei enää ehdi … Aikaisin toimitettava päivä on ma 16.11.`, `1` → ma 16.11. vaihtoehdot ja kellonaikavaraus, `1` → yhteenveto `Tilattava viimeistään su 15.11. klo 12.00.` ja varaus. "heti 20 l maitoa" ilman päivää → kiirettä huomioiva päiväkysymys. Tilausaikarivi vaihtoehtolistassa puuttui kokeessa, koska order-tools ei vielä anna `cutoff`-kenttää (ks. Kiire-kohta).
 
+## Jatko: tilausaikaraja käytössä ja kellonaikasanojen vuoto korjattu
+
+- Hakujärjestys-sessio lisäsi `34fc629`:ssä option `cutoff`-kentän (`storefront.mjs` `closingTime`) ja `NO_ORDERABLE_PRODUCT`-issueen `nextDeliveryDate`-kentän (null, kun pyydetyn päivän tilausaika on jo mennyt; ydin kokeilee silloin seuraavia päiviä). Oikeilla työkaluilla ja katalogilla ilman mallia: "huomiseksi 50 kananmunaa" → lista ja `Huomiselle ehtii tilata su 15.11. klo 12.00 asti.`; "tänään … ennen klo 7" → `Tänään ei enää ehdi`, `1` → ma 16.11. lista tilausaikarajan ja kellonaikavarauksen kanssa, `1` → yhteenveto.
+- Tarkistus paljasti sääntötulkin (mallin varapolku) virheen: kellonaika- ja kiiresanat vuotivat tuotesanaan ("kananmuna enne", "kananmuna enne kelt", "aamu maito", "eesti voi"). Ydin poistaa nyt kellonajat (ennen klo 7, klo 7 mennessä), vuorokaudenajat (aamulla, aamuks) ja kiireadverbit (heti, kiireesti, asap) tulkille menevästä tekstistä (`withoutClockWords`). Päiväsanat säilyvät, ja kiire sekä toive luetaan alkuperäisestä viestistä. Testi 7/7 (uusi tapaus myös oikealla sääntötulkilla, kun katalogi on paikalla), koko sarja `origin/main` 34fc629 + korjaus 297/297.
+
 ## Rajat
 
 - Ei Meta-lähetyksiä, oikeita Valio-kutsuja, tilauksia eikä 4749-restarttia. Käyttöönotto kuuluu Codexin käyttöönottochatille.
