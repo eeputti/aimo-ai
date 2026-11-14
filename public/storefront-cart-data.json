@@ -1,8 +1,81 @@
 {
   "source": "https://toimitustukku.valioaimo.fi/fi/cart",
   "capturedOn": "2026-11-14",
-  "note": "First delivery tab transcribed from the user-opened Chrome cart. The second tab's rows were not captured; no products are invented for it. This is local display data, independent of all agent orders.",
+  "note": "The real cart snapshot is retained in referenceCart for visual comparison only. The working demo starts empty, independent of agent orders. The second reference tab was not captured.",
   "cart": {
+    "selectedDate": "2026-11-16",
+    "references": {},
+    "carts": {
+      "2026-11-16": [],
+      "2026-11-18": []
+    }
+  },
+  "recommendations": [
+    {
+      "id": "8082064",
+      "name": "Valio taskutorttu 65 g x 80 / 5,2 kg laktoositon",
+      "price": 35.59,
+      "oldPrice": 47.32,
+      "unit": "ltk",
+      "comparison": 6.84,
+      "stock": "999+ ltk varastossa",
+      "frozen": true,
+      "seasonal": true,
+      "image": "/storefront-assets/optimized/8082064.8fceca1b620b.webp"
+    },
+    {
+      "id": "8097472",
+      "name": "Valio punainen juustopakkaus 720 g",
+      "price": 7.9,
+      "oldPrice": 9.3,
+      "unit": "pkt",
+      "comparison": 10.97,
+      "stock": "27.11. varastossa",
+      "seasonal": true,
+      "image": "/storefront-assets/optimized/8097472.5bd214a3ff7e.webp"
+    },
+    {
+      "id": "8047279",
+      "name": "Havi tuikku lämpökynttilä valkoinen 100kpl 4 h",
+      "price": 5.09,
+      "oldPrice": 6.99,
+      "unit": "pkt",
+      "stock": "128 pkt varastossa",
+      "vat": 25.5,
+      "image": "/storefront-assets/optimized/8047279.55745d772d97.webp"
+    },
+    {
+      "id": "8510",
+      "name": "VALIO AURA N3,2KG KOKONAINEN",
+      "price": 19.31,
+      "unit": "kg",
+      "comparison": 19.31,
+      "stock": "52 kg varastossa",
+      "image": "/storefront-assets/optimized/8510.9c8191822efe.webp"
+    },
+    {
+      "id": "8097382",
+      "name": "Huhtamaki 80x250ml kartonkinen kuumakuppi Christmas",
+      "price": 3.85,
+      "oldPrice": 5.35,
+      "unit": "pkt",
+      "stock": "20 pkt varastossa",
+      "vat": 25.5,
+      "image": "/storefront-assets/optimized/8097382.597c033933ca.webp"
+    },
+    {
+      "id": "8093815",
+      "name": "Vaasan AURA® Tähtitorttu 40x60g",
+      "price": 46.44,
+      "unit": "ltk",
+      "comparison": 19.35,
+      "stock": "Toimitettavissa 18.11.",
+      "frozen": true,
+      "pack": "40 kpl / ltk",
+      "image": "/storefront-assets/optimized/8093815.0f4641a13154.webp"
+    }
+  ],
+  "referenceCart": {
     "selectedDate": "2026-11-16",
     "references": {},
     "carts": {
@@ -134,70 +207,5 @@
       ],
       "2026-11-18": []
     }
-  },
-  "recommendations": [
-    {
-      "id": "8082064",
-      "name": "Valio taskutorttu 65 g x 80 / 5,2 kg laktoositon",
-      "price": 35.59,
-      "oldPrice": 47.32,
-      "unit": "ltk",
-      "comparison": 6.84,
-      "stock": "999+ ltk varastossa",
-      "frozen": true,
-      "seasonal": true,
-      "image": "/storefront-assets/optimized/8082064.8fceca1b620b.webp"
-    },
-    {
-      "id": "8097472",
-      "name": "Valio punainen juustopakkaus 720 g",
-      "price": 7.9,
-      "oldPrice": 9.3,
-      "unit": "pkt",
-      "comparison": 10.97,
-      "stock": "27.11. varastossa",
-      "seasonal": true,
-      "image": "/storefront-assets/optimized/8097472.5bd214a3ff7e.webp"
-    },
-    {
-      "id": "8047279",
-      "name": "Havi tuikku lämpökynttilä valkoinen 100kpl 4 h",
-      "price": 5.09,
-      "oldPrice": 6.99,
-      "unit": "pkt",
-      "stock": "128 pkt varastossa",
-      "vat": 25.5,
-      "image": "/storefront-assets/optimized/8047279.55745d772d97.webp"
-    },
-    {
-      "id": "8510",
-      "name": "VALIO AURA N3,2KG KOKONAINEN",
-      "price": 19.31,
-      "unit": "kg",
-      "comparison": 19.31,
-      "stock": "52 kg varastossa",
-      "image": "/storefront-assets/optimized/8510.9c8191822efe.webp"
-    },
-    {
-      "id": "8097382",
-      "name": "Huhtamaki 80x250ml kartonkinen kuumakuppi Christmas",
-      "price": 3.85,
-      "oldPrice": 5.35,
-      "unit": "pkt",
-      "stock": "20 pkt varastossa",
-      "vat": 25.5,
-      "image": "/storefront-assets/optimized/8097382.597c033933ca.webp"
-    },
-    {
-      "id": "8093815",
-      "name": "Vaasan AURA® Tähtitorttu 40x60g",
-      "price": 46.44,
-      "unit": "ltk",
-      "comparison": 19.35,
-      "stock": "Toimitettavissa 18.11.",
-      "frozen": true,
-      "pack": "40 kpl / ltk",
-      "image": "/storefront-assets/optimized/8093815.0f4641a13154.webp"
-    }
-  ]
+  }
 }

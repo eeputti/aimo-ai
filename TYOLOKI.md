@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — työpuun tilannetallennus: ostoskori alkaa tyhjänä (Claude Code)
+
+**Käyttäjän pyyntö:** Eelis pyysi pushaamaan uusimman version GitHubiin ennen käyttörajan täyttymistä. Työpuussa oli neljä commitoimatonta tiedostoa toisesta työvaiheesta; tämä istunto ei tehnyt niitä, vain tarkisti ja tallensi ne.
+
+- `public/storefront-cart-data.json` ja `storefront-cart-store.js`: työkori (`cart`) alkaa tyhjänä ja täytetään hausta. Oikean korin vertailurivit säilyvät erillään kentässä `referenceCart`. Selaimeen aiemmin tallennettu koskematon vertailukori poistetaan latauksessa; käyttäjän muokkaama tai täydentämä kori säilyy.
+- `test/storefront-cart.test.mjs`: kaksi uutta testiä (tyhjä aloitus, vain koskemattoman vertailukorin poisto). `README.md`: korin kuvaus päivitetty.
+
+**Tarkistukset:** `npm test` 67/67, `node --check`, `git diff --check`, diffistä haettu avaimia, ei osumia. Selaimessa ei katsottu, eikä palvelimia käynnistetty uudelleen. Staattiset tiedostot tulevat käyttöön sivun päivityksellä.
+
 ## 14.11.2026 — sanelun reseptiohjaus ja yhteisen koripolun käyttöönotto (Codex)
 
 **Käyttäjän päätös:** sanelusta pitää voida luetella tuotteita ja pyytää resepti samassa tarpeessa. Resepti avataan sovelluksen nykyiseen reseptihakuun ja annosmäärään (ei ulkoiselle sivustolle). Muut tuotteet säilyvät mukana. Ostoskorin ja hakuvaiheen yhteinen työ tehtiin Eeliksen erikseen valtuuttamalla chattien työnjaolla.

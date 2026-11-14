@@ -5,12 +5,13 @@ import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../public/storefront-cart-store.js', import.meta.url), 'utf8');
 const seed = JSON.parse(fs.readFileSync(new URL('../public/storefront-cart-data.json', import.meta.url), 'utf8'));
-async function fixture(storage = new Map()) {
+async function fixture(storage = new Map(), { reference = true } = {}) {
+  const sourceSeed = reference ? { ...seed, cart: seed.referenceCart || seed.cart } : seed;
   const requests = []; const events = [];
   const window = { dispatchEvent: (e) => events.push(e.type), addEventListener() {} };
   vm.runInNewContext(source, { window, document: { querySelector: () => null }, Event,
     localStorage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) },
-    fetch: async (url) => { requests.push(url); return { ok: true, json: async () => structuredClone(seed) }; },
+    fetch: async (url) => { requests.push(url); return { ok: true, json: async () => structuredClone(sourceSeed) }; },
   });
   await window.aimoCart.ready;
   return { cart: window.aimoCart, requests, events, storage };
@@ -32,7 +33,7 @@ test('search additions merge by product and date, survive reload, and do not mut
   assert.equal(f.cart.lines('2026-11-16').length, 10);
   const next = await fixture(f.storage);
   assert.equal(next.cart.get().selectedDate, '2026-11-20'); assert.equal(next.cart.totals().net, 12.5);
-  assert.equal(seed.cart.carts['2026-11-16'][0].qty, 3);
+  assert.equal((seed.referenceCart || seed.cart).carts['2026-11-16'][0].qty, 3);
 });
 
 test('moving a line removes only that line; moving a basket merges quantities on the destination day', async () => {
@@ -72,7 +73,7 @@ test('kilogram quantities retain gram precision while currency rounds to cents',
 });
 
 test('saved baskets use lightweight reference photos while preserving quantities and custom image URLs', async () => {
-  const saved = structuredClone(seed.cart);
+  const saved = structuredClone(seed.referenceCart || seed.cart);
   const rows = saved.carts[saved.selectedDate];
   rows[0].qty = 7; rows[0].image = `/storefront-assets/${rows[0].id}.jpg`;
   rows[1].image = 'https://example.com/custom.webp';
@@ -80,4 +81,20 @@ test('saved baskets use lightweight reference photos while preserving quantities
   assert.equal(cart.lines()[0].qty, 7);
   assert.match(cart.lines()[0].image, /\/optimized\/.*\.webp$/);
   assert.equal(cart.lines()[1].image, 'https://example.com/custom.webp');
+});
+
+
+test('the working demo starts empty rather than importing reference or agent products', async () => {
+  const { cart } = await fixture(new Map(), { reference: false });
+  assert.equal(cart.lines().length, 0); assert.equal(cart.totals().net, 0);
+});
+
+test('only an untouched old reference basket is retired; user changes remain', async () => {
+  const saved = structuredClone(seed.referenceCart);
+  const key = 'aimo.storefront.cart.v1';
+  const pristine = await fixture(new Map([[key, JSON.stringify(saved)]]), { reference: false });
+  assert.equal(pristine.cart.lines().length, 0);
+  saved.carts[saved.selectedDate][0].qty = 4;
+  const edited = await fixture(new Map([[key, JSON.stringify(saved)]]), { reference: false });
+  assert.equal(edited.cart.lines().length, 10); assert.equal(edited.cart.lines()[0].qty, 4);
 });

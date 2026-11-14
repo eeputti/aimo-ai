@@ -6,6 +6,12 @@
   const amount = (n) => Math.round((n + Number.EPSILON) * 1e6) / 1e6;
   const validDate = (d) => { const parsed = new Date(`${d}T12:00:00Z`); return /^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === d; };
   const number = (n) => Number(String(n).replace(',', '.'));
+  // Remove only our untouched visual reference basket; preserve all user edits and additions.
+  const untouchedReference = (saved, reference) => {
+    if (!reference || !Object.values(reference.carts).some((rows) => rows.length) || saved.selectedDate !== reference.selectedDate || Object.values(saved.references || {}).some(Boolean)) return false;
+    const signature = (carts) => JSON.stringify(Object.entries(carts).sort(([a], [b]) => a.localeCompare(b)).map(([date, rows]) => [date, rows.map((p) => [p.id, p.name, p.qty, p.price]).sort(([a], [b]) => a.localeCompare(b))]));
+    return signature(saved.carts) === signature(reference.carts);
+  };
   let state = { selectedDate: '2026-11-16', carts: {}, references: {} };
   let storageAvailable = true;
   const save = () => {
@@ -20,10 +26,10 @@
     state = copy(seed.cart);
     try {
       const saved = JSON.parse(localStorage.getItem(KEY));
-      if (saved && validDate(saved.selectedDate) && saved.carts && Object.values(saved.carts).every((rows) => Array.isArray(rows) && rows.every((p) => p.id && p.name && number(p.qty) > 0 && Number.isFinite(number(p.qty))))) state = { ...saved, references: saved.references || {} };
-    } catch { /* a missing or invalid saved basket starts from the reference snapshot */ }
+      if (saved && validDate(saved.selectedDate) && saved.carts && Object.values(saved.carts).every((rows) => Array.isArray(rows) && rows.every((p) => p.id && p.name && number(p.qty) > 0 && Number.isFinite(number(p.qty)))) && !untouchedReference(saved, seed.referenceCart)) state = { ...saved, references: saved.references || {} };
+    } catch { /* a missing or invalid saved basket starts empty */ }
     // Refresh legacy photo URLs without changing the user's saved products or quantities.
-    const photos = new Map([...Object.values(seed.cart.carts).flat(), ...(seed.recommendations || [])].map((p) => [p.id, p.image]));
+    const photos = new Map([...Object.values(seed.referenceCart?.carts || seed.cart.carts).flat(), ...(seed.recommendations || [])].map((p) => [p.id, p.image]));
     for (const rows of Object.values(state.carts)) for (const p of rows) {
       const legacy = [`/img/${p.id}`, ...['jpg', 'png', 'webp'].map((ext) => `/storefront-assets/${p.id}.${ext}`)];
       if (photos.get(p.id) && (!p.image || legacy.includes(p.image))) p.image = photos.get(p.id);
