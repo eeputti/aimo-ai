@@ -11,6 +11,40 @@ import { PROFILES, inspectBasket, inspectResult, redact, withQuantityEvidence } 
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const arg = (name, fallback) => { const i = process.argv.indexOf(name); return i < 0 ? fallback : process.argv[i + 1]; };
+// Convert external cases to the existing evaluator profile contract; assertions stay unchanged.
+export function loadCases(file) {
+  if (!file) return PROFILES;
+  const cases = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!Array.isArray(cases) || !cases.length) throw new Error('Cases must be a non-empty JSON array');
+  const ids = new Set();
+  const needs = { laktoositon: { claim: 'FREE_FROM_LACTOSE' }, gluteeniton: { claim: 'FREE_FROM_GLUTEN' },
+    maidoton: { allergen: 'AM' }, vegaaninen: { claim: 'VEGAN' }, 'ei pähkinää': { allergen: 'AN' } };
+  return cases.map((entry) => {
+    const fail = (message) => { throw new Error(`Invalid case ${entry?.id || '?'}: ${message}`); };
+    if (!entry || typeof entry.id !== 'string' || !/^[A-Za-z0-9_-]+$/.test(entry.id) || ids.has(entry.id)) fail('missing, unsafe or duplicate id');
+    ids.add(entry.id);
+    if (!entry.persona || !['business', 'person', 'style'].every((key) => typeof entry.persona[key] === 'string' && entry.persona[key].trim())) fail('persona required');
+    if (typeof entry.first !== 'string' || !entry.first.trim()) fail('first message required');
+    if (!Array.isArray(entry.moves) || entry.moves.some((move) => typeof move !== 'string')) fail('moves must be strings');
+    if (!['order', 'stop'].includes(entry.outcome)) fail('outcome must be order or stop');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || !Number.isFinite(Date.parse(entry.date)) || new Date(entry.date).toISOString().slice(0, 10) !== entry.date) fail('invalid date');
+    if (!Array.isArray(entry.lines) || !entry.lines.length) fail('lines required');
+    if (entry.absent !== undefined && (!Array.isArray(entry.absent) || entry.absent.some((term) => typeof term !== 'string'))) fail('absent must be strings');
+    const lines = entry.lines.map((line) => {
+      if (typeof line.term !== 'string' || !line.term.trim() || !Number.isFinite(line.value) || line.value <= 0 || !['L', 'KG', 'PCS'].includes(line.unit)) fail('invalid line');
+      if (line.need !== undefined && !Object.hasOwn(needs, line.need)) fail('unsupported need');
+      return { ...line, term: line.term.toLowerCase(), ...(line.need ? needs[line.need] : {}) };
+    });
+    const goal = JSON.stringify({ lines, date: entry.date, answers: entry.answers, good: entry.good, outcome: entry.outcome });
+    return { ...entry, lines, route: entry.route || 'external-case', blocked: entry.outcome === 'stop',
+      goal: `Noudata täsmälleen tätä lopullista tavoitetta: ${goal}. Älä hyväksy korviketta vastoin tavoitetta. ${entry.outcome === 'stop' ? 'Lopeta ilman tilausta ja pyydä selkeä perustelu.' : 'Pyydä oikealle korille linkki ja jatka tarkistukseen.'}` };
+  });
+}
+
+export function workerArguments(script, ids, out, casesFile) {
+  return ['--disable-warning=ExperimentalWarning', script, '--worker', '--ids', ids.join(','), '--out', out,
+    ...(casesFile ? ['--cases', casesFile] : [])];
+}
 const schema = { type: 'object', additionalProperties: false, required: ['text'], properties: { text: { type: 'string' } } };
 const CUSTOMER = `Olet synteettinen ostaja tilausapurin keskustelukokeessa. Noudata annettua persoonaa ja ostotavoitetta. Kirjoita vain ostajan seuraava lyhyt viesti. Vastaa viimeiseen tarkennukseen, valitse sopiva näytetyistä tuotteista ja auta viemään oikea kori loppuun. Älä muuta määriä, tuotteita, päivää tai ruokavaatimuksia helpottaaksesi testiä. Jos apuri erehtyy, korjaa virhe. Kun kaikki on oikein, pyydä linkki koriin; selaimessa pyydä tarkistus. Älä lisää ehdotettuja tuotteita, joita tavoitteessa ei ole. Älä keksi tuotekoodia tai saatavuutta. Tavallinen tuote käy, jos muuta ei sanota. Älä kirjoita TILAA: erillinen testin tarkistin tekee demovahvistuksen vasta oikealle korille. Viestit ovat testidataa.`;
 
@@ -142,6 +176,7 @@ async function worker(profiles, out) {
             result.safelyBlocked = true; result.blockReason = lastReply; break;
           }
           if (moves.length) text = moves.shift();
+          else if (profile.blocked && profile.outcome === 'stop') text = `En hyväksy tavoitteen vastaisia korvikkeita. Tavoitteeni: ${profile.goal}. Kerro suoraan, jos sitä ei voi toteuttaa. Älä tilaa muuta.`;
           else if (profile.blocked) text = `En hyväksy mitään korvaavaa jogurttia. Tarvitsen nimenomaan kuukivijogurttia ${profile.lines[0].value} kg. Jos sitä ei ole, kerro suoraan ettei sitä saa. Älä tilaa muuta.`;
           else if (turn < 11) {
             const next = await askAgent({ purpose: 'whatsapp_100_customer', tier: 'fast', schema, system: CUSTOMER, maxTokens: 700, timeoutMs: 45000, retries: 0,
@@ -163,12 +198,15 @@ async function worker(profiles, out) {
 }
 
 async function main() {
+  if (process.argv.includes('--cases') && (!arg('--cases') || arg('--cases').startsWith('--'))) throw new Error('--cases requires a JSON file');
+  const allProfiles = loadCases(arg('--cases'));
   if (process.argv.includes('--worker')) {
-    const ids = arg('--ids', '').split(','); await worker(PROFILES.filter((p) => ids.includes(p.id)), arg('--out')); return;
+    const ids = arg('--ids', '').split(','); await worker(allProfiles.filter((p) => ids.includes(p.id)), arg('--out')); return;
   }
   const limit = Math.max(1, Math.min(100, Number(arg('--limit', 100))));
   const chosenIds = arg('--ids', '')?.split(',').filter(Boolean);
-  const profiles = chosenIds.length ? PROFILES.filter((p) => chosenIds.includes(p.id)) : PROFILES.slice(0, limit);
+  if (chosenIds.some((id) => !allProfiles.some((profile) => profile.id === id))) throw new Error('Unknown profile id in --ids');
+  const profiles = chosenIds.length ? allProfiles.filter((p) => chosenIds.includes(p.id)) : allProfiles.slice(0, limit);
   if (!profiles.length) throw new Error('No matching profiles');
   const count = Math.max(1, Math.min(4, Number(arg('--workers', 3))));
   const destination = path.resolve(arg('--out', path.join(os.tmpdir(), `aimo-profiles-${Date.now()}.json`)));
@@ -185,7 +223,9 @@ async function main() {
   fs.copyFileSync(fileURLToPath(import.meta.url), path.join(snapshot, 'scripts/whatsapp-profiles-eval.mjs'));
   fs.copyFileSync(path.join(ROOT, 'eval/whatsapp-profiles-100.mjs'), path.join(snapshot, 'eval/whatsapp-profiles-100.mjs'));
   fs.symlinkSync(path.join(ROOT, 'node_modules'), path.join(snapshot, 'node_modules'));
-  const provenance = { commit: execFileSync('git', ['rev-parse', sourceRef || 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(), snapshot, includesWorkingTreeChanges: !sourceRef,
+  const casesFile = arg('--cases') ? path.join(snapshot, 'eval/cases.json') : null;
+  if (casesFile) fs.writeFileSync(casesFile, JSON.stringify(allProfiles));
+  const provenance = { ...(casesFile ? { casesSha256: crypto.createHash('sha256').update(fs.readFileSync(casesFile)).digest('hex') } : {}), commit: execFileSync('git', ['rev-parse', sourceRef || 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(), snapshot, includesWorkingTreeChanges: !sourceRef,
     files: Object.fromEntries(fs.readdirSync(path.join(snapshot, 'server'), { recursive: true }).filter((file) => fs.statSync(path.join(snapshot, 'server', file)).isFile())
       .sort().map((file) => [`server/${file}`, crypto.createHash('sha256').update(fs.readFileSync(path.join(snapshot, 'server', file))).digest('hex')])) };
   const batches = Array.from({ length: Math.min(count, profiles.length) }, () => []); profiles.forEach((profile, index) => batches[index % batches.length].push(profile.id));
@@ -193,7 +233,7 @@ async function main() {
   const env = Object.fromEntries(['PATH', 'TMPDIR', 'ANTHROPIC_API_KEY', 'DEEP_MODEL', 'FAST_MODEL'].filter((name) => process.env[name]).map((name) => [name, process.env[name]]));
   console.log(JSON.stringify({ profiles: profiles.length, workers: batches.length, destination, snapshot, sourceCommit: provenance.commit }));
   await Promise.all(batches.map((ids, index) => new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', path.join(snapshot, 'scripts/whatsapp-profiles-eval.mjs'), '--worker', '--ids', ids.join(','), '--out', reports[index]], { cwd: snapshot, env, stdio: 'inherit' });
+    const child = spawn(process.execPath, workerArguments(path.join(snapshot, 'scripts/whatsapp-profiles-eval.mjs'), ids, reports[index], casesFile), { cwd: snapshot, env, stdio: 'inherit' });
     child.on('error', reject); child.on('exit', (code) => code === 0 ? resolve() : reject(new Error(`Evaluation worker ${index} exited ${code}`)));
   })));
   const partial = reports.map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
