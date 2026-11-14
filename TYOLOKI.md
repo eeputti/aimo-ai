@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — Meta-testisovelluksen nimi, kieli ja portfolio (Codex)
+
+**Käyttäjän päätökset:** WhatsApp-demon nimi on **Valio Aimo Tilausapuri**, profiilikuvaksi halutaan projektin Valio Aimo -logo ja apurin käyttötekstit/vastaukset suomeksi. Käyttäjä valitsi itse **Roisku Median** yritysportfolion. Tämä on oma demo; mahdollinen Valion tuotantokäyttöönotto suunnitellaan erikseen Valion hallitsemiin Meta-/WhatsApp-resursseihin. Demon siirtämistä tai Valion oikeuksia ei ole luvattu eikä toteutettu.
+
+**Selaimesta varmennettu:** kirjautuneen Meta App Dashboardin luontiyhteenvedossa ovat oikea nimi, WhatsApp-käyttötapaus ja Roisku Media (Unverified business). Sovelluksen lopullinen luonti hyväksyy Meta Platform Terms -ehdot ja Developer Policies -käytännöt; erillinen hyväksymislupa on pyydetty. Logo on olemassa tiedostoissa `public/aimo-logo.png` ja `public/storefront-assets/logo.svg`, mutta sitä ei ole vielä asetettu Metaan. Testinumeroa, tokenia, webhookia tai puhelinviestien toimivuutta ei ole tässä vaiheessa varmennettu. Oma henkilökohtainen WhatsApp-numero on tarkoitus lisätä testivastaanottajaksi, ei muuttaa apurin yritysnumeroksi.
+
+**Tarkistukset ja seuraava askel:** projektin ohjeet, uusin työnjako ja nykyinen WhatsApp-ohje luettu; `main`/`origin/main` puhtaat commitissa `ee466f0`, `git fetch origin` onnistui. Tämä kirjaa päätökset ja keskeneräisen käyttöönoton, ei muuta sovelluskoodia tai käynnissä olevaa demoa. Jatka Metan sovellusluonnista hyväksymisluvan jälkeen, lisää testinumero ja profiili, sitten palvelimen salaiset asetukset ja julkinen vastaanotin. Ei testiviestejä, mallikutsuja tai tilauksia.
+
 ## 14.11.2026 — neljän ihmisen samanaikainen toteutus ja AI-promptit (Codex)
 
 **Käyttäjän päätös:** jaetaan WhatsApp-tilausapuri neljälle ihmiselle, jotka kaikki muokkaavat projektia samanaikaisesti omien AI-chattiensa kautta. Nimiä ei annettu, joten vastuut numeroitiin 1–4.
