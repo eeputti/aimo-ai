@@ -2,7 +2,7 @@
 
 **Current product direction (14 Nov 2026): a WhatsApp ordering assistant that remembers the active conversation, asks for missing requirements, proposes suitable products and requests approval before submitting an order.**
 
-WhatsApp integration is planned, not implemented. Valio is intended to own customer identification and ordering permissions through its own customer systems; the actual integration is unconfirmed. The existing gateway, catalogue, quantity conversions and price/availability checks form the backend foundation. See the current direction at the top of [SUUNNITELMA.md](SUUNNITELMA.md).
+A read-only WhatsApp test channel is implemented (see [setup](docs/whatsapp.md)); a live Meta connection has not been verified. Ordering and production customer identification are not implemented in this channel. Valio is intended to own customer identification and ordering permissions through its own customer systems; that integration is unconfirmed. The existing gateway, catalogue, quantity conversions and price/availability checks form the backend foundation. See the current direction at the top of [SUUNNITELMA.md](SUUNNITELMA.md).
 
 Shared development context for Codex and Claude Code: [working instructions](AGENTS.md), [current status and work log](TYOLOKI.md), and [competition plan](SUUNNITELMA.md). Claude Code loads the shared instructions through [CLAUDE.md](CLAUDE.md). Record each completed work stage and its checks in the work log, then commit and push it to GitHub.
 
@@ -96,6 +96,10 @@ Or plain REST:
 curl -s localhost:4747/v1/products/search -H 'authorization: Bearer demo-nordic-hotels' \
   -H 'content-type: application/json' -d '{"query":"lactose-free milk"}'
 ```
+
+## WhatsApp-testikanava
+
+Nykyinen Tilausapuri toimii myös WhatsApp Cloud API -kanavan kautta: numeron yhdistäminen kertakäyttökoodilla, tuotehaku ja keskustelumuisti. Tämä testiversio vain hakee tietoja; se ei tee tilauksia tai muuta selaimen koria. Käynnistä erikseen `npm run whatsapp` tai liitä sivuston palvelimeen asetuksella `WHATSAPP_ENABLED=true`. Meta-asetukset, julkinen HTTPS-webhook, henkilön yhdistäminen ja testaus: [WhatsAppin käyttöönotto](docs/whatsapp.md).
 
 ## The contract
 

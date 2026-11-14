@@ -25,6 +25,9 @@ import { searchStorefront, reviewStorefront, validDeliveryDate } from './storefr
 import { analyzeRecipeSource, recipeProducts } from './recipe-import.mjs';
 import { handleAssistantChat, assistantStatus } from './assistant.mjs'; // Tilausapuri: Danielin MCP-agentti sivulla /assistant.html
 
+import { createConfiguredWhatsApp } from './whatsapp/runtime.mjs';
+const whatsapp = process.env.WHATSAPP_ENABLED === 'true' ? createConfiguredWhatsApp() : null;
+
 const PUBLIC = path.join(ROOT, 'public');
 
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
@@ -306,6 +309,7 @@ const routes = {
 const server = http.createServer(async (req, res) => {
   const t0 = performance.now();
   const url = new URL(req.url, 'http://localhost');
+  if (whatsapp && await whatsapp.handle(req, res, url)) return;
   if (await handleGateway(req, res, url)) return; // portin reitit ensin; se käsittelee omat virheensä
   const handler = routes[`${req.method} ${url.pathname}`];
   try {
@@ -333,6 +337,7 @@ async function boot() {
   bootGateway();
   await aimoWarm();
   console.log(`Aimo-malli: sanasto ${aimoLexicon().stats.concepts} käsitettä, ${aimoLexicon().stats.categories} tuoteryhmää, ${aimoLexicon().stats.brands} merkkiä (${aimoLexicon().stats.ms} ms)`);
+  whatsapp?.start();
   server.listen(config.port, () => console.log(`\n→ http://localhost:${server.address().port}\n`));
 
   // Hintalähteen vaihtuessa (simuloitu ↔ live) demodata alustetaan uudelleen.
