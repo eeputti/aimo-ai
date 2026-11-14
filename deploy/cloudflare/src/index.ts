@@ -2,6 +2,7 @@ import { MAX_BODY_BYTES, parseSnapshot } from "./protocol.ts";
 import { parseOrderEvent } from "./order-event.ts";
 import { renderOrderEmail } from "./email.ts";
 import { registerDemoPayment, demoPaymentEmailAllowed, describeDemoPayment, handleDemoPayment } from "./demo-payment.ts";
+import { handleSignup } from "./signup.ts";
 
 // A sender is optional: without one orders are stored and e-mail waits. Either the Cloudflare
 // send_email binding EMAIL with ORDER_EMAIL_FROM (needs an onboarded domain), or RESEND_API_KEY.
@@ -144,6 +145,9 @@ export default {
         return json({ ok: true, orderId: event.order.orderId, duplicate: inserted.meta.changes === 0, email });
       } catch { console.error(JSON.stringify({ event: "order_event_write_failed" })); return json({ error: "Tallennus ei onnistunut." }, 503); }
     }
+    // Landing page sign-ups: the browser sees only its own status; the publisher token lists the numbers.
+    const signup = await handleSignup(request, env);
+    if (signup) return signup;
     const payment = await handleDemoPayment(request, env as OrderEnv, orderId => deliverEmail(env as OrderEnv, orderId, url.origin));
     if (payment) return payment;
     // Payment actions only simulate a payment. Publishing order events still needs the server's token.
