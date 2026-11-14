@@ -126,7 +126,7 @@ export async function handleChat(text, emit) {
     }
     if (a.type === 'substitute') {
       const target = a.lineId ? lines0.filter((l) => l.lineId === a.lineId) : matchLines(lines0, a.term || '');
-      if (target.length === 1) jobs.push((async () => { const ts = performance.now(); const res = await findSubstitutes(cat.get(target[0].productId), target[0].qty, proposal.deliveryDate, rules, { limit: 3 }); subMs += performance.now() - ts; subCount += res.checked; prep.set(a, { target: target[0], subs: res }); })());
+      if (target.length === 1) jobs.push((async () => { const ts = performance.now(); const res = await findSubstitutes(cat.get(target[0].productId), target[0].qty, proposal.deliveryDate, rules, { limit: 3, recipeRequired: target[0].recipeRequired }); subMs += performance.now() - ts; subCount += res.checked; prep.set(a, { target: target[0], subs: res }); })());
       else prep.set(a, { targets: target });
     }
   }

@@ -95,7 +95,7 @@ export async function seedDemo({ deliveryDate = defaultDeliveryDate() } = {}) {
 
   // Ryhmämenu: annosmäärä × resepti → raaka-ainetarve. Tämä on "ruokalistasta ostoslista" pienoiskoossa.
   kv.set('menuEvents', [{
-    id: 'pikkujoulu', name: 'Pikkujoulumenu', portions: 148,
+    id: 'pikkujoulu', name: 'Pikkujoulumenu', portions: 148, includedInBookings: true,
     groups: [{ date: addDays(deliveryDate, 4), pax: 64 }, { date: addDays(deliveryDate, 5), pax: 84 }],
     recipe: [
       { productId: '461915', amount: 0.12, unit: 'kg', label: 'lohta 120 g / annos' },

@@ -2,6 +2,37 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — resepti- ja ostotarvelaskennan suurimmat aukot
+
+**Käyttäjän pyyntö:** korjaa tarkistuksessa löytyneet suurimmat aukot: uudet reseptiraaka-aineet, varausten ja ryhmien kaksinkertainen laskenta, hiljaisemman viikon määrät sekä varasto-, saanto- ja reseptikorvausten käsittely.
+
+### Muutokset ja päätökset
+
+- Uusi puhdas `server/planning.mjs` yhdistää historiaennusteen, tavallisen myynnin varaukset ja päiväkohtaisen reseptitarpeen. Reseptit tuovat mukaan tuotteet ilman historiaa tai aktiivista tilausrytmiä. Saman tuotteen tarpeet yhdistetään ennen ylöspäin pyöristystä myyntieriin.
+- Reseptistä lasketut ryhmät erotetaan varausluvuista kentällä `includedInBookings`. Uusi API-syöte vaatii tiedon; vanha demomenu käsitellään varauksiin sisältyvänä. Viikkorajan ylittävästä menusta käytetään vain kyseisen viikon ryhmiä. Puuttuva varauspäivä ei tarkoita nollaa asiakasta.
+- Varauskerroin pienentää ostomäärää myös perustason alle. Budjettikarsinnan alaraja huomioi varastovähennyksen ja säilyttää reseptitarpeen; testeissä löytynyt vertailu alkuperäiseen bruttoperustasoon korjattiin.
+- Tuetut resepti- ja varastoyksiköt: g/kg, ml/cl/dl/l ja sales. Kiloja ja litroja ei rinnasteta. Valinnainen reseptin `yield` muuntaa annospainon ostettavaksi määräksi; oletus 1 käsittelee syötteen jo raakatarpeena.
+- Inventaario ja vahvistetut saapuvat toimitukset voidaan vähentää eräkohtaisesti. Vähennetään vain viikon alkupäivän ajantasainen inventaario ja samana päivänä saapuva vahvistettu toimitus, joka säilyy viikon loppuun. Puuttuvaa saldoa tai saantoa ei arvata. Lyhyt säilyvyys, vanha inventaario ja muut toimituspäivät näkyvät huomioina eivätkä pienennä tilausta.
+- Reseptiin tarvittavan tuotteen korvausta ei hyväksytä automaattisesti. Käyttäjän pitää valita vaihtoehto ja varmistaa maku, koostumus ja saanto; reseptikäytön merkintä säilyy myös korvaavalla rivillä.
+- `GET/POST /api/planning` lukee/päivittää resepti-, inventaario- ja saapumistiedot. Rakenteeltaan virheellinen syöte torjutaan ilman tallennusta. Hyväksytty päivitys laatii uuden ehdotuksen ja mitätöi vanhan ehdotuksen tilauskelpoisuuden suunnittelurevision kautta.
+- Puuttuva reseptimuunnos tai ristiriitainen ryhmäluku tuottaa `planningIssues`-esteen. Se näkyy keittiön päätöskorttina ja estää tilauksen myös tuoreessa sääntötarkistuksessa. Laskennan huomiot säilyvät myös kielimalliyhteenvedon rinnalla.
+- `AIMO_DB` mahdollistaa keittiökannan eristämisen testissä. `npm test` käyttää väliaikaisia kantoja, simulaatiota ja HTTP-testissä väliaikaista allekirjoitusavainta. Käyttäjän demoa ei nollattu eikä muokattu.
+- Käyttötapa, JSON-esimerkki ja rajaukset: `docs/kitchen-planning.md`; README ja ympäristömalli päivitettiin.
+
+### Tarkistukset
+
+- Ennen työtä `main` puhdas commitissa `67461b8`; `git fetch origin` onnistui oikeuslaajennuksella, ei uusia etäcommitteja.
+- `npm test`: **26/26 läpi**. Mukana puhtaan laskennan tapaukset, koko ehdotuksen muodostus, reseptikorvausten autonomian esto sekä HTTP-päivitys–laskenta–tilausarvio erillisessä demossa. HTTP-palvelimen portin avaus vaati hiekkalaatikon oikeuslaajennuksen.
+- `npm run aimo:eval`: **26/26 oikein**, 0 mallikutsua.
+- JavaScriptin syntaksitarkistukset ja `git diff --check`: läpi.
+- Live-mock-API:a käyttävää `npm run eval`-testiä ei ajettu; muutos ei tarvitse API-kiintiötä. Käyttöliittymää ei tarkistettu selaimessa eikä kielimallipolkua ajettu.
+
+### Jäljellä ja käyttöönotto
+
+- Varasto- ja reseptijärjestelmäintegraatioita tai tiedonsyöttölomaketta ei ole; uudet tiedot annetaan API:lla. Päiväkohtaista eräkulutusta ja säilyvyysoptimointia ei toteutettu. Inventaarion ja saapuvien listojen pitää kuvata eri fyysisiä määriä.
+- Historia on ostohistoriaa eikä mitattua kulutusta. Aiemmat ryhmäostot voivat edelleen vaikuttaa perustasoon. Tarkkuutta, säästöä tai hävikin vähenemistä ei ole validoitu oikeassa keittiössä.
+- Käynnistä palvelin uudella koodilla ja käytä keittiön **Aja uudelleen** -toimintoa, kun haluat korvata tallennetun luonnoksen. Tässä työvaiheessa ei käynnistetty uudelleen käyttäjän palvelinta eikä ylikirjoitettu sen luonnosta.
+
 ## 14.11.2026 — Danielin MCP-palvelin ja STOCK_UNKNOWN-lipun laajennus (Claude Code)
 
 **Tausta:** Daniel Turkkinen latasi GitHubiin commitissa `a38b854` kolme tiedostoa repojuureen: `server.py` (Python-MCP-palvelin Valion rajapinnalle: haku, tuotetiedot, hinnat, saatavuus), `test_tools.py` ja `server.cpython-311.pyc`. Tiedostot haettiin paikalliseen työpuuhun fast-forward-pullilla. Niitä ei ole muokattu, eikä niitä saa muokata ilman Eeliksen tai Danielin pyyntöä.

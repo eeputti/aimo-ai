@@ -110,7 +110,7 @@ export function evaluate(proposal, rules) {
   const budgetOk = overBy <= 0 || !!(proposal.budgetOverride && expected <= proposal.budgetOverride.approvedUpTo + 0.005);
   proposal.totals = { net, vat, gross: money(net + vat), pendingNet, expected, baselineNet, budgetCap: rules.budgetCap, overBy: Math.max(0, overBy), budgetOk, lines: lines.length, co2Kg: Math.round(co2), co2Lines, domesticShare: net ? Math.round((domesticNet / net) * 100) : 0 };
 
-  const approvals = [];
+  const approvals = (proposal.planningIssues || []).map((text, i) => ({ id: `planning:${i}`, type: 'planning', text }));
   for (const l of lines) {
     if (l.state === 'decision') approvals.push({ id: `line:${l.lineId}`, type: 'availability', lineId: l.lineId, text: `${l.name}: ${l.flags.find((f) => f.severity === 'decision').text}` });
     if (l.state === 'blocked') approvals.push({ id: `line:${l.lineId}`, type: 'blocked', lineId: l.lineId, text: `${l.name}: ${l.flags.find((f) => f.severity === 'blocked').text}` });
@@ -130,8 +130,8 @@ export const fmtMoney = (n) => `${(+n).toLocaleString('fi-FI', { minimumFraction
 export function planTrim(proposal, overBy) {
   const cat = loadCatalog();
   const cands = activeLines(proposal)
-    .filter((l) => l.price && l.state === 'ok' && l.baselineQty != null && l.qty > l.baselineQty)
-    .map((l) => { const floor = roundToStep(l.baselineQty + (l.menuExtra || 0), cat.get(l.productId), 'up'); return { l, floor, save: (l.qty - floor) * l.price.net }; })
+    .filter((l) => l.price && l.state === 'ok' && l.baselineQty != null && l.qty > (l.trimFloorQty ?? l.baselineQty))
+    .map((l) => { const floor = l.trimFloorQty ?? roundToStep(l.baselineQty + (l.menuExtra || 0), cat.get(l.productId), 'up'); return { l, floor, save: (l.qty - floor) * l.price.net }; })
     .filter((c) => c.save > 0.01)
     .sort((a, b) => b.save - a.save);
   const plan = []; let saved = 0;
@@ -183,6 +183,7 @@ export function decide(proposal, lineId, choice) {
   const opt = line.options?.[Number(choice)];
   if (!opt) return null;
   const sub = makeLine(opt.productId, opt.qty, {
+    recipeRequired: !!line.recipeRequired,
     group: line.group, origin: 'substitute', substituteFor: { productId: line.productId, name: line.name, qty: line.qty, unitLabel: line.unitLabel },
     baselineQty: null, tags: line.tags,
     reason: { text: `Korvaa tuotteen ${line.name}`, factors: opt.why.map((w) => ({ label: w })), sources: ['Aimo-tuotedata', 'saatavuus- ja hintarajapinta'] },

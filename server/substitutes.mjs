@@ -91,6 +91,7 @@ export async function findSubstitutes(original, qty, date, rules, ctx = {}) {
 
     const why = [];
     const warnings = [];
+    if (ctx.recipeRequired) warnings.push('Reseptikäyttö: varmista maku, koostumus ja saanto ennen korvaamista');
     if (c.listed) why.push('Aimon tuotedatassa merkitty korvaajaksi');
     if (c.allergensVerified) why.push(original.contains.length ? `Sama allergeeniprofiili (${original.contains.map(allergenName).join(', ')})` : 'Ei allergeeneja, kuten alkuperäisessä');
     else warnings.push('Allergeenitietoa ei voi varmentaa datasta');
@@ -113,7 +114,7 @@ export async function findSubstitutes(original, qty, date, rules, ctx = {}) {
       price: { net: price.net, total, deltaPct: deltaPct == null ? null : +deltaPct.toFixed(1), comparison: price.comparison, comparisonUnit: price.comparisonUnit, source: price.source },
       availability: { status: 'ok', amount: avail.amount, model: avail.model, source: avail.source },
       reliability: p.reliability ?? null, co2: p.co2 ?? null, country: p.country, listed: c.listed,
-      withinPolicy: !warnings.some((w) => /yli sallitun|varmentaa/.test(w)),
+      withinPolicy: !ctx.recipeRequired && !warnings.some((w) => /yli sallitun|varmentaa/.test(w)),
       why, warnings, score: +score.toFixed(3),
     });
   }

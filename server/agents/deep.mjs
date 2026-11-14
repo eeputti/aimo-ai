@@ -4,13 +4,13 @@
 // Vaiheet: 1) kysyntäennuste historiasta  2) signaalit (varaukset, ryhmämenut)  3) saatavuus + hinta rajatulle joukolle
 //          4) poikkeamille korvaajat valmiiksi  5) sääntötarkistus  6) iso kielimalli tarkistaa kokonaisuuden ja kirjoittaa tiivistelmän.
 // Numerot lasketaan koodilla; kielimalli saa vain valita annetuista vaihtoehdoista ja selittää, ei keksiä tuotteita tai määriä.
-import { loadCatalog, roundToStep, unitLabel, TEMP_LABEL } from '../catalog.mjs';
+import { loadCatalog, unitLabel, TEMP_LABEL } from '../catalog.mjs';
 import { kv, history, bookings, proposals, audit } from '../db.mjs';
 import { fetchQuotes, apiStats } from '../valioApi.mjs';
 import { apiMode, llmEnabled, config } from '../config.mjs';
 import { makeLine, applyQuote, evaluate, activeLines, decide, fmtQty, fmtMoney, fmtDate, DEFAULT_RULES } from '../proposal.mjs';
 import { findSubstitutes } from '../substitutes.mjs';
-import { addDays, isoWeek, weekKey } from '../demo.mjs';
+import { buildDemandPlan } from '../planning.mjs';
 import { publish } from '../bus.mjs';
 import { deepReview } from '../llm.mjs';
 
@@ -18,9 +18,6 @@ export const deepState = { running: false, queued: null, lastRun: null, steps: [
 
 const median = (a) => { const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const mean = (a) => a.reduce((s, x) => s + x, 0) / (a.length || 1);
-const TAG_WEIGHT = { protein: 1, veg: 1, dairy: 1, cream: 1, dessert: 1, bakery: 1, frozen: 1, dry: 0.5, nonfood: 0.5 };
-const WEEKDAYS = ['su', 'ma', 'ti', 'ke', 'to', 'pe', 'la'];
-const weekday = (iso) => WEEKDAYS[new Date(`${iso}T12:00:00Z`).getUTCDay()];
 
 /** Kysyntäennuste yhdelle tuotteelle viikkosarjasta. Palauttaa joko {base, factors} tai {skip: syy}. */
 export function forecast(series, weekLabels) {
@@ -50,22 +47,6 @@ export function forecast(series, weekLabels) {
   return { base, factors, cadence, lastWeekQty: series[n - 1] || null };
 }
 
-function bookingSignal(deliveryDate) {
-  const rows = bookings.all();
-  if (!rows.length) return null;
-  const byDate = new Map(rows.map((r) => [r.date, r]));
-  const weekSum = (start) => { let s = 0; for (let d = 0; d < 7; d++) s += byDate.get(addDays(start, d))?.covers || 0; return s; };
-  const next = weekSum(deliveryDate);
-  const past = [];
-  for (let w = 1; w <= 8; w++) { const s = weekSum(addDays(deliveryDate, -7 * w)); if (s > 0) past.push(s); }
-  if (!past.length || !next) return null;
-  const avg = mean(past);
-  const uplift = next / avg - 1;
-  const peaks = [];
-  for (let d = 0; d < 7; d++) { const date = addDays(deliveryDate, d); const r = byDate.get(date); if (r?.note) peaks.push(`${weekday(date)} ${r.covers}`); }
-  return { id: 'bookings', label: `Varaukset vk ${isoWeek(deliveryDate).week}`, uplift, next, avg: Math.round(avg), detail: `${next.toLocaleString('fi-FI')} asiakasta, tavallisesti ${Math.round(avg).toLocaleString('fi-FI')}`, peaks, source: 'Varausjärjestelmä (demodata)' };
-}
-
 function step(steps, name, detail, t0) {
   const s = { name, detail, ms: +(performance.now() - t0).toFixed(1) };
   steps.push(s);
@@ -82,6 +63,7 @@ export async function runDeep({ reason = 'ajastettu yöajo', deliveryDate } = {}
   publish('deep', { phase: 'start', reason });
   try {
     const cat = loadCatalog();
+    const planningRevision = kv.get('planningRevision', 0);
     const rules = kv.get('rules', DEFAULT_RULES);
     const date = deliveryDate || kv.get('deliveryDate');
     kv.set('deliveryDate', date);
@@ -107,59 +89,16 @@ export async function runDeep({ reason = 'ajastettu yöajo', deliveryDate } = {}
     }
     step(steps, 'Kysyntäennuste', `${series.size} tuotetta, ${weeks.length} viikon historia → ${planned.length} riviä, ${skipped.length} jätetty pois`, t);
 
-    // 2) Signaalit
+    // 2–3) Historia + päiväkohtaiset ryhmät + reseptit − käyttökelpoinen varasto.
     t = performance.now();
-    const signals = [];
-    const booking = bookingSignal(date);
-    if (booking && Math.abs(booking.uplift) >= 0.03) signals.push(booking);
-    const menuEvents = (kv.get('menuEvents', []) || []).filter((e) => e.groups.some((g) => g.date >= date && g.date <= addDays(date, 6)));
-    const menuExtra = new Map();
-    for (const ev of menuEvents) {
-      signals.push({ id: `menu:${ev.id}`, label: ev.name, detail: `${ev.portions} annosta (${ev.groups.map((g) => `${weekday(g.date)} ${g.pax}`).join(' + ')})`, source: 'Ryhmävaraukset + reseptiikka (demodata)' });
-      for (const r of ev.recipe) {
-        const p = cat.get(r.productId);
-        if (!p) continue;
-        const size = r.unit === 'l' ? p.litres || p.kg : p.kg || r.packKg; // myyntiyksikön koko reseptin yksikössä
-        if (!size) continue;
-        const need = r.amount * ev.portions;
-        const list = menuExtra.get(r.productId) || [];
-        list.push({ event: ev.name, portions: ev.portions, label: r.label, need, unit: r.unit, units: need / size });
-        menuExtra.set(r.productId, list);
-      }
-    }
-    step(steps, 'Signaalit', signals.map((s) => `${s.label}: ${s.detail}`).join(' · ') || 'ei poikkeavia signaaleja', t);
-
-    // 3) Määrät pakkauskokoihin
-    t = performance.now();
-    const lines = planned.map((pl) => {
-      const { p } = pl;
-      const ul = unitLabel(p.salesUnit);
-      const factors = [...pl.factors];
-      factors[0].value = `${fmtQty(Math.round(pl.base * 10) / 10)} ${ul}`;
-      let target = pl.base;
-      const sources = [`Tilaushistoria ${weekLabels[0]}–${weekLabels.at(-1).replace('vk ', '')}`];
-      const weight = Math.max(0, ...pl.tags.map((tg) => TAG_WEIGHT[tg] ?? 1), pl.tags.length ? 0 : 1);
-      if (booking && Math.abs(booking.uplift) >= 0.03) {
-        const u = booking.uplift * weight;
-        target *= 1 + u;
-        factors.push({ label: booking.label, detail: booking.detail + (weight < 1 ? ' (kuivatuotteille puolet vaikutuksesta)' : ''), value: `${u > 0 ? '+' : ''}${Math.round(u * 100)} %`, kind: 'signal' });
-        sources.push('Varaukset');
-      }
-      let extraUnits = 0;
-      for (const m of menuExtra.get(p.id) || []) {
-        extraUnits += m.units;
-        factors.push({ label: m.event, detail: `${m.portions} annosta × ${m.label} = ${fmtQty(Math.round(m.need * 10) / 10)} ${m.unit}`, value: `+${fmtQty(Math.round(m.units * 10) / 10)} ${ul}`, kind: 'menu' });
-        sources.push('Reseptiikka');
-      }
-      const qty = Math.max(roundToStep(pl.base, p), roundToStep(target + extraUnits, p, extraUnits ? 'up' : 'nearest'));
-      const baselineQty = roundToStep(pl.base, p);
-      const exact = target + extraUnits;
-      if (p.lot >= 2 && qty - exact > exact * 0.05) factors.push({ label: 'Myyntierä', detail: `tilattavissa ${fmtQty(p.lot)} ${ul} erissä, tarve ${fmtQty(Math.round(exact * 10) / 10)} ${ul}`, value: `→ ${fmtQty(qty)} ${ul}`, kind: 'lot' });
-      const deltaPct = baselineQty ? Math.round((qty / baselineQty - 1) * 100) : 0;
-      const short = factors.filter((f) => f.kind !== 'base' && f.value).map((f) => `${f.label.toLowerCase()} ${f.value}`);
-      const text = deltaPct === 0 ? `Sama kuin tavallisesti${short.length ? ': lisätarve ei riitä seuraavaan pakkauskokoon' : ''}` : `${deltaPct > 0 ? '+' : ''}${deltaPct} %: ${short.join(', ') || 'pyöristys pakkauskokoon'}`;
-      return makeLine(p.id, qty, { baselineQty, expectedQty: qty, lastWeekQty: pl.lastWeekQty, history: pl.series, weekLabels, group: pl.group, tags: pl.tags, menuExtra: extraUnits, deltaPct, reason: { text, factors, sources: [...new Set(sources)] } });
-    });
+    const demand = buildDemandPlan({ cat, planned, bookingRows: bookings.all(), menuEvents: kv.get('menuEvents', []),
+      inventory: kv.get('inventory'), incoming: kv.get('incoming', []), deliveryDate: date, weekLabels });
+    const signals = demand.signals;
+    const lines = demand.lines.map(({ productId, qty, extra }) => makeLine(productId, qty, extra));
+    const included = new Set(lines.map((l) => l.productId));
+    for (let i = skipped.length - 1; i >= 0; i--) if (included.has(skipped[i].productId)) skipped.splice(i, 1);
+    skipped.push(...demand.skipped);
+    step(steps, 'Reseptit ja ostotarve', `${signals.length} signaalia, ${lines.length} ostoriviä, ${demand.issues.length} laskennan estettä`, t);
     const order = ['Maito & munat', 'Hedelmät & vihannekset', 'Liha & kala', 'Kuivatuotteet', 'Pakasteet', 'Non-food'];
     lines.sort((a, b) => (order.indexOf(a.group) + 99) % 99 - (order.indexOf(b.group) + 99) % 99 || a.name.localeCompare(b.name, 'fi'));
     step(steps, 'Määrät pakkauskokoihin', `${lines.length} riviä pyöristetty myyntieriin`, t);
@@ -168,9 +107,9 @@ export async function runDeep({ reason = 'ajastettu yöajo', deliveryDate } = {}
     t = performance.now();
     const quotes = await fetchQuotes(lines.map((l) => l.productId), date);
     lines.forEach((l) => applyQuote(l, quotes.get(l.productId)));
-    const proposal = { id: `P-${date}-${Date.now().toString(36)}`, kitchen: kv.get('kitchen'), deliveryDate: date, createdAt: new Date().toISOString(), status: 'draft', lines, signals, skipped, source: apiMode() };
+    const proposal = { id: `P-${date}-${Date.now().toString(36)}`, kitchen: kv.get('kitchen'), deliveryDate: date, createdAt: new Date().toISOString(), status: 'draft', lines, signals, skipped, planningIssues: demand.issues, planningWarnings: demand.warnings, planningRevision, source: apiMode() };
     evaluate(proposal, rules);
-    if (!kv.get('budgetCalibrated')) {
+    if (!kv.get('budgetCalibrated') && !demand.issues.length && lines.length) {
       // DEMO: budjettikatto asetetaan ensimmäisen ehdotuksen perusteella noin 4 % sen alle, jotta "agentti kysyy luvan" -polku
       // näkyy samanlaisena sekä simuloidulla että live-datalla. Oikeassa käytössä katto tulee asiakkaan asetuksista.
       rules.budgetCap = Math.max(100, Math.floor((proposal.totals.expected * 0.962) / 50) * 50);
@@ -185,7 +124,7 @@ export async function runDeep({ reason = 'ajastettu yöajo', deliveryDate } = {}
     const weak = lines.filter((l) => l.state !== 'decision' && l.flags.some((f) => f.type === 'reliability'));
     let checked = 0;
     await Promise.all([...exceptions, ...weak].map(async (line) => {
-      const res = await findSubstitutes(cat.get(line.productId), line.qty, date, rules, { limit: line.state === 'decision' ? 3 : 10 });
+      const res = await findSubstitutes(cat.get(line.productId), line.qty, date, rules, { limit: line.state === 'decision' ? 3 : 10, recipeRequired: line.recipeRequired });
       checked += res.checked;
       if (line.state === 'decision') line.options = res.options;
       else { // toimitusvarmuus alle rajan: tarjotaan varmempaa vaihtoehtoa, ei pakoteta
@@ -211,11 +150,12 @@ export async function runDeep({ reason = 'ajastettu yöajo', deliveryDate } = {}
     t = performance.now();
     proposal.briefing = templateBriefing(proposal, signals, exceptions);
     proposal.llm = { used: false };
+    proposal.risks = demand.warnings;
     if (llmEnabled()) {
       try {
         const review = await deepReview(reviewFacts(proposal, signals, skipped));
         if (review?.briefing) proposal.briefing = review.briefing;
-        proposal.risks = review?.risks || [];
+        proposal.risks = [...demand.warnings, ...(review?.risks || [])];
         for (const pick of review?.picks || []) { // malli saa vain järjestää valmiiksi tarkistetut vaihtoehdot
           const line = proposal.lines.find((l) => l.lineId === pick.lineId);
           const i = line?.options?.findIndex((o) => o.productId === pick.productId) ?? -1;
@@ -251,7 +191,7 @@ function templateBriefing(proposal, signals, exceptions) {
   const t = proposal.totals;
   const parts = [`${weekdayLong(proposal.deliveryDate)} ${fmtDate(proposal.deliveryDate)} tilaus on valmiina: ${t.lines} riviä, ${fmtMoney(t.expected)} (alv 0 %).`];
   const booking = signals.find((s) => s.id === 'bookings');
-  if (booking) parts.push(`Varauksia on ${Math.round(Math.abs(booking.uplift) * 100)} % tavallista ${booking.uplift > 0 ? 'enemmän' : 'vähemmän'}${booking.peaks.length ? ` (${booking.peaks.join(' ja ')} asiakasta)` : ''}, joten tuoretuotteiden määriä on ${booking.uplift > 0 ? 'nostettu' : 'laskettu'}.`);
+  if (booking && Math.abs(booking.uplift) >= 0.03) parts.push(`Tavallisen myynnin varauksia on ${Math.round(Math.abs(booking.uplift) * 100)} % tavallista ${booking.uplift > 0 ? 'enemmän' : 'vähemmän'}${booking.peaks.length ? ` (${booking.peaks.join(' ja ')} asiakasta)` : ''}, joten tuoretuotteiden määriä on ${booking.uplift > 0 ? 'nostettu' : 'laskettu'}.`);
   const menu = signals.find((s) => s.id.startsWith('menu:'));
   if (menu) parts.push(`${menu.label} (${menu.detail.split(' (')[0]}) on laskettu reseptistä mukaan.`);
   const outs = exceptions.filter((l) => l.state !== 'replaced');
@@ -265,6 +205,7 @@ const weekdayLong = (iso) => ['Sunnuntain', 'Maanantain', 'Tiistain', 'Keskiviik
 function reviewFacts(proposal, signals, skipped) {
   return {
     keittio: proposal.kitchen?.name, toimituspaiva: proposal.deliveryDate, summat: proposal.totals,
+    laskennan_esteet: proposal.planningIssues, laskennan_huomiot: proposal.planningWarnings,
     signaalit: signals.map((s) => ({ nimi: s.label, kuvaus: s.detail, lahde: s.source })),
     rivit: activeLines(proposal).map((l) => ({ lineId: l.lineId, tuote: l.name, maara: `${fmtQty(l.qty)} ${l.unitLabel}`, perustaso: l.baselineQty, perustelu: l.reason.text, tila: l.state, liput: l.flags.map((f) => f.text), toimitusvarmuus: l.reliability, rivisumma: l.total })),
     poikkeamat: proposal.lines.filter((l) => l.options?.length).map((l) => ({ lineId: l.lineId, tuote: l.name, syy: l.flags.map((f) => f.text).join('; ') || l.altReason, vaihtoehdot: l.options.map((o) => ({ productId: o.productId, tuote: o.name, maara: `${fmtQty(o.qty)} ${o.unitLabel}`, hintaero_pct: o.price.deltaPct, toimitusvarmuus: o.reliability, perusteet: o.why, varoitukset: o.warnings })) })),

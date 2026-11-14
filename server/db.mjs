@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { ROOT } from './catalog.mjs';
 
-const db = new DatabaseSync(path.join(ROOT, 'data', 'aimo.db'));
+const db = new DatabaseSync(process.env.AIMO_DB || path.join(ROOT, 'data', 'aimo.db'));
 db.exec(`
   PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);

@@ -39,6 +39,8 @@ npm start                   # http://localhost:4747
 
 The homepage uses local images, fonts and a fixed product snapshot. Its prices, availability, delivery date and cart are display data; the homepage does not place orders. Product carousels and the assistant greeting open and close locally. Asset sources are recorded in `public/storefront-assets/sources.json`.
 
+The kitchen demo combines history, ordinary bookings and recipe demand, including new ingredients, yield factors and explicitly supplied usable inventory/incoming deliveries. See [kitchen planning inputs and limitations](docs/kitchen-planning.md). Run `npm test` for isolated planning and HTTP regression tests; the local catalogue is required, and the tests do not use live API keys or the running demo databases.
+
 The whole chain in one command, as an outside agent sees it (real HTTP calls, live mock API):
 
 ```bash

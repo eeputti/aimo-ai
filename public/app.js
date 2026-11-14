@@ -209,13 +209,13 @@ function renderDecisions() {
   const p = state.d.proposal; const el = $('#decisions');
   if (!p || state.deepRunning || p.status === 'ordered') { el.innerHTML = ''; return; }
   const byId = new Map(p.lines.map((l) => [l.lineId, l]));
-  const order = { availability: 0, blocked: 1, qtyjump: 2, budget: 3 };
+  const order = { planning: -1, availability: 0, blocked: 1, qtyjump: 2, budget: 3 };
   const list = [...p.approvals].sort((a, b) => order[a.type] - order[b.type]);
   if (!list.length) { el.innerHTML = '<div class="section-head"><h2>Ei avoimia päätöksiä</h2><span class="count ok">✓</span></div>'; return; }
   const recommendable = list.filter((a) => a.type === 'availability' && byId.get(a.lineId)?.options?.some((o) => o.recommended)).length;
   el.innerHTML = `<div class="section-head"><h2>Tarvitsen päätöksesi</h2><span class="count">${list.length}</span>
       ${recommendable > 1 ? `<button class="btn" style="margin-left:auto" data-action="accept-all">Hyväksy ${recommendable} suositeltua korvaajaa</button>` : ''}</div>
-    <div class="cards">${list.map((a) => (a.type === 'budget' ? budgetCard(a, p) : a.type === 'availability' ? availabilityCard(byId.get(a.lineId)) : simpleCard(byId.get(a.lineId), a))).join('')}</div>`;
+    <div class="cards">${list.map((a) => (a.type === 'planning' ? `<article class="card"><div class="card-head"><h3>Ostotarvetta ei voitu laskea kokonaan</h3></div><p class="need">${esc(a.text)}</p><p class="small muted">Täydennä resepti- tai varastotiedot ja laadi ehdotus uudelleen.</p><button class="btn ghost" data-action="deep-run">Laske uudelleen</button></article>` : a.type === 'budget' ? budgetCard(a, p) : a.type === 'availability' ? availabilityCard(byId.get(a.lineId)) : simpleCard(byId.get(a.lineId), a))).join('')}</div>`;
 }
 
 // ---------- rivit ----------

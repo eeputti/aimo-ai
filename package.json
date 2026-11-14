@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Aimo Agent Gateway (Junction 2026, Valio Aimo): avoin portti ostoagenteille. Allekirjoitetut tarjoukset, mandaatit, ihmisen hyväksyntä, audit trail.",
   "scripts": {
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.mjs",
     "catalog": "node scripts/build-catalog.mjs && node scripts/build-packs.mjs",
     "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env server/index.mjs",
     "dev": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env --watch-path=server server/index.mjs",

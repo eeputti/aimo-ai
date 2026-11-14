@@ -18,6 +18,7 @@ import { ledger as gatewayLedger } from './gateway/store.mjs'; // Aimo Agent Gat
 import { serveImage } from './images.mjs';
 import { orderMode, setOrderMode } from './mode.mjs';
 import { packHint } from './packs.mjs';
+import { validatePlanning } from './planning.mjs';
 import { interpret as aimoInterpret, warm as aimoWarm, loadLexicon as aimoLexicon } from './aimo/index.mjs'; // Aimo-malli: vapaa teksti → rakenteinen pyyntö
 
 const PUBLIC = path.join(ROOT, 'public');
@@ -31,6 +32,7 @@ function sse(res) {
 }
 
 const rulesNow = () => kv.get('rules', DEFAULT_RULES);
+const planningCurrent = (p) => (p.planningRevision ?? 0) === kv.get('planningRevision', 0);
 function statePayload(t0) {
   const proposal = proposals.current();
   if (proposal && proposal.status !== 'ordered') for (const l of activeLines(proposal)) l.pack = l.state === 'ok' ? packHint(l, rulesNow()) : null; // ennen tätä ominaisuutta tallennetut ehdotukset
@@ -54,6 +56,7 @@ function draftOr(res) {
   const p = proposals.current();
   if (!p) { json(res, 409, { error: 'Ehdotusta ei ole vielä laadittu' }); return null; }
   if (p.status === 'ordered') { json(res, 409, { error: 'Tilaus on jo lähetetty' }); return null; }
+  if (!planningCurrent(p)) { json(res, 409, { error: 'Suunnittelutiedot muuttuivat: odota uutta tilausehdotusta' }); return null; }
   return p;
 }
 
@@ -63,6 +66,25 @@ const proposalHash = (p) => crypto.createHash('sha1').update(JSON.stringify(acti
 const routes = {
   'GET /api/state': (req, res, t0) => json(res, 200, statePayload(t0)),
   'GET /api/audit': (req, res) => json(res, 200, { entries: auditList(120) }),
+
+  'GET /api/planning': (req, res) => json(res, 200, { menuEvents: kv.get('menuEvents', []), inventory: kv.get('inventory'), incoming: kv.get('incoming', []) }),
+  'POST /api/planning': async (req, res) => {
+    if (deepState.running) return json(res, 409, { error: 'Odota, että nykyinen tarvelaskenta valmistuu' });
+    const body = await readBody(req);
+    const keys = ['menuEvents', 'inventory', 'incoming'];
+    if (!body || typeof body !== 'object' || Array.isArray(body) || !Object.keys(body).length || Object.keys(body).some((k) => !keys.includes(k))) return json(res, 400, { error: 'Sallitut kentät: menuEvents, inventory ja incoming' });
+    const data = Object.fromEntries(keys.map((k) => [k, Object.hasOwn(body, k) ? body[k] : kv.get(k, k === 'inventory' ? null : [])]));
+    const errors = validatePlanning(data, loadCatalog());
+    if (!errors.length && Object.hasOwn(body, 'menuEvents')) for (const ev of data.menuEvents) for (const g of ev.groups) {
+      if (typeof (g.includedInBookings ?? ev.includedInBookings) !== 'boolean') errors.push(`${ev.name || ev.id}: ilmoita includedInBookings, jotta ryhmää ei lasketa kahdesti`);
+    }
+    if (errors.length) return json(res, 400, { error: 'Suunnittelutiedot ovat puutteelliset', details: errors });
+    for (const k of keys) if (Object.hasOwn(body, k)) kv.set(k, data[k]);
+    kv.set('planningRevision', kv.get('planningRevision', 0) + 1);
+    audit('käyttäjä', 'Päivitti keittiön suunnittelutiedot', { kentat: Object.keys(body) });
+    runDeep({ reason: 'resepti- tai varastotiedot päivitetty' }).catch((e) => console.error('[deep]', e));
+    json(res, 202, { started: true });
+  },
 
   // Tila-arvaus: millaista tilausta ostaja on tekemässä (säännöt, ei kielimallia). POST vahvistaa arvauksen tai vaihtaa tilan.
   'GET /api/mode': (req, res) => json(res, 200, { mode: orderMode() }),
@@ -213,6 +235,7 @@ const routes = {
     if (!p) return json(res, 409, { error: 'Ehdotusta ei ole' });
     const existing = orders.byProposal(p.id);
     if (existing) return json(res, 200, { ok: true, order: existing, duplicate: true, proposal: p }); // tuplaklikkaus ei luo toista tilausta
+    if (!planningCurrent(p)) return json(res, 409, { error: 'Suunnittelutiedot muuttuivat: tarkista uusi tilausehdotus' });
     const t = reviewTokens.get(token);
     if (!t || t.proposalId !== p.id || t.expires < Date.now()) return json(res, 409, { error: 'Tarkistus on vanhentunut, tarkista tilaus uudelleen' });
     if (t.hash !== proposalHash(p)) return json(res, 409, { error: 'Tilaus muuttui tarkistuksen jälkeen, tarkista uudelleen' });
@@ -266,7 +289,7 @@ async function boot() {
   bootGateway();
   await aimoWarm();
   console.log(`Aimo-malli: sanasto ${aimoLexicon().stats.concepts} käsitettä, ${aimoLexicon().stats.categories} tuoteryhmää, ${aimoLexicon().stats.brands} merkkiä (${aimoLexicon().stats.ms} ms)`);
-  server.listen(config.port, () => console.log(`\n→ http://localhost:${config.port}\n`));
+  server.listen(config.port, () => console.log(`\n→ http://localhost:${server.address().port}\n`));
 
   // Hintalähteen vaihtuessa (simuloitu ↔ live) demodata alustetaan uudelleen, jotta demobudjetti kalibroituu oikeilla hinnoilla.
   if (!kv.get('kitchen') || (proposals.current() && proposals.current().source !== apiMode())) await seedDemo();
