@@ -6,140 +6,55 @@
   <meta name="theme-color" content="#003c75">
   <meta name="color-scheme" content="light">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="description" content="Tilaa Valio Aimolta WhatsAppissa. Kerro tarve omin sanoin, tarkista kori ja vahvista tilaus.">
-  <title>Aimo Tilausapuri | Junction 2026 -demo</title>
+  <meta name="description" content="Valio Aimon WhatsApp-tilausapuri. Anna numerosi ja tilaa WhatsAppissa.">
+  <title>WhatsAppin tilausapuri | Valio Aimo</title>
   <link rel="icon" href="/aimo-logo.png">
   <link rel="stylesheet" href="/landing.css">
   <script type="module" src="/landing.js"></script>
 </head>
 <body>
-  <header class="bar">
-    <a class="brand" href="/" aria-label="Aimo Tilausapuri, etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="138" height="48"></a>
-    <nav aria-label="Päävalikko"><a href="/tilaukset.html">Demotilaukset</a><a class="nav-cta" href="#kokeile">Kokeile itse</a></nav>
-  </header>
+  <main class="page">
+    <div class="marks" role="img" aria-label="Valio Aimo ja WhatsApp">
+      <img class="logo" src="/aimo-logo.png" alt="Valio Aimo" width="152" height="53">
+      <span class="heart" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.3C1 8.4 3.1 4.5 6.9 4.5c2.1 0 3.6 1.1 5.1 3 1.5-1.9 3-3 5.1-3 3.8 0 5.9 3.9 4.5 7.2C19.5 16.4 12 21 12 21Z" fill="currentColor"/></svg></span>
+      <span class="wa-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><path d="M16 3.5A12.4 12.4 0 0 0 5.3 22.2L3.6 28.4l6.4-1.7A12.4 12.4 0 1 0 16 3.5Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M11.6 9.6c.4 0 .8 0 1 .6l1.2 2.8c.1.3 0 .6-.1.9l-.8 1c-.2.2-.2.5 0 .8.7 1.2 2.2 2.8 3.9 3.6.3.1.6.1.8-.1l1-1.2c.2-.3.5-.3.8-.2l2.7 1.3c.3.1.5.4.5.7 0 1.4-1.3 2.6-2.7 2.6-4.6-.4-9.3-4.9-9.7-9.6 0-1.4 1-3.2 1.4-3.2Z" fill="#fff"/></svg>
+      </span>
+    </div>
+    <h1>WhatsAppin tilausapuri</h1>
+    <p class="lead">Anna numerosi, niin pääset tilaamaan Valio Aimolta WhatsAppissa.</p>
 
-  <main>
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-text">
-        <p class="eyebrow">AIMO AGENT GATEWAY, JUNCTION 2026</p>
-        <h1 id="hero-title">Tilaa Valio Aimolta <span>WhatsAppissa.</span></h1>
-        <p class="lead">Kerro tarve omin sanoin. Apuri kokoaa ostoskorin oikeista tuotteista, hinnoista ja toimituspäivistä. Sinä tarkistat ja vahvistat tilauksen.</p>
-        <div class="hero-actions">
-          <a class="button primary" href="#kokeile">Kokeile omalla puhelimella</a>
-          <a class="button ghost" href="/tilaukset.html">Katso demotilaukset</a>
-        </div>
-        <ul class="proof" aria-label="Mitä apuri tekee">
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Oikeat tuotteet ja hinnat</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Kysyy puuttuvat tiedot</li>
-          <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Sinä vahvistat aina</li>
-        </ul>
-      </div>
+    <div class="card">
+      <form id="signup-form" novalidate>
+        <label for="phone">Puhelinnumero</label>
+        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+358 40 123 4567" required>
+        <label for="name">Nimi</label>
+        <input id="name" name="name" autocomplete="name" maxlength="60" required>
+        <label class="consent"><input id="consent" name="consent" type="checkbox" required><span>Numeroani saa käyttää tämän demon WhatsApp-keskusteluun. Tiedot poistetaan viimeistään 7 päivän kuluttua.</span></label>
+        <p id="form-error" class="error" role="alert" hidden></p>
+        <button id="submit" class="button" type="submit">Aloita WhatsAppissa</button>
+      </form>
 
-      <div class="phone" aria-label="Esimerkkikeskustelu WhatsAppissa" role="img">
-        <div class="phone-head">
-          <img src="/aimo-logo.png" alt="" width="40" height="40">
-          <div><strong>Aimo Tilausapuri</strong><span>verkossa</span></div>
-        </div>
-        <div class="chat">
-          <p class="msg me">Moi! Tarvitsen 20 litraa laktoositonta maitoa ja 5 kg voita maanantaiksi.<time>9.41</time></p>
-          <div class="msg bot">
-            <p>Selvä! <b>Ostoskorissasi nyt:</b></p>
-            <p>- Laktoositon kevytmaitojuoma 1 l, 20 kpl<br>- Voi 500 g, 10 kpl</p>
-            <p>Toimitus ma 16.11. Kirjoita <b>ok</b>, niin avaan korin.</p>
-            <time>9.41</time>
-          </div>
-          <p class="msg me">ok<time>9.42</time></p>
-          <div class="msg bot cart">
-            <div class="cart-row"><span class="cart-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h10.2L20 7H6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="19.5" r="1.5" fill="currentColor"/><circle cx="17" cy="19.5" r="1.5" fill="currentColor"/></svg></span><div><b>Ostoskori valmis</b><span>2 tuotetta, toimitus ma 16.11.</span></div></div>
-            <span class="cart-button">Avaa kori ja vahvista</span>
-            <time>9.42</time>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="steps" aria-labelledby="steps-title">
-      <h2 id="steps-title" class="visually-hidden">Näin se toimii</h2>
-      <article>
-        <span class="step-icon chat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 18.5 5.3 15A7.5 7.5 0 1 1 9 18.7Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></span>
-        <p class="step-number">1</p><h3>Kirjoita omin sanoin</h3><p>Puhekieli, kirjoitusvirheet ja epätarkat määrät käyvät. Apuri kysyy vain sen, mikä vaikuttaa tuotteen valintaan.</p>
-      </article>
-      <article>
-        <span class="step-icon cart-step" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h10.2L20 7H6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="19.5" r="1.5" fill="currentColor"/><circle cx="17" cy="19.5" r="1.5" fill="currentColor"/></svg></span>
-        <p class="step-number">2</p><h3>Tarkista kori</h3><p>Tuotteet, määrät, hinnat ja toimituspäivä tulevat Valion rajapinnasta. Kori aukeaa puhelimessa yhdellä napautuksella.</p>
-      </article>
-      <article>
-        <span class="step-icon check-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m9 12 2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-        <p class="step-number">3</p><h3>Vahvista tilaus</h3><p>Allekirjoitettu tarjous ja ostovaltuudet tarkistetaan. Poikkeava tilaus menee ensin ihmisen hyväksyttäväksi.</p>
-      </article>
-    </section>
-
-    <section class="gateway" aria-labelledby="gateway-title">
-      <div>
-        <p class="eyebrow light">SAMA PORTTI KAIKILLE AGENTEILLE</p>
-        <h2 id="gateway-title">WhatsApp on yksi portin asiakkaista.</h2>
-        <p>Aimo Agent Gateway antaa minkä tahansa ostoagentin hakea tuotteita, pyytää kiinteähintaisen tarjouksen ja tehdä tilauksen. Säännöt pysyvät samoina kanavasta riippumatta.</p>
-      </div>
-      <ul class="badges">
-        <li><span aria-hidden="true">✍</span>Allekirjoitettu tarjous</li>
-        <li><span aria-hidden="true">€</span>Ostovaltuudet ja rajat</li>
-        <li><span aria-hidden="true">✓</span>Ihmisen hyväksyntä</li>
-        <li><span aria-hidden="true">⛓</span>Päätösketju tallessa</li>
-      </ul>
-    </section>
-
-    <section id="kokeile" class="signup" aria-labelledby="signup-title">
-      <div class="signup-intro">
-        <p class="eyebrow">KOKEILE ITSE</p>
-        <h2 id="signup-title">Liity demoon puhelinnumerollasi.</h2>
-        <ol class="how">
-          <li><b>Anna numerosi.</b> Liitämme sen omaksi testikeittiöksi, jolla on oma ostoskori.</li>
-          <li><b>Vahvista numerosi.</b> Testivaiheessa saat Metalta WhatsAppiin vahvistuskoodin. Kirjoita se tälle sivulle, niin hyväksymme numerosi.</li>
-          <li><b>Avaa WhatsApp.</b> Kerro, mitä keittiöön tarvitaan. Tilaukset ovat demotilauksia: rahaa ei veloiteta eikä mitään toimiteta.</li>
+      <div id="status" class="status" hidden aria-live="polite">
+        <ol class="track" aria-label="Vaiheet">
+          <li data-step="received">Numero vastaanotettu</li>
+          <li data-step="linked">Lisätty tilausapuriin</li>
+          <li data-step="approved">Hyväksytty WhatsAppiin</li>
+          <li data-step="ready">Valmis keskusteluun</li>
         </ol>
-      </div>
-
-      <div class="card">
-        <form id="signup-form" novalidate>
-          <label for="phone">Puhelinnumero</label>
-          <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+358 40 123 4567" required aria-describedby="phone-help">
-          <p id="phone-help" class="help">Sama numero, jolla käytät WhatsAppia.</p>
-          <label for="name">Nimi</label>
-          <input id="name" name="name" autocomplete="name" maxlength="60" required>
-          <label for="company">Keittiö tai yritys <span>(valinnainen)</span></label>
-          <input id="company" name="company" autocomplete="organization" maxlength="80" placeholder="Demokeittiö">
-          <label class="consent"><input id="consent" name="consent" type="checkbox" required><span>Numeroani saa käyttää tämän demon WhatsApp-keskusteluun. Tiedot poistetaan viimeistään 7 päivän kuluttua.</span></label>
-          <p id="form-error" class="error" role="alert" hidden></p>
-          <button id="submit" class="button primary wide" type="submit">Liity demoon</button>
+        <h2 id="status-title">Lisätään numeroasi apuriin</h2>
+        <p id="status-detail">Tämä kestää yleensä muutaman sekunnin.</p>
+        <form id="code-form" class="code-form" hidden novalidate>
+          <label for="code">Metalta tullut vahvistuskoodi</label>
+          <div class="code-row"><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="123456"><button id="code-submit" class="button" type="submit">Lähetä</button></div>
+          <p id="code-error" class="error" role="alert" hidden></p>
         </form>
-
-        <div id="status" class="status" hidden aria-live="polite">
-          <ol class="track" aria-label="Ilmoittautumisen vaiheet">
-            <li data-step="received">Numero vastaanotettu</li>
-            <li data-step="linked">Lisätty tilausapuriin</li>
-            <li data-step="approved">Hyväksytty WhatsAppiin</li>
-            <li data-step="ready">Valmis keskusteluun</li>
-          </ol>
-          <h3 id="status-title">Lisätään numeroasi apuriin</h3>
-          <p id="status-detail">Tämä kestää yleensä muutaman sekunnin.</p>
-          <form id="code-form" class="code-form" hidden novalidate>
-            <label for="code">Metalta tullut vahvistuskoodi</label>
-            <div class="code-row"><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="123456"><button id="code-submit" class="button primary" type="submit">Lähetä</button></div>
-            <p id="code-error" class="error" role="alert" hidden></p>
-          </form>
-          <a id="open-whatsapp" class="button whatsapp wide" href="#" target="_blank" rel="noopener noreferrer" hidden>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1.3-3.6A8 8 0 1 1 8.3 19Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9 8.5c0 3.4 2.8 6.5 6.5 6.5l1-1.6-2-1-1 .9c-1-.5-2-1.5-2.5-2.5l.9-1-1-2Z" fill="currentColor"/></svg>
-            Avaa WhatsApp
-          </a>
-          <button id="restart" class="link" type="button">Käytä toista numeroa</button>
-        </div>
+        <a id="open-whatsapp" class="button whatsapp" href="#" target="_blank" rel="noopener noreferrer" hidden>Avaa WhatsApp</a>
+        <button id="restart" class="link" type="button">Käytä toista numeroa</button>
       </div>
-    </section>
-  </main>
+    </div>
 
-  <footer>
-    <span>Aimo Agent Gateway, Junction 2026 -demo</span>
-    <span>Demotilaukset eivät ole oikeita Valio-tilauksia. Numeroita käytetään vain tähän demoon.</span>
-  </footer>
+    <p class="foot">Junction 2026 -demo. Tilaukset eivät ole oikeita Valio-tilauksia.</p>
+  </main>
 </body>
 </html>

@@ -9,6 +9,10 @@
 - `scripts/whatsapp-signups.mjs` ajetaan WhatsApp-palvelimen koneella. Se hakee Workerilta odottavat numerot (Worker ei koskaan ota yhteyttä koneeseen, joten tunnelin vaihtuminen ei haittaa), liittää uuden numeron omaksi testiasiakkaaksi samalla `invite`/`pair`-polulla kuin `WHATSAPP_DEMO_PHONE` ja näyttää terminaalissa ja macOS-ilmoituksena, mitä esittäjän pitää tehdä Metassa. Aiemmin YHDISTA-koodilla liitetty numero säilyttää korinsa ja historiansa ja on heti valmis. WhatsApp-linkki luetaan Metasta (`display_phone_number`), joten apurin numeroa ei ole Gitissä.
 - Käyttäjän lisäpyyntö: kokeilija kirjoittaa Metalta tulleen vahvistuskoodin suoraan sivulle. Koodi näkyy vain esittäjän terminaalissa, ja se poistetaan hyväksynnän yhteydessä.
 
+## Yksinkertaistus (Eeliksen pyyntö, klo 01.40)
+
+Sivulla on nyt vain Valio Aimo -logo, sininen sydän, WhatsApp-ikoni, otsikko **WhatsAppin tilausapuri**, yksi rivi ohjetta ja lomake (puhelinnumero, nimi, suostumus). Esittely, puhelinkuva, vaiheet ja yritys-kenttä poistettiin. Palvelin käyttää yrityksenä oletusta Demokeittiö. Tilavaiheet ovat sinisiä, ja WhatsApp-napit vihreitä. Worker-versio `3c4a8c81-6d21-499c-bc31-f629c5badcf4`, julkaistu 477131e:n päältä niin, että sen demomaksulinkki säilyi. Paikallinen selainketju (lomake → liitos → koodi → hyväksyntä → Avaa WhatsApp) toistettiin 375 px:n leveydellä, Workerin testit 20/20.
+
 ## Esittäjän ohje
 
 Käynnistä seuranta projektin juuressa ja jätä se auki:

@@ -79,7 +79,7 @@ function follow(signup, delay = 1500) {
 function fieldError(field, message) {
   const error = $('form-error');
   error.textContent = message; error.hidden = false;
-  for (const name of ['phone', 'name', 'company']) $(name).removeAttribute('aria-invalid');
+  for (const name of ['phone', 'name']) $(name).removeAttribute('aria-invalid');
   if (field && $(field)) { $(field).setAttribute('aria-invalid', 'true'); $(field).focus(); }
 }
 
@@ -95,7 +95,7 @@ $('signup-form').addEventListener('submit', async event => {
   try {
     const response = await fetch('/api/signups', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ phone, name, company: $('company').value.trim(), consent: true }),
+      body: JSON.stringify({ phone, name, consent: true }),
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) return fieldError(body.field, body.error || 'Ilmoittautuminen ei onnistunut. Yritä uudelleen.');
@@ -106,7 +106,7 @@ $('signup-form').addEventListener('submit', async event => {
     fieldError(null, 'Yhteys katkesi. Tarkista verkko ja yritä uudelleen.');
   } finally {
     $('submit').disabled = false;
-    $('submit').textContent = 'Liity demoon';
+    $('submit').textContent = 'Aloita WhatsAppissa';
   }
 });
 
