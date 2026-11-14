@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — demon skenaario 3 näyttää taas toimituspäivän siirron (Claude Code, katselmointichatti)
+
+- **Käyttäjän pyyntö:** korjaa haastekatselmoinnin löydös 1. Sunnuntaina "200 litres of lactose-free milk by Sunday" tulkitaan seuraavaksi sunnuntaiksi 22.11., jolloin tilaus vahvistui ilman `DELIVERY_DATE_SHIFT`-polkua.
+- `scripts/demo-buyer.mjs`: skenaarion 3 pyyntö on nyt "200 litres of lactose-free milk today" ja otsikko "tänään ei ehdi"; README:n esimerkkituloste päivitetty. Gateway- tai tulkintakoodia ei muutettu. Toimii niin kauan kuin "tänään" (tai `DEMO_NOW`) on ennen mock-API:n toimituspäivää ma 16.11.
+- **Tarkistus:** `node --check`; koko `npm run demo` eristetyllä palvelimella (portti 4799, omat väliaikaiset kannat ja avain, ei malliavainta) oikeaa mock-API:a vasten: skenaario 3 → `pending_approval (DELIVERY_DATE_SHIFT)`, kaikki muut skenaariot samat kuin edellisessä ajossa, lokiketju ehjä (185 riviä). Testipalvelin pysäytetty, käynnissä olevaan demoon ei koskettu.
+
 ## 15.11.2026 — haasteen vaatimukset tarkistettu toteutusta vasten (Claude Code, katselmointichatti)
 
 - **Käyttäjän pyyntö:** tarkista kaikki tehty haastekuvausta vasten ja vastaa, miten toteutus täyttää sen. Kohta kohdalta -kartta: `docs/challenge-coverage.md`. Koodia ei muutettu.

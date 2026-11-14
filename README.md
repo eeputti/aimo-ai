@@ -79,7 +79,7 @@ npm run demo
 ━━ 2. "100 litraa Arlan rasvatonta laktoositonta maitojuomaa maanantaiksi"
           stock is 51 → 51 × original + 49 × substitute, same allergen profile, cheaper
           → confirmed without a human (within mandate), human gets a notification
-━━ 3. "… by Sunday"       → earliest delivery is Monday → pending_approval (DELIVERY_DATE_SHIFT)
+━━ 3. "… today"           → earliest delivery is Monday → pending_approval (DELIVERY_DATE_SHIFT)
 ━━ 4. tampered offer      → rejected (OFFER_INVALID_SIGNATURE)
 ━━ 5. new buyer, default mandate → pending_approval (APPROVAL_ALWAYS)
 ━━ Audit trail: chain VALID

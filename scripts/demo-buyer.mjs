@@ -28,7 +28,8 @@ if (a.order?.status === 'pending_approval') {
   line(`   Ihminen hyväksyi yhdellä napilla → ${approved.status}`);
 }
 const b = await scenario('2. Osittainen saatavuus → agentti täydentää korvaajalla sääntöjen sisällä', { apiKey: 'demo-nordic-hotels', text: '100 litraa Arlan rasvatonta laktoositonta maitojuomaa maanantaiksi' });
-await scenario('3. Toimitusrajoite → sunnuntaiksi ei ehdi, kysytään päivän siirrosta', { apiKey: 'demo-nordic-hotels', text: '200 litres of lactose-free milk by Sunday' });
+// "today" eikä "by Sunday": sunnuntaina "by Sunday" tarkoittaa seuraavaa sunnuntaita, jolloin päivä ei siirry.
+await scenario('3. Toimitusrajoite → tänään ei ehdi, kysytään päivän siirrosta', { apiKey: 'demo-nordic-hotels', text: '200 litres of lactose-free milk today' });
 await scenario('4. Muokattu tarjous hylätään (allekirjoitus ei täsmää)', { apiKey: 'demo-nordic-hotels', text: '50 litres of lactose-free milk by Monday', tamper: true });
 await scenario('5. Uusi asiakas oletusmandaatilla → jokainen tilaus kuitataan', { apiKey: 'demo-kahvila-aalto', text: '20 litraa laktoositonta maitoa maanantaiksi' });
 

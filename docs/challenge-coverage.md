@@ -41,7 +41,7 @@ Nähty: osittainen saldo 51 + 49 korvaajaa, `SUBSTITUTION_WITHIN_POLICY`, vahvis
 
 ## Löydökset ennen palautusta (su klo 10.00)
 
-1. **Demon skenaario 3 ei toimi sunnuntaina.** "200 litres of lactose-free milk by Sunday" tulkitaan nyt seuraavaksi sunnuntaiksi 22.11., ja tilaus vahvistuu ilman päivän siirtoa. Tulkinta antaa sanalle "today" päivän 15.11., joka on mock-API:n aikaisinta toimitusta (16.11.) aiemmin. Tilauksen `DELIVERY_DATE_SHIFT`-polkua ei ajettu tällä tekstillä.
+1. **Korjattu su klo 00.50: demon skenaario 3.** "200 litres of lactose-free milk by Sunday" tulkittiin sunnuntaina seuraavaksi sunnuntaiksi 22.11., ja tilaus vahvistui ilman päivän siirtoa. Pyyntö on nyt "200 litres of lactose-free milk today" (15.11., mock-API:n aikaisin toimitus 16.11.): koko demo ajettu uudelleen eristetysti, skenaario 3 → `pending_approval (DELIVERY_DATE_SHIFT)`, muut skenaariot ennallaan. Toimii niin kauan kuin "tänään" on ennen mock-API:n toimituspäivää 16.11.
 2. **Porttia ei voi kokeilla julkisesta osoitteesta.** Tunnelin kautta vastaavat vain `/healthz` ja WhatsAppin reitit; `/mcp`, `/openapi.json`, `/.well-known/agent-gateway.json`, `/v1/*` ja `/approve.html` palauttavat 404. Paikallisesti portissa 4749 ne vastaavat.
 3. **README:n ja SUUNNITELMA.md:n alku on vanhentunut.** README sanoo WhatsAppin olevan vain lukeva ja tilaamisen puuttuvan, ja SUUNNITELMA.md esittää WhatsAppin pääkäyttöliittymänä. Molemmat sotivat haasteen "ei chatbot" -kehystä vastaan repoa lukevalle tuomarille.
 4. **Palautuksen checklist (SUUNNITELMA.md) on kaikilta kohdiltaan avoin:** video, deck, julkinen demolinkki, tila FINAL.
