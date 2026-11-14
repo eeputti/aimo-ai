@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+
+## 15.11.2026 — palautuksen englanninkielinen pitch-video (Codex, videochatti)
+
+- Käyttäjä pyysi Valio Aimo AI -agentista enintään kahden minuutin videon ja ohjasi hakemaan tiedot aimo-ai-reposta. aimo-team-/teamMCP-aineisto rajattiin pois pitchistä. README:n ja haastekattavuuden mukainen ydin on Agent Gateway; WhatsApp, kauppa ja keittiödemo ovat sen asiakkaita.
+- Valmis kuvitettu MP4 englanninkielisellä synteettisellä kertojaäänellä ja poltetulla tekstityksellä: **110,028 s**, 1280 × 720, H.264/AAC. Julkinen katselu ja lataus: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site . Käsikirjoitus, kohtausajat, lähteet ja rajaukset: docs/pitch-video.md (6e38508).
+- Varmennus: koko videon dekoodaus ilman virheitä, ffprobe-kesto ja koodekit, puhe ei katkea kohtausrajoihin, renderöidyn tekstityksen silmämääräinen tarkistus. Julkaistun MP4:n anonyymi takaisinluku HTTP200, 2 535 186 tavua ja identtinen SHA-256. Sites-versio1, lähdecommit ded2455d5ecfd4d506b64b514e1e287f92f9d4a3, julkaisu succeeded ja yleisö public.
+- Ei oikeita tilauksia, maksuja, Meta-viestejä, palvelinmuutoksia tai challenge-API-ajoja. Kuvitettu työnkulku merkitty, tuotantointegraatiot tulevaisuutena. Ei deckiä tai lomakkeen/yhteystietojen täyttöä. MP4 on tarvittaessa ladattavissa YouTubeen/Vimeoon käyttäjän omalle tilille.
+
 ## 15.11.2026 — 100 profiilin viimeiset korjaukset käytössä, katkennut julkinen tunneli palautettu (Codex, token-korjauschatti)
 
 - fe9940d:n sadan profiilin löydösten korjaukset otettu käyttöön. Lopullinen tarkka ajossa oleva versio on **777b5a45e49a427cecf32986700c6399ca4bb6ea**: mukana fe9940d, checkout135c1fd ja toisen chatin valmis korilinkkipainike. Snapshot /private/tmp/aimo-whatsapp-runtime-777b5a45e: kaikki 507 seurattua tiedostoa täsmäävät Gitin blob-tiivisteisiin. Uusi **Node PID 13329 / istunto 97405**, yksi 4749-listener. Myöhempi 9efab5b:n kellonaikatervehdys/kiirevaihe ja sen jälkeiset koodit EIVÄT kuulu tähän runtimeen.
