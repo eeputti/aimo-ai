@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsAppin palvelintoken lähettää, vastaanotto puhelimessa vahvistettu (Codex)
+
+- Käyttäjän toimintakohtaisella hyväksynnällä luotu `AimoDemo` / Employee -palvelintoken, oikea sovellus, voimassa 13.1.2027 klo 22.25.29 Suomen aikaa. Valittu vain `whatsapp_business_messaging`; Meta lisää oletuksena `public_profile`:n. Tunnus tallennettu paikallisesti `.env`:iin (0600), takaisinluku täsmää. Puhelimen lukutarkistus 200 / CONNECTED / VERIFIED. Ei salaisuuksia repoon tai chattiin.
+- Ensimmäinen suppeiden resurssioikeuksien lähetys palautti code 10. Käyttäjä hyväksyi erikseen korjauskokeilun, jossa **vain Test Messaging Account** saa Everything-oikeuden (myös asetukset/käyttäjät/maksutietojen katselu). Testinumeron WhatsApp Account säilyy numeron katselu + Messages -rajauksessa, sovellus kehitys/katselu/testaus; resursseja yhteensä kolme. Muita yritysresursseja, maksutapaa tai PINiä ei muutettu. Metan erillinen tilivahvistuspyyntö muuttui hyväksytyksi.
+- Muutoksen jälkeen sama messaging-only-token hyväksyi yhden lukukuittauksen 200 / success true ja yhden valmiiksi tallennetun tervehdyksen 200 / Meta-viestitunniste klo 22.57.20. Hyväksyntä kirjattu samaan inbox-riviin ja vastausosaan; muut neljä epäonnistunutta riviä säilyvät. **Käyttäjä vahvisti tervehdyksen saapuneen WhatsAppiin.** Laajempaa management-tokenia ei tarvita palvelimen viestintään.
+- Aiempi 131005 ei kuvaa koko myöhempää iltaa: kannassa oli jo 21 Metan hyväksymää vastausta ennen uuden tokenin koetta; viimeisimmät vanhan tokenin virheet olivat klo 22 päättymisen jälkeisiä 401:itä. Oikeusmuutos ratkaisi uuden tokenin code 10 -eston kokeessa; aiemman 131005:n tarkkaa yksittäistä syytä ei päätellä jälkikäteen.
+- **Seuraavaksi:** sovittu yksi toimivan tokenin credential-reload toisen korjauschatin nykyiseen workeriin samoilla kannoilla/tunnelilla, sitten uusi puhelin→worker→puhelin-tukikoe. PNG-profiilivaihto on kesken. Danielin handoff-API ja sen riippumaton varmennus ovat Gitissä; niiden käyttöönoton SHA sovitaan erikseen. API pysyy paikallisena. Tarkka tila ja rajapintasopimus `docs/parallel/1.md`; lähdekoodin omistusrajat säilyvät.
+
 ## 14.11.2026 — vahvistettu tilaus Workeriin ja asiakkaan sähköposti (Claude Code)
 
 - **Käyttäjän päätös:** WhatsApp-keskustelu ja tilausydin pysyvät Node-palvelimella. Cloudflare Workeriin siirtyy vain asiakkaan vahvistama (TILAA, `confirmed`) tilaus, ja Worker lähettää asiakkaalle Peetun pohjaan perustuvan vahvistusviestin. Koko localhostia ei porteta Workersiin ennen demoa; koko taustan alustavalinta pysyy avoimena. Sopimus ja käyttöönotto: `docs/order-events.md`.
