@@ -8,6 +8,8 @@ import { codeHash } from './store.mjs';
 // Varattu testinumero, jota ei voi lisätä Metan vastaanottajaksi. Selaindemolla on oma asiakkuus ja luonnos.
 export const WEB_DEMO_PHONE = '358000000001';
 const PAGE = new URL('../../public/whatsapp-demo.html', import.meta.url);
+// WhatsApp-palvelin ei tarjoa public-kansiota, joten avatarin logo kulkee varademon omalla, yhtä rajatulla reitillä.
+const LOGO = new URL('../../public/aimo-logo.png', import.meta.url);
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
 const LOOPBACK = /^(127\.0\.0\.1|::1|::ffff:127\.0\.0\.1)$/;
 // cloudflared yhdistää paikallisesti, mutta lisää välityspalvelimen otsakkeet. Niiden kanssa pyyntö ei ole paikallinen.
@@ -25,7 +27,7 @@ function body(req) {
 }
 
 /** @param {{store: object, chat: Function, readPage?: () => string}} o chat = tilaussillan chat (ordering.mjs) */
-export function createWebDemo({ store, chat, readPage = () => fs.readFileSync(PAGE, 'utf8') }) {
+export function createWebDemo({ store, chat, readPage = () => fs.readFileSync(PAGE, 'utf8'), readLogo = () => fs.readFileSync(LOGO) }) {
   let queue = Promise.resolve();
   function member() {
     if (!store.member(WEB_DEMO_PHONE)) {
@@ -36,8 +38,14 @@ export function createWebDemo({ store, chat, readPage = () => fs.readFileSync(PA
   }
   return {
     async handle(req, res, url) {
-      if (url.pathname !== '/demo' && url.pathname !== '/demo/chat') return false;
+      if (url.pathname !== '/demo' && url.pathname !== '/demo/chat' && url.pathname !== '/demo/logo.png') return false;
       if (!isLocal(req)) { json(res, 403, { error: 'Selaindemo toimii vain palvelinkoneen omasta selaimesta.' }); return true; }
+      if (url.pathname === '/demo/logo.png') {
+        if (req.method !== 'GET') { json(res, 405, { error: 'Method not allowed' }); return true; }
+        let png;
+        try { png = readLogo(); } catch { res.writeHead(404); res.end(); return true; }
+        res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'max-age=3600' }); res.end(png); return true;
+      }
       if (url.pathname === '/demo' && req.method === 'GET') {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }); res.end(readPage()); return true;
       }

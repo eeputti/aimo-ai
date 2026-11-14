@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Valio Aimo Tilausapuri</title>
+<link rel="icon" href="/demo/logo.png">
 <style>
   :root { --petrol: #005670; --lilac: #ece6f3; --bubble: #d9f2e4; --ink: #0f2a33; --muted: #6b797d; --line: #dfe6e9; --ok: #1a7f37; }
   * { box-sizing: border-box; }
@@ -12,7 +13,8 @@
   .phone { width: min(440px, 100vw); height: min(860px, 100dvh); background: #f4f1ea; display: flex; flex-direction: column; overflow: hidden; }
   @media (min-width: 480px) { .phone { border-radius: 28px; box-shadow: 0 18px 60px rgba(0, 86, 112, .28); border: 8px solid #10242b; } }
   header { background: var(--petrol); color: #fff; display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
-  .avatar { width: 40px; height: 40px; border-radius: 50%; background: #fff; color: var(--petrol); display: grid; place-items: center; font-weight: 800; font-size: 15px; flex: none; }
+  .avatar { width: 42px; height: 42px; border-radius: 50%; background: #fff; color: var(--petrol); display: grid; place-items: center; font-weight: 800; font-size: 13px; flex: none; overflow: hidden; padding: 0 4px; }
+  .avatar img { width: 100%; height: auto; display: block; }
   header b { display: block; font-size: 16px; }
   header small { opacity: .8; font-size: 12px; }
   header button { margin-left: auto; background: none; border: 0; color: #fff; padding: 8px; border-radius: 50%; cursor: pointer; }
@@ -29,10 +31,24 @@
   .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
   @keyframes blink { 0%, 60%, 100% { opacity: .25; } 30% { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) { .typing i { animation: none; } }
-  .chips { display: flex; gap: 8px; padding: 6px 12px; overflow-x: auto; scrollbar-width: none; }
+  .day { align-self: center; background: #fff; color: var(--muted); font-size: 12px; padding: 4px 10px; border-radius: 8px; box-shadow: 0 1px 1px rgba(0, 0, 0, .06); }
+  .msg.welcome b { color: var(--petrol); }
+  .msg.welcome .ex { display: block; margin-top: 4px; color: var(--muted); }
+  .chips { display: flex; gap: 8px; padding: 6px 12px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-behavior: smooth; }
   .chips::-webkit-scrollbar { display: none; }
+  /* Hiirellä: ohut näkyvä vierityspalkki, rullan pystyliike vierittää sivuttain ja rivin voi raahata. */
+  @media (hover: hover) and (pointer: fine) {
+    .chips { scrollbar-width: thin; scrollbar-color: rgba(0, 86, 112, .35) transparent; cursor: grab; }
+    .chips::-webkit-scrollbar { display: block; height: 6px; }
+    .chips::-webkit-scrollbar-thumb { background: rgba(0, 86, 112, .35); border-radius: 3px; }
+    .chips.dragging { cursor: grabbing; scroll-behavior: auto; user-select: none; }
+  }
+  .chips.fade-r { -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  .chips.fade-l { -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%); mask-image: linear-gradient(90deg, transparent, #000 15%); }
+  .chips.fade-l.fade-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent); mask-image: linear-gradient(90deg, transparent, #000 15%, #000 85%, transparent); }
   .chips button { flex: none; border: 1px solid var(--petrol); background: #fff; color: var(--petrol); border-radius: 16px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
   .chips button:hover { background: var(--lilac); }
+  @media (prefers-reduced-motion: reduce) { .chips { scroll-behavior: auto; } }
   form { display: flex; gap: 8px; padding: 8px 10px 12px; }
   textarea { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 20px; padding: 10px 14px; font: inherit; font-size: 15px; height: 42px; max-height: 120px; outline: none; }
   textarea:focus { border-color: var(--petrol); }
@@ -44,7 +60,7 @@
 <body>
 <main class="phone">
   <header>
-    <div class="avatar" aria-hidden="true">aimo</div>
+    <div class="avatar" aria-hidden="true"><img src="/demo/logo.png" alt="" onerror="this.replaceWith('aimo')"></div>
     <div><b>Valio Aimo Tilausapuri</b><small>Demo, oikeaa tilausta ei lähetetä</small></div>
     <button type="button" id="reset" title="Aloita alusta" aria-label="Aloita alusta">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
@@ -77,9 +93,51 @@
     log.append(el); log.scrollTop = log.scrollHeight;
     return el;
   }
+  // Tyhjä näkymä: paikallinen tervetuloviesti, ei palvelinkutsua eikä mallivuoroa.
+  function welcome() {
+    const day = document.createElement('div'); day.className = 'day'; day.textContent = 'Tänään';
+    const el = document.createElement('div'); el.className = 'msg in welcome';
+    el.innerHTML = '<b>Moi! Olen Aimo-tilausapuri.</b>\nKerro mitä keittiöön tarvitaan ja mille päivälle, niin kokoan ostoslistan ja ehdotan sopivat tuotteet. Tilaus lähtee vasta, kun vahvistat sen sanalla <b>TILAA</b>.'
+      + `<span class="ex">Esim. 20 l maitoa ja 5 kg voita maanantaiksi</span><time>${clock()}</time>`;
+    log.replaceChildren(day, el);
+  }
   function setChips(list) {
     chips.replaceChildren(...list.map((t) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = () => send(t); return b; }));
+    chips.scrollLeft = 0; fadeChips();
   }
+  // Pikavalintojen vieritys hiirellä: rullan pystyliike sivuttain, raahaus ja reunojen häivytys kun rivi jatkuu.
+  function fadeChips() {
+    const max = chips.scrollWidth - chips.clientWidth;
+    chips.classList.toggle('fade-l', chips.scrollLeft > 2);
+    chips.classList.toggle('fade-r', max - chips.scrollLeft > 2);
+  }
+  chips.addEventListener('scroll', fadeChips, { passive: true });
+  window.addEventListener('resize', fadeChips);
+  chips.addEventListener('wheel', (e) => {
+    if (chips.scrollWidth <= chips.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    chips.scrollBy({ left: e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY });
+  }, { passive: false });
+  let drag = null;
+  chips.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0 || chips.scrollWidth <= chips.clientWidth) return;
+    drag = { x: e.clientX, left: chips.scrollLeft, moved: false, id: e.pointerId };
+  });
+  chips.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x;
+    if (!drag.moved && Math.abs(dx) < 5) return;
+    if (!drag.moved) { drag.moved = true; chips.classList.add('dragging'); chips.setPointerCapture(e.pointerId); }
+    chips.scrollLeft = drag.left - dx;
+  });
+  const endDrag = () => {
+    if (!drag) return;
+    // Raahauksen päättävä vapautus ei saa samalla lähettää pikavastausta.
+    if (drag.moved) chips.addEventListener('click', (ev) => { ev.stopPropagation(); ev.preventDefault(); }, { capture: true, once: true });
+    chips.classList.remove('dragging'); drag = null;
+  };
+  chips.addEventListener('pointerup', endDrag);
+  chips.addEventListener('pointercancel', endDrag);
   async function send(text) {
     text = text.trim();
     if (!text || busy) return;
@@ -103,8 +161,16 @@
   form.addEventListener('submit', (e) => { e.preventDefault(); send(input.value); });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input.value); } });
   input.addEventListener('input', () => { input.style.height = ''; input.style.height = `${Math.min(input.scrollHeight, 120)}px`; });
-  document.getElementById('reset').addEventListener('click', async () => { if (busy) return; log.replaceChildren(); await send('peru'); setChips(START); });
-  setChips(START); input.focus();
+  // Alusta: sama nollausviesti kuin ennen, mutta näkymä palaa tervetuloviestiin eikä näytä nollausvuoroa.
+  document.getElementById('reset').addEventListener('click', async () => {
+    if (busy) return;
+    busy = true; sendBtn.disabled = true; welcome(); setChips(START);
+    try {
+      const res = await fetch('/demo/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: 'peru' }) });
+      if (!res.ok) bubble('Alusta aloitus ei onnistunut. Edellinen luonnos voi olla yhä voimassa.', 'in', 'fail');
+    } catch { bubble('Yhteys palvelimeen katkesi. Edellinen luonnos voi olla yhä voimassa.', 'in', 'fail'); } finally { busy = false; sendBtn.disabled = false; input.focus(); }
+  });
+  welcome(); setChips(START); input.focus();
 </script>
 </body>
 </html>

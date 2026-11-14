@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — varademon tervetuloviesti, hiirellä vieritettävät pikavalinnat ja logo (Claude Code, aleksi-claude)
+
+**Käyttäjän pyyntö:** Aleksi rajasi työnjaon tehtävän B (/demo-varademo) kolmeen visuaaliseen korjaukseen. Työ varattiin yhteiseltä taululta (`f4ceb8a9`). Tarkka raportti `docs/parallel/varademo-qa.md`.
+
+- `public/whatsapp-demo.html`: tyhjässä näkymässä Tänään-merkki ja apurin tervetuloviesti (selaimessa, ei palvelinkutsua). Alusta-painike lähettää saman `peru`-viestin mutta palauttaa näkymän tervetuloviestiin. Pikavalintarivi vierittyy hiiren rullalla sivuttain ja raahaamalla; raahaus ei lähetä pikavastausta, hiirilaitteilla ohut vierityspalkki ja reunojen häivytys. Avatarissa ja faviconina `aimo-logo.png`.
+- `server/whatsapp/web-demo.mjs`: `GET /demo/logo.png` samalla localhost-rajauksella kuin sivu, koska WhatsApp-palvelin ei tarjoa public-kansiota.
+- **Tarkistukset:** varademon testit 2/2 (uusi logoreitin ja tunnelin 403 -tarkistus). Koko `npm test` 155/192 läpi, 30 virhettä: sama tulos ilman tämän työn muutoksia, syynä koneelta puuttuva `data/catalog.json`. Edge headless, eristetty palvelin portissa 4791 simuloidulla chatilla: 1280 ja 375 px, tervetuloviesti, logo, rulla 200 px sivuttain, raahaus ilman lähetystä, kirjoittaa-ilmaisin, Alusta, vaakaylivuoto 0 px, ei konsolivirheitä. Ei malli-, Meta- tai Valio-kutsuja, 4749-palvelimeen ei koskettu.
+- **Avoinna:** moniosaiset vastaukset erillisinä kuplina ja oikean mallin ketju jäivät rajauksen ulkopuolelle; moniosaisuus vaatisi tiedon ordering-sillalta (Danielin tiedostot). Käynnissä oleva 4749-palvelin saa muutokset vasta seuraavassa käyttöönoton omistajan restartissa.
 ## 14.11.2026 — valmis julkinen tilauskatselu ja vain lukeva julkaisija GitHubiin (Codex, Cloudflare-julkaisuchatin toteutus)
 
 - **Tekijä ja valtuutettu rajaus:** `Arvioi Cloudflare Workers -vaihtoehto` -chat toteutti ja luovutti `deploy/cloudflare/`-paketin sekä `docs/cloudflare.md`- ja `docs/parallel/cloudflare-setup.md`-raportit (tehtävä `6432ffe5`). Käyttäjä valitsi ensin ilmaisen jaettavan katselusivun nykyisen taustapalvelimen jäädessä koneelle. Tämä vaihe ei siirrä WhatsAppia, verkkokauppaa tai MCP:tä Workersiin. Käyttäjän uudempi koko backendin alustavertailu ei peru erikseen hyväksyttyä katseluvaihetta.
