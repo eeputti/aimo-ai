@@ -1,0 +1,232 @@
+// Toimitustukun näköinen WhatsApp-kori. Ainoa totuus on palvelimen luonnos: sivu lukee sen
+// korilinkin rajatusta API:sta eikä kopioi riviä selaimen omaan ostoskoriin.
+const $ = (id) => document.getElementById(id);
+const token = location.hash.slice(1);
+// Sama avain kuin aiemmalla korisivulla: kesken jäänyt pyyntö säilyy myös sivun vaihtuessa.
+const storageKey = `aimo.whatsapp-cart.pending.${token.slice(-24)}`;
+const doneKey = `aimo.whatsapp-cart.done.${token.slice(-24)}`;
+let list = null; let priced = null; let busy = false; let reviewed = false; let pending = null; let done = null; let rows = [];
+try { pending = JSON.parse(sessionStorage.getItem(storageKey)); } catch { /* read-only browsing still works */ }
+
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const money = (n) => n == null ? 'Hinta tarkistetaan' : `${n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const num = (n) => Number(n).toLocaleString('fi-FI', { maximumFractionDigits: 3 });
+const dateLabel = (iso) => iso.split('-').reverse().join('.');
+const round = (n) => Math.round(n * 100) / 100;
+const claims = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
+const allergens = { AM: 'maidoton', AW: 'ei gluteeniviljoja', AE: 'munaton', AN: 'pähkinätön', AP: 'ei maapähkinää', AF: 'kalaton', AY: 'soijaton' };
+const diet = (v) => [...(v?.claims || []).map((c) => claims[c] || c), ...(v?.excludeAllergens || []).map((c) => allergens[c] || c)].join(', ');
+const unitLabel = (q) => q.unit === 'L' ? 'l' : q.unit === 'KG' ? 'kg' : q.basis === 'sales' ? 'pakkausta' : 'kpl';
+const coverLabel = (c) => c && Number.isFinite(c.value) ? `${num(c.value)} ${c.unit === 'L' ? 'l' : c.unit === 'KG' ? 'kg' : 'kpl'}` : '';
+const icon = (name) => `<span class="icon i-${name}" aria-hidden="true"></span>`;
+let statusTimer;
+function tell(text) { clearTimeout(statusTimer); const s = $('wa-status'); s.textContent = text; s.hidden = false; statusTimer = setTimeout(() => { s.hidden = true; }, 4000); }
+
+async function request(path = '', input) {
+  const response = await fetch(`/whatsapp/cart/api${path}`, {
+    headers: { authorization: `Bearer ${token}`, ...(input ? { 'content-type': 'application/json' } : {}) },
+    ...(input ? { method: 'POST', body: JSON.stringify(input) } : {}), cache: 'no-store',
+  });
+  let data = {};
+  try { data = await response.json(); } catch { /* an empty error body keeps the generic message */ }
+  if (!response.ok) throw Object.assign(new Error(data.error || 'Ostoskoria ei voitu avata.'), { status: response.status });
+  return data;
+}
+// Hinnat ja myyntipakkaukset tulevat samasta luonnoksesta tarkistetusta tarjouksesta, vain valmiille korille.
+async function prices(value) {
+  if (!value || value.status !== 'review') return null;
+  const key = `${value.id}:${value.revision}`;
+  if (priced?.key === key) return priced;
+  try {
+    const data = await request('/export');
+    if (data.state === 'ready' && data.id === value.id && data.revision === value.revision && Array.isArray(data.lines)) return { key, state: 'ready', lines: data.lines };
+    return { key, state: data.state === 'waiting' ? 'waiting' : 'none', message: data.message };
+  } catch { return { key, state: 'none' }; } // Rivit näkyvät ilman hintoja, jos tarkistus ei onnistu.
+}
+
+function lines() {
+  if (priced?.lines) return priced.lines.map((l) => {
+    const source = list.lines.find((x) => x.selectedProductId === l.id);
+    const net = Number.isFinite(l.price) ? round(l.price * l.qty) : null;
+    const per = l.requested && ['L', 'KG'].includes(l.requested.unit) && l.requested.value > 0 && net != null ? { value: round(net / l.requested.value), unit: l.requested.unit === 'L' ? 'l' : 'kg' } : null;
+    return { id: l.id, name: l.name, term: source?.productTerm || l.name, qty: l.qty, unit: l.unit || 'kpl', price: l.price, vat: l.vat, taxUnknown: l.taxUnknown || l.vat == null,
+      net, per, covers: coverLabel(l.requested), note: diet(source) };
+  });
+  return list.lines.map((l) => ({ id: l.selectedProductId, name: l.selectedName || l.productTerm, term: l.productTerm,
+    qty: l.quantity?.value ?? null, unit: l.quantity ? unitLabel(l.quantity) : '', price: null, net: null, note: diet(l),
+    needsProduct: !l.selectedProductId, needsQty: !l.quantity }));
+}
+function picture(p) {
+  return `<div class="cart-picture${p.id ? '' : ' wa-noimg'}">${p.id ? `<img src="/whatsapp/cart/img/${encodeURIComponent(p.id)}" alt="" loading="lazy">` : ''}</div>`;
+}
+function row(p) {
+  const qty = p.qty == null ? '<span class="wa-qty-missing">Määrä?</span>' : `<span class="wa-qty-value">${esc(num(p.qty))}</span><span class="wa-unit">${esc(p.unit)}</span>`;
+  const gross = p.net == null || p.taxUnknown ? null : round(p.net * (1 + p.vat / 100));
+  const notes = [];
+  if (p.needsProduct) notes.push(`Valitse tarkka tuote: ${esc(p.term)}`);
+  if (p.needsQty) notes.push(`Kerro määrä: ${esc(p.term)}`);
+  return `<tbody data-term="${esc(p.term)}">
+    <tr>
+      <td><div class="cart-product">${picture(p)}<div><span class="cart-product-name">${esc(p.name)}</span><span class="cart-product-code">${p.id ? esc(p.id) : 'Tuote valitaan'}${p.note ? `<span class="wa-diet">${esc(p.note)}</span>` : ''}</span></div></div></td>
+      <td><div class="cart-unit-price"><span class="cart-price"><strong>${money(p.price)}</strong>${p.price == null ? '' : ` / ${esc(p.unit)}`}</span></div></td>
+      <td>${p.per ? `<span class="cart-price">${money(p.per.value)} / ${p.per.unit}</span>` : ''}</td>
+      <td><button type="button" class="cart-quantity wa-qty" data-prefill="${esc(p.term)} " aria-label="Muuta määrää: ${esc(p.name)}">${qty}${icon('edit')}</button></td>
+      <td>${esc(p.covers || '')}</td>
+      <td class="cart-line-total"><strong>${p.net == null ? '–' : money(p.net)}</strong>${p.net == null ? '' : gross == null ? '<small>Alv tarkistetaan</small>' : `<small>${money(gross)} (alv ${esc(num(p.vat))} %)</small>`}</td>
+      <td><button type="button" class="cart-remove" data-prefill="poista ${esc(p.term)}" aria-label="Poista tuote ostoskorista: ${esc(p.name)}">${icon('trash')}</button></td>
+    </tr>
+    ${notes.length ? `<tr class="cart-problem wa-note"><td colspan="7"><div class="cart-move-line">${icon('warning')}${notes.join('. ')}. <button type="button" data-prefill="${esc(p.term)} ">Täydennä</button></div></td></tr>` : ''}
+  </tbody>`;
+}
+function totals() {
+  const known = rows.length && rows.every((p) => p.net != null);
+  const net = known ? round(rows.reduce((s, p) => s + p.net, 0)) : null;
+  const vat = {}; let taxUnknown = !known;
+  if (known) for (const p of rows) { if (p.taxUnknown) taxUnknown = true; else vat[p.vat] = round((vat[p.vat] || 0) + p.net * p.vat / 100); }
+  const gross = known && !taxUnknown ? round(net + Object.values(vat).reduce((s, v) => s + v, 0)) : null;
+  return { net, vat, gross, known, taxUnknown };
+}
+function controls() {
+  const locked = busy || !list || !!pending || !!done;
+  for (const el of document.querySelectorAll('#wa-edit-form input, #wa-edit-form button, [data-prefill]')) el.disabled = locked;
+  $('wa-review').disabled = locked;
+  $('wa-review').hidden = !!done;
+  $('wa-retry').hidden = !pending; $('wa-retry').disabled = busy;
+  $('wa-confirm').hidden = !reviewed || locked;
+}
+function render() {
+  if (!list) {
+    rows = [];
+    $('wa-days').replaceChildren(); $('wa-selected-day').textContent = '';
+    for (const id of ['wa-company', 'wa-site', 'wa-diet']) $(id).textContent = '–';
+    $('wa-head-count').textContent = '0'; $('wa-head-total').textContent = '0,00 €'; $('wa-head-date-label').textContent = '–';
+    $('wa-totals').replaceChildren();
+    controls(); return;
+  }
+  rows = lines();
+  const t = totals();
+  const date = list.deliveryDate;
+  $('wa-days').innerHTML = `<button type="button" class="cart-day" role="tab" aria-selected="true" aria-controls="wa-lines">${date ? dateLabel(date) : 'Päivä puuttuu'}<span class="cart-count">${rows.length}</span></button>`;
+  $('wa-selected-day').textContent = date ? `Valittu toimitus ${dateLabel(date)}` : 'Toimituspäivä puuttuu';
+  $('wa-head-date-label').textContent = date ? dateLabel(date) : 'Valitse';
+  $('wa-head-count').textContent = String(rows.length);
+  $('wa-head-total').textContent = t.gross != null ? money(t.gross) : t.net != null ? money(t.net) : 'Tarkistetaan';
+  $('wa-head-cart').setAttribute('aria-label', `Ostoskori: ${rows.length} tuotetta`);
+  $('wa-company').textContent = list.companyName || 'WhatsApp-asiakas';
+  $('wa-account-company').textContent = list.companyName || 'WhatsApp-asiakas';
+  $('wa-site').textContent = list.deliverySiteId ? 'Testikeittiö' : 'Kerro toimitusosoite apurille';
+  $('wa-diet').textContent = diet(list.diet) || 'Ei ilmoitettuja yhteisiä vaatimuksia';
+  $('wa-lines').innerHTML = rows.length
+    ? `<table class="cart-table" aria-label="Ostoskorin tuotteet"><colgroup>${'<col>'.repeat(7)}</colgroup><thead><tr><th scope="col">Tuote</th><th scope="col">Yksikköhinta<span>(alv 0 %)</span></th><th scope="col">Vertailuhinta<span>(alv 0 %)</span></th><th scope="col">Määrä</th><th scope="col">Sis.</th><th scope="col">Hinta yhteensä<span>(alv 0 % / sis. alv)</span></th><th scope="col"><span class="sr-only">Poista</span></th></tr></thead>${rows.map(row).join('')}</table>`
+    : '<div class="cart-empty"><p>Ostoskori on tyhjä. Kirjoita tuotteet yllä olevaan kenttään tai WhatsAppiin.</p></div>';
+  const missing = [];
+  if (!date) missing.push('toimituspäivä');
+  if (rows.some((p) => p.needsProduct)) missing.push('tarkka tuotevalinta');
+  if (rows.some((p) => p.needsQty)) missing.push('määrä');
+  const alert = done ? '' : missing.length ? `Täydennä vielä: ${missing.join(', ')}. Kirjoita tieto yllä olevaan kenttään tai WhatsAppiin.`
+    : priced?.state === 'waiting' ? (priced.message || 'Tuotteen saatavuus pitää tarkistaa ennen tilaamista.') : '';
+  $('wa-alert').hidden = !alert; $('wa-alert-text').textContent = alert;
+  const vatRows = Object.entries(t.vat).map(([rate, amount]) => `<div><dt>Alv ${esc(num(rate))} %</dt><dd>${money(amount)}</dd></div>`).join('');
+  $('wa-totals').innerHTML = `<div><dt>Ostokset (alv 0 %)</dt><dd>${t.known ? money(t.net) : 'Tarkistetaan'}</dd></div><div><dt>Toimitusmaksu (alv 0 %)</dt><dd>0,00 €</dd></div><div><dt>Yhteensä (alv 0 %)</dt><dd>${t.known ? money(t.net) : 'Tarkistetaan'}</dd></div>${vatRows}<div class="cart-final"><dt>Yhteensä (sis. alv)</dt><dd>${t.gross != null ? money(t.gross) : 'Tarkistetaan'}</dd></div>`;
+  controls();
+}
+async function load({ keepReview = false } = {}) {
+  const before = list && `${list.id}:${list.revision}`;
+  const data = await request(); const next = data.shoppingList || null;
+  const p = await prices(next);
+  if (!keepReview || before !== (next && `${next.id}:${next.revision}`)) { reviewed = false; $('wa-review-panel').hidden = true; }
+  list = next; priced = p; render();
+}
+// Vahvistuspainike tulee vasta erikseen pyydetyn tarkistuksen jälkeen; muutoksen jälkeen ohjataan tarkistukseen.
+const tidy = (text, review) => text.replace(/(?:Vahvista(?: valmis)?(?: tilaus)? vastaamalla|vastaa)\s+\*?TILAA\*?(?:,\s*kun haluat tilata)?[.!]?/giu,
+  review ? 'Vahvista tilaus alla olevasta vihreästä painikkeesta.' : 'Paina TARKISTA JA TILAA, kun haluat vahvistaa tilauksen.');
+const formatted = (text) => esc(text).replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>');
+async function send(text, review = false) {
+  if (busy || done || (!list && !pending)) return;
+  if (!pending) {
+    pending = { text, messageId: crypto.randomUUID(), expectedList: { id: list.id, revision: list.revision }, review };
+    try { sessionStorage.setItem(storageKey, JSON.stringify(pending)); }
+    catch { pending = null; tell('Salli selaimen istuntotallennus ennen tilauksen muuttamista tai vahvistamista.'); return; }
+  }
+  busy = true; reviewed = false; controls(); tell(pending.review ? 'Tarkistetaan tilausta…' : 'Päivitetään ostoskoria…');
+  try {
+    const wasReview = pending.review;
+    const data = await request('/chat', pending);
+    pending = null; sessionStorage.removeItem(storageKey);
+    if (['confirmed', 'pending_approval'].includes(data.status)) {
+      done = { status: data.status, text: data.text || '', ...(data.checkout ? { checkout: data.checkout } : {}), orderId: data.orderId };
+      try { sessionStorage.setItem(doneKey, JSON.stringify(done)); } catch { /* the receipt is also in WhatsApp */ }
+      showDone(); render(); tell($('wa-done-title').textContent);
+      window.dispatchEvent(new CustomEvent('aimo:order-result', { detail: data })); return;
+    }
+    const next = data.shoppingList || null; const p = await prices(next);
+    list = next; priced = p;
+    $('wa-reply').innerHTML = formatted(data.status === 'ready' ? tidy(data.text || '', wasReview) : data.text || '');
+    $('wa-review-panel').hidden = false;
+    reviewed = wasReview && data.status === 'ready' && !!list;
+    render();
+    tell(reviewed ? 'Tarkista yhteenveto. Vahvista vasta, kun kaikki on oikein.' : 'Ostoskori päivitetty.');
+    $('wa-message').value = '';
+    if (wasReview || !reviewed) $('wa-review-panel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  } catch (error) {
+    if ([400, 403, 409, 410, 413, 415].includes(error.status)) {
+      pending = null; sessionStorage.removeItem(storageKey);
+      if (error.status === 409) {
+        $('wa-review-panel').hidden = true;
+        try { await load(); error.message = 'Ostoskori muuttui WhatsAppissa ja on nyt päivitetty. Tarkista tilaus uudelleen ennen vahvistamista.'; }
+        catch { list = null; render(); }
+      } else if ([403, 410].includes(error.status)) { list = null; render(); showProblem(error.message); }
+    }
+    tell(error.message);
+  } finally { busy = false; controls(); }
+}
+function showDone() {
+  $('wa-review-panel').hidden = true; $('wa-edit-form').hidden = true;
+  $('wa-done-title').textContent = done.status === 'confirmed' ? 'Demotilaus vahvistettu' : 'Tilaus odottaa hyväksyntää';
+  $('wa-done-text').innerHTML = formatted(done.text); $('wa-done').hidden = false;
+  // Demomaksun siirtymä tulee maksupolun omasta moduulista vain vahvistetulle tilaukselle, jolla on checkout-tieto.
+  if (done.status === 'confirmed' && done.checkout?.url) {
+    import('/whatsapp/checkout.js').then((m) => m.showDemoCheckout?.(done, { container: $('demo-checkout'), document })).catch(() => {});
+  }
+}
+function showProblem(text) {
+  $('wa-lines').innerHTML = `<div class="cart-empty wa-problem"><p>${esc(text)}</p></div>`;
+  $('wa-alert').hidden = false; $('wa-alert-text').textContent = text;
+}
+function prefill(text) {
+  const input = $('wa-message'); if (input.disabled) return;
+  input.value = text; input.focus(); input.setSelectionRange(text.length, text.length);
+  input.closest('form').scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.prefill != null) { prefill(b.dataset.prefill); return; }
+  if (b.dataset.action === 'print') window.print();
+  if (b.dataset.action === 'reload' && !busy && !pending) load({ keepReview: true }).then(() => tell('Ostoskori on ajan tasalla.')).catch((e) => tell(e.message));
+});
+// Puuttuva tuotekuva näyttää pakkauskuvakkeen kuten kaupan haussa.
+document.addEventListener('error', (ev) => {
+  const img = ev.target;
+  if (img instanceof HTMLImageElement && img.closest('.cart-picture')) { img.hidden = true; img.closest('.cart-picture').classList.add('wa-noimg'); }
+}, true);
+$('wa-review').addEventListener('click', () => { void send('näytä', true); });
+$('wa-confirm').addEventListener('click', () => { if (reviewed) void send('TILAA'); });
+$('wa-retry').addEventListener('click', () => { if (pending) void send(pending.text, pending.review); });
+$('wa-edit-form').addEventListener('submit', (ev) => { ev.preventDefault(); const text = $('wa-message').value.trim(); if (text && !pending) void send(text); });
+// Uusi korilinkki samassa välilehdessä vaihtaa vain fragmentin: ladataan sivu uuden linkin oikeuksilla.
+window.addEventListener('hashchange', () => location.reload());
+// WhatsAppista palatessa kori päivitetään. Hyväksyntä säilyy vain, jos luonnos ei muuttunut.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && token && !busy && !pending && !done) load({ keepReview: true }).catch(() => {});
+});
+if (token) {
+  load().then(() => { if (pending) tell('Aiemman pyynnön tulos on vielä tarkistettava. Yritä samaa pyyntöä uudelleen.'); })
+    .catch((error) => {
+      list = null;
+      // Vahvistettu kori suljetaan palvelimella; samassa välilehdessä näytetään sen kuittaus uudelleen.
+      try { done = !pending && [403, 410].includes(error.status) && JSON.parse(sessionStorage.getItem(doneKey)); } catch { done = null; }
+      render();
+      if (done) { showDone(); showProblem('Tilaus on jo vahvistettu tällä linkillä. Kuittaus on myös WhatsAppissa.'); $('wa-alert').hidden = true; return; }
+      showProblem(pending ? 'Aiemman pyynnön vastaus jäi saamatta. Tarkista sen tulos yrittämällä samaa pyyntöä uudelleen.' : error.message);
+    });
+} else { render(); showProblem('Avaa ostoskori WhatsApp-apurin lähettämästä linkistä.'); }

@@ -6,6 +6,7 @@ import { bootstrapDemoMember, createDemoOrderingChat, validateOrderingEnvironmen
 import { createShoppingListHandoff } from './shopping-list.mjs';
 import { createWebDemo } from './web-demo.mjs';
 import { createCartLink } from './cart-link.mjs';
+import { createStorefrontCartPage } from './storefront-cart.mjs';
 
 export const whatsappDbPath = () => process.env.WHATSAPP_DB || fileURLToPath(new URL('../../data/whatsapp.db', import.meta.url));
 export function whatsappSettings(env = process.env) {
@@ -32,13 +33,15 @@ export function createConfiguredWhatsApp() {
     });
   }
   const cartLink = ordering ? createCartLink({ store, ordering, baseUrl: process.env.WHATSAPP_PUBLIC_URL, secret: settings.appSecret }) : null;
+  // Korilinkin sivu kaupan ostoskorin ulkoasulla. Vain staattiset tiedostot; API pysyy cartLinkissä.
+  const storefrontCart = cartLink ? createStorefrontCartPage() : null;
   const channel = createWhatsAppChannel({ settings, store, chat: cartLink?.chat || ordering?.chat || replyToAssistant,
     onPrune: () => ordering?.prune(), send: createMetaSender(settings), typing: createMetaTypingIndicator(settings) });
   // Selaindemo on olemassa vain tilaustilassa, jolloin kannat ovat eristetyt.
   const webDemo = ordering ? createWebDemo({ store, chat: ordering.chat }) : null;
   const shoppingLists = ordering ? createShoppingListHandoff({ store, ordering, defaultPhone: process.env.WHATSAPP_DEMO_PHONE }) : null;
   return { ...channel,
-    async handle(req, res, url = new URL(req.url, 'http://localhost')) { return (cartLink ? await cartLink.handle(req, res, url) : false) || (await channel.handle(req, res, url)) || (shoppingLists ? await shoppingLists.handle(req, res, url) : false) || (webDemo ? webDemo.handle(req, res, url) : false); },
+    async handle(req, res, url = new URL(req.url, 'http://localhost')) { return (storefrontCart ? storefrontCart.handle(req, res, url) : false) || (cartLink ? await cartLink.handle(req, res, url) : false) || (await channel.handle(req, res, url)) || (shoppingLists ? await shoppingLists.handle(req, res, url) : false) || (webDemo ? webDemo.handle(req, res, url) : false); },
     async close() {
       try { await channel.stop(); await ordering?.close(); }
       finally { store.close(); }
