@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsApp-palvelin ja HTTPS-tunneli käynnissä (Codex)
+
+**Varmennettu:** `npm run whatsapp` portissa 4749, commitin `fcd3c71` vain lukeva snapshot, pysyvä projektin `data/whatsapp.db`. Clauden samanaikaisesti muokkaamia moduuleja ei otettu kesken käyttöön. `.env`:n portti, absoluuttinen WhatsApp-kantapolku ja tilausdemon pois päältä pitävä asetus päivitettiin paikallisesti; muut arvot säilyivät. Molemmat verkkokauppapalvelimet ja niiden kannat säilyvät.
+
+Cloudflared 2026.11.0:n tilapäinen HTTPS-osoite on `https://tournaments-increasing-icq-statutes.trycloudflare.com`; callback-polku `/webhooks/whatsapp`. Paikallinen ja julkinen `/healthz` 200, tila `read-only-test`; paikallinen GET-vahvistus oikein ja allekirjoittamaton POST 403. Sovelluksen webhook-tilaukset ovat API-takaisinluvussa tyhjät; WABA:ssa vain Metan oma testityökalu. Tässä ei vielä rekisteröity callbackia tai `messages`-tilausta.
+
+**Esteet ja jatko:** selainohjaus aikakatkaisi Customize-painikkeeseen; käyttäjältä pyydettiin oikean näkymän avaamista ja aiemman testivastaanottajan tilan vahvistusta. Automaattinen hyväksyntätarkistus esti julkisen GET-vahvistustestin, koska verify token kulkisi Cloudflaren URL:ssa. Tähän pyydettiin täsmällinen hyväksyntä ennen julkista GETiä/Meta-rekisteröintiä. Puhelintesti ja profiilin asettaminen nimenomaan `public/aimo-logo.png`:stä ovat vielä avoimia. Nykyisen PNG:n koko on 380 × 132; aiempi profiili on asetettu SVG:stä. Tarkempi käynnistys-/jatkotieto: `docs/parallel/1.md`. Ei tuotetietojen MCP-/mallikutsuja tai tilauksia.
+
 ## 14.11.2026 — WhatsApp-käyttöönoton jatko: token ja paikalliset asetukset (Codex)
 
 **Käyttäjän työnjako:** Codex hoitaa Metan, HTTPS-tunnelin ja palvelimen käynnistyksen; Claude Code tekee rinnakkain tilauskeskustelun kytkennän. Codex ei muokkaa Claudelle varattuja WhatsApp-/keskustelu-/tilaustyökalumoduuleja tai `server/config.mjs`:ää. Tarkempi tilanne ja muutospyynnöt ovat `docs/parallel/1.md`:ssä.
