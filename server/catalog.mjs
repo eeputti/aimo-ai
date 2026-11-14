@@ -134,7 +134,8 @@ export class Catalog {
   /**
    * Palauttaa [{product, score, match}] parhaat ensin. opts: {limit, temp, filter(p), boost(p)}
    * match: 'core' = haettu tuote itse, 'variant' = saman pääsanan toinen tuote tai sama sana toisessa tuoteryhmässä,
-   * 'related' = sana on vain määritteenä. Tulostaulukon translated-kenttä kertoo käytetyt suomennokset.
+   * 'related' = sana on vain määritteenä. exact = jokainen hakusana on nimessä kokonaisena sanana.
+   * Tulostaulukon translated-kenttä kertoo käytetyt suomennokset.
    */
   search(query, opts = {}) {
     const limit = opts.limit ?? 8;
@@ -153,20 +154,23 @@ export class Catalog {
     const perTerm = terms.map((term) => {
       const best = new Map(); // productIndex -> score
       const kinds = new Map(); // productIndex -> osuman laji
+      const exact = new Set(); // productIndex, jonka nimessä hakusana on kokonaisena sanana (ei "pas|tilli")
       const variants = stems(term);
       for (const tok of this.vocabKeys) {
         let s = 0; let kind = RELATED;
         for (const st of variants) { const [m, k] = matchScore(tok, st, term); if (m > s) { s = m; kind = k; } }
         if (s <= 0) continue;
         const postings = this.vocab.get(tok);
+        const whole = variants.includes(tok);
         for (let k = 0; k < postings.length; k += 2) {
           const idx = postings[k];
+          if (whole) exact.add(idx);
           const pos = postings[k + 1];
           const withPos = s * (1 - Math.min(pos, 6) * 0.03); // nimen alussa oleva sana painaa enemmän
           if ((best.get(idx) || 0) < withPos) { best.set(idx, withPos); kinds.set(idx, kind); }
         }
       }
-      return { best, kinds };
+      return { best, kinds, exact };
     });
 
     const combine = (requireAll) => {
@@ -185,14 +189,14 @@ export class Catalog {
         }
         let kind = CORE; // heikoin laji ratkaisee: "laktoositon kahvimaito" on kahvimaitoa
         for (const { kinds } of perTerm) { const k = kinds.get(idx); if (k !== undefined && k > kind) kind = k; }
-        candidates.push({ p, base: sum / perTerm.length, kind });
+        candidates.push({ p, base: sum / perTerm.length, kind, exact: perTerm.every(({ exact }) => exact.has(idx)) });
       }
       // Kotiryhmä: tuoteryhmä, johon vahvat osumat keskittyvät. "Maito" on maitohyllyn tuote, ei kondensoitua maitoa säilykkeissä.
       const mass = new Map(); let total = 0;
       for (const c of candidates) if (c.kind !== RELATED) { const w = c.kind === CORE ? 1 : 0.5; mass.set(c.p.category, (mass.get(c.p.category) || 0) + w); total += w; }
       let home = null;
       if (total >= 3) { const [category, weight] = [...mass].sort((a, b) => b[1] - a[1])[0]; if (weight / total >= 0.4) home = category; }
-      const res = candidates.map(({ p, base, kind }) => {
+      const res = candidates.map(({ p, base, kind, exact }) => {
         const atHome = !home || p.category === home;
         let score = base;
         if (kind === VARIANT || (kind === CORE && !atHome)) score -= VARIANT_PENALTY; // sama sana toisessa tuoteryhmässä (kermanvärinen lautasliina) ei ole perustuote
@@ -200,7 +204,7 @@ export class Catalog {
         if (p.reliability != null) score += 0.08; // toimitusvarmuusdata = tuotetta on oikeasti tilattu
         score += Math.max(0, 0.06 - p._nameLen * 0.006); // lyhyt nimi = perustuote
         if (opts.boost) score += opts.boost(p) || 0;
-        return { product: p, score, match: MATCH_KIND[kind === CORE && !atHome ? VARIANT : kind] };
+        return { product: p, score, match: MATCH_KIND[kind === CORE && !atHome ? VARIANT : kind], exact };
       });
       return res.sort((a, b) => b.score - a.score);
     };

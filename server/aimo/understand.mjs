@@ -189,7 +189,13 @@ function parseItem(raw, lang) {
   const words = tokens.filter((t) => !FILLER.has(t) && !/^\d+(\.\d+)?$/.test(t) && t !== 'x');
 
   // tuotesana: viimeinen sana, jonka Aimon sanasto tuntee, on pääsana ("laktoositonta kevytmaitoa", "whipping cream")
-  const known = words.map((w) => ({ w, concept: conceptOf(w), type: variants(w).map(productTypeFor).find(Boolean) || null }));
+  const known = words.map((w) => {
+    const concept = conceptOf(w);
+    let type = variants(w).map(productTypeFor).find(Boolean) || null;
+    // "kookosmaito" päättyy sanaan "maito", mutta on sanaston mukaan toisella hyllyllä: se ei ole juomamaitoa.
+    if (type && concept && !variants(w).some((v) => type.keywords.includes(v)) && !type.categories.includes(concept.top[0].category)) type = null;
+    return { w, concept, type };
+  });
   const heads = known.filter((k) => k.concept || k.type);
   for (const k of known) if (!k.concept && !k.type) unparsed.push(k.w);
   if (heads.length) {

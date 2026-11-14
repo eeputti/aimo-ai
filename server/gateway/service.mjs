@@ -62,16 +62,32 @@ export function searchProducts(buyer, input = {}) {
   const it = interpret(input);
   noteSearch(buyer.id);
   const exclude = new Set((input.excludeAllergens || []).map(String));
+  const bound = (v, name, max) => {
+    if (v == null) return null;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > max) throw new GatewayError(400, 'INVALID_FILTER', `${name}: luku väliltä 0–${max}`);
+    return n;
+  };
+  const minReliability = bound(input.minDeliveryReliability, 'minDeliveryReliability', 1);
+  const maxCo2 = bound(input.maxCo2PerKg, 'maxCo2PerKg', 1000);
+  if (minReliability != null) it.assumptions.push(`Vain tuotteet, joiden toimitusvarmuus on vähintään ${Math.round(minReliability * 100)} %. Tuotteet ilman toimitusvarmuustietoa on jätetty pois.`);
+  if (maxCo2 != null) it.assumptions.push(`Vain tuotteet, joiden hiilijalanjälki on enintään ${maxCo2} kg CO2e/kg. Tuotteet ilman hiilijalanjälkitietoa on jätetty pois.`);
   const passes = (p) => {
     if (it.claims.some((c) => !p.labels?.includes(c))) return false;
     if ([...exclude].some((a) => p.contains.includes(a))) return false;
     if (input.countryOfOrigin && p.country !== String(input.countryOfOrigin).toLowerCase()) return false;
     if (input.brand && !(p.brand || '').toLowerCase().includes(String(input.brand).toLowerCase())) return false;
+    if (minReliability != null && !(p.reliability >= minReliability)) return false; // puuttuva tieto ei läpäise suodatinta
+    if (maxCo2 != null && !(p.co2 <= maxCo2)) return false;
     if (it.type && (!it.type.categories.includes(p.category) || (it.type.exclude && it.type.exclude.test(p.name)))) return false;
     return !productBlock(buyer.mandate, p); // mandaatin kieltämiä ei edes ehdoteta
   };
   let hits;
-  if (it.textQuery) hits = cat.search(it.textQuery, { limit: 400, filter: passes });
+  if (it.textQuery) {
+    hits = cat.search(it.textQuery, { limit: 400, filter: passes });
+    // Kokonaisena sanana nimessä oleva osuma ennen osasanaosumaa ("tilli" ennen "pastilli"); muu järjestys säilyy.
+    if (hits.some((h) => h.exact)) hits = [...hits.filter((h) => h.exact), ...hits.filter((h) => !h.exact)];
+  }
   else if (it.type) hits = cat.products.filter(passes).map((p) => ({ product: p, score: 1 + (p.reliability != null ? 0.05 : 0) })).sort((a, b) => b.score - a.score || a.product.name.localeCompare(b.product.name, 'fi'));
   else if (it.claims.length || exclude.size) throw new GatewayError(400, 'QUERY_TOO_BROAD', 'Anna hakusana tai tuotetyyppi väittämien lisäksi');
   else throw new GatewayError(400, 'QUERY_REQUIRED', 'Anna query tai productType');
@@ -83,7 +99,7 @@ export function searchProducts(buyer, input = {}) {
     clock: clock.info(),
     interpretedAs: { productType: it.type?.id || null, claims: it.claims, textQuery: it.textQuery || null, assumptions: it.assumptions },
     total: hits.length,
-    items: hits.slice(0, limit).map((h) => productCard(h.product, { matchScore: +h.score.toFixed(3) })),
+    items: hits.slice(0, limit).map((h) => productCard(h.product, { matchScore: +h.score.toFixed(3), wholeWordMatch: !!h.exact })),
     next: 'Hinta ja saatavuus: request_quote näille tuotekoodeille (candidates). Koko valikoimaa ei saa hinnoitella kerralla.',
     ms: +(performance.now() - t0).toFixed(1),
   };

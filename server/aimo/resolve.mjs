@@ -2,7 +2,7 @@
 // Tuotteet tulevat aina katalogista. Tämä kerros ei koskaan tuota tuotekoodia, jota katalogissa ei ole,
 // ja jos mikään ei täsmää, se sanoo sen suoraan (NO_MATCH) ja tarjoaa lähimmät löysennykset nappeina.
 import { loadCatalog } from '../catalog.mjs';
-import { loadLexicon, variants } from './lexicon.mjs';
+import { loadLexicon, variants, conceptOf } from './lexicon.mjs';
 
 /** Esiintyykö sana (missä tahansa taivutusmuodossa) tuotteen suomen- tai englanninkielisessä nimessä? */
 const nameHas = (p, term) => { const en = (p.nameEn || '').toLowerCase(); return variants(term).some((v) => p._tokens.some((t) => t.includes(v)) || en.includes(v)); };
@@ -45,7 +45,13 @@ export function resolveItem(item, opts = {}) {
   const { steps, type, terms } = filterSteps(item);
   let pool;
   if (type || item.category) pool = cat.products;
-  else pool = item.productTerm ? cat.search(item.productTerm, { limit: 200 }).map((h) => h.product) : []; // tuntematon ryhmä: nimihaku koko katalogista
+  else {
+    // Tuntematon ryhmä: nimihaku koko katalogista. Jos sana löytyy nimestä kokonaisena, osasanaosumat jätetään pois:
+    // muuten halvin ehdokas voi olla "pas|tilli", kun haettiin tilliä.
+    const hits = item.productTerm ? cat.search(item.productTerm, { limit: 200 }) : [];
+    const whole = hits.filter((h) => h.exact);
+    pool = (whole.length ? whole : hits).map((h) => h.product);
+  }
   const funnel = [];
   let relaxed = null;
   for (const [name, fn] of steps) {
@@ -57,7 +63,14 @@ export function resolveItem(item, opts = {}) {
   // tuotesanat nimessä: jos pääsanan lisäksi on tarkentavia sanoja, suositaan tuotteita joissa ne esiintyvät
   if (terms.length && (type || item.category)) {
     let narrowed = pool.filter((p) => terms.every((t) => nameHas(p, t)));
-    if (!narrowed.length) narrowed = pool.filter((p) => nameHas(p, terms.at(-1))); // "broilerin rintafilee": pääsana ratkaisee, jos kaikki sanat eivät osu
+    if (!narrowed.length) {
+      // Kaikki sanat eivät osu samaan nimeen: tarkin sana ratkaisee. "Oltermanni juusto": Oltermannin nimessä ei lue "juusto",
+      // joten rajataan Oltermanniin eikä kaikkiin juusto-nimisiin. Tasatilanteessa pääsana (viimeinen) voittaa.
+      // Tarkin = koko valikoimassa harvinaisin sana (Oltermanni 23 tuotetta, juusto 80).
+      const rarity = (t) => conceptOf(t)?.total ?? Infinity;
+      const perTerm = terms.map((t) => ({ n: rarity(t), list: pool.filter((p) => nameHas(p, t)) })).filter((x) => x.list.length);
+      narrowed = perTerm.reduce((best, x) => (!best || x.n <= best.n ? x : best), null)?.list || [];
+    }
     if (narrowed.length) { pool = narrowed; funnel.push({ filter: 'nameTerms', remaining: pool.length }); }
   }
   // järjestys: tuote, jolla on toimitusvarmuusdataa (= oikeasti tilattu) ja lyhyt nimi (= perustuote) ensin

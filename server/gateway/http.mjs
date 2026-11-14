@@ -1,5 +1,5 @@
 // REST- ja MCP-sovittimet samaan sopimukseen (contract.mjs) + ihmisen konsoli (hyväksynnät, mandaatti, aikajana).
-import { OPERATIONS, REASONS, GATEWAY } from './contract.mjs';
+import { OPERATIONS, REASONS, GATEWAY, AGENT_INSTRUCTIONS } from './contract.mjs';
 import { searchProducts, requestQuote, placeOrder, addToOrder, getOrder, listOrders, decideApproval, acceptSuggestion, auditTrail, mandateOf, productTypes, GatewayError } from './service.mjs';
 import { buyers, ledger, onLedger, wipeGateway } from './store.mjs';
 import { seedBuyers, updateMandate, publicMandate } from './mandate.mjs';
@@ -89,7 +89,7 @@ async function mcpMessage(msg, req, url) {
   if (msg.jsonrpc !== '2.0' || typeof msg.method !== 'string') return fail(-32600, 'Invalid Request');
   if (msg.id === undefined) return null; // ilmoitus (esim. notifications/initialized): ei vastausta
   switch (msg.method) {
-    case 'initialize': return ok({ protocolVersion: msg.params?.protocolVersion || '2025-06-18', capabilities: { tools: { listChanged: false } }, serverInfo: { name: GATEWAY.name, title: GATEWAY.title, version: GATEWAY.version }, instructions: 'Hae ensin search_products, pyydä sitten request_quote vain rajatulle ehdokasjoukolle ja tilaa place_order-kutsulla allekirjoitetulla tarjouksella. Tilaus voi jäädä odottamaan ihmisen hyväksyntää (pending_approval): älä yritä kiertää sitä.' });
+    case 'initialize': return ok({ protocolVersion: msg.params?.protocolVersion || '2025-06-18', capabilities: { tools: { listChanged: false } }, serverInfo: { name: GATEWAY.name, title: GATEWAY.title, version: GATEWAY.version }, instructions: AGENT_INSTRUCTIONS });;
     case 'ping': return ok({});
     case 'tools/list': return ok({ tools: OPERATIONS.map((o) => ({ name: o.name, title: o.summary, description: o.description, inputSchema: o.input })) });
     case 'tools/call': {

@@ -58,6 +58,9 @@ export function loadLexicon() {
     return { fi, en };
   });
   const concepts = new Map(); // sana → {total, cats: Map(cat → n)}
+  // Sama laskenta vain kokonaisista sanoista. "tilli" on yrtti; "pas|tilli" ei saa viedä sanaa makeishyllylle.
+  const whole = new Map();
+  const bumpWhole = (w, c) => { let e = whole.get(w); if (!e) whole.set(w, (e = { total: 0, cats: new Map() })); e.total += 1; e.cats.set(c, (e.cats.get(c) || 0) + 1); };
   const bump = (w, c) => { let e = concepts.get(w); if (!e) concepts.set(w, (e = { total: 0, cats: new Map() })); e.total += 1; e.cats.set(c, (e.cats.get(c) || 0) + 1); };
   products.forEach((p, i) => {
     const seen = new Set();
@@ -67,8 +70,16 @@ export function loadLexicon() {
     }
     for (const w of perProduct[i].en) seen.add(w);
     for (const w of seen) bump(w, p.category);
+    for (const w of new Set([...perProduct[i].fi, ...perProduct[i].en])) bumpWhole(w, p.category);
   });
   for (const [w, e] of concepts) if (e.total < 2) concepts.delete(w);
+  // Jos sanan yleisin hylly syntyy pelkistä yhdyssanojen loppuosista eikä sana esiinny siellä kertaakaan itsenäisenä,
+  // hylly otetaan itsenäisistä osumista. Muuten laskenta pysyy ennallaan (kevyt|maito kuuluu yhä maidolle).
+  const topOf = (e) => [...e.cats].sort((a, b) => b[1] - a[1])[0][0];
+  for (const [w, e] of whole) {
+    const c = concepts.get(w);
+    if (c && e.total >= 2 && !e.cats.has(topOf(c))) concepts.set(w, e);
+  }
 
   // 3) Kategorialle luettava nimi: sana, joka kattaa kategoriasta eniten ja keskittyy siihen.
   const sizes = new Map();

@@ -11,6 +11,31 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 **Tarkistukset:** `node --check` kolmelle JavaScript-tiedostolle, `npm test`, haku merkkien luokkanimillä ei löydä osumia. Selaimessa ei katsottu.
 
+## 14.11.2026 — Danielin agentin osat porttiin: kokonaiset sanat haussa, suodattimet, agenttiohje (Claude Code)
+
+**Tausta:** Eelis pyysi katsomaan Danielin repon `DanielTurkkinen/valio-aimo-agent` ja yhdistämään sen tähän projektiin niin, että Danielin agentti korvaisi Clauden. Repossa on yksi commit: sama `server.py` kuin tämän repon juuressa (lisänä tunnus osoitteessa `?token=`), `test_tools.py`, README ja `requirements.txt`.
+
+**Havainto ja päätös:** Danielin palvelin on MCP-työkalupalvelin (kuusi lukutyökalua ja ohjeteksti). Siinä ei ole kielimallia, joten se ei voi korvata Claudea: agentti syntyy vasta, kun Claude liitetään siihen. Eelis hyväksyi suunnan, jossa Danielin osat siirretään Node-porttiin eikä Python-palvelinta ajeta rinnalla (kaksi välimuistia samaan Valion rajapintaan, toinen prosessi demoon). Danielin tiedostoja ei muokattu.
+
+- **Agenttiohje** (`server/gateway/contract.mjs`, `AGENT_INSTRUCTIONS`; `http.mjs` antaa sen MCP:n `initialize`-vastauksessa): Danielin työnkulku, jatkettuna vaiheilla `get_mandate`, `request_quote`, `place_order`, `pending_approval` ja `get_audit_trail`.
+- **Suodattimet** `search_products`-operaatioon (`contract.mjs`, `service.mjs`): `minDeliveryReliability` (0–1) ja `maxCo2PerKg`. Tuote ilman tietoa jää pois, ja se kerrotaan `interpretedAs.assumptions`-kentässä. Virheellinen arvo palauttaa `INVALID_FILTER`.
+- **Kokonaiset sanat ensin** (Danielin haun periaate): `server/catalog.mjs` merkitsee osumalle `exact`, kun jokainen hakusana on nimessä kokonaisena sanana. Portin haku nostaa nämä osasanaosumien edelle (`wholeWordMatch` tuotekortissa). Pisteytys on ennallaan.
+- **Aiemmin kirjattu vika korjattu** ("tilli" → pastilli, "kookosmaito" → rasvaton maito, "mustikka" → mustikkakeitto). Syy oli tulkintakerroksessa, ei haussa:
+  - `server/aimo/lexicon.mjs`: jos sanan yleisin tuoteryhmä syntyy pelkistä yhdyssanojen loppuosista (pas|tilli) eikä sana esiinny siellä kertaakaan itsenäisenä, ryhmä otetaan itsenäisistä osumista.
+  - `server/aimo/understand.mjs`: sana, joka vain päättyy tuotetyypin avainsanaan (kookos|maito), ei saa tyyppiä, jos sanasto sijoittaa sen toiseen tuoteryhmään.
+  - `server/aimo/resolve.mjs`: tuntemattoman ryhmän nimihaku käyttää vain kokonaisen sanan osumia, kun niitä on. Kun kaikki tuotesanat eivät osu samaan nimeen, valikoimassa harvinaisin sana rajaa (Oltermanni ennen sanaa juusto) aiemman "viimeinen sana" -säännön sijaan.
+
+**Tarkistukset:** `node --check` muutetuille tiedostoille, `git diff --check`, `npm test` 26/26, `npm run aimo:eval` 26/26 (välivaiheessa 24/26 ja 25/26, korjattu). Tulkinta ilman mallia: "1 kg tilliä" → 13 tuotetta, kärjessä GREENS 1KG TILLI; "5 l kookosmaitoa" → 12 kookosmaitoa; "2 kg mustikkaa" → kärjessä mustikka (ennen mustikkasose ja mustikkakeitto); "12 kg Valio Oltermanni juustoa" → 12 Oltermannia; lohikeittoresepti ja "broilerin rintafilee" ennallaan. Suodattimet kokeiltu suoralla funktiokutsulla: "kaurajuoma" 36 tuotetta, toimitusvarmuus vähintään 0,95 → 8, enintään 0,5 kg CO2e/kg → 23. Eristetty simuloitu palvelin portissa 4757 (omat testikannat, ei avaimia): `initialize` palauttaa uuden ohjeen ja `tools/list` näyttää suodattimet.
+
+**Tarkistamatta:** suodatettua hakua ei saatu ajettua MCP:n `tools/call`-kutsuna (testikutsun ostaja-avain oli väärä), vain suorana funktiokutsuna. Live-mock-API:a, `npm run eval`- ja `npm run demo` -ajoja ei tehty. Ulkopuolista Claudea ei liitetty porttiin uudella ohjeella. Tilauspolkua tarjoukseen asti ei ajettu korjatuilla hauilla, joten halvimman valinta korjatusta joukosta on katsomatta ("tilli" sisältää yhä tilli-sipulisilakan).
+
+**Huomiot:**
+
+- Palvelinmuutokset tulevat voimaan vasta käynnissä olevan palvelimen uudelleenkäynnistyksessä.
+- Vertailuajossa käytin hetken `git stash` ja `git stash pop` -komentoja yhteisessä työpuussa. Tila palautui samaksi, mutta toisen työvaiheen commitoimattomat tiedostot olivat hetken poissa levyltä. Näin ei pidä tehdä yhteisessä kansiossa.
+- Tekemättä: Clauden kutsujen kokoaminen yhden moduulin taakse (`server/llm.mjs`, `server/aimo/model.mjs`, `server/gateway/advisor.mjs`), jotta mallin voi vaihtaa yhdestä kohdasta. "10 l kahvimaitoa" tulkitaan yhä juomamaidoksi (vanha vika, ei korjattu).
+- Danielin palvelimen aiemmin kirjatut viat (Stock-saldo 999999, aikaisempi toimitus hylätään, oikea kello) ovat hänen koodissaan ennallaan.
+
 ## 14.11.2026 — hakupaneelin reseptihaku kielimallilla ja annoslaskuri (Claude Code)
 
 **Käyttäjän pyyntö:** Eelis halusi, että reseptin voi hakea kirjoittamalla ("lohikeitto", "kermainen lohikeitto"), ehdotuksia tulee paljon ja ne tulevat tekoälymallilta. Annosmäärälle laskuri: miinus vasemmalla, plus oikealla, luku keskellä muokattavana.

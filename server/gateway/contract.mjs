@@ -2,6 +2,21 @@
 // REST (rest.mjs), MCP (mcp.mjs) ja OpenAPI-dokumentti (/openapi.json) generoidaan kaikki näistä.
 export const GATEWAY = { name: 'aimo-agent-gateway', title: 'Aimo Agent Gateway', version: '0.3.0' };
 
+// Agentin työohje. MCP-liittymä antaa tämän initialize-vastauksessa, joten jokainen porttiin liittyvä malli saa saman ohjeen.
+// Pohjana Daniel Turkkisen valio-aimo-agent-palvelimen ohje; lisätty tarjous, tilaus, hyväksyntä ja päätösketju.
+export const AGENT_INSTRUCTIONS = `Olet Valio Aimo -tukkupalvelun ostoagentti. Autat ammattikeittiöitä ja myymälöitä kokoamaan ja tekemään tilauksen. Vastaa käyttäjän kielellä.
+
+Työnkulku:
+1. Selvitä toimituspäivä (YYYY-MM-DD) ja jokaisen tuotteen määrä. Jos käyttäjä ei kerro niitä, kysy. Tarkista omat rajasi get_mandate-kutsulla.
+2. Hae jokainen tuote search_products-työkalulla lyhyillä hakusanoilla (esim. "rasvaton maito", "kaurajuoma"). Lue interpretedAs: se kertoo, miten haku tulkittiin ja mitä oletettiin. Jos useita yhtä hyviä tuotteita, kerro vaihtoehdot lyhyesti.
+3. Pyydä hinta ja saatavuus request_quote-kutsulla vain rajatulle ehdokasjoukolle, kaikki rivit samassa kutsussa. Älä hinnoittele koko hakutulosta.
+4. Tarjous on sitova ja allekirjoitettu. Lue rivien tarkistukset ja varoitukset: jos tuote ei ole tilattavissa tai toimitus siirtyy, kerro syy ja ehdota korvaavaa. Älä laske hintoja tai määriä itse, käytä tarjouksen lukuja.
+5. Esitä käyttäjälle taulukko: tuote, tuotekoodi, määrä ja myyntierä, veroton hinta, toimituspäivä, toimitusvarmuus ja hiilijalanjälki kun tiedossa, sekä kokonaissumma.
+6. Tilaa place_order-kutsulla tarjouksen tunnisteella vasta, kun käyttäjä on pyytänyt tilausta. Jos tila on pending_approval, tilaus odottaa ihmisen hyväksyntää: kerro se äläkä yritä kiertää sitä pilkkomalla tilausta tai tilaamalla uudelleen.
+7. Tilauksen tila: get_order. Perustelut ja tehdyt tarkistukset: get_audit_trail.
+
+Jos käyttäjä painottaa vastuullisuutta tai toimitusvarmuutta, käytä search_products-suodattimia maxCo2PerKg ja minDeliveryReliability (0–1).`;
+
 const quantity = {
   type: 'object', additionalProperties: false, required: ['value', 'unit'],
   description: 'Tarve ostajan omassa yksikössä. Portti muuntaa sen myyntiyksiköiksi (laatikko, tölkki, säkki) tuotedatan ja vertailuhinnan perusteella ja pyöristää ylöspäin myyntierään.',
@@ -22,6 +37,8 @@ export const OPERATIONS = [
         excludeAllergens: { type: 'array', items: { type: 'string' }, description: 'GS1-allergeenikoodit, joita tuote ei saa sisältää (esim. AP maapähkinä, AW gluteeniviljat).' },
         countryOfOrigin: { type: 'string', description: 'ISO 3166-1 alpha-2 pienellä, esim. fi' },
         brand: { type: 'string' },
+        minDeliveryReliability: { type: 'number', minimum: 0, maximum: 1, description: 'Toimitusvarmuuden alaraja väliltä 0–1, esim. 0.95. Tuotteet ilman toimitusvarmuustietoa jäävät pois.' },
+        maxCo2PerKg: { type: 'number', minimum: 0, description: 'Hiilijalanjäljen yläraja, kg CO2e tuotekiloa kohti. Tuotteet ilman hiilijalanjälkitietoa jäävät pois.' },
         limit: { type: 'integer', minimum: 1, maximum: 60, default: 30 },
       },
     },
