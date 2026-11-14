@@ -50,7 +50,7 @@ test('suggest antaa enintään kolme vaihtoehtoa, pyytää tarkennuksen vain jak
   assert.equal(s.lines[0].options.length, 3);
   assert.equal(s.lines[0].total, 4);
   assert.deepEqual(s.lines[0].clarify, ['FREE_FROM_LACTOSE']); // 1/4 tilattavista on laktoosittomia
-  assert.deepEqual(s.lines[0].options[0], { productId: '1', name: 'Tuote 1', brand: null, salesUnits: 2, salesUnitLabel: 'ltk', covers: { value: 20, unit: 'L' }, unitPriceNet: 5, lineNet: 10, deliveryDate: date, stock: 50, labels: ['FREE_FROM_LACTOSE'], note: null, why: null });
+  assert.deepEqual(s.lines[0].options[0], { productId: '1', name: 'Tuote 1', brand: null, salesUnits: 2, salesUnitLabel: 'ltk', covers: { value: 20, unit: 'L' }, unitPriceNet: 5, lineNet: 10, deliveryDate: date, stock: 50, labels: ['FREE_FROM_LACTOSE'], note: null, why: null, warning: null });
   const asked = await tools.suggest({ customer, draft: draftOf([line('a', { claims: ['FREE_FROM_LACTOSE'] })]) });
   assert.deepEqual(asked.lines[0].clarify, []);
   // Maidoton: tuote 1 sisältää maitoa, tuotteilta 3 ja 4 puuttuu allergeenitieto. Vain 2 kelpaa.
@@ -61,6 +61,29 @@ test('suggest antaa enintään kolme vaihtoehtoa, pyytää tarkennuksen vain jak
   assert.equal(down.issues[0].code, 'SEARCH_FAILED');
   assert.equal(down.lines.length, 0);
   assert.equal(lineQuery(line('a', { claims: ['FREE_FROM_LACTOSE'] })), '20 l laktoositon maito');
+});
+
+test('koko tilauksen ruokavalio: sisältävä pois, puuttuva allergeenitieto näkyy varoituksena, merkintä on pehmeä', async () => {
+  const seen = [];
+  const { tools } = fakes({ search: async (l) => { seen.push(l.claims); return l.claims.includes('FREE_FROM_GLUTEN') ? [] : [found('1', ['FREE_FROM_LACTOSE']), found('2'), found('3')]; } });
+  const nutFree = await tools.suggest({ customer, draft: draftOf([line('a')], { diet: { claims: [], excludeAllergens: ['AM'] } }) });
+  // Tuote 1 sisältää maitoa: pois. Tuote 2 on varmennettu. Tuotteelta 3 puuttuu tieto: näytetään varoituksella.
+  assert.deepEqual(nutFree.lines[0].options.map((o) => [o.productId, o.warning]), [['2', null], ['3', 'allergeenitieto puuttuu, tarkista itse']]);
+  // Halvin on aina näkyvissä, vaikka se ei olisi järjestyksen kärjessä.
+  const pricey = fakes({ search: async () => [found('2'), found('5'), found('6'), found('7', [], { price: 1 })] });
+  assert.deepEqual((await pricey.tools.suggest({ customer, draft: draftOf([line('a')]) })).lines[0].options.map((o) => o.productId), ['2', '5', '7']);
+  // Rivin oma kielto on tiukka: varmentamaton ei kelpaa.
+  const strict = await tools.suggest({ customer, draft: draftOf([line('a', { excludeAllergens: ['AM'] })]) });
+  assert.deepEqual(strict.lines[0].options.map((o) => o.productId), ['2']);
+  // Merkintää ei löydy yhdeltäkään: näytetään ilman merkintää ja kerrotaan se, ei tyhjää listaa.
+  seen.length = 0;
+  const gluten = await tools.suggest({ customer, draft: draftOf([line('a')], { diet: { claims: ['FREE_FROM_GLUTEN'], excludeAllergens: [] } }) });
+  assert.deepEqual(seen, [['FREE_FROM_GLUTEN'], []]);
+  assert.equal(gluten.lines[0].options[0].warning, 'Ei merkintää: gluteeniton');
+  // Tarjous estää valinnan, joka sisältää tilauksen kieltämää allergeenia, ja ruokavalio kuuluu sisällön tiivisteeseen.
+  const d1 = draftOf([line('a', { selectedProductId: '1' })], { diet: { claims: [], excludeAllergens: ['AM'] } });
+  assert.equal((await tools.quote({ customer, draft: d1 })).issues[0].code, 'ALLERGEN_CONFLICT');
+  assert.notEqual(draftHash(customer, d1), draftHash(customer, { ...d1, diet: { claims: [], excludeAllergens: [] } }));
 });
 
 test('quote vaatii käyttäjän valinnan, ei vaihda toimituspäivää hiljaa ja estää allergiaristiriidan', async () => {

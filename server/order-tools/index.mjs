@@ -17,7 +17,8 @@ const validDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
 /** Tarjous sidotaan sisältöön: sama hash vain, jos asiakas, päivä, toimituspaikka, tuotteet ja määrät ovat samat. */
 export function draftHash(customer, draft) {
   const lines = (draft.lines || []).map((l) => [l.ref, String(l.selectedProductId || ''), l.quantity?.value ?? null, l.quantity?.unit ?? null, l.quantity?.basis || 'sales']).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-  return crypto.createHash('sha256').update(JSON.stringify([customer.customerId, customer.bindingVersion, draft.id, draft.deliveryDate || null, draft.deliverySiteId || null, lines])).digest('hex');
+  const diet = [[...(draft.diet?.claims || [])].sort(), [...(draft.diet?.excludeAllergens || [])].sort()];
+  return crypto.createHash('sha256').update(JSON.stringify([customer.customerId, customer.bindingVersion, draft.id, draft.deliveryDate || null, draft.deliverySiteId || null, diet, lines])).digest('hex');
 }
 
 /** Hakuteksti nykyiselle tulkinnalle: määrä, ruokavaatimukset ja tuotesana. Tuotenumero haetaan sellaisenaan. */
@@ -45,9 +46,10 @@ export function rankOptions(found, line) {
     const over = need && covered ? (covered - need) / need : 0;
     const fit = (over > 0.5 ? 2 : over > 0.1 ? 1 : 0) + (o.qty > 30 ? 2 : o.qty > 12 ? 1 : 0);
     // Yksi kuvaileva sana (lajike, tuotesarja) ei vielä tee tuotteesta maustettua. Näin haun oma hyllyjärjestys säilyy.
-    return [extras >= 2 ? 1 : 0, fit];
+    // Isossa tilauksessa kaikki vaihtoehdot ovat kymmeniä eriä: silloin vähemmän käsiteltäviä eriä ensin.
+    return [extras >= 2 ? 1 : 0, fit, o.qty > 30 ? o.qty : 0];
   };
-  return found.map((o, i) => ({ o, i, s: score(o) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.i - b.i).map((x) => x.o);
+  return found.map((o, i) => ({ o, i, s: score(o) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.s[2] - b.s[2] || a.i - b.i).map((x) => x.o);
 }
 
 async function defaultDeps() {
@@ -98,19 +100,37 @@ export function createOrderingTools(deps = {}) {
     if (issues.length) return { lines: [], issues };
     const { search, product } = await d();
     const lines = [];
+    // Koko tilauksen ruokavalio (draft.diet): allergeenia sisältävä tuote putoaa aina pois. Tuote, jolta allergeenitieto puuttuu
+    // (esim. tuoreet kasvikset), näytetään varoituksen kanssa, ja merkintää vailla olevat näytetään vain, jos merkittyjä ei ole.
+    // Rivin oma vaatimus (line.claims, line.excludeAllergens) on tiukka: varmentamaton ei kelpaa.
+    const diet = { claims: draft.diet?.claims || [], excludeAllergens: draft.diet?.excludeAllergens || [] };
     for (const line of draft.lines) {
-      let found;
-      try { found = await search(line, draft.deliveryDate); } catch { issues.push(issue('SEARCH_FAILED', `Tuotehaku ei onnistunut: ${line.productTerm}. Hintoja tai saatavuutta ei näytetä.`, { ref: line.ref })); continue; }
-      const fit = rankOptions(found.filter((o) => !unsafe(product(o.id), line)), line);
+      let found; let warning = null;
+      const extra = diet.claims.filter((c) => !(line.claims || []).includes(c));
+      try {
+        found = await search(extra.length ? { ...line, claims: [...(line.claims || []), ...extra] } : line, draft.deliveryDate);
+        if (!found.length && extra.length) { found = await search(line, draft.deliveryDate); if (found.length) warning = `Ei merkintää: ${extra.map((c) => CLAIM_WORD[c] || c).join(', ')}`; }
+      } catch { issues.push(issue('SEARCH_FAILED', `Tuotehaku ei onnistunut: ${line.productTerm}. Hintoja tai saatavuutta ei näytetä.`, { ref: line.ref })); continue; }
+      let fit = found.filter((o) => !unsafe(product(o.id), line));
+      if (diet.excludeAllergens.length) {
+        const has = (o) => diet.excludeAllergens.some((a) => product(o.id)?.contains?.includes(a) || product(o.id)?.mayContain?.includes(a));
+        fit = fit.filter((o) => !has(o));
+      }
+      fit = rankOptions(fit, line);
       if (!fit.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${draft.deliveryDate}: ${line.productTerm}.`, { ref: line.ref })); continue; }
       const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim)).map((c) => ({ claim: c.claim, share: fit.filter((o) => o.labels?.includes(c.claim)).length / fit.length, ...c }))
         .filter((c) => fit.length >= 3 && c.share >= c.min && c.share <= c.max).map((c) => c.claim);
-      lines.push({ ref: line.ref, total: fit.length, clarify, options: fit.slice(0, 3).map((o) => ({
+      // Halvin tarpeen kattava vaihtoehto on aina kolmen joukossa, vaikka järjestys suosisi isompaa pakkausta.
+      const top = fit.slice(0, 3);
+      const cheapest = fit.reduce((a, b) => (b.price * b.qty < a.price * a.qty ? b : a));
+      if (!top.includes(cheapest)) top[top.length - 1] = cheapest;
+      lines.push({ ref: line.ref, total: fit.length, clarify, options: top.map((o) => ({
         productId: String(o.id), name: o.name, brand: o.brand || null, salesUnits: o.qty, salesUnitLabel: o.unitLabel,
         covers: o.quantityExplanation ? { value: o.quantityExplanation.providedItems, unit: 'PCS' } : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
         unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
         stock: o.availability?.stock ?? null, labels: o.labels || [], note: o.quantityExplanation?.text || null,
         why: o.substituteFor ? `Korvaa tuotteen ${o.substituteFor.name}` : null,
+        warning: [warning, diet.excludeAllergens.length && !product(o.id)?.hasAllergenData ? 'allergeenitieto puuttuu, tarkista itse' : null].filter(Boolean).join('; ') || null,
       })) });
     }
     return { lines, issues };
@@ -126,7 +146,8 @@ export function createOrderingTools(deps = {}) {
     const { buyer, requestQuote, product } = await d();
     const b = buyer(customer.buyerId);
     if (!b) return fail(issue('BUYER_UNKNOWN', 'Asiakkuutta ei löydy tilausjärjestelmästä.'));
-    const bad = draft.lines.filter((l) => unsafe(product(l.selectedProductId), l));
+    const dietBan = draft.diet?.excludeAllergens || [];
+    const bad = draft.lines.filter((l) => unsafe(product(l.selectedProductId), l) || dietBan.some((a) => product(l.selectedProductId)?.contains?.includes(a) || product(l.selectedProductId)?.mayContain?.includes(a)));
     if (bad.length) return fail(...bad.map((l) => issue('ALLERGEN_CONFLICT', `Valittu tuote ei täytä allergiavaatimusta: ${l.productTerm}.`, { ref: l.ref })));
     let q;
     try {
