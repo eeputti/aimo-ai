@@ -89,7 +89,7 @@ export function createRunnerStore(store, { deny, digest, resourcePath, overlaps 
         if (sourceAvailable) {
           const message = db.prepare('INSERT INTO messages(project,sender,recipient,subject,body,request_key,created) VALUES(?,?,?,?,?,?,?)')
             .run(row.project, actor, row.source, `Runnerin tulos: ${task.title}`.slice(0, 200), `${note}\n\nTehtävä: ${task.id}`, `runner-result:${row.id}`, now());
-          db.prepare('INSERT INTO events(project,actor,type,data,created) VALUES(?,?,?,?,?)').run(row.project, actor, 'message_sent', JSON.stringify({ messageSeq: Number(message.lastInsertRowid), recipient: row.source }), now());
+          db.prepare('INSERT INTO events(project,actor,type,data,created) VALUES(?,?,?,?,?)').run(row.project, actor, 'message_sent', JSON.stringify({ messageSeq: Number(message.lastInsertRowid), recipient: row.source, runnerTaskId: task.id }), now());
           db.prepare('INSERT INTO events(project,actor,type,data,created) VALUES(?,?,?,?,?)').run(row.project, actor, 'task_handed_off', JSON.stringify({ taskId: task.id, from: actor, to: row.source, commitSha: args.commitSha || null }), now());
         }
         const result = { runId: row.id, taskId: task.id, outcome: args.outcome, status, owner: sourceAvailable ? row.source : actor };

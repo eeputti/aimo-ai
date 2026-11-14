@@ -30,6 +30,7 @@ export function dispatchAssignments(store, job, result, policy) {
     store.access(item.to, job.project);
     const task = store.claim(job.actor, { project: job.project, title: item.title, description: item.description, resources: item.resources });
     const handed = store.handoff(job.actor, { project: job.project, taskId: task.id, expectedRevision: task.revision, to: item.to, note: `Koordinaattorin työnjako pyynnöstä ${job.id}. ${item.description}` });
+    store.db.prepare('INSERT INTO coord_assignments VALUES(?,?,?,?)').run(handed.id, job.project, job.id, job.requester);
     tasks.push({ id: handed.id, owner: handed.owner, title: handed.title });
   }
   return tasks;

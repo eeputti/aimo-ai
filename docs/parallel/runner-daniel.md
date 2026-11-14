@@ -13,3 +13,11 @@
 - Oikeat erilliset SQLite-yhteydet: kilpailu, token/jäsen/instanssi, idempotentti kuittaus, vanhentunut vuokra ja tavallisten työkalujen ohituksen esto. Oikeat lapsiprosessit simuloivat CLI:tä: stdin ei ole shell-koodi, env-avaimen poisto, aikaraja, ulkoinen pysäytys, suuri tuloste ja epäonnistunut exit. Oikea Git-työpuu ja paikallinen päiväkirja: lähde säilyy ja kesken jäänyttä ajoa ei toisteta.
 - Ei oikeita Codex-/Claude-malliajoja, OpenAI-, Meta- tai Valio-kutsuja. Codexin argumentit tarkistettu paikallisesta --help-tulosteesta, Aleksin Claude tarkisti oman natiivin Claude 2.1.325:n --helpin. Varsinainen CLI-kirjautuminen ja käytössä olevan CLI-version toiminta käyttäjän koneella on vielä käyttöönottoasia.
 - Kesken: HTTP-MCP:n ja ajurin täysi ketju, Aleksin Codexin riippumaton tarkistus, Aleksin Clauden koodiin sovitettu käyttöohje, viimeistely ja main-integrointi. Nykyistä käyttäjän MCP-prosessia/tunnelia ei muuteta.
+
+## Viimeistely ja HTTP-varmennus
+
+- Oikea Streamable HTTP -asiakas, luovutus, pysyvä ajopäiväkirja, Git-työpuu ja oikea Node-lapsi testattu yhtenä ketjuna. Codex/Claude tulosteet simuloitu; ei mallikuluja.
+- Koordinaattorin jako tallentaa alkuperäisen pyytäjän. `runner_finish`-palvelintapahtuman metatieto varmentaa tuloksen; sitä ei voi luoda tavallisella viestin tekstillä. Koordinaattori vastaa alkuperäiselle jäsenelle ja tulosaihe ei käynnistä uutta työnjakoa.
+- `runner-child.mjs` valvoo IPC-disconnectia ja pysäyttää oman CLI-puunsa myös ajurin äkkikuolemassa. Todellinen kaatumiskoe läpi Linuxissa. `preflightCli` tarkistaa asennetun CLI:n liput ennen palvelinyhteyttä/varauksia; väärä versio pysäyttää käynnistyksen. Claude ei käytä Bashia, Codex ei siirrä työtä erilliseen daemoniin.
+- Koko paketti **62/62 läpi**, myös L1/L2 nyt pakolliset. Windowsin mode/polku/SIGTERM-testien oletukset korjattu; oma ympäristö on Linux, Windows-ajoa ei väitetä tehdyksi.
+- MCP-yhteys katkesi sisäiseen virheeseen tämän vaiheen aikana. Aiemmat luovutukset ja koodi-ilmoitukset ovat menneet läpi; uusia vertaisvastauksia tai loppukuittauksia ei ole luettu. Vertaisomisteiset tiedostot jätetään erilleen. Julkaistu ohjerunko 84ddfad ei vielä vastaa lopullista koodia.

@@ -37,3 +37,19 @@ test('ordinary analysis and runner result messages cannot trigger a recursive de
   assert.equal(f.store.state('manager', { project: 'aimo-ai' }).tasks.length, 0);
   assert.equal(f.store.db.prepare('SELECT error_code FROM coord_jobs').get().error_code, 'INVALID_ASSIGNMENT');
 });
+test('verified runner output returns through the coordinator to the original human without another delegation', async (t) => {
+  const f = fixture(t); let calls = 0;
+  const coordinator = createCoordinator(f.store, f.config, { log() {}, agent: async ({ dispatch }) => {
+    calls++;
+    return dispatch ? { summary: 'One review', reply: 'Review plan', assignments: [assignment('one', 'docs/a.md')] } : { summary: 'Review received', reply: 'The worker completed the requested review.' };
+  } });
+  f.ask(); await coordinator.tick();
+  const task = f.store.state('manager', { project: 'aimo-ai' }).tasks[0]; const instanceId = crypto.randomUUID();
+  const run = f.store.runner.claim('one', { project: 'aimo-ai', taskId: task.id, expectedRevision: task.revision, instanceId, claimKey: 'k'.repeat(43), allowedSenders: [f.config.actor], allowedPaths: ['docs'] });
+  f.store.runner.finish('one', { project: 'aimo-ai', runId: run.runId, instanceId, leaseToken: run.leaseToken, outcome: 'completed', note: 'Read source; no edits.' });
+  await coordinator.tick(); await coordinator.tick();
+  assert.equal(calls, 2); assert.equal(f.store.state('manager', { project: 'aimo-ai' }).tasks.length, 1);
+  const replies = f.store.readMessages('manager', { project: 'aimo-ai' }).messages.filter((m) => m.sender === f.config.actor);
+  assert.equal(replies.length, 2); assert.match(replies[1].body, /worker completed/);
+  assert.equal(f.store.coordination.snapshot('one', 'aimo-ai').jobs.length, 0);
+});

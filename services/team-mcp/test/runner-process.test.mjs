@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runCli, resolveCli, cliArguments } from '../src/runner-process.mjs';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
+import { runCli, resolveCli, cliArguments, preflightCli } from '../src/runner-process.mjs';
 import { childEnvironment, runnerConfig } from '../src/runner-config.mjs';
 import { localRunnerState } from '../src/runner-local.mjs';
 
@@ -45,6 +47,26 @@ test('Windows npm wrappers resolve to fixed Node package entrypoints without a c
   const command = resolveCli('codex', 'codex', { platform: 'win32', env: { PATH: base }, exists: (p) => files.has(p) });
   assert.equal(command.executable, process.execPath); assert.equal(command.prefix[0], base + '\\node_modules\\@openai\\codex\\bin\\codex.js');
   assert.throws(() => resolveCli(base + '\\custom.cmd', 'codex', { platform: 'win32', exists: (p) => p.endsWith('custom.cmd') }), { code: 'CLI_SHIM_UNSUPPORTED' });
+});
+test('CLI preflight rejects unsupported installed executables before any job is claimed', () => {
+  assert.throws(() => preflightCli({ provider: 'codex', binary: process.execPath }), { code: 'CLI_VERSION_UNSUPPORTED' });
+  assert.ok(cliArguments(settings).includes('--no-daemon'));
+  assert.ok(cliArguments({ ...settings, provider: 'claude' }).includes('--permission-prompts'));
+});
+test('an abruptly killed runner disconnects its guardian and stops the owned CLI subtree', { timeout: 10000 }, async (t) => {
+  const fixture = script(t, 'import fs from "node:fs";fs.writeFileSync("started",String(process.pid));setInterval(()=>fs.appendFileSync("heartbeat","x"),20);');
+  const moduleUrl = new URL('../src/runner-process.mjs', import.meta.url).href;
+  const parentFile = path.join(fixture.dir, 'parent.mjs');
+  fs.writeFileSync(parentFile, `import {runCli} from ${JSON.stringify(moduleUrl)};await runCli({provider:'codex',access:'read-only',timeoutMs:9000},{cwd:${JSON.stringify(fixture.dir)},prompt:'x',resolved:${JSON.stringify(fixture.resolved)}});`);
+  const parent = spawn(process.execPath, [parentFile], { stdio: 'ignore' });
+  const closed = once(parent, 'close'); t.after(() => { if (parent.exitCode === null && parent.signalCode === null) parent.kill('SIGKILL'); });
+  const deadline = Date.now() + 5000;
+  while (!fs.existsSync(path.join(fixture.dir, 'heartbeat'))) { assert.ok(Date.now() < deadline, 'CLI did not start'); await new Promise((r) => setTimeout(r, 20)); }
+  parent.kill('SIGKILL'); await closed;
+  await new Promise((r) => setTimeout(r, 350));
+  const before = fs.readFileSync(path.join(fixture.dir, 'heartbeat'), 'utf8');
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(fs.readFileSync(path.join(fixture.dir, 'heartbeat'), 'utf8'), before, 'orphaned CLI kept working after its runner died');
 });
 test('runner configuration rejects URL tokens, broad traversal and protected configuration paths', () => {
   const env = { TEAM_RUNNER_URL: 'https://test.example/mcp', TEAM_RUNNER_MEMBER: 'worker', TEAM_RUNNER_KEY: 'k'.repeat(43) };

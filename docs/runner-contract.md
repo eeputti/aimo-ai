@@ -8,7 +8,7 @@ Koneella käynnissä oleva `npm run runner` yhdistää yhteiseen HTTP-MCP:hen om
 
 ## Uudet MCP-työkalut
 
-- `runner_claim_task`: project, taskId, expectedRevision, instanceId (UUID), allowedSenders[], allowedPaths[]. Vain voimassa oleva omalle tunnisteelle luovutettu tehtävä. Lähettäjä luetaan palvelimen tapahtumasta. Tarkistaa polut ja vapaat tiedostovaraukset. Palauttaa runId, salaisen leaseTokenin, leaseUntil, sourceMember ja task-olion. Vain toinen kahdesta samanaikaisesta varauksesta saa aloittaa.
+- `runner_claim_task`: project, taskId, expectedRevision, instanceId (UUID), claimKey (30–100 merkin satunnainen salaisuus), allowedSenders[], allowedPaths[]. Asiakas tallentaa claimKeyn ennen verkkokutsua ja käyttää samaa arvoa kadonneen vastauksen uusintaan; palvelin säilyttää siitä vain tiivisteen. Vain voimassa oleva omalle tunnisteelle luovutettu tehtävä. Lähettäjä luetaan palvelimen tapahtumasta. Tarkistaa polut ja vapaat tiedostovaraukset. Palauttaa runId, salaisen leaseTokenin (= claimKey), leaseUntil, sourceMember ja task-olion. Vain toinen kahdesta samanaikaisesta varauksesta saa aloittaa.
 - `runner_heartbeat`: project, runId, instanceId, leaseToken. Uusii tokeniin sidotun ajon ja tiedostovaraukset. Tavalliset claim/progress/handoff-kutsut eivät saa ohittaa aktiivista ajuria.
 - `runner_finish`: samat tunnisteet, outcome (completed/blocked/interrupted), note ja valinnainen commitSha. Tallentaa kuittauksen, vapauttaa varaukset ja luovuttaa tehtävän alkuperäiselle lähettäjälle tarkistukseen atomisesti. Uusinta on idempotentti. Vanhentunut tai väärä token ei voi julkaista tulosta.
 

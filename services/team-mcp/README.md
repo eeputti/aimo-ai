@@ -156,6 +156,9 @@ OAuth käyttää joko julkista PKCE-asiakasta (`none`) tai SDK:n confidential cl
 | `report_progress` | Omistajan tilanne, uusinta, `blocked`, `done` tai `released`; vaatii ajantasaisen `expectedRevision`-arvon. `blocked` lähettää esteestä viestin: `blockedOn`-jäsenelle suoraan, muuten koko projektille. Varaus säilyy. |
 | `handoff_task` | Luovuttaa oman tehtävän toiselle jäsenelle: omistus siirtyy, tiedostovaraukset vapautuvat ja vastaanottaja saa suoran viestin, jossa on muistiinpano, commit ja tehtävän tunniste. Vastaanottaja ottaa työn `claim_task`-kutsulla samalla `taskId`:llä; siihen asti tehtävä on tilassa `handed_off` eikä sitä voi päivittää. Tehtävä on varattu vastaanottajalle 120 minuuttia, sen jälkeen kuka tahansa voi ottaa sen. |
 | `update_project_state` | Yhteisen yhteenvedon päivitys ajantasaisen revision pohjalta. |
+| `runner_claim_task` | Paikallisen CLI-ajurin atominen vastaanotto: tuore omalle jäsenelle luovutettu tehtävä, odotettu revisio, instanssi ja ennen kutsua tallennettu salainen `claimKey`. Tarkistaa paikallisen lähettäjä-/polkulistan ja varaa tiedostot 120 sekunniksi. |
+| `runner_heartbeat` | Uusii yhden ajon tokeniin ja instanssiin sidotun vuokran. Tavalliset tehtävätyökalut eivät ohita aktiivista ajoa. |
+| `runner_finish` | Kuittaa tuloksen kerran ja palauttaa työn lähettäjälle tarkistettavaksi. Ei hyväksy koodia, commitoi tai pushaa. |
 
 Varaus `server/ordering` estää palvelimessa toisen varauksen myös polulle `server/ordering/checkout.mjs`. Eri tehtävien päällekkäisyys torjutaan myös saman jäsenen osalta. Varaukset ovat neuvoa antavia eivätkä estä OS-/Git-muokkauksia. Vanheneminen sallii tehtävän uudelleenvaraamisen; suljettua tehtävää ei avata uudelleen vaan luodaan uusi. Tehtävän alkuperäiset tiedostopolut säilyvät, vaikka vanhentuneen varauksen joku muu ottaisi. `get_project_state` näyttää erikseen aktiiviset resurssivaraukset ja alkuperäiset `requestedResources`-polut.
 
@@ -181,7 +184,29 @@ Jäsenavaimet ja access/refresh-/authorization code -tunnisteet haetaan kannasta
 
 ## Rajat ja varmennus
 
-MCP ei avaa tai herätä tiimiläisten ChatGPT-/Claude-keskusteluja eikä muuta niiden omia käyttöoikeuksia. Erillinen `npm run coordinator` -prosessi seuraa samaa kantaa ja näyttää avaimella suojatun paikallisen tilannenäkymän portissa 4752. Oletus on `observe`: ei mallikutsuja. `openai` käsittelee vain `team-coordinator`-jäsenelle osoitetut suorat viestit ja vastaa pyytäjän postilaatikkoon; se käyttää erikseen asetettua API-avainta ja mallia. Agentti ei muokkaa koodia tai suorita komentoja. Katso [käyttöönotto, rajat ja työnkulku](../../docs/team-coordinator.md).
+MCP ei avaa tai herätä tiimiläisten ChatGPT-/Claude-keskusteluja eikä muuta niiden omia käyttöoikeuksia. Erillinen `npm run coordinator` -prosessi seuraa samaa kantaa ja näyttää avaimella suojatun paikallisen tilannenäkymän portissa 4752. Oletus on `observe`: ei mallikutsuja. `openai` käsittelee vain `team-coordinator`-jäsenelle osoitetut suorat viestit ja vastaa pyytäjän postilaatikkoon; se käyttää erikseen asetettua API-avainta ja mallia. Agentti ei itse muokkaa koodia tai suorita komentoja. Katso [käyttöönotto ja työnkulku](../../docs/team-coordinator.md).
+
+## Automaattinen CLI-heräte ja rajattu työnjako
+
+`npm run runner` käynnistää oman koneen Codex CLI:n tai Claude Coden sille nimenomaisesti luovutetusta tehtävästä. Ajuri käyttää erillistä Git-työpuuta ja palauttaa tuloksen lähettäjän MCP-postilaatikkoon tarkistettavaksi. Se ei käynnistä selaimessa auki olevia chatteja. Palvelimen on ensin oltava päivitetty tähän 13 työkalun versioon; vanha käynnissä oleva prosessi pitää päivittää hallitusti. Ajuri pysähtyy, jos runner-työkalut puuttuvat.
+
+1. Asenna Node 22.13+, Git ja ajantasainen Codex CLI tai Claude Code omaan klooniin. Kirjaudu CLI:hin etukäteen samalla käyttöjärjestelmäkäyttäjällä. Pelkkä Codex-työpöytäsovellus ei riitä. Käynnistys tarkistaa CLI:n tarvittavat liput `--help`-kutsuilla ilman malliajoa.
+2. Ylläpitäjä luo yhteisen MCP:n omalla palvelinkoneella erillisen jäsenen, esim. `npm.cmd --prefix services/team-mcp run admin -- add-member --id aleksi-codex-runner --name "Aleksi / Codex runner" --projects aimo-ai`. Toimita tulostuva avain yksityisesti.
+3. Kopioi tämän hakemiston `.env.runner.example` tiedostoksi `.env.runner`. Aseta nykyinen HTTPS-osoite `/mcp`-päätteellä ilman URL-tokenia, oma jäsen ja avain, `TEAM_RUNNER_PROVIDER=codex` tai `claude`, sallitut lähettäjät ja kapeat polut (esim. `docs`, ilman loppukauttaviivaa). Aloita `TEAM_RUNNER_ACCESS=read-only`. `workspace-write` sallii muutoksia erillisessä työpuussa. Pidä asetukset ja ajopäiväkirja oman käyttäjän yksityisessä kansiossa; Windowsissa POSIX-mode ei korvaa NTFS-oikeuksia.
+4. Aja repon juuresta `npm.cmd ci --prefix services/team-mcp` ja `npm.cmd --prefix services/team-mcp run runner` (Linuxissa `npm`). Asetustiedosto luetaan vain `.env.runner`-tiedostosta. Ajuri pollaa oletuksena 5 sekunnin välein, tekee yhden työn kerrallaan ja aikaraja on 600 sekuntia. Ctrl+C pysäyttää ajurin.
+5. Sallittu lähettäjä luo tehtävän tarkoilla tiedostopoluilla ja luovuttaa sen ajurin jäsenelle `handoff_task`-kutsulla. Tavallinen viesti ei käynnistä paikallista CLI:tä. Tuloksessa on työpuun ja paikallisen haaran sijainti sekä oikeasti tehdyt tarkistukset. Muutokset odottavat erillistä tarkistusta ja commit/push/mergeä. Katkon jälkeinen sovitus ei aja epävarmaa tehtävää uudelleen; päiväkirjaa ei pidä poistaa tai ohittaa.
+
+CLI käyttää normaaleja käyttöoikeuksiaan: Codexin read-only/workspace-write-hiekkalaatikko; Claudessa plan/acceptEdits, vain luku-/muokkaustyökalut ja luvitusta vaativien toimien automaattinen esto. Claude-ajuri ei tarjoa Bash-työkalua. Tiedostorajaus tarkistetaan Git-muutoksista ajon jälkeen; se ei ole erillinen käyttöjärjestelmän turvaraja. Ajuri ei välitä MCP-avaintaan lapsen ympäristöön. Enintään 12 CLI-ajoa tunnissa/jäsen; heartbeat 15 s, vuokra 120 s.
+
+Koordinaattorin automaattinen työnjako on oletuksena pois. Salli `.env.coordinator`-tiedostossa kaikki kolme listaa ja käynnistä koordinaattori uudelleen samalle MCP-kannalle:
+
+```dotenv
+TEAM_COORDINATOR_WORKERS=daniel-codex-runner,aleksi-codex-runner,aleksi-claude-runner
+TEAM_COORDINATOR_DISPATCH_SENDERS=daniel-chatgpt
+TEAM_COORDINATOR_DISPATCH_PATHS=docs,services/team-mcp
+```
+
+Lähetä sitten koordinaattorille suora viesti, jonka otsikko alkaa `[DELEGATE]`. Kerro tavoite, tiedostorajaus ja valmistumiskriteeri. Vain listattu lähettäjä voi pyytää työnjakoa; koordinaattori tekee enintään kolme erillistä luovutusta listatuille jäsenille ja vapaille sallituille poluille. Virheellinen tai päällekkäinen suunnitelma peruutetaan kokonaan. Runner palauttaa työn tarkistukseen; koordinaattori käsittelee varmennetun tulosviestin ja vastaa alkuperäiselle pyytäjälle. Tulos ei käynnistä uusia luovutuksia. API-kutsujen tuntiraja koskee myös tulosten käsittelyä; API-jonossa on enintään viisi avointa pyyntöä/pyytäjä ja 100 yhteensä. Yli 15 minuutin Retry-After antaa virhekuittauksen automaattisen varhaisen uusinnan sijaan.
 
 ```bash
 npm test

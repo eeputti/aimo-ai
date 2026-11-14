@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { runnerConfig } from './runner-config.mjs';
-import { resolveCli } from './runner-process.mjs';
+import { preflightCli } from './runner-process.mjs';
 import { connectRunner } from './runner-client.mjs';
 import { localRunnerState } from './runner-local.mjs';
 import { createLocalRunner } from './runner.mjs';
@@ -10,7 +10,7 @@ process.once('SIGINT', stop); process.once('SIGTERM', stop);
 let remote, journal;
 try {
   const settings = runnerConfig(); const instanceId = crypto.randomUUID();
-  resolveCli(settings.binary, settings.provider);
+  preflightCli(settings);
   journal = localRunnerState(settings.state, instanceId);
   remote = await connectRunner(settings);
   console.log(`Local runner: ${settings.member}, ${settings.provider}, ${settings.access}\nKeep this terminal open. Existing browser chats are not woken.`);

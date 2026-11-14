@@ -21,7 +21,7 @@ export function createLocalRunner(settings, remote, journal, { execute = runCli,
         record.completion ||= { outcome: 'interrupted', note: `Paikallinen ajuri keskeytyi. Ajoa ei suoriteta uudelleen. Tarkista säilynyt työpuu: ${record.worktree?.directory || 'ei vielä luotu'}.` };
         journal.save(record, 'finishing'); await finish(record);
       } catch (err) {
-        if (['RUN_NOT_FOUND', 'RUN_LEASE_LOST', 'FINISH_CONFLICT', 'NOT_ASSIGNED', 'REVISION_CONFLICT'].includes(err.code)) { journal.save(record, 'finished'); log(`Runner ${record.taskId}: interrupted, server state changed`); }
+        if (['RUN_NOT_FOUND', 'RUN_LEASE_LOST', 'FINISH_CONFLICT', 'NOT_ASSIGNED', 'REVISION_CONFLICT', 'SENDER_NOT_ALLOWED', 'PATH_NOT_ALLOWED'].includes(err.code)) { journal.save(record, 'finished'); log(`Runner ${record.taskId}: interrupted, server state changed`); }
         else throw err;
       }
     }

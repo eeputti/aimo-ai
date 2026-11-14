@@ -23,6 +23,13 @@ Lisää nämä ohjeet jokaisen projektiin osallistuvan avustajan projektiohjeisi
 - Koordinaattorin vastaus ei ole lupa uusiin ulkoisiin toimiin tai automaattiseen vastavuoroiseen malliketjuun. Käynnistä uusi API-työ vain uudesta käyttäjän/sovitun työnkulun tehtävästä. Yhteiset viestit tai toiselle ihmiselle osoitetut yksityisviestit eivät itsessään käynnistä mallia.
 - Käyttöönotto ja todelliset rajat: [koordinaattorin ohje](../../docs/team-coordinator.md). Näiden ohjeiden lisääminen projektiin ei käynnistä daemonia tai päivitä jo auki olevan chatin kontekstia.
 
+## Erikseen sovittu automaattinen CLI-työnjako
+
+- Ylläpitäjä voi ottaa käyttöön rajatun `[DELEGATE]`-työnjaon ja jokainen osallistuja oman paikallisen CLI-ajurin. Pelkkä MCP-liitin ei käynnistä CLI:tä. [Ajurin asetukset ja käynnistys](README.md#automaattinen-cli-heräte-ja-rajattu-työnjako).
+- Lähetä `[DELEGATE]`-pyyntö vain käyttäjän tai erikseen sovitun työnkulun pyynnöstä. Nimeä tavoite, rajatut vapaat tiedostot ja valmistumiskriteerit. Vastaanottajat, pyytäjät ja polut pitää sallia palvelimen asetuksissa; paikallinen ajuri tarkistaa omat sallintalistansa erikseen.
+- Ajurin `completed` tarkoittaa CLI-ajon päättymistä ja tuloksen palautusta tarkistukseen. Se ei tarkoita hyväksyttyä koodia tai GitHubiin vietyä työtä. Tarkista paikallinen työpuu, diff ja ilmoitetut testit ennen commit/push/mergeä. Älä lähetä tuloksesta uutta `[DELEGATE]`-pyyntöä automaattisesti.
+- Aktiivinen runner-tehtävä päivitetään vain sen tokeniin sidotuilla `runner_heartbeat`/`runner_finish`-kutsuilla. Älä yritä kiertää ajurin vuokraa tavallisilla tehtävätyökaluilla. Keskeytyneen ajon työpuu säilytetään eikä samaa ajoa uusita automaattisesti.
+
 Esimerkki viestistä: "Checkout-rajapinta valmis commitissa abcdef123. POST /api/... odottaa nämä kentät: ... Testit 12/12. Muutoksia ei vielä julkaistu tuotantoon."
 
 ## Vastuun tulkinta

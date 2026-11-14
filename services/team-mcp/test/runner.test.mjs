@@ -70,6 +70,28 @@ test('local recovery closes an interrupted attempt without executing it twice', 
   await runner.tick(); await runner.tick(); assert.equal(executions, 0); assert.equal(journal.pending().length, 0);
   assert.equal(f.store.state('manager', { project: 'aimo-ai' }).tasks[0].owner, 'manager');
 });
+test('a lost claim response is reconciled from its durable nonce without starting a CLI', async (t) => {
+  const f = fixture(t); const task = f.handoff(); const args = f.args(task);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-runner-lost-claim-'));
+  const journal = localRunnerState(dir, crypto.randomUUID()); t.after(() => { journal.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  f.store.runner.claim('worker', args); // Server committed, HTTP response never reached the caller.
+  journal.save({ taskId: task.id, expectedRevision: task.revision, instanceId: args.instanceId, claimKey: args.claimKey }, 'claiming');
+  let executions = 0;
+  const remote = { call: async (name, body) => name === 'get_project_state' ? f.store.state('worker', body) : f.store.runner[name.replace('runner_', '').replace('_task', '')]('worker', body) };
+  const runner = createLocalRunner({ project: 'aimo-ai', member: 'worker', paths: ['docs'], senders: ['manager'], key: 'private-key' }, remote, journal, { execute: async () => { executions++; }, log() {} });
+  await runner.tick(); await runner.tick();
+  assert.equal(executions, 0); assert.equal(journal.pending().length, 0);
+  assert.equal(f.store.db.prepare('SELECT COUNT(*) AS n FROM runner_runs').get().n, 1);
+  assert.equal(f.store.readMessages('manager', { project: 'aimo-ai' }).messages.filter((m) => m.sender === 'worker').length, 1);
+});
+test('revoking a worker fences its heartbeat and completion and permits explicit human recovery', (t) => {
+  const f = fixture(t); const task = f.handoff(); const args = f.args(task); const run = f.store.runner.claim('worker', args);
+  const identity = { project: 'aimo-ai', runId: run.runId, instanceId: args.instanceId, leaseToken: run.leaseToken };
+  f.store.revokeMember('worker');
+  assert.throws(() => f.store.runner.heartbeat('worker', identity));
+  assert.throws(() => f.store.runner.finish('worker', { ...identity, outcome: 'completed', note: 'late' }));
+  assert.equal(f.store.claim('manager', { project: 'aimo-ai', taskId: task.id }).owner, 'manager');
+});
 test('isolated Git worktrees preserve the main tree and detect task-scope violations', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-runner-git-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   git(dir, ['init']); git(dir, ['config', 'user.email', 'test@example.invalid']); git(dir, ['config', 'user.name', 'Test']);

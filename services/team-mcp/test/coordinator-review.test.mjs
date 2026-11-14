@@ -1,5 +1,5 @@
 // Riippumattoman tarkistuksen regressiot (aleksi-claude, tehtävä 2e683d3d). Raportti docs/parallel/coordinator-aleksi-claude.md.
-// todo-testit kuvaavat havaitun riskin halutun käytöksen; ne eivät kaada sarjaa ennen kuin ydinkoodin omistaja integroi korjauksen.
+// L1/L2 korjattu heräteajurin integraatiossa; molemmat regressiot ovat nyt pakollisia.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openStore } from '../src/store.mjs';
@@ -31,7 +31,7 @@ test('review: coordinator replies never become new jobs and other members cannot
 
 // L1: Retry-After / uusintaviive ilman ylärajaa. OpenAI:n (tai välityspalvelimen) suuri Retry-After tai kaukainen HTTP-päivä
 // siirtää työn due-ajan vuosien päähän. Työ jää tilaan queued, vie jonopaikan eikä pyytäjä saa koskaan vastausta tai virhekuittausta.
-test('review L1: an unbounded Retry-After from the API cannot park a job forever without notifying the requester', { todo: 'odottaa ydinkoodin korjausta: rajaa retryAfterMs (esim. enintään 15 min) tai muuta kaukainen viive pysyväksi virheeksi' }, async (t) => {
+test('review L1: an unbounded Retry-After from the API cannot park a job forever without notifying the requester', async (t) => {
   const agentError = await runOpenAIAgent({ apiKey: 'k', model: 'm', job: { input: { subject: 's', body: 'b' } }, context: {},
     fetchImpl: async () => new Response('limited', { status: 429, headers: { 'retry-after': 'Fri, 01 Jan 2100 00:00:00 GMT' } }) }).catch((e) => e);
   assert.ok(agentError.retryable);
@@ -44,7 +44,7 @@ test('review L1: an unbounded Retry-After from the API cannot park a job forever
 
 // L2: jonoraja 100 on yhteinen koko projektille eikä pyytäjäkohtainen. Yksi jäsen (tai virheellisesti silmukoiva agentti)
 // täyttää jonon, ja tuntirajalla 12 jonon purku kestää noin 8 tuntia; muiden pyynnöt saavat sillä välin QUEUE_FULL.
-test('review L2: one requester cannot fill the shared queue and lock out other members', { todo: 'odottaa ydinkoodin korjausta: pyytäjäkohtainen jonoraja (esim. 5 avointa työtä) ennen yhteistä 100 rajaa' }, (t) => {
+test('review L2: one requester cannot fill the shared queue and lock out other members', (t) => {
   const f = fixture(t);
   for (let i = 0; i < 100; i++) f.message('alice');
   f.message('bob'); f.ingest();
