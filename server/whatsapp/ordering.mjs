@@ -3,10 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { createDemoBuyerResolver } from './demo-buyer.mjs';
 import { codeHash, phoneNumber } from './store.mjs';
 
-const customerId = (binding) => `whatsapp-demo:${binding}`;
-const buyerId = (binding) => `whatsapp-demo-${binding}`;
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -30,7 +29,7 @@ export function bootstrapDemoMember(store, env = process.env) {
   if (!store.pair(phone, codeHash(invitation.code))) throw new Error('Testiasiakkaan yhdistäminen epäonnistui.');
 }
 
-export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadOrdering } = {}) {
+export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadOrdering, resolveBuyer = createDemoBuyerResolver() } = {}) {
   let runtime; let pending;
   const queues = new Map();
   function serial(binding, work) {
@@ -46,13 +45,17 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
   };
   const conversationId = (customer, epoch = epochOf(customer.bindingVersion)) =>
     `${phoneId}:${customer.customerId}:${customer.bindingVersion}${epoch ? `:session:${epoch}` : ''}`;
-  const context = (current) => ({ customerId: customerId(current.binding), buyerId: buyerId(current.binding), bindingVersion: current.binding,
-    companyName: current.company, personName: current.person, source: 'demo',
-    deliverySites: [{ id: 'demo-keittio', label: 'Testikeittiö' }], permissions: { readProducts: true, placeOrders: true } });
+  const context = (current) => {
+    const identity = resolveBuyer(current);
+    return { customerId: identity.customerId, buyerId: identity.buyerId, bindingVersion: current.binding,
+      companyName: runtime?.buyerName?.(identity.buyerId) || current.company, personName: current.person, source: 'demo',
+      deliverySites: [{ id: 'demo-keittio', label: 'Testikeittiö' }], permissions: { readProducts: true, placeOrders: true } };
+  };
   const livePermissions = (customer) => {
-    const member = store.db.prepare('SELECT binding FROM members WHERE binding=?').get(customer?.bindingVersion || '');
-    const allowed = !!member && customer.customerId === customerId(member.binding)
-      && customer.buyerId === buyerId(member.binding) && customer.source === 'demo';
+    const member = store.db.prepare('SELECT * FROM members WHERE binding=?').get(customer?.bindingVersion || '');
+    const identity = member && resolveBuyer(member);
+    const allowed = !!member && customer.customerId === identity.customerId
+      && customer.buyerId === identity.buyerId && customer.source === 'demo';
     return { readProducts: allowed, placeOrders: allowed };
   };
   const load = loadOrdering || (async (permissions) => {
@@ -60,7 +63,9 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       import('../order-conversation/runtime.mjs'), import('../gateway/store.mjs'), import('../gateway/mandate.mjs'), import('./dialogue.mjs'),
     ]);
     const ordering = await createConfiguredOrdering({ draftDb, quoteDb, permissions });
-    return { ...ordering, dialogue: await createConfiguredDialogue(store), ensureBuyer(customer) {
+    return { ...ordering, buyerName: (id) => buyers.byId(id)?.name, dialogue: await createConfiguredDialogue(store), ensureBuyer(customer) {
+      const member = store.db.prepare('SELECT * FROM members WHERE binding=?').get(customer.bindingVersion);
+      if (member && resolveBuyer(member).mapped && !buyers.byId(customer.buyerId)) throw new Error('Valittua demoasiakasta ei löydy. Alusta kaupan asiakas ennen numeroliitosta.');
       if (!buyers.byId(customer.buyerId)) buyers.save({
         id: customer.buyerId, name: customer.companyName, kind: 'WhatsApp-testiasiakas',
         apiKey: crypto.randomBytes(32).toString('hex'), approver: 'Testaaja',
@@ -70,6 +75,15 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
   });
   const getRuntime = () => (pending ||= Promise.resolve().then(() => load(livePermissions)).then((value) => (runtime = value)));
   const bridge = {
+    async getAccount(member) {
+      return serial(member?.binding, async () => {
+        const current = member?.phone && store.member(member.phone);
+        if (!current || current.binding !== member.binding) throw Object.assign(new Error('Testiyhteys ei ole voimassa.'), { status: 403 });
+        await getRuntime(); const customer = context(current);
+        if (!livePermissions(customer).readProducts) throw Object.assign(new Error('Ei käyttöoikeutta.'), { status: 403 });
+        return { buyerId: customer.buyerId, companyName: customer.companyName, personName: current.person };
+      });
+    },
     async getShoppingList(member) {
       return serial(member?.binding, async () => {
         const current = member?.phone && store.member(member.phone);
@@ -98,8 +112,8 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       if (!current || current.binding !== member.binding || !messageId) {
         return { text: 'Testiyhteys ei ole voimassa. Pyydä ylläpitäjältä uusi yhdistäminen.' };
       }
-      const customer = context(current);
       const ordering = await getRuntime();
+      const customer = context(current);
       if (!livePermissions(customer).readProducts) return { text: 'Testiyhteys ei ole enää voimassa.' };
       if (expectedList !== undefined && !ordering.hasTurnResult?.({ messageId, customer })) {
         const list = ordering.getShoppingList?.({ conversationId: conversationId(customer), customer }) || null;

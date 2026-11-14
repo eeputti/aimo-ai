@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — Kahvila Aallon WhatsApp-numeroliitos ja korimuutosten eristetty koe (Codex)
+
+- Lisätty vain palvelimella asetettava WHATSAPP_DEMO_BUYER_ID-kytkentä nykyiselle WHATSAPP_DEMO_PHONE-lähettäjälle. Olemassa olevan ostajan avaimet, valtuudet ja historia säilyvät; muut puhelimet eivät saa samaa asiakasta. Asiakastunnus ja nimi ovat yhtenäiset tilausmoottorissa, listasiirrossa ja paikalliskaupassa.
+- Uusi asiakkuus saa oman luonnosnimiavaruuden: vanhaa koria ei siirretä automaattisesti. Eristetyssä kokeessa WhatsAppin 20 → 30 litraa päivitti oikean verkkokaupan koritallennuksen neljästä viiteen kuuden litran erään ilman duplikaattia. Tuote- ja hintatyökalut sekä puhelinnumerot ovat synteettisiä; ei Meta-lähetystä tai tilausta. Kohdistetut testit 46/46 läpi; git diff --check läpi.
+- Oikean Eeliksen numeron palvelinasetuksia tai localhost:4747-prosessia ei ole käytettävissä, joten oikean puhelimen loppukoetta tai käyttöönottoa ei väitetä tehdyksi. Omistajat päivittävät palvelimet, asettavat kohdeostajan ja uuden yksityisen korilähdelinkin. Ohje docs/parallel/whatsapp-kahvila-aalto.md. MCP-viesti Eeliksen Codexille epäonnistui Internal error -virheeseen; toimitusta ei vahvistettu.
+
 ## 15.11.2026 — README alkaa portista, WhatsApp ja kauppa sen asiakkaina (Claude Code, katselmointichatti)
 
 - **Käyttäjän pyyntö:** korjaa haastekatselmoinnin löydös 3. README alkoi "Current product direction: a WhatsApp ordering assistant" ja väitti WhatsAppin olevan vain lukeva ja tilaamisen puuttuvan. Haaste sanoo, ettei kyse ole chatbotista verkkokaupan tilalla, ja README on tuomarin ensimmäinen sivu.
