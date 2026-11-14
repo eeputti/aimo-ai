@@ -20,7 +20,7 @@ Jos käyttäjä painottaa vastuullisuutta tai toimitusvarmuutta, käytä search_
 const quantity = {
   type: 'object', additionalProperties: false, required: ['value', 'unit'],
   description: 'Tarve ostajan omassa yksikössä. Portti muuntaa sen myyntiyksiköiksi (laatikko, tölkki, säkki) tuotedatan ja vertailuhinnan perusteella ja pyöristää ylöspäin myyntierään.',
-  properties: { value: { type: 'number', exclusiveMinimum: 0 }, unit: { type: 'string', enum: ['L', 'KG', 'PCS'], description: 'L = litraa, KG = kiloa, PCS = myyntiyksikköä' } },
+  properties: { value: { type: 'number', exclusiveMinimum: 0 }, unit: { type: 'string', enum: ['L', 'KG', 'PCS'], description: 'L = litraa, KG = kiloa, PCS = kappaleita basis-kentän mukaan' }, basis: { type: 'string', enum: ['items', 'sales'], description: 'Vain PCS: items = yksittäiset tuotteet, sales = myyntiyksiköt (oletus). Pakkauskoon on oltava tiedossa items-muunnosta varten.' } },
 };
 
 export const OPERATIONS = [

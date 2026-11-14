@@ -25,12 +25,12 @@ const CASES = [
   ['500 g vähälaktoosista voita', { items: [{ type: 'butter', q: KG(0.5), claims: ['LOW_LACTOSE'] }] }],
   ['25 kg perunoita, 10 kg sipulia ja 5 kg porkkanaa keskiviikoksi', { date: '2026-11-18', items: [{ q: KG(25), top: 'peruna' }, { q: KG(10), top: 'sipuli' }, { q: KG(5), top: 'porkkana' }] }],
   ['Please order 40 boxes of nut-free cookies', { items: [{ q: PCS(40), ex: ['AN'] }] }],
-  ['kaksi tusinaa kananmunia', { items: [{ type: 'eggs', q: PCS(24) }] }],
+  ['kaksi tusinaa kananmunia', { items: [{ type: 'eggs', q: { ...PCS(24), basis: 'items' } }] }],
   ['12 kg Valio Oltermanni juustoa 2026-11-19', { date: '2026-11-19', items: [{ q: KG(12), brand: 'Valio', top: 'oltermanni' }] }],
   ['60 l kaurajuomaa ja 15 kg kahvia ylihuomiseksi', { date: '2026-11-16', items: [{ cat: '10402', q: L(60) }, { cat: '22300', q: KG(15) }] }],
   ['luomu kevytmaitoa 40 litraa', { items: [{ type: 'milk', q: L(40), claims: ['EU_ORGANIC_FARMING'], fat: 'semi-skimmed' }] }],
   ['2,5 kg basmatiriisiä', { items: [{ cat: '21340', q: KG(2.5), top: 'basmati' }] }],
-  ['3 dozen eggs and 10 kg sugar for Thursday', { date: '2026-11-19', items: [{ type: 'eggs', q: PCS(36) }, { cat: '22100', q: KG(10) }] }], // kärjessä saa olla myös nestesokeri (Nordic Sugar Neste): se on sokeria
+  ['3 dozen eggs and 10 kg sugar for Thursday', { date: '2026-11-19', items: [{ type: 'eggs', q: { ...PCS(36), basis: 'items' } }, { cat: '22100', q: KG(10) }] }], // kärjessä saa olla myös nestesokeri (Nordic Sugar Neste): se on sokeria
   // Näissä oikea tulos on "en ymmärtänyt": kerroksen pitää tunnistaa se itse eikä arvata.
   ['2 kg unicorn meat', { lowConfidence: true }],
   ['hmm what about the thing we talked about', { lowConfidence: true }],

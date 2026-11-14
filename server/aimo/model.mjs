@@ -26,7 +26,7 @@ export const REQUEST_SCHEMA = {
           brand: { anyOf: [{ type: 'string' }, { type: 'null' }] },
           countryOfOrigin: { anyOf: [{ type: 'string' }, { type: 'null' }] },
           fat: { anyOf: [{ type: 'string', enum: ['fat-free', 'semi-skimmed', 'whole'] }, { type: 'null' }] },
-          quantity: { anyOf: [{ type: 'object', additionalProperties: false, required: ['value', 'unit'], properties: { value: { type: 'number' }, unit: { type: 'string', enum: ['L', 'KG', 'PCS'] } } }, { type: 'null' }] },
+          quantity: { anyOf: [{ type: 'object', additionalProperties: false, required: ['value', 'unit', 'basis'], properties: { value: { type: 'number' }, unit: { type: 'string', enum: ['L', 'KG', 'PCS'] }, basis: { type: 'string', enum: ['items', 'sales'] } } }, { type: 'null' }] },
         },
       },
     },
@@ -54,6 +54,7 @@ Yleisimmät merkit: ${topBrands}
 - Ruokavaliorajaus on väittämä (claims), ei osa tuotesanaa. "Laktoositon" on FREE_FROM_LACTOSE; "vähälaktoosinen" on LOW_LACTOSE. Ne eivät ole sama asia, älä koskaan vaihda toista toiseen.
 - "Ilman pähkinää", "nut-free", "ei soijaa" ovat excludeAllergens (GS1-koodit: AN pähkinät, AP maapähkinä, AY soija, AE kananmuna, AF kala, AM maito, AS seesami, UW vehnä).
 - Määrä ostajan omassa yksikössä: L (litrat), KG (kilot) tai PCS (kappaleet, laatikot, tölkit, pussit). Muunna dl, cl, ml ja g. Älä muunna litroja laatikoiksi: sen tekee rajapinta tuotedatasta.
+- PCS-määrän basis erottaa yksittäiset tuotteet ja myyntipakkaukset: "100 kananmunaa" ja "100 kpl kananmunia" ovat basis "items"; "100 rasiaa kananmunia" on basis "sales". Älä päättele munien määrää pakkauksessa, se luetaan tuotetiedoista. Muilla tuotteilla basis on "sales", ellei käyttäjä nimenomaisesti laske yksittäisiä tuotteita.
 - Jos määrää ei sanota, quantity on null. Älä arvaa määrää.
 - Päivä: laske suhteelliset päivät ("maanantaiksi", "tomorrow") käyttäjän viestin mukana annetusta nykyhetkestä. Jos päivää ei sanota, deliveryDate on null.
 - Ostajat kirjoittavat puhekieltä, murretta ja kirjoitusvirheitä ("pottuu", "maetoo", "jätskii", "limsaa"). Päättele tarkoitettu tuote ja anna productTerm valikoiman sanalla ("peruna", "maito", "jäätelö", "virvoitusjuoma"). Kenttään heard tulee ostajan oma sana muuttamattomana.

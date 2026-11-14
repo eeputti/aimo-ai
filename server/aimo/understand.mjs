@@ -7,6 +7,7 @@
 //  - jokainen kenttä on tyypitetty ja validoitu (määrä, yksikkö, päivä), kelpaamaton arvo hylätään eikä arvata
 //  - oletukset kirjataan näkyviin, ihmiseltä ei kysytä avoimia kysymyksiä
 import { normalize } from '../catalog.mjs';
+import { quantityBasisFor } from '../itemQuantities.mjs';
 import { conceptOf, brandAt, variants, loadLexicon, recognize } from './lexicon.mjs';
 import { synonymOf, learnedOf, SHELVES } from './synonyms.mjs';
 
@@ -253,6 +254,13 @@ function parseItem(raw, lang) {
     const shelf = heads.length === 1 && !head.type ? SHELVES[head.concept?.word] || SHELVES[head.w] : null;
     if (shelf) { item.shelf = { names: shelf.names }; item.category = null; item.categories = shelf.categories; item.categoryLabel = shelf.label; }
     if (!shelf && !head.type && head.concept.top[0].share < 0.5 && head.concept.top[1]) notes.push({ code: 'CATEGORY_AMBIGUOUS', fi: `"${head.concept.word}" esiintyy useassa tuoteryhmässä (${head.concept.top.slice(0, 3).map((t) => t.label).join(' / ')}): haetaan kaikista`, en: `"${head.concept.word}" appears in several product groups: searching all of them` });
+  }
+  const basis = quantityBasisFor(item, q?.unitWord);
+  if (basis === 'items') {
+    item.quantity.basis = basis;
+    const assumed = notes.findIndex((n) => n.code === 'UNIT_ASSUMED');
+    if (assumed >= 0) notes.splice(assumed, 1);
+    notes.push({ code: 'INDIVIDUAL_ITEMS', fi: `${item.quantity.value} kananmunaa tarkoittaa munien lukumäärää. Pakkaukset lasketaan tuotetiedoista.`, en: 'The quantity counts individual eggs, not sales packs.' });
   }
   if (!item.quantity) notes.push({ code: 'QUANTITY_MISSING', fi: 'Määrää ei annettu', en: 'No quantity given' });
   return { item, notes, unparsed };

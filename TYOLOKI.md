@@ -2,6 +2,17 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — kananmunien kappaleet erotetaan myyntipakkauksista (Codex, sanelu)
+
+**Käyttäjän päätös:** "100 kananmunaa" tarkoittaa sataa munaa, ei sataa rasiaa. Kappalemäärä ja myyntipakkausten määrä erotetaan valitulle tuotteelle, ja lasku näytetään ennen koriin lisäämistä.
+
+- `server/itemQuantities.mjs`: ilmoitettu kappalemäärä luetaan tuotetiedosta tai nimestä (esim. Kieku M6/M10/M90, 12 kpl) sekä tarvittaessa perSales-muunnoksesta. Painosta ei päätellä munamäärää. Tuntematon tai ristiriitainen pakkaustieto ei muunnu kappaleiksi. `explainItemQuantity` antaa pyydetyn ja toimitettavan kappalemäärän sekä ylijäämän.
+- `quantity.basis: items | sales` on vapaaehtoinen tarkenne PCS-yksikölle. Oletus sales säilyttää vanhojen koririvien ja API-pyyntöjen myyntiyksikkömerkityksen. Säännöt tunnistavat "100 kananmunaa" ja "100 kpl kananmunia" items-määräksi; rasia/paketti/laatikko säilyy myyntipakkauksena. Mallin skeema ja ohje sekä gatewayn sopimus päivitetty.
+- `server/gateway/quantity.mjs`: yhteinen muunnos haulle ja tarjoukselle. Alkuperäinen irrotus `service.mjs`:stä kuuluu rinnakkaiseen hakutyöhön ja on tässä mukana sovitusti; saneluvaihe lisäsi basis-tuen. Haku-, tarjous- ja koritarkistuksen kytkennät tähän helperiin ovat rinnakkaisen hakutyön commitissa.
+- `test/item-quantities.test.mjs`: bare/kpl/rasia-erottelu, 6/8/10/12/56/90 munan pakkaukset, tuntematon muunnos ja oikean katalogin kolme tuotetta. 100 munaa → 10 × 10 = 100, 17 × 6 = 102 tai 2 × 90 = 180. Aimo-evalin kahden tusinatapauksen odotuksiin lisätty items-tarkenne (luvut 24 ja 36 säilyvät).
+
+**Tarkistukset:** kappale- ja intenttestit 8/8 sekä rinnakkaisen storefrontin regressiot 8/8, `npm run aimo:eval` 26/26 ja `aimo:eval:spoken` 54/54, 0 mallikutsua. Oikeaa mallia tai Valio-API:a ei tässä kutsuttu. **Seuraava askel:** liitä sanelun reseptiaikomus sovelluksen reseptihakuun ja annosmäärään, säilytä samassa lauseessa luetellut tuotteet, testaa yhteinen haku → kori ja käynnistä vanha 4747-palvelin sovitusti uudelleen samoilla kannoilla. Sen uudet storefront-reitit palauttivat tarkistuksessa vielä 404.
+
 ## 14.11.2026 — Aimon ostoskori ja yhteinen hakukenttä (Codex, korin ulkoasu)
 
 **Käyttäjän päätös:** demossa käytetään uutta hakua ja Aimon toimitustukun mukaista ostoskoria. Keittiön vanhaa agenttiehdotusta ja agenttien aiempia tilauksia ei tuoda tähän koriin. Myöhempi tarkennus: myös korin Lisää tuotteita -kenttään sama sininen AI-kuvake ja mikrofoni; haku avautuu animaatiolla juuri käytetystä kentästä. Koriin tulee saatavuuden tarkistus, keltaiset huomiot, päivälle siirto ja hyväksyttävät korvaajat ennen maksuvaihetta. Oikeaa maksupalvelua ei ole kytketty.
