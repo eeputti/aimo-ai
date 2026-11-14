@@ -3,33 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aimo Agent Gateway</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Sofia+Sans+Extra+Condensed:wght@800&display=swap" rel="stylesheet">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%23005670%27/%3E%3Cpath d=%27M8 16h10m-4-5 5 5-5 5M22 9v14%27 stroke=%27%23c0e021%27 stroke-width=%273%27 fill=%27none%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/gateway.css">
-  <link rel="stylesheet" href="/aimo-shell.css">
+  <title>Etusivu | Valio Aimo® toimitustukku</title>
+  <meta name="description" content="Valio Aimon toimitustukun etusivun paikallinen ulkoasuversio.">
+  <link rel="icon" href="/aimo-logo.png">
+  <link rel="preload" href="/storefront-assets/Matter-Regular.otf" as="font" type="font/otf" crossorigin>
+  <link rel="preload" href="/storefront-assets/Matter-Bold.otf" as="font" type="font/otf" crossorigin>
+  <link rel="preload" href="/storefront-assets/National2Compressed-Bold.otf" as="font" type="font/otf" crossorigin>
+  <link rel="stylesheet" href="/storefront.css">
 </head>
 <body>
-  <script src="/aimo-shell.js" data-page="gateway"></script>
-  <div class="wrap">
-    <div>
-      <h1>Ostajan agentti tilaa. Ihminen päättää, kun sillä on väliä.</h1>
-      <p class="lede">Haku, allekirjoitettu tarjous, tilaus ja päätösketju mille tahansa ostoagentille.</p>
-    </div>
-    <section id="products" aria-label="Agenttien tilaamat tuotteet"></section>
-    <div class="cols">
-      <div class="side">
-        <section class="panel" id="agent"></section>
-        <section class="panel" id="contract"></section>
+  <a class="skip" href="#main">Siirry sisältöön</a>
+  <header class="store-header">
+    <div class="service-bar"><div class="container">
+      <nav class="services" aria-label="Valio Aimon palvelut">
+        <button type="button" class="service"><span class="service-logo" aria-hidden="true"></span>Valioaimo.fi</button>
+        <button type="button" class="service"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/storefront.svg')"></span>Pikatukku</button>
+        <a class="service selected" href="/" aria-current="page"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/truck.svg')"></span>Toimitustukku</a>
+        <button type="button" class="service"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/package.svg')"></span>VALO Tilauspalvelu</button>
+        <button type="button" class="service"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/chart-bar.svg')"></span>Minun Aimo</button>
+      </nav>
+      <div class="account"><span class="customer">554485 VALIO OY / ALKOHOLI</span><button type="button" aria-label="Oma tili"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/user.svg')"></span><span class="user-name">Junction TestUser</span><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/caret-down.svg')"></span></button><button type="button" class="language" aria-label="Kieli: suomi">FI<span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/caret-down.svg')"></span></button></div>
+    </div></div>
+    <div class="container main-header">
+      <a class="brand" href="/" aria-label="Valio Aimo etusivu"><img src="/storefront-assets/logo.svg" alt="Valio Aimo" width="96" height="32"></a>
+      <nav class="main-nav" aria-label="Päävalikko"><button type="button">Tuotteet</button><button type="button">Tilaukset</button><button type="button">Ajankohtaista</button></nav>
+      <div class="search" role="search"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/magnifying-glass.svg')"></span><input type="search" aria-label="Hae tuotteita" placeholder="Hae tuotteita" autocomplete="off"></div>
+      <div class="header-actions">
+        <button type="button" class="header-action" aria-label="Toimituspäivä 16.11.2026"><span class="header-icon"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/calendar-blank.svg')"></span><span class="badge">2</span></span><span>Toimituspäivä<b>16.11.2026</b></span></button>
+        <button type="button" class="header-action" aria-label="Ostoskori: 3 tuotetta, 79,39 euroa"><span class="header-icon"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/shopping-cart.svg')"></span><span class="badge">3</span></span><span>Ostoskori<b>79,39 €</b></span></button>
       </div>
-      <div class="side">
-        <section class="panel" id="inbox"></section>
-        <section class="panel" id="mandate"></section>
-        <section class="panel" id="trail"></section>
-      </div>
     </div>
-  </div>
-  <script type="module" src="/gateway.js"></script>
-  <script type="module" src="/gateway-products.js"></script>
+  </header>
+  <main id="main"><div id="storefront-content"></div></main>
+  <footer class="site-footer"><div class="container">
+    <div class="footer-main">
+      <div><img class="footer-logo" src="/storefront-assets/logo.svg" alt="Valio Aimo" width="96" height="32"><div class="socials" aria-label="Sosiaalinen media"><span class="icon" aria-label="Facebook" role="img" style="--icon:url('/storefront-assets/icons/facebook.svg')"></span><span class="icon" aria-label="Instagram" role="img" style="--icon:url('/storefront-assets/icons/instagram.svg')"></span><span class="icon" aria-label="LinkedIn" role="img" style="--icon:url('/storefront-assets/icons/linkedin.svg')"></span><span class="icon" aria-label="YouTube" role="img" style="--icon:url('/storefront-assets/icons/youtube.svg')"></span></div></div>
+      <div class="footer-column"><strong>Verkkokauppa</strong><button type="button">Tule asiakkaaksi</button><button type="button">Myyntiehdot</button></div>
+      <div class="footer-column"><strong>Asiakaspalvelu</strong><button type="button">Yhteystiedot</button><button type="button">Tiedotteet</button><button type="button">Usein kysyttyä</button><p>Myyntipalvelu p. 010 381 190<br>arkisin klo 8–15.30</p></div>
+      <div class="footer-column"><strong>Valio Aimo®</strong><button type="button">valioaimo.fi</button><button type="button">Tilaa uutiskirje</button></div>
+    </div>
+    <div class="footer-bottom"><span>© Valio Oy</span><div><button type="button">Tietosuojaseloste</button><button type="button">Evästekäytännöt</button></div></div>
+  </div></footer>
+  <aside class="chat-intro" aria-label="Toimitustukun tekoälyapuri"><button type="button" class="close-chat" aria-label="Sulje apurin tervehdys"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/x.svg')"></span></button><div class="chat-title"><span class="chat-avatar"><img src="/storefront-assets/logo.svg" alt="Valio Aimo"></span><span>Tarvitsetko apua?</span></div><p>Olen toimitustukun tekoälyapuri, ja autan mielelläni 😊</p></aside>
+  <button type="button" class="chat-launch" aria-label="Avaa apurin tervehdys"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/chat-circle-text.svg')"></span></button>
+  <script type="module" src="/storefront.js"></script>
 </body>
 </html>

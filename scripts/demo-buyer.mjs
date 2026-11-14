@@ -51,6 +51,20 @@ for (const text of ['20 litraa laktoositonta maitoa maanantaiksi', '30 litraa la
 const w = await scenario('   Sama ostaja, sama tuote, poikkeava määrä', { apiKey: 'demo-ravintola-kulma', text: '1500 litraa laktoositonta maitoa maanantaiksi' });
 for (const r of (w.order?.reasons || []).filter((x) => ['UNUSUAL_QUANTITY', 'ORDER_SPLIT_UNDER_CAP'].includes(x.code))) line(`   Vahti: ${r.message}`);
 
+// 9. "Unohtuiko tämä?": kahdessa tilauksessa on ollut maitoa ja kermaa, kolmannessa vain maitoa. Portti huomaa puuttuvan kerman
+// ostajan omasta historiasta ja tarjoaa sen valmiina tuotteena ja määränä. Ihminen lisää sen yhdellä napilla, sama ketju kuin add_to_order.
+line('\n━━ 9. "Unohtuiko tämä?": portti huomaa, mitä ostajan tavallisesta tilauksesta puuttuu');
+for (const text of ['20 litraa laktoositonta maitoa ja 10 litraa kuohukermaa maanantaiksi', '30 litraa laktoositonta maitoa ja 10 litraa kuohukermaa maanantaiksi']) {
+  const r = await runBuyerAgent({ baseUrl, apiKey: 'demo-ravintola-kulma', text });
+  line(`   Historia: "${text}" → ${r.order ? `${r.order.status}, ${r.order.totals.net.toFixed(2)} €` : r.summary}`);
+}
+const f = await scenario('   Sama ostaja tilaa tällä kertaa vain maitoa', { apiKey: 'demo-ravintola-kulma', text: '25 litraa laktoositonta maitoa maanantaiksi' });
+for (const s of f.order?.suggestions || []) line(`   Portti ehdottaa: ${s.message}`);
+if (f.order?.suggestions?.length) {
+  const g = await console_(`/console/orders/${f.order.orderId}/suggestions/${f.order.suggestions[0].productId}`, { by: 'Keittiöpäällikkö' });
+  line(`   Ihminen lisäsi yhdellä napilla → ${g.addition?.status || g.error?.message}, uusi summa ${g.totals?.net?.toFixed(2)} €`);
+}
+
 if (a.order) {
   const trail = await (await fetch(`${baseUrl}/v1/orders/${a.order.orderId}/audit`, { headers: { authorization: 'Bearer demo-nordic-hotels' } })).json();
   line(`\n━━ Audit trail tilaukselle ${a.order.orderId}: ketju ${trail.chain.valid ? 'EHJÄ' : 'RIKKI'} (${trail.chain.entries} riviä)`);

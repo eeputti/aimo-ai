@@ -40,12 +40,23 @@ function orderCard(o, { actions = true, link = true } = {}) {
     ${o.pendingAddition ? additionCard(o, actions) : ''}
     ${o.totals ? `<div><div class="total">${money(o.totals.net)}</div><div class="small muted" title="alv 0 % · verollisena ${money(o.totals.gross)}">toimitus ${day(o.deliveryDate)}${o.cutoffLabel && o.status === 'pending_approval' ? ` · päätä ennen ${esc(o.cutoffLabel)}` : ''}</div></div>` : ''}
     ${o.lines?.length ? `<ul class="lines">${o.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b> · ${money(l.lineNet)}</span>${l.substituteFor ? `<span class="sub">korvaa tuotteen ${esc(l.substituteFor)}</span>` : ''}${l.addedIn ? '<span class="sub">lisätty jälkikäteen</span>' : ''}</li>`).join('')}</ul>` : ''}
+    ${o.suggestions?.length ? suggestBlock(o) : ''}
     ${o.approval?.explanation && o.status === 'pending_approval' ? `<details class="ai-note"><summary><b>${{ approve: 'Tekoäly suosittelee: hyväksy', reject: 'Tekoäly suosittelee: hylkää', review: 'Tekoäly suosittelee: tarkista' }[o.approval.explanation.suggestion] || 'Tekoälyn selitys'}</b></summary><p class="small">${esc(o.approval.explanation.text)} ${esc(o.approval.explanation.suggestionWhy)}</p><p class="small muted">${esc(o.approval.explanation.model)} · päätös on sinun</p></details>` : ''}
     ${o.substitutions?.some((s) => s.modelNote) ? `<div class="ai-note"><p class="small">${o.substitutions.filter((s) => s.modelNote).map((s) => esc(s.modelNote)).join(' ')} <span class="muted">Korvaajan valitsi tekoäly portin tarkistamista vaihtoehdoista (${esc(o.substitutions.find((s) => s.modelNote).chosenBy)}).</span></p></div>` : ''}
     ${reasons.length ? `<ul class="why">${reasons.map((r) => `<li class="${r.severity}">${esc(reasonText(r))}<code>${esc(r.code)}</code></li>`).join('')}</ul>` : ''}
     ${o.status === 'pending_approval' && actions ? `<div class="actions"><button class="btn primary big" data-act="approve" data-order="${o.orderId}">Hyväksy</button><button class="btn danger big" data-act="reject" data-order="${o.orderId}">Hylkää</button></div>` : ''}
     <div class="small muted">${esc(o.orderId)} · ${dayTime(o.createdAt)}${link ? ` · <a href="#" data-act="trail" data-order="${o.orderId}">päätösketju</a>${o.status === 'pending_approval' || o.pendingAddition ? ` · <a href="/approve.html?order=${o.orderId}" target="_blank" rel="noopener">avaa puhelinnäkymä</a>` : ''}` : ''}</div>
   </article>`;
+}
+
+// "Unohtuiko tämä?": portti huomaa ostajan omasta historiasta, mitä tavallisesta tilauksesta puuttuu. Ei kysymystä, vaan kuva ja yksi nappi.
+function suggestBlock(o) {
+  return `<div class="suggest"><div class="suggest-head">Unohtuiko tämä?</div>
+    <ul>${o.suggestions.map((s) => `<li>
+      <span class="limg"><img src="/img/${esc(s.productId)}" alt="" loading="lazy" onerror="this.parentNode.remove()"></span>
+      <span><b>${esc(s.name)}</b><span class="small muted" title="${esc(s.message)}">mukana ${s.inOrders}/${s.ofOrders} viime tilauksessa · yleensä ${qty(s.typicalQuantity)} ${esc(s.salesUnitLabel)}</span></span>
+      <button class="btn add" data-act="suggest" data-order="${o.orderId}" data-product="${esc(s.productId)}" aria-label="Lisää tilaukseen ${esc(s.name)}, ${qty(s.typicalQuantity)} ${esc(s.salesUnitLabel)}">+ Lisää${s.estimateNet != null ? ` <span class="num">noin ${money(s.estimateNet)}</span>` : ''}</button>
+    </li>`).join('')}</ul></div>`;
 }
 
 // "Unohtui kerma": lisäys vahvistettuun tilaukseen, joka ylittää valtuuden. Tilaus pysyy voimassa, vain lisäys kysytään.
@@ -60,7 +71,7 @@ function additionCard(o, actions) {
   </div>`;
 }
 
-const EVENT_FI = { MODEL_CALL: 'Kielimalli avusti', QUOTE_REQUESTED: 'Agentti pyysi tarjousta', OFFER_ISSUED: 'Portti antoi allekirjoitetun tarjouksen', CANDIDATES_EXCLUDED: 'Ehdokkaita jäi pois', ORDER_RECEIVED: 'Agentti lähetti tilauksen', OFFER_VERIFIED: 'Tarjouksen allekirjoitus todennettu', OFFER_VERIFICATION_FAILED: 'Tarjouksen todennus epäonnistui', LIVE_RECHECK: 'Hinta, saldo ja tilausaika tarkistettu uudelleen', MANDATE_EVALUATED: 'Mandaatti arvioitu', WATCH_EVALUATED: 'Taustavahti vertasi ostajan historiaan',APPROVAL_REQUESTED: 'Hyväksyntäpyyntö lähetetty ihmiselle', ORDER_PENDING_APPROVAL: 'Tilaus odottaa hyväksyntää', ORDER_CONFIRMED: 'Tilaus vahvistettu', ORDER_REJECTED: 'Tilaus hylätty', HUMAN_APPROVED: 'Ihminen hyväksyi', HUMAN_REJECTED: 'Ihminen hylkäsi', NOTIFICATION_SENT: 'Ilmoitus lähetetty ihmiselle', MANDATE_UPDATED: 'Mandaattia muutettu', DEMO_RESET: 'Demo nollattu' };
+const EVENT_FI = { MODEL_CALL: 'Kielimalli avusti', QUOTE_REQUESTED: 'Agentti pyysi tarjousta', OFFER_ISSUED: 'Portti antoi allekirjoitetun tarjouksen', CANDIDATES_EXCLUDED: 'Ehdokkaita jäi pois', ORDER_RECEIVED: 'Agentti lähetti tilauksen', OFFER_VERIFIED: 'Tarjouksen allekirjoitus todennettu', OFFER_VERIFICATION_FAILED: 'Tarjouksen todennus epäonnistui', LIVE_RECHECK: 'Hinta, saldo ja tilausaika tarkistettu uudelleen', MANDATE_EVALUATED: 'Mandaatti arvioitu', WATCH_EVALUATED: 'Taustavahti vertasi ostajan historiaan',APPROVAL_REQUESTED: 'Hyväksyntäpyyntö lähetetty ihmiselle', ORDER_PENDING_APPROVAL: 'Tilaus odottaa hyväksyntää', ORDER_CONFIRMED: 'Tilaus vahvistettu', ORDER_REJECTED: 'Tilaus hylätty', HUMAN_APPROVED: 'Ihminen hyväksyi', HUMAN_REJECTED: 'Ihminen hylkäsi', SUGGESTION_ACCEPTED: 'Ihminen lisäsi portin ehdotuksen', NOTIFICATION_SENT: 'Ilmoitus lähetetty ihmiselle', MANDATE_UPDATED: 'Mandaattia muutettu', DEMO_RESET: 'Demo nollattu' };
 function eventDetail(e) {
   const p = e.payload || {};
   if (e.type === 'MODEL_CALL') return `${{ pick_substitute: 'korvaajan valinta', explain_approval: 'selitys hyväksyjälle', interpret_request: 'pyynnön tulkinta' }[p.purpose] || p.purpose} · ${p.model} · ${p.ms} ms${p.tokens ? ` · ${p.tokens.in}+${p.tokens.out} tokenia` : ''} · ${p.error ? `virhe: ${p.error}` : p.usedByCode ? 'koodi käytti vastausta' : 'koodi ei käyttänyt vastausta'}${p.note ? ` (${p.note})` : ''}`;
@@ -71,6 +82,7 @@ function eventDetail(e) {
   if (e.type === 'QUOTE_REQUESTED') return `${p.productsPriced} tuotetta hinnoiteltu (${p.priceSource}), toimitus ${p.deliveryDate}`;
   if (e.type === 'LIVE_RECHECK') return `${p.products} tuotetta${p.changed?.length ? `, muuttunut: ${p.changed.join(', ')}` : ', ei muutoksia'}`;
   if (e.type === 'OFFER_VERIFIED' || e.type === 'OFFER_VERIFICATION_FAILED') return `${p.algorithm}${p.failures?.length ? ` · ${p.failures.join(', ')}` : ''}`;
+  if (e.type === 'SUGGESTION_ACCEPTED') return `${p.name} × ${qty(p.quantity)} ${p.unit} · mukana ${p.basis?.inOrders}/${p.basis?.ofOrders} viime tilauksessa`;
   if (e.type === 'HUMAN_APPROVED') return p.overrode?.length ? `hyväksyi poikkeukset: ${p.overrode.join(', ')}` : '';
   if (e.type === 'APPROVAL_REQUESTED' || e.type === 'NOTIFICATION_SENT') return `vastaanottaja: ${p.to}`;
   if (e.type.startsWith('ORDER_')) return [p.net != null ? money(p.net) : '', (p.reasons || []).join(', ')].filter(Boolean).join(' · ');
@@ -93,7 +105,8 @@ async function phone(orderId) {
   root.addEventListener('click', async (ev) => {
     const b = ev.target.closest('[data-act]'); if (!b) return;
     b.disabled = true;
-    try { render(await api(`/console/orders/${orderId}/${b.dataset.act}`, { by: 'Hankintapäällikkö' })); } catch (e) { alert(e.message); load(); }
+    const path = b.dataset.act === 'suggest' ? `suggestions/${b.dataset.product}` : b.dataset.act;
+    try { render(await api(`/console/orders/${orderId}/${path}`, { by: 'Hankintapäällikkö' })); } catch (e) { alert(e.message); load(); }
   });
   load();
 }
@@ -115,7 +128,7 @@ function renderTop() {
     <span class="chip ${d.mode.api === 'live' ? 'live' : 'sim'}">${d.mode.api === 'live' ? 'Live: Aimo-mock-API' : 'Simuloitu hinta ja saatavuus'}</span>
     <span class="chip">Portin kello <b>${dayTime(d.clock.now)}</b>${d.clock.simulated ? ' · simuloitu' : ''}</span>
     <span class="chip">Loki ${d.chain.valid ? '✓ ehjä' : `✕ rikki rivillä ${d.chain.brokenAt}`} · ${d.chain.entries} riviä</span>
-    <a class="chip" href="/">Keittiödemo (asiakas)</a>`;
+    <a class="chip" href="/kitchen.html">Keittiödemo (asiakas)</a>`;
   if (d.clock.simulated && !$('.demo-clock')) document.body.insertAdjacentHTML('afterbegin', '<div class="demo-clock">Demokello päällä: portin aika on simuloitu (DEMO_NOW)</div>');
 }
 function renderAgent() {
@@ -229,7 +242,7 @@ function consoleApp() {
     if (act === 'unchip') { S.patches = S.patches.slice(0, +b.dataset.k); return loadPreview(); } // myöhemmät tarkennukset rakentuvat aiempien päälle
     if (act === 'scenario') { const s = SCENARIOS[+b.dataset.i]; return runAgent(s.buyer, s.text, !!s.tamper); }
     if (act === 'buyer') { S.buyer = b.dataset.buyer; renderAgent(); return renderMandate(); }
-    if (act === 'approve' || act === 'reject') { b.disabled = true; try { await api(`/console/orders/${b.dataset.order}/${act}`, { by: S.d.buyers.find((x) => x.id === S.d.orders.find((o) => o.orderId === b.dataset.order)?.buyerId)?.approver || 'ostaja' }); S.trail = { orderId: b.dataset.order, entries: [] }; } catch (e) { alert(e.message); } return refresh(); }
+    if (act === 'approve' || act === 'reject' || act === 'suggest') { b.disabled = true; try { await api(`/console/orders/${b.dataset.order}/${act === 'suggest' ? `suggestions/${b.dataset.product}` : act}`, { by: S.d.buyers.find((x) => x.id === S.d.orders.find((o) => o.orderId === b.dataset.order)?.buyerId)?.approver || 'ostaja' }); S.trail = { orderId: b.dataset.order, entries: [] }; } catch (e) { alert(e.message); } return refresh(); }
     if (act === 'trail') { ev.preventDefault(); S.trail = await api(`/console/orders/${b.dataset.order}/audit`); renderTrail(); return $('#trail').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     if (act === 'reset') { if (!confirm('Nollataanko portin tilaukset, loki ja mandaatit demon alkutilaan?')) return; S.run = null; S.trail = null; await api('/console/reset', {}); return refresh(); }
   });

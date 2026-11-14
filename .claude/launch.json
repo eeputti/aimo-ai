@@ -4,14 +4,28 @@
     {
       "name": "aimo-ai",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["start"],
+      "runtimeArgs": [
+        "start"
+      ],
       "port": 4747
     },
     {
       "name": "aimo-ai-4750",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "PORT=4750 npm start"],
+      "runtimeArgs": [
+        "-c",
+        "PORT=4750 npm start"
+      ],
       "port": 4750
+    },
+    {
+      "name": "aimo-ai-test-4751",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "PORT=4751 GATEWAY_DB=/private/tmp/claude-501/-Users-eeputti--claude-spares-spare-fpDhe7/d3feaf80-2428-4e9b-8508-476a975b15c8/scratchpad/gateway-test.db npm start"
+      ],
+      "port": 4751
     }
   ]
 }

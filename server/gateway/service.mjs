@@ -9,11 +9,12 @@ import { apiMode } from '../config.mjs';
 import { findSubstitutes } from '../substitutes.mjs';
 import { clock, parseApiTime, cutoffPassed, helsinkiLabel } from './clock.mjs';
 import { signOffer, verifyOffer } from './signing.mjs';
-import { quotes, orders, ledger } from './store.mjs';
+import { quotes, orders, ledger, buyers } from './store.mjs';
 import { evaluateMandate, productBlock, substitutionRules, publicMandate } from './mandate.mjs';
 import { reason, REASONS, PRODUCT_TYPES, CLAIM_PHRASES } from './contract.mjs';
 import { watchOrder, noteSearch } from './watch.mjs';
 import { pickSubstitute, explainApproval } from './advisor.mjs';
+import { suggestFor } from './suggest.mjs';
 
 const OFFER_TTL_MS = 15 * 60_000;
 const money = (n) => +(+n).toFixed(2);
@@ -273,7 +274,8 @@ export async function requestQuote(buyer, input = {}) {
 }
 
 // ---------- place_order ----------
-function publicOrder(o) { return { ...o, statusLabel: { confirmed: 'Vahvistettu', pending_approval: 'Odottaa ihmisen hyväksyntää', rejected: 'Hylätty' }[o.status], clock: clock.info() }; }
+// suggestions: mitä ostajan tavallisesta tilauksesta puuttuu (suggest.mjs). Lasketaan luettaessa, ei tallenneta tilaukselle.
+function publicOrder(o) { return { ...o, suggestions: suggestFor(buyers.byId(o.buyerId), o), statusLabel: { confirmed: 'Vahvistettu', pending_approval: 'Odottaa ihmisen hyväksyntää', rejected: 'Hylätty' }[o.status], clock: clock.info() }; }
 
 /** Hyväksyntää odottava tilaus vanhenee, kun tilausaikaraja menee. */
 function refresh(o) {
@@ -542,6 +544,26 @@ export function decideApproval(orderId, decision, by = 'ostaja') {
   orders.save(o);
   ledger.append('gateway', o.status === 'confirmed' ? 'ORDER_CONFIRMED' : 'ORDER_REJECTED', { net: o.totals.net, after: 'human decision' }, refs);
   return publicOrder(o);
+}
+
+/**
+ * "Unohtuiko tämä?": ihminen lisää portin ehdotuksen yhdellä napilla. Portti ei oikaise mitään: se pyytää itseltään
+ * allekirjoitetun tarjouksen ja lisää sen add_to_order-ketjun läpi (tuore tarkistus, mandaatti, vahti, loki).
+ * Jos lisäys jäisi odottamaan hyväksyntää, napin painanut ihminen on jo se hyväksyjä, joten päätös kirjataan hänen nimiinsä.
+ */
+export async function acceptSuggestion(orderId, productId, by = 'ostaja', ctx = {}) {
+  const o = refresh(orders.get(orderId));
+  if (!o) throw new GatewayError(404, 'ORDER_NOT_FOUND', 'Tilausta ei löydy');
+  const buyer = buyers.byId(o.buyerId);
+  const s = suggestFor(buyer, o).find((x) => x.productId === String(productId));
+  if (!s) throw new GatewayError(409, 'SUGGESTION_NOT_AVAILABLE', 'Ehdotus ei ole enää voimassa');
+  ledger.append(`human:${by}`, 'SUGGESTION_ACCEPTED', { productId: s.productId, name: s.name, quantity: s.typicalQuantity, unit: s.salesUnitLabel, basis: { inOrders: s.inOrders, ofOrders: s.ofOrders } }, { buyerId: buyer.id, orderId });
+  const quote = await requestQuote(buyer, { deliveryDate: o.deliveryDate, maxOptions: 1, needs: [{ ref: 'suggestion', candidates: [s.productId], quantity: { value: s.typicalQuantity, unit: 'PCS' }, allowSubstitutes: false }] });
+  const option = quote.needs[0].options[0];
+  if (!option) { const why = quote.needs[0].excluded[0]; throw new GatewayError(409, 'SUGGESTION_NOT_AVAILABLE', `${s.name} ei ole nyt tilattavissa${why ? `: ${why.message}` : ''}`, why); }
+  const r = await addToOrder(buyer, { orderId, offers: [option.offer], idempotencyKey: `suggest-${s.productId}-${(o.additions?.length || 0) + 1}`, requestedBy: `Portin ehdotus: ${by} lisäsi yhdellä napilla` }, ctx);
+  if (r.addition?.status === 'pending_approval') return decideApproval(orderId, 'approve', by);
+  return r;
 }
 
 export function auditTrail(buyer, orderId) {

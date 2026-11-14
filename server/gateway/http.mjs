@@ -1,6 +1,6 @@
 // REST- ja MCP-sovittimet samaan sopimukseen (contract.mjs) + ihmisen konsoli (hyväksynnät, mandaatti, aikajana).
 import { OPERATIONS, REASONS, GATEWAY } from './contract.mjs';
-import { searchProducts, requestQuote, placeOrder, addToOrder, getOrder, listOrders, decideApproval, auditTrail, mandateOf, productTypes, GatewayError } from './service.mjs';
+import { searchProducts, requestQuote, placeOrder, addToOrder, getOrder, listOrders, decideApproval, acceptSuggestion, auditTrail, mandateOf, productTypes, GatewayError } from './service.mjs';
 import { buyers, ledger, onLedger, wipeGateway } from './store.mjs';
 import { seedBuyers, updateMandate, publicMandate } from './mandate.mjs';
 import { jwks } from './signing.mjs';
@@ -9,6 +9,7 @@ import { runBuyerAgent } from './buyerAgent.mjs';
 import { apiMode, config } from '../config.mjs';
 import { apiStats } from '../valioApi.mjs';
 import { watchReport, WATCH_DISCLOSURE } from './watch.mjs';
+import { SUGGEST_DISCLOSURE } from './suggest.mjs';
 
 const send = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'access-control-allow-origin': '*', ...headers }); res.end(body === undefined ? '' : JSON.stringify(body)); };
 const readBody = (req) => new Promise((resolve, reject) => { let data = ''; req.on('data', (c) => { data += c; if (data.length > 2e6) reject(new GatewayError(413, 'TOO_LARGE', 'Pyyntö on liian suuri')); }); req.on('end', () => { if (!data) return resolve({}); try { resolve(JSON.parse(data)); } catch { reject(new GatewayError(400, 'INVALID_JSON', 'Pyynnön runko ei ole kelvollista JSONia')); } }); req.on('error', reject); });
@@ -44,6 +45,7 @@ function capabilities(req) {
     offers: { format: 'JWS compact', alg: 'EdDSA (Ed25519)', validityMinutes: 15, verification: 'Julkinen avain: jwks. Portti hylkää muokatun tai vanhentuneen tarjouksen.' },
     orderStatuses: ['confirmed', 'pending_approval', 'rejected'],
     monitoring: WATCH_DISCLOSURE,
+    suggestions: SUGGEST_DISCLOSURE,
     reasonCodes: Object.fromEntries(Object.entries(REASONS).map(([k, v]) => [k, v.en])),
     productTypes: productTypes().map((t) => t.id),
     dataSource: apiMode() === 'live' ? 'Valio Aimo Junction 2026 mock API (live price + availability)' : 'SIMULATED price + availability (no API key)',
@@ -73,6 +75,7 @@ function openapi(req) {
     },
     'x-reason-codes': REASONS,
     'x-monitoring': WATCH_DISCLOSURE,
+    'x-suggestions': SUGGEST_DISCLOSURE,
   };
 }
 
@@ -156,6 +159,8 @@ export async function handleGateway(req, res, url) {
       req.on('close', () => { off(); clearInterval(ping); });
       return true;
     }
+    const sm = /^\/console\/orders\/([\w-]+)\/suggestions\/([\w-]+)$/.exec(p); // "Unohtuiko tämä?": yksi nappi hyväksyntänäkymässä
+    if (sm && m === 'POST') { const body = await readBody(req); return send(res, 200, await acceptSuggestion(sm[1], sm[2], String(body.by || 'ostaja').slice(0, 60), { baseUrl: baseUrlOf(req) })), true; }
     const am = /^\/console\/orders\/([\w-]+)(\/(approve|reject|audit))?$/.exec(p);
     if (am && m === 'POST' && am[3] !== 'audit') { const body = await readBody(req); return send(res, 200, decideApproval(am[1], am[3], String(body.by || 'ostaja').slice(0, 60))), true; }
     if (am && m === 'GET') return send(res, 200, am[3] === 'audit' ? auditTrail(null, am[1]) : getOrder(null, am[1])), true;

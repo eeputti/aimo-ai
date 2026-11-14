@@ -1,0 +1,347 @@
+{
+  "reference": "https://toimitustukku.valioaimo.fi/fi/",
+  "capturedOn": "2026-11-14",
+  "assets": [
+    {
+      "file": "christmas.jpg",
+      "source": "https://api.valioaimo.fi/medias/Herotesti-2-.jpg?context=bWFzdGVyfGltYWdlc3w0Nzc1MHxpbWFnZS9qcGVnfGFETmhMMmcwT1M4NU1UZzJPVGsxTmpBeE5ETTRMMGhsY205MFpYTjBhU0FvTWlrdWFuQm58MmJiMTRhNmI0MjI0NjQ2YjUzNDk3YzE4N2FiZjhhMTFjZDJlYWI4MTg3OGIyMmRjZjIxNGVlNjFmZmUxY2FmYw",
+      "bytes": 47750,
+      "sha256": "37f7d111654e927301601fd1a4a7a99b3251d7360eca50b8271608e4b5d8051a",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "november.jpg",
+      "source": "https://api.valioaimo.fi/medias/Marraskuu.jpg?context=bWFzdGVyfGltYWdlc3wxMTQzMjd8aW1hZ2UvanBlZ3xhREl6TDJoak9TODVNVGM1TURjMk5qSTBOREUwTDAxaGNuSmhjMnQxZFM1cWNHY3w4YzIzZTc3ZDFlMjljZWZmMGE1ZjA1MTZjNzc0OGNiMDEyNDgxMDYzNWMxZWMyMjViYjI4NDQ2YzZkNzE4OTU5",
+      "bytes": 114327,
+      "sha256": "1794ca22fc70b1980afc8c5f9dc9db09e144b0fb4e3234184c88ddbd38fd1db2",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "logo.svg",
+      "source": "https://api.valioaimo.fi/medias/aimo-logo.svg?context=bWFzdGVyfGltYWdlc3w1MjcwfGltYWdlL3N2Zyt4bWx8YURKaUwyaG1OeTg0T0Rnek1EWXlNakV3TlRrd0wyRnBiVzlmYkc5bmJ5NXpkbWN8N2IyZThmOTYyMGU3NTZhZDNlOTg3NjBmNjk3ZmY1OTU5NGU1MTM3YjQ2MDEyODY2YzkwNmFmOTBlZWFiYTNiNQ",
+      "bytes": 5270,
+      "sha256": "5cff0719a35a33ce3200acde94420e98809673a1a77f267d84ad7de900a4f366",
+      "mime": "image/svg+xml"
+    },
+    {
+      "file": "campaign.jpg",
+      "source": "https://api.valioaimo.fi/medias/Pikaiset-kansikuva-35387-pohjolan-pizza.jpg?context=bWFzdGVyfGltYWdlc3wzMDY1MTZ8aW1hZ2UvanBlZ3xhRGMwTDJnMVlpODVNVGd3TURrMU1qRTNOamswTDFCcGEyRnBjMlYwSUd0aGJuTnBhM1YyWVY4ek5UTTROMTl3YjJocWIyeGhibDl3YVhwNllTNXFjR2N8NGJhZjNiOGFhMmY4NGVjZTU2ZTg3YTExNTkyYTRhMTI1ZmRlOGY1MTI3YzczZTZiMTA1NDM4OTE1MDkzZTFkMg",
+      "bytes": 306516,
+      "sha256": "6a1ef51d4c9be98ef130283e4536d799c5b1fc738d2db4ba1e3e41871916083d",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "seasons.jpg",
+      "source": "https://api.valioaimo.fi/medias/41796-runebergin-laskiaispulla.jpg?context=bWFzdGVyfGltYWdlc3wxMDQxMTgyfGltYWdlL2pwZWd8YUdJM0wyZzRZeTg1TURNek9UY3hPVFUzTnprd0x6UXhOemsyWDNKMWJtVmlaWEpuYVc1ZmJHRnphMmxoYVhOd2RXeHNZUzVxY0djfGE0OTMzYzMyYmRhM2M4MWJkNmExOGVlNjY5OGZjODIxMWQwM2FkMWI4ZjFkYzRjZjY1YzRmMWE4NWQxNDQzOGM",
+      "bytes": 1041182,
+      "sha256": "4dcd7f70bf511fc17dab231ea7f9afbb6dbca51a3d7641131a38a53813bb7182",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "recipes.jpg",
+      "source": "https://api.valioaimo.fi/medias/uusi-kuva-Mika.jpg?context=bWFzdGVyfGltYWdlc3wzNTEyNDl8aW1hZ2UvanBlZ3xhRGd5TDJoa09DODVNRE15T0RrNE5UUXpOalEyTDNWMWMybGZhM1YyWVY5TmFXdGhMbXB3Wnd8ZjQ1ZWQxZGMwY2NiNmUxZjBlZTFjZDk3MzBjNzFmYmM4NzQxN2QwOWU1YWU5ZDI4ODcyZmM4MjEwNzI1MGU2Mg",
+      "bytes": 351249,
+      "sha256": "f05c6773b23dab25de5751b64d833e5bcea1613e7fcadadeb9578586bdfbd926",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "minun-aimo.jpg",
+      "source": "https://api.valioaimo.fi/medias/Valio-Aimo-lanseeraus-kaikille-6.jpg?context=bWFzdGVyfGltYWdlc3w2NTMzMDR8aW1hZ2UvanBlZ3xhREJqTDJnd05DODVNVEV3TVRBd016RXlNRGswTDFaaGJHbHZJRUZwYlc5ZmJHRnVjMlZsY21GMWMxOXJZV2xyYVd4c1pTMDJMbXB3Wnd8YTdjYTUyZWQ1NGYxM2M4YzU3MjE2MzBiOGM2NDg2NjVkYzZhZTU1MmE3ZjBhMjIyYmQyNjZhZWJhY2I3NWE4ZA",
+      "bytes": 653304,
+      "sha256": "c27a89c9c36d489245995e6096ef9eb1e395d8b9998c28c8bd780517af164cec",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "hkfoods.jpg",
+      "source": "https://api.valioaimo.fi/medias/HKFoods-tavarantoimittajat-web1.jpg?context=bWFzdGVyfGltYWdlc3wxNTQ5ODV8aW1hZ2UvanBlZ3xhREUzTDJoa09DODVNVFEwTVRBd05EZzNNVGs0TDBoTFJtOXZaSE5mZEdGMllYSmhiblJ2YVcxcGRIUmhhbUYwWDNkbFlqRXVhbkJufDliYWRhYzAyNGY2Nzg5Y2UxOTZiYWRkZGI2YjcxMWU2MWYwYjVkY2FmN2MyMWY0NjJmOTk2NDBhODc5ZjY4ZDQ",
+      "bytes": 154985,
+      "sha256": "f484137ab1b9d29e9cc75c32e273d2238136ec546c8ea1c6aa3f3fd9854f4759",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "feelia.jpg",
+      "source": "https://api.valioaimo.fi/medias/Feelia-tavarantoimittajat-web1.jpg?context=bWFzdGVyfGltYWdlc3wxMjM4MTR8aW1hZ2UvanBlZ3xhREE0TDJoa01pODVNVFEwTVRBd05qRTRNamN3TDBabFpXeHBZVjkwWVhaaGNtRnVkRzlwYldsMGRHRnFZWFJmZDJWaU1TNXFjR2N8MTE0MWM4NWZmMTYwOTY1ZjU3YjJmMTI2Nzc2ZTljOTg2YTU0ZDEyNTZmMDRjYTIxMTk5N2I3ZDA3OTJjNmQzMw",
+      "bytes": 123814,
+      "sha256": "742f3235d57e0f881145b4ad53c7445cdede438e4287d37d05785b7f6b2b4af5",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "Matter-Regular.otf",
+      "source": "https://toimitustukku.valioaimo.fi/fonts/Matter-Regular.otf",
+      "bytes": 60336,
+      "sha256": "f2c3f2290149587342b242ffa5aeed2becf5a53539b05bdc275a87ff49b9e342",
+      "mime": "application/octet-stream"
+    },
+    {
+      "file": "Matter-Bold.otf",
+      "source": "https://toimitustukku.valioaimo.fi/fonts/Matter-Bold.otf",
+      "bytes": 62076,
+      "sha256": "49e28ed5a52e05e365a256e9630206bdffa99ad865bd4053e3b46e8231683cd6",
+      "mime": "application/octet-stream"
+    },
+    {
+      "file": "National2Compressed-Bold.otf",
+      "source": "https://toimitustukku.valioaimo.fi/fonts/National2Compressed-Bold.otf",
+      "bytes": 235724,
+      "sha256": "060b30de1fbe8781f518149e7834622d37a66c934884c29c405c65b3120c343d",
+      "mime": "application/octet-stream"
+    },
+    {
+      "file": "688127.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MTE1MDkwNHxpbWFnZS9qcGVnfGFERTFMMmcwTnk4NU1UWXpPREExTWprME5qSXl8MDgyMjU0MTc4ZTFlMzNhNzBkYTA3NmI1ZGNiNmZjMTkzOWE0ZGNiNjQ1MTA1MDgxNDQ2MjdiYTM3NWFiOTg5Mw",
+      "page": "https://www.valioaimo.fi/toimitustukku/ferrero-rocher-suklaa-hasselpahkinakonvehti-16-kpl-200-g/",
+      "bytes": 74140,
+      "sha256": "a5671329fc3c356fdf566059fc5a4f889b8cae40ff99b3fc70da0848ccb548d2"
+    },
+    {
+      "file": "8097729.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MzQyMjIxNnxpbWFnZS9qcGVnfGFHRmxMMmhrTlM4NU1UY3hOalUxTkRVNE9EUTJ8MmY2OTZhMmE5YTI5ODAyMmY5MTg2ZDIxMzA4OWEyNGU3Nzg1YzUyZjdkMWJmNTc5ZGM2OWVhMGUyMDA4NTljMg",
+      "page": "https://www.valioaimo.fi/toimitustukku/momma-ohuet-piparkakut-paahdettu-voi-150-g/",
+      "bytes": 68721,
+      "sha256": "e9cf83fb6cdbf15b72c88d2bf371039eb06c9ec6999f9fb843b2f0021e8e8f0e"
+    },
+    {
+      "file": "8097345.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8NjI3NzYxfGltYWdlL2pwZWd8YUdSaEwyZzRZaTg1TVRjeE5ETTVOREU1TkRJeXxjYjQ1N2ZhN2VmM2FjMDc5MjllMDVlYjI5Njg5NmM0OTAwYjBmOWI2NzdhM2M3MWY4NDExOTVjMDk4ODdjNzRl",
+      "page": "https://www.valioaimo.fi/toimitustukku/4-x-marabou-aladdin-konvehteja-410-g/",
+      "bytes": 79761,
+      "sha256": "fcb833484c22d1bdc547970387e352f87b61f0f53b74deef30b29f88e2a32c2d"
+    },
+    {
+      "file": "8097326.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MTQwMjM1NDl8aW1hZ2UvcG5nfGFHVmhMMmhpTUM4NU1UY3hORE0yTkRjd016QXl8YzgwNDI0ZWVhZjYxOTJhODdhNWViM2JlZTg5YTg1NWZkMzA2NThlZTIxYTcyMzc5ZjE3Y2EzNmZhMzFjNzgxNw",
+      "page": "https://www.valioaimo.fi/toimitustukku/panda-hienoja-konvehteja-170-g/",
+      "bytes": 602859,
+      "sha256": "dff5a0233db100b46c3c74b01445b2cd6b860695c07d56979a55ad5b122409e7"
+    },
+    {
+      "file": "171140.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MzE2Njk1N3xpbWFnZS9wbmd8YUdZMEwyZ3dNeTg1TVRJMk5EZzRPVE15TXpneXw1NjhmZWJiYmUxZDczOWY5N2RjMmZlYWQzMTFkYTliN2Y2YzcyYjg2MGU4ZDhjNzI3ZTgzOWFhMjYxYTMyZDFk",
+      "page": "https://www.valioaimo.fi/toimitustukku/12-x-after-eight-400-g-minttutaytteinen-suklaa/",
+      "bytes": 176110,
+      "sha256": "b55df10cdda800b54b121161d997deb46ee96e8cb58405239671af096d2f6547"
+    },
+    {
+      "file": "328955.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MjE0NjUxOXxpbWFnZS9wbmd8YUdZeUwyZzJOaTg1TVRVeU5qQTRORE0yTWpVMHwzNmYwMWFiNzk2YzUxOTc0N2ZmNDA2ZGU1NzFhYTk3YjlmYTY0N2I4NmMzZWVjYjNlODY3OTQ1ODk5NjVlMTU5",
+      "page": "https://www.valioaimo.fi/toimitustukku/panda-juhlapoydan-suklaakonvehti-300-g/",
+      "bytes": 482611,
+      "sha256": "cb66e279e4c7606670426547463f2c6454670106790aba3a7f4e874d2bca3dc0"
+    },
+    {
+      "file": "412924.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MTE2MDY0NnxpbWFnZS9wbmd8YURKa0wyaGhZUzg1TVRZek56a3lOVEUxTVRBeXxlNDUxNmYwM2U5ODYxZjIyYjE1NzZmYjFjNzQ2ODRjM2E1YWVmNmZjYjJkNjNlNDU1ZGNiYjNkY2FjMGExZmRk",
+      "page": "https://www.valioaimo.fi/toimitustukku/malaco-allsorts-lakritsisekoitus-1-kg/",
+      "bytes": 788406,
+      "sha256": "62d932295a1dc176c72df9260fe70231f0581c3b480c612ff3e36add17f555c7"
+    },
+    {
+      "file": "8097726.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MzQ3NTE1OXxpbWFnZS9wbmd8YURjMkwyZ3hNeTg1TVRjeE5qVXpPVGcwTWpnMnxjMTM3ZjQxNGE4MzdmOThkMzFmOWZiZWEzODJhZjAyMTc5NDE0OTZjYTJlYjYwNzE0MDc4ZTc2OGIyMjA4NTM3",
+      "page": "https://www.valioaimo.fi/toimitustukku/tasangon-perinteiset-piparkakut-600-g/",
+      "bytes": 1193710,
+      "sha256": "926242a0a647a27e726b70bb02962c423c5a84dc817b81ba8e634e4c229bea9a"
+    },
+    {
+      "file": "8069128.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MTQ4ODczOXxpbWFnZS9qcGVnfGFETTFMMmd3WXk4NU1UVTBPVEkzTURZM01UWTJ8N2IwYzM0NmJlZmE4YzZkMjkwNzIyYjcwN2ZkZjllYjIzNzAwNjgyNzgzNjY5Y2I3ZjhmNmNjM2MzNDVlMzU1OA",
+      "page": "https://www.valioaimo.fi/toimitustukku/marli-perinteinen-glogitiiviste-13-5-l/",
+      "bytes": 69061,
+      "sha256": "469a151bef1a63f3f1ecfae3c92e89e4153b7eaaf6a9e44ca90c9694a1c526c8"
+    },
+    {
+      "file": "8092866.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8ODYyNzMyMnxpbWFnZS9wbmd8YURNMUwyaGlaQzg1TVRZM01ERXhNemd4TWpjNHxjNzA2NjhiMDVkYmQ3ZjQxMDExNmMzZjg3NjgzYjFjMzRhZTQ4OWUxNTQ1NGJmZGMyZDZhZDk0NDNmMDI4ZGI2",
+      "page": "https://www.valioaimo.fi/toimitustukku/panda-joulupukki-suklaakonvehti-280-g/",
+      "bytes": 1198810,
+      "sha256": "67676ba780b71c65b10f82929163f048c186c5a9e24feb4caa864f18c0ded9d3"
+    },
+    {
+      "file": "8096918.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/8096918.jpg?context=bWFzdGVyfHJvb3R8OTIxODUxfGltYWdlL2pwZWd8YURGa0wyZzJZaTg1TURnMU5EUXdOemcyTkRZeUx6Z3dPVFk1TVRndWFuQm58MGQ0Nzk2YzZlY2ZjYWM3MDQ2ZGM2NDZkZTUwZWU3NzRhYjE4YzM2OWUyMDc2MTJlMTVjMTM3OTNiZjJlMDZiOQ",
+      "page": "https://www.valioaimo.fi/toimitustukku/kitola-500-g-arkisalaatti-mix/",
+      "bytes": 69048,
+      "sha256": "af3697690a324ac3be5befe160c350859e202b46e3bd12c450f764fcd59de8d9"
+    },
+    {
+      "file": "8096919.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/8096919.jpg?context=bWFzdGVyfHJvb3R8ODg0NTE0fGltYWdlL2pwZWd8YURKakwyZzNNUzg1TURnMU5EUXdPVEUzTlRNMEx6Z3dPVFk1TVRrdWFuQm58ZTc0OTIzMTA4Mzc0MmIyNjM4MWJlNzQ0ZjJjMzQ5ZjRmYmUyYTNiMTY1Y2I4MmQ3Njg3YTgzNDE1ZGZmNjE0Mw",
+      "page": "https://www.valioaimo.fi/toimitustukku/kitola-500-g-juhlasalaatti-mix/",
+      "bytes": 71684,
+      "sha256": "6e1a30aa995ae465dca88361d8ebab279512884db870213d5e42f14fa64fe5f4"
+    },
+    {
+      "file": "8095107.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8NTA2ODYzN3xpbWFnZS9wbmd8YURJM0wyZzFPQzg1TVRRMk1EZ3dOekl5T1RjMHwwYTQwYTczOTBjNWI4OGQ1ODRhOTJmMDdmOWQwYmUxMzc4NTQ1MzNlZmM0MzQ3NzdiMTFmNmE4MWQ0OGZmNWFh",
+      "page": "https://www.valioaimo.fi/toimitustukku/topfish-asc-pangasiusfilee-esipaistettu-paneroitu-gluteeniton-135-165-g-5-kg-pakaste/",
+      "bytes": 1036210,
+      "sha256": "cd5801381a2849c92aaf66639a08dd8b4da9f994e3da9914d657493d88db17ef"
+    },
+    {
+      "file": "8098264.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8OTkyMTYyfGltYWdlL3BuZ3xhRFpqTDJnMU55ODVNVGN4TnpNMU1qRTJNVFU0fGMyNWQ5NzlmYzYxMmE1M2NmMTYxNGNmMTk1ZDM5ZjFlZjQ5YTMyOTdkZDk5MjJmM2Y4YzU5NDFhNGE3NzIzMzA",
+      "page": "https://www.valioaimo.fi/toimitustukku/cakesmiths-porkkanakakku-2510-g-30palaa-vegaaninen-kypsa-pakaste/",
+      "bytes": 861086,
+      "sha256": "cb2457da9514aa2e8801723d96139728a6ae7e6729d005737acffc414bbdd603"
+    },
+    {
+      "file": "8076230.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8NDIxNjg4NnxpbWFnZS9wbmd8YURjeEwyaG1OQzg1TVRVMU16RTVNakF4T0RJeXwwOTY2YzhkZDc0MGY3ZGFhZTI1OTJhMTAzM2Q2NmNiOTFmYjExZTgwMWVjM2ExOGQ5Njk1NDhiMTI4MTE0NTNl",
+      "page": "https://www.valioaimo.fi/toimitustukku/makrobios-ravintohiivahiutale-100-g/",
+      "bytes": 802661,
+      "sha256": "7ecfce2f86e555bc5bf37769c33e48ef42164a54c4c7af2dcbb984b6578c7426"
+    },
+    {
+      "file": "8090955.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MzE5MTN8aW1hZ2UvanBlZ3xhR0psTDJoa01pODVNVFkxT0RBME5qTTBNVFF5fDRmNmMwYTNmNmIzZDY4ZjFkMmU5NGE2Y2Q4NzI1OTI2NzU1MDczMDNhNDBjMDBiNzI3ZjMyMjY3MWZhOGYyMmY",
+      "page": "https://www.valioaimo.fi/toimitustukku/lapin-liha-poron-takapotka-annospala-noin-300-g-pakaste/",
+      "bytes": 20777,
+      "sha256": "dd341e86deb4fd2ebf8fd8d33757add75ae607708dc2bbf745ff6f6130a80845"
+    },
+    {
+      "file": "8086334.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/emarsys-default-image.png?context=bWFzdGVyfHJvb3R8MzU0MnxpbWFnZS9wbmd8YUdabUwyaGxaaTg0T1RVek5URXhPRE0zTnpJMkwyVnRZWEp6ZVhOZlpHVm1ZWFZzZEY5cGJXRm5aUzV3Ym1jfDE4ZGJmYTk5OWUwZTI4MDZlNjM1MmRlMTFhMWNiZDBjM2U3NDZhOWEwMjUyNTU4MjlmZjdjZGMyMWY1M2Q4MmI",
+      "page": "https://www.valioaimo.fi/toimitustukku/yamamori-500-ml-tonkatsu-maustekastike/",
+      "bytes": 33860,
+      "sha256": "131b0350f7065edc1bfc9b3c927be6ed233c57c1fa5c88d5891a18177fa2b190"
+    },
+    {
+      "file": "3253.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/3253.jpg?context=bWFzdGVyfHJvb3R8NDU1Nzl8aW1hZ2UvanBlZ3xhR1l6TDJoaVlTODRPREV5T1RFeU1UUTROVEV3THpNeU5UTXVhbkJufDAwZDIzMGNlNjRkYzU4YTU4NmNlZmZjOTUzNGM0MGZjYWJjNjM3NjJmNmY0MmRhNmE4NWYyNGFmOTE5Y2Q2NDc",
+      "page": "https://www.valioaimo.fi/toimitustukku/paaryna-nashi-kiina/",
+      "bytes": 42289,
+      "sha256": "1f2b97249d3c2501e7170cf6bf5aac84659eb22d012cbd7cd32d9629ffa883c3"
+    },
+    {
+      "file": "2510.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8NTI1MzQ1fGltYWdlL2pwZWd8YURobUwyaGlaUzg0T0Rjek9ERTJPREUzTmprMHw3YmVmYjM4ZDRmMTBiZTEwOTE1MWRjMjE2MTkwYzlhYzFhZmEzZWFlYTczNzVkNjBjZDgyODc1YzkyZWNjODI3",
+      "page": "https://www.valioaimo.fi/toimitustukku/palsternakka-pesty-suomi/",
+      "bytes": 29801,
+      "sha256": "59a3a1bdd6e688a65c2ef816581238fdb82a7a6f003911ff912ce3d492a85191"
+    },
+    {
+      "file": "2098.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MzU3MTcyNnxpbWFnZS9qcGVnfGFEUmtMMmd3TXk4NE9EY3pOemt4TmpVeE9EY3d8YmNhMzA5ODdjZGI2MWI4M2VlN2JmYjUxMzliMWU5ZThhYzU4NzIzZTcyMWE2MGRhMmRlMDU0NGEzMTJlOWQ0YQ",
+      "page": "https://www.valioaimo.fi/toimitustukku/maa-artisokka-kuorittu/",
+      "bytes": 113865,
+      "sha256": "58c2e9366c96169d51884bc01d23554a7c1be5f5a6fcdf8b48c57bbf7d9f1580"
+    },
+    {
+      "file": "2578.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MTgwODV8aW1hZ2UvanBlZ3xhR015TDJnMk15ODRPRGN6T0RNNU9EZzJNelkyfGI1ZDExNDdiZjM1MmI5ZDExYjk3NGNlY2ZiYTM3ODVhNDJkOGQxNTQwYWQ3ZTcwZGQ4MzRjYjllNmVlNjUyYmU",
+      "page": "https://www.valioaimo.fi/toimitustukku/keltajuuri-pesty-suomi/",
+      "bytes": 33830,
+      "sha256": "6dca9c3acb81f7a5598683a6bbbaa39fedd9918991c57ca21b9aebceee955fbb"
+    },
+    {
+      "file": "3222.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/3222.jpg?context=bWFzdGVyfHJvb3R8Mjk4NTd8aW1hZ2UvanBlZ3xhRGd3TDJobU55ODRPREV5T1RBek9Ea3dPVGMwTHpNeU1qSXVhbkJufDFhYTRkZjQ0NDc0MjlkNzdkOWEwNzhhOThmMzMxNjI1YzBmZjZlZmM3Zjk5YjgyMzQ3M2U4YTFmM2QxN2Y3NWU",
+      "page": "https://www.valioaimo.fi/toimitustukku/omena-granny-smith-2-kg-pss/",
+      "bytes": 24611,
+      "sha256": "25ca6c26b450d9240e89625b90904dfaee85cd4ced32e014c9867569172bdccf"
+    },
+    {
+      "file": "8067395.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8ODcwMTk5MXxpbWFnZS9wbmd8YURaakwyaGlPUzg0T0RVMk1URTVPRE0yTnpBeXxhMDA2ZTNkMWE4NjIxNTYxZGM4N2VhNThlNzZhNTI5NGM1MTEwMDFmMzBhMzRhMGNmNTU4OWYzZGYxNjFhZjY4",
+      "page": "https://www.valioaimo.fi/toimitustukku/friendship-pepper-jack-125-kg-burgerviip/",
+      "bytes": 319511,
+      "sha256": "2d8be68422fee37e7867b6138665995889ca26a1263c81210cc9eaa7607232a4"
+    },
+    {
+      "file": "8069825.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8OTUwNzUwfGltYWdlL2pwZWd8YURNMUwyaGlNaTg1TVRVME9UZ3pNell5TlRrd3w4M2QyYThiZDRlN2YzYWMzMTdjMTM5OTIxNzY1MmQ1OTYzMDA3ZmQ0Y2QyM2Q1ZGFmNDlhYTEwZWM2ZmNkMzky",
+      "page": "https://www.valioaimo.fi/toimitustukku/nonnas-sour-cream-majoneesi-1000-ml/",
+      "bytes": 195903,
+      "sha256": "fc0faff333b9578ab731f63fe3f2d763d1d26c4f273e007da781e42d8626e4c0"
+    },
+    {
+      "file": "9901708.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8NDU5Nzc4fGltYWdlL3BuZ3xhREU0TDJnMVl5ODVNVFUzTWpBeE5qSTFNVEU0fGNiYzhkYjI3Njk5ZWU0NWQzYzc0NmM1ODFmYjY4ZTgzYmY3YzdhYWIwYmVjYmU0MWVjMDA5NDMzYTg0YmEwMWM",
+      "page": "https://www.valioaimo.fi/toimitustukku/hk-amerikan-pekoni-2-kg/",
+      "bytes": 292899,
+      "sha256": "9b4c75c51ba0f066a9ddc6a820c65884340c0bed286e8bc82e70282593d82e1d"
+    },
+    {
+      "file": "8091688.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8NTM0ODI5fGltYWdlL2pwZWd8YURJNUwyZ3lOaTg1TVRZMk1UUTRORFk0TnpZMnw0MDllMjk5MDYwMmRjZjc2Y2M0N2E3ZjE0ZWRiZDkzOWMzZDc3YWViZTdmYzVhOWM3YTcxMGJjNWRjNmMwN2Q3",
+      "page": "https://www.valioaimo.fi/toimitustukku/gruyere-1100-1400-g-juusto-reserve/",
+      "bytes": 81654,
+      "sha256": "f75d47cb782175a3efb486a5a2749aec0350e1d5a0f32e1190bd89ce6f9b931e"
+    },
+    {
+      "file": "8087461.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MzExNzY4fGltYWdlL2pwZWd8YURrM0wyZzFaaTg1TVRjMk5qY3hOalE1T0RJeXwxNDRlM2JjNDk4OGE4N2E3ZDc2YmNhNGMyYmRkMjc1YjkxYWFhOGY3YzQ2MDU3Njk0MGM3Y2FmZWVhNTZiNWE4",
+      "bytes": 107166,
+      "sha256": "85b1d8047e84555f0637cdc80c68b31d87cf1de6f633a1a21ab8770e6aba7526",
+      "mime": "image/jpeg",
+      "page": "https://www.valioaimo.fi/toimitustukku/sipulikuutio-10-kg-6-x6mm-pakaste/"
+    },
+    {
+      "file": "8090735.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MTE4ODM0OHxpbWFnZS9wbmd8YUdFNEwyaGtaUzg1TVRZMU56RTVORE0zTXpReXwxYzdlY2JmZGE0MDc4ZDQ0ZTgxNmUwODhiYWRlMTQ0ZGFhOGUwNmNmYTMxMjFiYzc5OGFjNTM2YTNkM2JkOGIw",
+      "bytes": 158194,
+      "sha256": "efc2e0faf43a0ea2573e2bd49da60af0cf68c266f67a969501432df2e1468c8f",
+      "mime": "image/png",
+      "page": "https://www.valioaimo.fi/toimitustukku/a-green-puupohjainen-1-osainen-lounasrasia-215-x215-x60-mm-50-kpl/"
+    },
+    {
+      "file": "9906609.jpg",
+      "source": "https://www.valio.fi/cdn-cgi/image/format=auto/https://cdn-wp.valio.fi/valio-fi/2026/05/valio-glogi-tumma-kausituote-6491.png",
+      "bytes": 1231538,
+      "sha256": "f4d1563a6c9bcc3c0f411bad70a23ecb09c70febcf92bcb5c06b97ffe0134916",
+      "mime": "image/png",
+      "page": "https://www.valio.fi/tuotteet/valio-glogi-tumma-kausituote/"
+    },
+    {
+      "file": "9906601.jpg",
+      "source": "https://www.valio.fi/cdn-cgi/image/format=auto/https://cdn-wp.valio.fi/valio-fi/2026/05/valio-glogi-tumma-sokeroimaton-kausituote-6468.png",
+      "bytes": 1269958,
+      "sha256": "54e01e01751dd3ae7fe3fb7e1b7371b79b892e198f302347e732612ce29c20c6",
+      "mime": "image/png",
+      "page": "https://www.valio.fi/tuotteet/valio-glogi-tumma-sokeroimaton-kausituote/"
+    },
+    {
+      "file": "9906610.jpg",
+      "source": "https://www.valio.fi/cdn-cgi/image/format=auto/https://cdn-wp.valio.fi/valio-fi/2026/05/valio-glogi-vaalea-kausituote-6492.png",
+      "bytes": 1164991,
+      "sha256": "62cce30461a3e7cd9bee2ab7e732c7a5b07b60e87bafc64ac9aaa6ab7d1b4346",
+      "mime": "image/png",
+      "page": "https://www.valio.fi/tuotteet/valio-glogi-vaalea-kausituote/"
+    },
+    {
+      "file": "8082077.png",
+      "page": "https://www.valio.fi/tuotteet/valio-gluteeniton-tahtitorttu/",
+      "source": "https://www.valio.fi/cdn-cgi/image/format=auto/https://cdn-wp.valio.fi/valio-fi/2026/05/valio-gluteeniton-tahtitorttu-85334.png",
+      "bytes": 1918586,
+      "sha256": "23bcbba37bac1ba5093293ef8cc0f8291900f84937a403e57de3c9048398beb3"
+    },
+    {
+      "file": "8082054.png",
+      "page": "https://www.valio.fi/tuotteet/valio-luumutahti/",
+      "source": "https://www.valio.fi/cdn-cgi/image/format=auto/https://cdn-wp.valio.fi/valio-fi/2026/05/valio-luumutahti-85922.png",
+      "bytes": 2275016,
+      "sha256": "3c3e9cd2658722ab008736938f9c841373cfdc2a21f7a0525386b6d9dc8653ec"
+    },
+    {
+      "file": "8081949.png",
+      "page": "https://www.valio.fi/tuotteet/valio-kermaviili-laktoositon/",
+      "source": "https://www.valio.fi/cdn-cgi/image/format=auto/https://cdn-wp.valio.fi/valio-fi/2026/05/valio-kermaviili-laktoositon-14204-800x800.png",
+      "bytes": 91937,
+      "sha256": "e4450bbbda0559de8010ac174017e8342a997a014cdd0d92e9532181406a69b1"
+    },
+    {
+      "file": "3110.jpg",
+      "page": "https://www.valioaimo.fi/toimitustukku/klementiini-es/",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/3110.jpg?context=bWFzdGVyfHJvb3R8MzY4NzV8aW1hZ2UvanBlZ3xhREV6TDJoaU1TODRPREU0T1RrM016azFORGcyTHpNeE1UQXVhbkJufDdjOWI2NWZlNjViMDVhMDJiMTkyYjkxYTY1OGZiMWFiZGI0NDExODg1NTBlNTkxZmM3YTlhZmU5OTJmYzcwMDA",
+      "bytes": 33540,
+      "sha256": "f1bc0b6d9dc035c57d9170f5a279162b4171d655fb3f215891ba7ff54d8a48f7"
+    },
+    {
+      "file": "9999298.webp",
+      "source": "https://cdn.s-cloud.fi/v1/w720h720%40_q75/assets/dam-id/2pxkjLtF4k9BfMEhXtj-mQ.webp?clientId=5621",
+      "page": "https://www.s-kaupat.fi/tuote/6-x-hartwall-original-long-drink-glogg-5-5-0-33-l/6413605320970",
+      "bytes": 60072,
+      "sha256": "e8772094311481e88d9e1734fb8f850ea87ab2f3f13fb64e6db3d5b3540be812"
+    }
+  ]
+}

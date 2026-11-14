@@ -2,6 +2,8 @@
 
 **The open front door for buyer agents at Valio Aimo: verifiable offers, spend-limited mandates, human sign-off when it matters, and a tamper-evident record of every decision.**
 
+Shared development context for Codex and Claude Code: [working instructions](AGENTS.md), [current status and work log](TYOLOKI.md), and [competition plan](SUUNNITELMA.md). Claude Code loads the shared instructions through [CLAUDE.md](CLAUDE.md). Record each completed work stage and its checks in the work log, then commit and push it to GitHub.
+
 Junction 2026, Valio Aimo challenge "Trusted Trade Agents". This is not a chatbot on top of the web shop. It is the Aimo-side interface that lets *any* buyer agent go from inquiry to commitment, with the buyer's own rules deciding what the agent may do alone.
 
 ```
@@ -26,13 +28,16 @@ npm start                   # http://localhost:4747
 
 | URL | What |
 |---|---|
-| `/gateway.html` | Console: run a buyer agent, approve, edit the mandate, read the audit trail |
+| `/` or `/gateway.html` | Static local copy of the Toimitustukku homepage, based on the 14 Nov 2026 reference |
+| `/agent.html` | Console: run a buyer agent, approve, edit the mandate, read the audit trail |
 | `/approve.html?order=…` | The human approval view, built for a phone: what was asked, what is proposed, why it stopped, Approve / Reject |
 | `/openapi.json` | The contract (OpenAPI 3.1) |
 | `/mcp` | The same contract as MCP tools (Streamable HTTP, JSON-RPC) |
 | `/.well-known/agent-gateway.json` | Discovery: operations, reason codes, clock |
 | `/.well-known/jwks.json` | Public key for verifying offers |
-| `/` | Demo client: a kitchen ordering agent (Ravintola Kulma) |
+| `/kitchen.html` | Demo client: a kitchen ordering agent (Ravintola Kulma) |
+
+The homepage uses local images, fonts and a fixed product snapshot. Its prices, availability, delivery date and cart are display data; the homepage does not place orders. Product carousels and the assistant greeting open and close locally. Asset sources are recorded in `public/storefront-assets/sources.json`.
 
 The whole chain in one command, as an outside agent sees it (real HTTP calls, live mock API):
 
@@ -117,6 +122,14 @@ Reason codes are part of the contract (`/.well-known/agent-gateway.json`): an ag
 | Tampered, expired, reused or someone else's offer | Rejected with `OFFER_INVALID_SIGNATURE`, `OFFER_EXPIRED`, `OFFER_ALREADY_USED`, `OFFER_WRONG_BUYER`. |
 | Retries | Same idempotency key returns the same order. |
 
+## "Did you forget this?"
+
+The gateway notices what is missing before the buyer does. For a buyer's most recent open order, `place_order`, `add_to_order` and `get_order` return a `suggestions` list: products that were in at least half (and at least two) of that buyer's last confirmed orders, when the current order has nothing from the same product group. Each suggestion is a concrete product and the buyer's typical quantity, never an open question.
+
+- **For the agent**: the suggestion carries a ready `next` step (`request_quote` → `add_to_order`).
+- **For the human**: the approval view shows it with one button. Pressing it runs the same chain as any addition: signed offer, live re-check, mandate, audit trail (`SUGGESTION_ACCEPTED`).
+- No language model, and only the buyer's own history (`server/gateway/suggest.mjs`, disclosed in `/.well-known/agent-gateway.json`). A suggestion never changes an order by itself.
+
 ## Trust
 
 - **Signed offers**: JWS compact, EdDSA (Ed25519). Payload holds the lines, fixed net prices, delivery date, cut-off and expiry. Public key at `/.well-known/jwks.json`.
@@ -160,7 +173,7 @@ Reason codes are part of the contract (`/.well-known/agent-gateway.json`): an ag
 ```
 server/gateway/   contract · service (search, quote, order) · mandate · signing · store (ledger) · clock · http (REST + MCP) · buyerAgent (reference client)
 server/           catalog (search index) · valioApi (price + availability, cached) · substitutes · kitchen demo client
-public/           gateway.html (console) · approve.html (phone) · index.html (kitchen demo)
+public/           index.html / gateway.html (storefront) · agent.html (console) · approve.html (phone) · kitchen.html (kitchen demo)
 scripts/          build-catalog · fetch-data · demo-buyer
 ```
 
