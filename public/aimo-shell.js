@@ -224,6 +224,13 @@
   });
   el.querySelector('#as-search').addEventListener('submit', (ev) => { ev.preventDefault(); seq++; toAgent(sugg.hidden ? q.value.trim() : request(), true); });
 
+  // Etusivun fiksu haku (storefront-search.js) jättää pyynnön tähän; konsoli tulkitsee sen kuten oman hakunsa Enterin.
+  if (page === 'gateway') {
+    let handed = null;
+    try { handed = sessionStorage.getItem('aimo.ask'); sessionStorage.removeItem('aimo.ask'); } catch { /* ei tallennusta: ei siirrettävää */ }
+    if (handed) { let tries = 0; const wait = setInterval(() => { if (document.querySelector(target.form)) { clearInterval(wait); toAgent(handed, true); } else if (++tries > 100) clearInterval(wait); }, 50); }
+  }
+
   // Konsolissa oikea reuna: toimituspäivä ja kori (keittiödemossa app.js täyttää saman paikan omalla tilauksellaan).
   if (page !== 'gateway') return;
   const right = el.querySelector('#status');

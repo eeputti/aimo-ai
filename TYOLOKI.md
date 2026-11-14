@@ -2,6 +2,19 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — etusivun fiksu haku (Claude Code)
+
+**Käyttäjän päätös:** etusivusta (`/`, Toimitustukun ulkoasukopio) tehdään demon aloitusnäkymä, ja sen hakukenttä ymmärtää puhekielisen pyynnön. Valinnan jälkeen tilauksen hoitaa agentti portin kautta, ei etusivun oma ostoskori. Reseptihaku, allergeenirajaus omana toimintonaan ja live-hinnat rajattiin tästä työvaiheesta pois.
+
+- Uusi `public/storefront-search.js` (ladataan `index.html`- ja `gateway.html`-sivuilla). Kirjoittaessa kutsutaan `POST /api/aimo/interpret` asetuksella `llm: false`, joten näppäily ei maksa mallikutsua eikä Valion API-kutsua. Otsakkeen alle avautuva paneeli näyttää rivikohtaisesti määrän, tuotteen, väittämät (esim. laktoositon), toimituspäivän, sopivien tuotteiden määrän ja kolme parasta osumaa kuvineen sekä tulkinnan keston. Ymmärtämättä jääneet sanat ja oletukset näytetään erikseen.
+- Enter tai nappi "Pyydä tarjous agentilta" tallentaa tekstin `sessionStorage`-avaimeen `aimo.ask` ja avaa `/agent.html`-sivun. `public/aimo-shell.js` lukee avaimen konsolissa ja antaa tekstin samaan polkuun kuin konsolin oma haku: pyyntö tulkitaan ensin, tilaus ei lähde ilman käyttäjän seuraavaa painallusta.
+- Etusivu ei näytä hintoja eikä saldoja hakutuloksissa. Tarkennusnapit (pakkauskoko, merkki) ovat vain konsolissa, koska valinta ei siirtyisi etusivulta mukana.
+- Tyylit lisättiin `public/storefront.css`-tiedoston loppuun (`.ss-`-luokat). Puuttuvan tuotekuvan paikalla on pakkauskuvake.
+
+**Tarkistukset:** selaimessa eristetyllä simuloidulla palvelimella (portti 4755, omat testikannat, ei API-avaimia): "laktoositonta kermaa 20 l perjantaiksi ja 5 kg voita" tuotti kaksi riviä, päivän pe 20.11. ja osumat; siirto konsoliin täytti pyynnön ja avasi tulkinnan. "gluteeniton leipä", tuntematon sana ja "lohikeitto 100 annosta maanantaiksi" näkyivät oikein. Reseptitapaus nojaa toisen työvaiheen commitoimattomaan `server/aimo/recipes.mjs`-työhön. `npm test` 26/26, `node --check` läpi. Kapeaa näyttöä ei tarkistettu.
+
+**Jäljellä:** käynnissä olevat palvelimet tarjoavat staattiset tiedostot levyltä, joten haku näkyy sivun päivityksellä. `.claude/launch.json`-tiedostoon lisättiin paikallisesti asetus `aimo-ai-test-4755`; se ei ole tässä commitissa, koska tiedostossa on toisen työvaiheen muutoksia.
+
 ## 14.11.2026 — keittiönäkymän tilapalkki pois (Claude Code)
 
 **Käyttäjän pyyntö:** Eelis halusi keittiönäkymän (`/kitchen.html`) yläpalkin alta pois rivin, jossa olivat merkit "Live: Aimo API", "Claude päällä" ja viimeisin vasteaika.
