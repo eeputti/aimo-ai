@@ -1,12 +1,17 @@
-# Aimo tilausapuri ja Agent Gateway
+# Aimo Agent Gateway
 
-**Current product direction (14 Nov 2026): a WhatsApp ordering assistant that remembers the active conversation, asks for missing requirements, proposes suitable products and requests approval before submitting an order.**
+Junction 2026, Valio Aimo challenge "Trusted Trade Agents".
 
-A read-only WhatsApp test channel is implemented (see [setup](docs/whatsapp.md)); a live Meta connection has not been verified. Ordering and production customer identification are not implemented in this channel. Valio is intended to own customer identification and ordering permissions through its own customer systems; that integration is unconfirmed. The existing gateway, catalogue, quantity conversions and price/availability checks form the backend foundation. See the current direction at the top of [SUUNNITELMA.md](SUUNNITELMA.md).
+**The Agent Gateway is the Aimo-side interface through which an external purchasing agent searches products, gets a signed fixed-price offer, places an order within the buyer's own mandate and sends everything else to a human, with a hash-chained audit trail of every step.** One contract (`server/gateway/contract.mjs`) serves REST, MCP and OpenAPI 3.1, so the interface is not tied to one platform.
 
-Shared development context for Codex and Claude Code: [working instructions](AGENTS.md), [current status and work log](TYOLOKI.md), and [competition plan](SUUNNITELMA.md). Claude Code loads the shared instructions through [CLAUDE.md](CLAUDE.md). Record each completed work stage and its checks in the work log, then commit and push it to GitHub.
+The gateway is the product, not a chatbot in place of the web shop. Everything below is a client of the same contract:
 
-Junction 2026, Valio Aimo challenge "Trusted Trade Agents". The existing Agent Gateway is the Aimo-side interface that lets a buyer agent go from inquiry to commitment, with the buyer's own rules deciding what the agent may do alone. The WhatsApp assistant will add a conversational client to this foundation.
+| Client | What it shows |
+|---|---|
+| Any MCP or REST agent | `npm run demo` sends the challenge's example request and nine more scenarios (exceptions, approvals, additions, a recipe) as real HTTP calls, against the challenge mock API when `VALIO_API_KEY` is set. Your own agent connects to `/mcp` with a demo buyer key ([Connect your own agent](#connect-your-own-agent)). The gateway runs locally; it is not exposed at a public address. |
+| Storefront (`/`) | The existing web shop look. The basket's **Tarkista ja tilaa** requests signed offers and places the order through the gateway; the mandate decides whether it is confirmed or waits for approval. |
+| WhatsApp assistant | A buyer writes the need in WhatsApp; the assistant keeps a draft, asks for missing details, proposes products and links to a basket where the buyer confirms. The order is a gateway order under that buyer's mandate ([WhatsApp-tilausapuri](#whatsapp-tilausapuri)). |
+| Kitchen demo (`/kitchen.html`) | A kitchen ordering agent that proposes next week's order from history, bookings and recipes. |
 
 ```
 buyer's agent ──► search_products ──► request_quote ──► place_order ──► confirmed
@@ -102,19 +107,13 @@ curl -s localhost:4747/v1/products/search -H 'authorization: Bearer demo-nordic-
   -H 'content-type: application/json' -d '{"query":"lactose-free milk"}'
 ```
 
-## Tiimin yhteinen MCP
+## WhatsApp-tilausapuri
 
-**Yhteinen MCP-linkki: <https://bench-butter-save-marsh.trycloudflare.com/mcp>** (tilapäinen Cloudflare-tunneli). Kopioi koko osoite Clauden tai ChatGPT:n MCP-liittimen URL-kenttään ja kirjaudu omalla tiimiavaimellasi.
+Ostaja kirjoittaa tarpeensa WhatsAppiin omin sanoin. Apuri säilyttää palvelimella tilausluonnoksen, kysyy puuttuvat tiedot (esimerkiksi toimituspäivän ja ruokavalion), ehdottaa tuotteita ja näyttää korin. Kun ostaja kuittaa yhteenvedon (esimerkiksi "ok"), apuri lähettää linkin samaan koriin selaimessa, ja lopullinen vahvistus tehdään siellä. Tilaus kulkee saman portin kautta kuin muidenkin agenttien: allekirjoitettu tarjous, tuore tarkistus, ostajan mandaatti ja päätösloki. Jokainen yhdistetty numero saa oman demo-ostajan (hyväksyntä vain poikkeuksissa, enintään 6 000 € / tilaus).
 
-**Tiimiläiselle: [liittymisohje, yhteinen MCP-osoite ja omat avustajatunnisteet](docs/team-mcp-join.md).** Eeliksen, Aleksin ja Peetun Claude- ja ChatGPT-tunnisteet on luotu. Oma avain toimitetaan yksityisesti.
-
-**Jatkuva seuranta ja API-agentti:** [OpenAI-koordinaattorin käyttöohje](docs/team-coordinator.md). Erillinen prosessi näyttää avustajien raportoiman työn ja voi vastata sille osoitettuihin koordinointipyyntöihin. Se käynnistetään yhteisen MCP-palvelimen rinnalle samalla koneella ja samalla kannalla.
-
-Claude-, ChatGPT- ja muiden MCP-avustajien projektiviestit, tehtävävaraukset ja yhteinen tilannekuva toimivat erillisessä [Team MCP -palvelussa](services/team-mcp/README.md). Yhteinen testipalvelin on käytössä tilapäisen Cloudflare-tunnelin kautta; osoite ja käytön ehdot ovat liittymisohjeessa. Palvelulla on oma OAuth-kirjautuminen, avustajakohtaiset tunnukset ja SQLite-kanta. Pysyvä hosting on vielä valitsematta. Palvelu ei tarvitse verkkokaupan tuotekatalogia tai malliavaimia eikä käynnistä muiden avustajien keskusteluja automaattisesti. Samalla koneella työskentelevät avustajat voivat käyttää samaa paikallista kantaa komentoriviltä: varaus, este, luovutus ja valmistuminen on kuvattu [AGENTS.md](AGENTS.md):ssä.
-
-## WhatsApp-testikanava
-
-Nykyinen Tilausapuri toimii myös WhatsApp Cloud API -kanavan kautta: numeron yhdistäminen kertakäyttökoodilla, tuotehaku ja keskustelumuisti. Tämä testiversio vain hakee tietoja; se ei tee tilauksia tai muuta selaimen koria. Käynnistä erikseen `npm run whatsapp` tai liitä sivuston palvelimeen asetuksella `WHATSAPP_ENABLED=true`. Meta-asetukset, julkinen HTTPS-webhook, henkilön yhdistäminen ja testaus: [WhatsAppin käyttöönotto](docs/whatsapp.md).
+- Käynnistys `npm run whatsapp`, tilaukset asetuksella `WHATSAPP_ORDERING_ENABLED=true`. Meta-asetukset, webhook, numeron yhdistäminen ja rajat: [WhatsAppin käyttöönotto](docs/whatsapp.md).
+- Oikealla puhelimella on varmennettu vastaukset, yksi vahvistettu demotilaus (14.11.) ja korilinkin avautuminen (15.11.).
+- Rajat: Metan testinumero vastaa vain Metassa vahvistetuille testivastaanottajille. Numeron yhdistäminen kutsukoodilla on testitunnistus. Tuotannossa asiakastunnistus ja tilausoikeudet kuuluvat Valion omiin järjestelmiin; sitä integraatiota ei ole varmennettu. Oikeaa Valio-tilausta, maksua tai toimitusta ei tehdä.
 
 ## The contract
 
@@ -216,3 +215,17 @@ scripts/          build-catalog, fetch-data, demo-buyer
 ```
 
 The challenge data may only be used for this event, so `data/raw/` and the API key are not in the repository. MIT licence.
+
+## Development
+
+Shared development context for Codex and Claude Code: [working instructions](AGENTS.md), [current status and work log](TYOLOKI.md), and [competition plan](SUUNNITELMA.md). Claude Code loads the shared instructions through [CLAUDE.md](CLAUDE.md). Record each completed work stage and its checks in the work log, then commit and push it to GitHub.
+
+### Tiimin yhteinen MCP
+
+**Yhteinen MCP-linkki: <https://bench-butter-save-marsh.trycloudflare.com/mcp>** (tilapäinen Cloudflare-tunneli). Kopioi koko osoite Clauden tai ChatGPT:n MCP-liittimen URL-kenttään ja kirjaudu omalla tiimiavaimellasi.
+
+**Tiimiläiselle: [liittymisohje, yhteinen MCP-osoite ja omat avustajatunnisteet](docs/team-mcp-join.md).** Eeliksen, Aleksin ja Peetun Claude- ja ChatGPT-tunnisteet on luotu. Oma avain toimitetaan yksityisesti.
+
+**Jatkuva seuranta ja API-agentti:** [OpenAI-koordinaattorin käyttöohje](docs/team-coordinator.md). Erillinen prosessi näyttää avustajien raportoiman työn ja voi vastata sille osoitettuihin koordinointipyyntöihin. Se käynnistetään yhteisen MCP-palvelimen rinnalle samalla koneella ja samalla kannalla.
+
+Claude-, ChatGPT- ja muiden MCP-avustajien projektiviestit, tehtävävaraukset ja yhteinen tilannekuva toimivat erillisessä [Team MCP -palvelussa](services/team-mcp/README.md). Yhteinen testipalvelin on käytössä tilapäisen Cloudflare-tunnelin kautta; osoite ja käytön ehdot ovat liittymisohjeessa. Palvelulla on oma OAuth-kirjautuminen, avustajakohtaiset tunnukset ja SQLite-kanta. Pysyvä hosting on vielä valitsematta. Palvelu ei tarvitse verkkokaupan tuotekatalogia tai malliavaimia eikä käynnistä muiden avustajien keskusteluja automaattisesti. Samalla koneella työskentelevät avustajat voivat käyttää samaa paikallista kantaa komentoriviltä: varaus, este, luovutus ja valmistuminen on kuvattu [AGENTS.md](AGENTS.md):ssä.

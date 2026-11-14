@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — README alkaa portista, WhatsApp ja kauppa sen asiakkaina (Claude Code, katselmointichatti)
+
+- **Käyttäjän pyyntö:** korjaa haastekatselmoinnin löydös 3. README alkoi "Current product direction: a WhatsApp ordering assistant" ja väitti WhatsAppin olevan vain lukeva ja tilaamisen puuttuvan. Haaste sanoo, ettei kyse ole chatbotista verkkokaupan tilalla, ja README on tuomarin ensimmäinen sivu.
+- **Muutos (vain README.md):** otsikko "Aimo Agent Gateway", yksi lause portista ratkaisuna ja taulukko sen asiakkaista: mikä tahansa MCP/REST-agentti (`npm run demo`, oma agentti `/mcp`:iin, portti vain paikallisesti), kauppa, WhatsApp-apuri ja keittiödemo. WhatsApp-osio kuvaa nykyisen tilauspolun (luonnos → kuittaus → korilinkki → vahvistus selaimessa → gatewayn tilaus ostajan mandaatilla), puhelimella varmennetut asiat ja rajat (Metan testivastaanottajat, testitunnistus, ei oikeaa Valio-tilausta). Tiimin MCP-työkalut ja kehitysohjeet siirtyivät loppuun otsikon "Development" alle sisältöä muuttamatta.
+- **Tarkistus:** diff luettu kokonaan, kaikki linkitetyt tiedostot ja ankkurit olemassa, `git diff --check`, ei keskipisteitä. Väitteet tarkistettu koodista ja lokista: WhatsApp-tilaus kulkee `order-tools`-moduulin `requestQuote`/`placeOrder`-kutsuilla, demo-ostajan mandaatti `exceptions` ja 6 000 € (`server/whatsapp/ordering.mjs`), portin julkiset reitit 404 tunnelissa. Sovelluskoodia ei muutettu, joten testejä ei ajettu.
+- **Ennallaan:** SUUNNITELMA.md:n alku ja `docs/whatsapp.md`:n "vain lukeva" -kohdat.
+
 ## 15.11.2026 — demon skenaario 3 näyttää taas toimituspäivän siirron (Claude Code, katselmointichatti)
 
 - **Käyttäjän pyyntö:** korjaa haastekatselmoinnin löydös 1. Sunnuntaina "200 litres of lactose-free milk by Sunday" tulkitaan seuraavaksi sunnuntaiksi 22.11., jolloin tilaus vahvistui ilman `DELIVERY_DATE_SHIFT`-polkua.
