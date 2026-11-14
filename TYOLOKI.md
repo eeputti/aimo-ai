@@ -2,6 +2,20 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — Danielin MCP-palvelin päivitetty ja pysyvästi Renderissä (Claude Code, Danielin istunto)
+
+**Käyttäjän pyyntö:** Daniel pyysi päivittämään juuren `server.py`:n reposta `DanielTurkkinen/valio-aimo-agent` (yksityinen), jossa sitä nyt kehitetään. Palvelin pyörii Renderissä pysyvässä osoitteessa; tunneliosoite ei enää vaihdu. Osoitetta ja tokenia ei kirjata tähän julkiseen repoon, ne saa Danielilta.
+
+- Juuren `server.py` ja `test_tools.py` korvattiin uusimmilla versioilla, lisättiin `requirements.txt` (`mcp>=2.3`). `server.cpython-311.pyc` poistettiin, ja `.gitignore` estää jatkossa `*.pyc`- ja `__pycache__`-tiedostot. Node-sovelluksen tiedostoihin ei koskettu.
+- **Korjattu tämän lokin 14.11. havaitsemat viat:** saldo 999999 tulkitaan tuntemattomaksi kaikilla tuotteilla (ei vain Terminal), ja pyydettyä aikaisempi toimitus kelpaa (`deliversByRequestedDate`, huomautus näytetään). Ennallaan: tilausaikaraja verrataan koneen kelloon, ei `DEMO_NOW`-kelloon.
+- **Uusi `quote`-työkalu ja vastausmuoto:** agentti vastaa yhdellä taulukolla, sarakkeet Tuote, Aikaisin toimitus, Tilaa viimeistään, Hinta (alv 0), Korvaava tuote. Korvaajat haetaan samasta `category`-ryhmästä nimen sanojen perusteella, vain saatavilla olevat, ja nimen ominaisuudet (laktoositon, gluteeniton, maidoton, vegaaninen, luomu, kasvis) säilyvät. Allergeeneja ei verrata luokittelusta.
+- **Muisti:** tuotedata jäsennetään yksi tuote kerrallaan ja säilytetään kevyenä (lisätiedot zlib-pakattuina). Keksityllä, oikean kokoisella datalla latauksen huippu laski 641 Mt:stä noin 95 Mt:hen; vanha versio kaatui Renderin 512 Mt:n ilmaistasolla.
+- Muut: tunnus myös osoitteessa `?token=` (claude.ai:n custom connector), `/healthz` ilman tunnusta, agentin ohjeet MCP:n `instructions`-kentässä.
+
+**Tarkistukset:** Danielin repossa: `quote` ja korvaajalogiikka keksityllä datalla (laktoosittomalle ei tarjottu tavallista maitoa, umpeutunut takaraja ei kelpaa korvaajaksi, 4 API-kutsua), suoratoistojäsennys vastaa `json.loads`-tulosta myös monitavuisten merkkien kohdalla palarajoilla, palvelin käynnistyy ja `/healthz` vastaa. Daniel vahvisti agentin toimivan Renderin kautta. Korvaajien laatua oikealla datalla ei ole arvioitu järjestelmällisesti.
+
+**Huomio Eelikselle:** Danielin palvelinta kehitetään jatkossa hänen omassa repossaan; tämän repon kopio päivitetään pyynnöstä. Gatewayn `/mcp` ja Danielin palvelin ovat yhä erillisiä.
+
 ## 14.11.2026 — sanelu keskelle isoksi lopetuspainikkeeksi (Codex)
 
 **Käyttäjän päätös:** kuunnellessa näkyy keskellä iso litteä mikrofonipainike, kevyt pomppiva liike, teksti "Kuuntelen…" ja ohje "Lopeta sanelu painamalla mikrofonia." Puhetta ei kirjoiteta näkyviin kuuntelun aikana. Lopetuksen jälkeen näytetään käsittelytila ja sitten ostoslistan tulkinta.

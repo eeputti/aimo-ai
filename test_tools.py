@@ -94,6 +94,7 @@ def main():
     show(f"get_product_details({ids[:1]})", call("get_product_details", product_ids=ids[:1]), limit=4000)
     show(f"get_prices({ids}, {date})", call("get_prices", product_ids=ids, requested_date=date))
     show(f"get_availability({ids}, {date})", call("get_availability", product_ids=ids, requested_date=date))
+    show(f"quote({ids}, {date})", call("quote", product_ids=ids, requested_date=date), limit=6000)
 
 
 if __name__ == "__main__":
