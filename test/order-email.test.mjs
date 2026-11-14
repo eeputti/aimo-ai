@@ -17,7 +17,9 @@ const { createOrderMailer, readEmailConfig } = await import('../server/order-ema
 const { createOrderEmailFlow, validateEmail } = await import('../server/order-email-flow.mjs');
 const { handleOrderEmailRequest } = await import('../server/order-email-http.mjs');
 const { renderReviewEmail } = await import('../server/order-email-templates.mjs');
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+const { closeDatabase } = await import('../server/db.mjs');
+const { closeGatewayDatabase } = await import('../server/gateway/store.mjs');
+after(() => { closeDatabase(); closeGatewayDatabase(); fs.rmSync(dir, { recursive: true, force: true }); });
 
 const API_KEY = 're_test_key_do_not_log_0123456789';
 const ENV = { RESEND_API_KEY: API_KEY, ORDER_EMAIL_FROM: 'Valio Aimo <orders@example.test>', ORDER_EMAIL_PUBLIC_URL: 'https://shop.example.test' };

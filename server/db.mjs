@@ -83,3 +83,5 @@ export function wipe() {
   db.exec('DELETE FROM kv; DELETE FROM history; DELETE FROM bookings; DELETE FROM proposals; DELETE FROM orders; DELETE FROM audit;');
 }
 export function wipeApiCache() { db.exec('DELETE FROM api_cache;'); }
+// Test processes keep this module-level connection open; close it before removing a temporary DB on Windows.
+export function closeDatabase() { db.close(); }

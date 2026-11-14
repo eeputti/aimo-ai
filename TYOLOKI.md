@@ -2,8 +2,9 @@
 
 - Yhdistetty PR #1:n tilausyhteenveto ja tilausvahvistus Resendillä ajantasaiseen `main`-haaraan commitista `c63ff64`. Toiminto pyytää sähköpostin tarjouksen jälkeen; tilaus syntyy vasta vahvistussivun POST-painikkeesta olemassa olevan `prepareCheckout` / `confirmCheckout` -ketjun kautta. GET/HEAD pysyvät vain lukevina, hintojen/saatavuuden muutos estää vahvistuksen ja idempotenssi suojaa uusinnat. Aiempi suoran tilauksen palautus säilyy.
 - Säilytetty PR:n alkuperäinen yksityiskohtainen toteutus- ja päätösmerkintä alla. Tämän yhdistämisen työloki perustuu feature-haaran TYOLOKI-merkintään sekä PR-diffiin; mitään sähköpostia ei lähetetty eikä palvelua julkaistu.
-- Tarkistukset: PR-diffin `git diff --check` läpi. Kohdistetussa Node-testissä 19 tarkistusta läpäisi, mutta kahden SQLite-testitiedoston `after`-siivous epäonnistui Windowsin EPERM-lukitukseen. Testien väitteitä ei merkitä kokonaan läpäistyiksi yhdistetyssä versiossa. Ei Resend-live-toimitusta tai selainkoetta.
-- Seuraava askel: suorita kohdistetut testit uudelleen ympäristössä, jossa SQLite-kannat voidaan siivota, tee selainpolun tarkistus ja aseta kolme Resend-ympäristömuuttujaa vasta ennen erikseen sovittua live-koetta.
+- Alkuperäinen testien EPERM-siivousvirhe johtui siitä, että testit jättivät `server/db.mjs`- ja `server/gateway/store.mjs`-moduulien SQLite-yhteydet auki ennen temp-hakemiston poistoa. Lisätty eksplisiittiset sulkutoiminnot ja kutsuttu niitä kahden asianomaisen testin `after`-koukussa.
+- Tarkistukset: `node --check` muutetuille moduuleille läpi; `node --disable-warning=ExperimentalWarning --test test/order-email.test.mjs test/storefront-order.test.mjs test/storefront-checkout.test.mjs` **19/19 läpi**, myös Windows-temp-kantojen poisto onnistui. `git diff --check` läpi. Ei Resend-live-toimitusta tai selainkoetta.
+- Seuraava askel: selainpolun tarkistus ennen demoa; Resend-asetukset ja live-koe vasta erikseen valmisteltuna.
 # Työloki ja työn jatkaminen
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.

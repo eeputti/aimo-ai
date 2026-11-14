@@ -12,7 +12,9 @@ const { reviewStorefront, searchStorefront } = await import('../server/storefron
 const { prepareCheckout, confirmCheckout } = await import('../server/storefront-checkout.mjs');
 const { orders, ledger } = await import('../server/gateway/store.mjs');
 const { kv } = await import('../server/db.mjs');
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+const { closeDatabase } = await import('../server/db.mjs');
+const { closeGatewayDatabase } = await import('../server/gateway/store.mjs');
+after(() => { closeDatabase(); closeGatewayDatabase(); fs.rmSync(dir, { recursive: true, force: true }); });
 const date = '2026-11-16';
 async function basket() {
   const r = await reviewStorefront(products.map((p) => ({ id: p.id, qty: 2 })), date);
