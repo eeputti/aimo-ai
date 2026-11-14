@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsApp-lähetyseston lisärajaus, tilauslogiikka erillään (Codex)
+
+**Uusi näyttö:** 131005 toistuu myös Hello World -pohjalla sekä API-version, appsecret_proofin, vastaanottajamuodon ja eksplisiittisen testitilin valinnan vertailuissa. Meta ei hyväksynyt yhtäkään vertailulähetystä. Tokenin omistajan sovellusrooli on ylläpitäjä, vastaanottaja vastaa vahvistettua numeroa, ja molemmat WhatsApp-oikeudet näkyvät Metassa Ready for testing. Numeron tila CONNECTED/VERIFIED/LIVE, PIN pois päältä. Varsinaista Metan resursoikeus-/tilieston juurisyytä ei vielä väitetä ratkaistuksi. Ei maksutapa- tai rekisteröintimuutoksia.
+
+**Käyttäjän rinnakkaistyön ohjaus:** Claudelle annettiin erillinen agenttien yhteistyön/GitHub-tilannekuvan/Team MCP:n käyttöönoton kehitystehtävä. Mahdolliseksi toiseksi osuudeksi ehdotettiin realistisen puhekielen ja tilausvarmuuden testipakettia. Codex jatkaa Metan asetuksia, tunneli-/palvelinkäyttöönottoa ja odottaa edelleen tilauskytkennän valmiin commitin ilmoitusta; paikallista ehdotusta ei otettu käyttöön.
+
+**PNG-profiili kesken:** pyydetyn `public/aimo-logo.png`:n upload onnistui, profiilikirjoitus epäonnistui HTTP 400 / unknown error. Tiedosto on 380 × 132; sopivan profiiliversion tarve on selvitettävä. Käyttäjä priorisoi lähetyksen korjaamisen, joten kuva jäi odottamaan. Lähdekoodin varatut tiedostot säilyvät koskemattomina. Tarkempi vianrajaus ja jatko `docs/parallel/1.md`:ssä.
+
 ## 14.11.2026 — avustajien työnvaraus, esteet ja luovutus käyttöön paikallisesti (Claude Code)
 
 **Käyttäjän pyyntö:** selvitä, miten projektin AI-agentit jakavat työn ja pysyvät ajan tasalla, mikä on toteutettu ja mikä oikeasti käytössä, ja tee toimiva tapa varata työ, ilmoittaa esteistä, luovuttaa valmis osuus ja löytää ajantasainen tieto GitHubista. Meta-asetuksiin, WhatsApp-käyttöönottoon, `.env`-tiedostoihin ja palvelinten käynnistyksiin ei koskettu.
