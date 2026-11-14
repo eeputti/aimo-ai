@@ -20,6 +20,22 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 **Tarkistukset:** `node --check` kolmelle JavaScript-tiedostolle, `npm test`, haku merkkien luokkanimillä ei löydä osumia. Selaimessa ei katsottu.
 
+## 14.11.2026 — demopalvelimen uudelleenkäynnistys ja selaintarkistus (Claude Code)
+
+**Käyttäjän pyyntö:** Eelis pyysi käynnistämään palvelimen uudelleen ja testaamaan selaimessa kahden edellisen työvaiheen muutokset (commitit `15f17a5` ja `02f62bc`).
+
+- Portin 4747 demopalvelin pysäytettiin ja käynnistettiin uudelleen asetuksella `aimo-ai` (`npm start`, live-mock-API, Claude päällä). Tilauskantaa ei nollattu: agenttikonsoli näyttää aiemmat tilaukset ja lokin ehjänä (175 riviä).
+- Portin 4748 palvelin on toisen työvaiheen käynnistämä. Siihen ei koskettu, joten se ajaa yhä vanhaa palvelinkoodia.
+
+**Tarkistukset selaimessa (1280 px):**
+
+- Etusivun hakupaneeli, "1 kg tilliä ja 5 l kookosmaitoa maanantaiksi": tilli 13 sopivaa tuotetta, kärjessä GREENS 1KG TILLI 4,71 €; kookosmaito 12 sopivaa tuotetta, kärjessä VALCOM 1L KOOKOSMAITO 3,51 €. Hinnat ja saatavuus näkyvät.
+- Reseptihaku "kasvissosekeitto": malli palautti ehdotukset uuden agenttimoduulin kautta. Ensimmäisen valinta tuotti raaka-ainerivit (porkkana 12 kg, peruna 12 kg) hintoineen ja merkin "Tekoälyn ehdotus, tarkista tuotteet".
+- Agenttikonsoli `/agent.html` latautuu ilman konsolivirheitä. Palvelimen lokissa ei virheitä.
+- Aiemmin tarkistamatta jäänyt kohta: suodatettu haku MCP:n `tools/call`-kutsuna toimii (kaurajuoma, toimitusvarmuus vähintään 0,95 ja enintään 0,5 kg CO2e/kg → 7 tuotetta, oletukset kerrottu vastauksessa).
+
+**Tarkistamatta:** tilauksia ei tehty, jotta käyttäjän demotila ei muutu, joten tarjous, korvaajan valinta ja hyväksynnän selitys jäivät selaimessa ajamatta. Keittiönäkymää ja kapeaa näyttöä ei katsottu. Etusivun 404-vastaukset ovat puuttuvia tuotekuvia (`/img/…`), ei tämän työn aiheuttamia.
+
 ## 14.11.2026 — mallikutsut yhden Aimo-agentti-moduulin taakse (Claude Code)
 
 **Käyttäjän pyyntö:** Eelis pyysi kokoamaan Clauden kutsut yhden Aimo-agentti-moduulin taakse, jotta "Valion oma agentti" on yksi paikka ja mallin voi vaihtaa siitä.
