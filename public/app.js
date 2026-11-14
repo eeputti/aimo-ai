@@ -89,7 +89,7 @@ function renderHero() {
     </div>
     <div class="hero-strip">${p.lines.filter((l) => l.productId && !noImg.has(l.productId)).slice(0, 14).map((l) => `<span title="${esc(l.name)}">${thumb(l.productId)}</span>`).join('')}</div>
     ${state.showSteps ? `<p class="briefing">${esc(p.briefing)}</p>` : ''}
-    ${(p.risks || []).length ? `<div class="banner">${p.risks.map((r) => `<div>• ${esc(r)}</div>`).join('')}</div>` : ''}
+    ${(p.risks || []).length ? `<div class="banner">${p.risks.map((r) => `<div>${esc(r)}</div>`).join('')}</div>` : ''}
     ${order ? `<div class="banner ok"><b>${order.lines.length} riviä, ${money(order.totals.net)}, toimitus ${esc(dateLabel(order.deliveryDate))}.</b> ${esc(order.note)} <button class="linkbtn" data-action="next-week">Laadi seuraavan viikon ehdotus</button></div>` : ''}
     <div class="hero-meta">
       <span class="tag deep" title="${esc(deep.reason)}, ${deep.weeks} vk historiaa, ${deep.quotedProducts} hintaa/saatavuutta kysytty${deep.apiCalls ? `, ${deep.apiCalls} API-kutsua` : ''}">Syvä agentti, ${esc(clock(deep.finishedAt))}, ${ms(deep.ms)}</span>
