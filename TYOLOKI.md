@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — yhteinen toimituspäivä ja korien päivähallinta (Codex)
+
+**Käyttäjän päätös:** yläkulman valinta on haun oletustoimituspäivä. Haussa kirjoitettu, saneltu tai valittu päivä päivittää saman valinnan. Ostoskorin toimitusvälilehti pitää voida muuttaa tai poistaa järjestelmällisesti.
+
+- `storefront-cart-store.js`: päivän valinta pitää eri päivien korit erillään, eikä muiden päivien lukeminen luo välilehtiä. Yläkulmassa on oma valitsin kaikilla kaupan sivuilla. Koko korin siirto poistaa vanhan päivän, yhdistää kohdepäivän saman tuotteen määrät ja säilyttää molempien tilaajaviitteet. Määrärajan ylittävä yhdistely torjutaan ennen muutoksia. Päivän poisto poistaa vain sen tuotteet ja viitteen; valinta siirtyy seuraavaan päivään tai viimeiseen aiempaan. Yksi toimituspäivä säilytetään.
+- `aimo-ask.js/css`, `delivery-date.js`: näkyvä päiväkenttä haussa, tallennetun päivän latauksen odotus ja kaksisuuntainen synkronointi. Valitsimesta vaihdettu päivä korvaa hakutekstin aiemman päiväilmauksen tuotteiden, määrien ja suodatinten säilyessä. Vain uusin hakuvastaus saa muuttaa päivää. Päivänvaihto, paneelin sulkeminen ja keskeneräinen korilisäys eivät päästä aiempaa vastausta palauttamaan vanhaa valintaa. Kirjoitus ja sanelu käyttävät samaa hakufunktiota; oikeaa mikrofonia ei tässä testattu.
+- `cart.html`, `storefront-cart.js/css`: toimitusvälilehtien yhteydessä Lisää toimituspäivä, Muuta toimituspäivää ja Poista toimituspäivä. Siirto kertoo yhdistämisestä; poistaminen varmistaa päivän ja tuotemäärän. Viimeistä päivää ei voi poistaa, mutta sen korin voi tyhjentää. Muutos mitätöi aiemman saatavuus-/maksutarkistuksen nykyisellä korin tarkistuspolulla.
+
+**Varmennus:** `npm test` **74/74**, `aimo:eval` **26/26** ja `aimo:eval:spoken` **54/54**, ei mallikutsuja. Seitsemän uutta testiä kattavat päivien erottelun ja tallentumisen, siirron ja viitteet, poiston valintajärjestyksen, määrärajat sekä hakutekstin päivämäärän vaihdon. Syntaksit ja diff-tarkistus läpi. Eristetty simulaatio portissa 4782 omilla väliaikaisilla kannoilla: yläkulman ke 18.11. → päivätön maitohaku käyttää keskiviikkoa; tekstin maanantaiksi → yläkulma ma 16.11.; haun valitsin pe 20.11. → teksti ja saatavuus perjantaille. Sama tuote 4 + 4 myyntierää kahdelta päivältä yhdistyi kahdeksaksi, vanha välilehti poistui ja tulos säilyi sivun päivityksessä. Poiston peruutus sekä tuotteellisen päivän vahvistettu poisto ja viimeisen päivän esto varmistettu. Nopeat päivänvaihdot ja haun sulkeminen kesken kirjoitusviiveen jättivät uusimman päivän voimaan. 375 px: 0 px vaakaylivuotoa. Testipolussa ei selaimen JavaScript-virheitä.
+
+**Käyttöönotto ja työnjako:** selainmuutokset tulevat käyttöön sivun päivityksellä. Päädemon palvelinta, tietokantoja tai käyttäjän koria ei muutettu. Saatavuussäännöt ja oikean mock-API:n muiden toimituspäivien rajoitus säilyvät. Työpuussa jatkuu toisen chatin reseptituonti, myös `aimo-ask.js`:ssä; tämän commitin hakutiedostosta rajataan vain toimituspäivän omat muutokset. Reseptituonnin tiedostot ja paketit jäävät sen omaan työvaiheeseen.
+
 ## 14.11.2026 — ostoskorin hakukenttä liikkuu paneelin yläreunaan (Codex)
 
 **Käyttäjän pyyntö:** ostoskorin vasemman reunan Lisää tuotteita -kenttä siirtyy animoituna avautuvan hakunäkymän yläreunaan. Sen pitää näyttää samalta jatkuvalta kentältä.

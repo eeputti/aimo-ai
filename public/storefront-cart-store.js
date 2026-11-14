@@ -18,7 +18,9 @@
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { storageAvailable = false; }
     window.dispatchEvent(new Event('aimo:cart-change'));
   };
-  const lines = (date = state.selectedDate) => state.carts[date] ||= [];
+  // Reading another day must not create a new delivery tab.
+  const lines = (date = state.selectedDate) => state.carts[date] || [];
+  const ensureDay = (date) => state.carts[date] ||= [];
   const ready = fetch('/storefront-cart-data.json').then((r) => {
     if (!r.ok) throw new Error('Ostoskoria ei voitu ladata.');
     return r.json();
@@ -54,7 +56,7 @@
   window.aimoCart = {
     ready, totals, get: () => copy(state), lines: (date) => copy(lines(date)),
     get storageAvailable() { return storageAvailable; },
-    select(date) { if (!validDate(date)) throw new Error('Tarkista toimituspäivä.'); state.selectedDate = date; lines(date); save(); },
+    select(date) { if (!validDate(date)) throw new Error('Tarkista toimituspäivä.'); if (state.selectedDate === date) return; state.selectedDate = date; ensureDay(date); save(); },
     setQuantity(id, value, date = state.selectedDate) {
       const p = lines(date).find((p) => p.id === id); const qty = number(value);
       if (!p || !Number.isFinite(qty) || amount(qty) <= 0 || qty > 999999) throw new Error('Anna positiivinen määrä, enintään 999 999.');
@@ -62,24 +64,43 @@
     },
     remove(id, date = state.selectedDate) { state.carts[date] = lines(date).filter((p) => p.id !== id); save(); },
     clear(date = state.selectedDate) { state.carts[date] = []; save(); },
+    removeDate(date = state.selectedDate) {
+      const dates = Object.keys(state.carts).sort();
+      if (!dates.includes(date)) throw new Error('Toimituspäivää ei löydy.');
+      if (dates.length === 1) throw new Error('Säilytä yksi toimituspäivä. Voit tyhjentää sen ostoskorin.');
+      delete state.carts[date]; delete state.references[date];
+      if (state.selectedDate === date) state.selectedDate = dates.find((d) => d > date) || dates.filter((d) => d < date).at(-1);
+      save();
+    },
     reference(value) { state.references[state.selectedDate] = String(value).slice(0, 100); save(); },
     move(date, id = null) {
       if (!validDate(date)) throw new Error('Tarkista toimituspäivä.');
       const from = state.selectedDate; if (from === date) return;
       const moving = lines(from).filter((p) => !id || p.id === id);
+      if (id && !moving.length) throw new Error('Siirrettävää tuotetta ei löydy.');
+      // Validate the complete merge before changing either basket.
+      for (const p of moving) if (amount((lines(date).find((r) => r.id === p.id)?.qty || 0) + p.qty) > 999999) throw new Error('Yhdistetty määrä ylittäisi enimmäismäärän 999 999.');
+      ensureDay(date);
       for (const p of moving) {
         const existing = lines(date).find((r) => r.id === p.id);
         if (existing) existing.qty = amount(existing.qty + p.qty);
         else lines(date).push(copy(p));
       }
       state.carts[from] = lines(from).filter((p) => !moving.includes(p));
-      if (!id) state.selectedDate = date;
+      if (!id) {
+        const refs = [...new Set([state.references[date], state.references[from]].filter(Boolean))];
+        if (refs.length) state.references[date] = refs.join(' / ');
+        delete state.references[from]; delete state.carts[from];
+        state.selectedDate = date;
+      }
       save();
     },
     async add(product, qty = 1, date = state.selectedDate) {
       await ready;
       if (!validDate(date) || !product?.id || !product.name || !Number.isFinite(number(qty)) || amount(number(qty)) <= 0 || number(qty) > 999999) throw new Error('Tarkista tuote ja määrä.');
       const existing = lines(date).find((p) => p.id === String(product.id));
+      if (amount((existing?.qty || 0) + number(qty)) > 999999) throw new Error('Yhdistetty määrä ylittäisi enimmäismäärän 999 999.');
+      ensureDay(date);
       if (existing) existing.qty = amount(existing.qty + number(qty));
       else lines(date).push({ ...copy(product), id: String(product.id), qty: amount(number(qty)) });
       state.selectedDate = date; save();
@@ -101,10 +122,27 @@
     }
   };
   document.querySelector('.header-actions .header-action:last-child')?.addEventListener('click', () => { location.href = '/cart.html'; });
-  document.querySelector('.header-actions .header-action:first-child')?.addEventListener('click', () => {
-    if (document.querySelector('#cart-date-dialog')) document.querySelector('[data-cart-action="date"]').click();
-    else location.href = '/cart.html#toimituspaiva';
-  });
+  // The header selects the search/basket day. Moving an existing basket is a separate cart action.
+  let dateDialog;
+  window.aimoCart.openDatePicker = async () => {
+    await ready;
+    if (!dateDialog) {
+      dateDialog = document.createElement('dialog'); dateDialog.className = 'delivery-dialog';
+      dateDialog.setAttribute('aria-labelledby', 'delivery-title');
+      dateDialog.innerHTML = '<form><h2 id="delivery-title">Valitse toimituspäivä</h2><p>Haku ja uudet tuotteet käyttävät valitsemaasi päivää. Muiden päivien tuotteet säilyvät omissa koreissaan.</p><label>Toimituspäivä<input type="date" required></label><p class="delivery-error" role="alert" hidden></p><div class="delivery-actions"><button type="button">Peruuta</button><button type="submit" class="solid-button">Valitse päivä</button></div></form>';
+      dateDialog.querySelector('button[type="button"]').addEventListener('click', () => dateDialog.close());
+      dateDialog.querySelector('form').addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        try { window.aimoCart.select(dateDialog.querySelector('input').value); dateDialog.close(); }
+        catch (e) { const error = dateDialog.querySelector('[role="alert"]'); error.textContent = e.message; error.hidden = false; }
+      });
+      document.body.append(dateDialog);
+    }
+    dateDialog.querySelector('input').value = state.selectedDate;
+    dateDialog.querySelector('[role="alert"]').hidden = true;
+    if (!dateDialog.open) dateDialog.showModal();
+  };
+  document.querySelector('.header-actions .header-action:first-child')?.addEventListener('click', () => window.aimoCart.openDatePicker());
   window.addEventListener('aimo:cart-change', updateHeader);
   window.addEventListener('storage', (ev) => {
     if (ev.key !== KEY || !ev.newValue) return;

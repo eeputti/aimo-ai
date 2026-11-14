@@ -49,6 +49,8 @@ The header and search panel open the same browser-local storefront cart (`aimo.s
 
 The search panel's **Katso tilausehdotus** shortcut opens the history-based kitchen proposal at `/kitchen.html`. Its expandable preview reads the saved proposal even when the browser-local cart is empty. The kitchen demo combines history, ordinary bookings and recipe demand, including new ingredients, yield factors and explicitly supplied usable inventory/incoming deliveries. See [kitchen planning inputs and limitations](docs/kitchen-planning.md). Run `npm test` for isolated planning and HTTP regression tests; the local catalogue is required, and the tests do not use live API keys or the running demo databases.
 
+The header, search date picker and selected cart tab share one delivery date. Search uses it when the request has no date; a date written or dictated in the request updates the shared selection. Selecting a day keeps the other baskets intact. In the cart, **Muuta toimituspäivää** moves the whole selected basket and removes its old tab; an existing destination basket merges product quantities and preserves both references. **Poista toimituspäivä** confirms removal of that day's products and reference, then selects the next remaining day (or the previous one). One delivery day is always retained. Date changes invalidate the cart's availability/payment review.
+
 The whole chain in one command, as an outside agent sees it (real HTTP calls, live mock API):
 
 ```bash

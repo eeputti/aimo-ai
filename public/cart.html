@@ -38,6 +38,12 @@
   <main id="main" class="container cart-main">
     <h1>Ostoskori</h1>
     <div id="cart-days" class="cart-days" role="tablist" aria-label="Ostoskorin toimituspäivät"></div>
+    <div class="cart-date-tools">
+      <strong id="cart-selected-day"></strong>
+      <button type="button" data-cart-action="select-date">Lisää toimituspäivä</button>
+      <button type="button" data-cart-action="date">Muuta toimituspäivää</button>
+      <button type="button" data-cart-action="remove-date">Poista toimituspäivä</button>
+    </div>
     <div class="cart-details">
       <dl><dt>Asiakas</dt><dd>554485<br>VALIO OY / ALKOHOLI</dd></dl>
       <dl><dt>Toimitusosoite</dt><dd>ORIONINTIE 18-22<br>02200, ESPOO</dd></dl>
@@ -54,7 +60,6 @@
           <button type="button" disabled title="Tilauspohjat liitetään myöhemmin"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/file-plus.svg')"></span>Lisää tilauspohjalle</button>
           <button type="button" data-cart-action="export"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/file-arrow-down.svg')"></span>Vie Exceliin</button>
           <button type="button" data-cart-action="print"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/printer.svg')"></span>Tulosta</button>
-          <button type="button" data-cart-action="date"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/calendar-blank.svg')"></span>Vaihda toimituspäivää</button>
           <button type="button" data-cart-action="clear"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/trash.svg')"></span>Tyhjennä ostoskori</button>
         </div>
       </div>
@@ -65,9 +70,19 @@
   <dialog id="cart-date-dialog" class="cart-dialog" aria-labelledby="cart-date-title">
     <form id="cart-date-form">
       <h2 id="cart-date-title">Vaihda toimituspäivää</h2>
+      <p id="cart-date-description"></p>
       <label>Toimituspäivä<input id="cart-date" type="date" required></label>
+      <p id="cart-date-merge" role="status" hidden>Kohdepäivällä on jo ostoskori. Tuotteet yhdistetään ja saman tuotteen määrät lasketaan yhteen. Saatavuus ja hinnat tarkistetaan uudelleen.</p>
       <p id="cart-date-error" class="cart-dialog-error" role="alert" hidden></p>
       <div class="cart-dialog-actions"><button type="button" data-cart-action="cancel-date">Peruuta</button><button class="solid-button" type="submit">Vahvista</button></div>
+    </form>
+  </dialog>
+  <dialog id="cart-remove-date-dialog" class="cart-dialog" aria-labelledby="cart-remove-date-title">
+    <form id="cart-remove-date-form">
+      <h2 id="cart-remove-date-title">Poista toimituspäivä</h2>
+      <p id="cart-remove-date-description"></p>
+      <p id="cart-remove-date-error" class="cart-dialog-error" role="alert" hidden></p>
+      <div class="cart-dialog-actions"><button type="button" data-cart-action="cancel-remove-date">Peruuta</button><button class="solid-button" type="submit">Poista päivä ja tuotteet</button></div>
     </form>
   </dialog>
   <div id="cart-status" class="cart-status" role="status" hidden></div>

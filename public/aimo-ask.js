@@ -7,6 +7,7 @@
   if (window.aimoAsk) return;
   const HANDOFF_KEY = 'aimo.ask';
   const intentReady = import('/aimo-request-intent.js').catch(() => null);
+  const deliveryReady = import('/delivery-date.js');
   let recipeContext = null;
   const storefrontCart = window.aimoCart || null;
   const PLACEHOLDER = 'Hae tuotteita tai kerro mitä tarvitset';
@@ -56,6 +57,7 @@
           <button type="button" class="ask-x" data-close="1" aria-label="Sulje haku">${I.close}</button>
         </form></div>
         <p class="ask-intro">Kerro tarve, tarkista ostoskori ja hyväksy tarvittavat muutokset.</p>
+        ${storefrontCart ? '<label class="ask-delivery">Toimituspäivä<input class="ask-delivery-input" type="date" required aria-label="Haun toimituspäivä"></label>' : ''}
         <div class="ask-body">
           <aside class="ask-side">
             <div class="ask-card" data-card="recipe">
@@ -97,7 +99,7 @@
   const rinput = root.querySelector('.ask-rinput'); const pinput = root.querySelector('.ask-portions'); const ideasEl = root.querySelector('.ask-ideas');
   const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  let origin = null; let seq = 0; let timer; let orderable = false;
+  let origin = null; let seq = 0; let timer; let orderable = false; let searchClosed = true;
   let voice = null;
   const voiceReady = import('/aimo-voice.js').then(({ attachVoice }) => {
     voice = attachVoice({ root, input: q,
@@ -111,6 +113,10 @@
   let portions = 100; let ideas = []; let picked = null; let override = null; let ideaSeq = 0; let ideaTimer;
   // Suodattimet (laktoositon, rasvaton...) ovat rakenteisia muutoksia tulkintaan, eivät uutta tekstiä. Ne nollataan, kun käyttäjä kirjoittaa.
   let patches = []; let last = null; const expanded = new Set();
+  let observedDate = storefrontCart?.get().selectedDate;
+  let syncingDate = false;
+  const deliveryInput = root.querySelector('.ask-delivery-input');
+  if (deliveryInput) deliveryInput.value = observedDate;
   const WD_TO = ['sunnuntaiksi', 'maanantaiksi', 'tiistaiksi', 'keskiviikoksi', 'torstaiksi', 'perjantaiksi', 'lauantaiksi'];
   const int = (n) => Number(n).toLocaleString('fi-FI');
   const sent = () => (override && q.value.trim() === override.label ? override.text : q.value.trim());
@@ -208,11 +214,15 @@
   }
   let deepTimer;
   async function search(speech = false) {
+    if (searchClosed || root.hidden) return;
     if (override && q.value.trim() !== override.label) { override = null; picked = null; paintIdeas(); }
     const text = sent(); const mine = ++seq;
+    orderable = false; last = null;
     if (text.length < 2) { idle(); return; }
     const intent = await intentReady;
+    await storefrontCart?.ready;
     if (mine !== seq || root.hidden) return;
+    const requestedDate = storefrontCart?.get().selectedDate;
     if (!override && recipeContext?.label !== q.value) {
       const routed = intent?.routeRequest(text);
       if (routed?.recipe) return openRecipeRequest(routed, text, speech, mine);
@@ -224,7 +234,7 @@
     let r;
     try {
       main.innerHTML = '<p class="ask-thinking">Tarkistan tuotteet ja saatavuuden…</p>';
-      r = await fetchSearch(text, speech, storefrontCart?.get().selectedDate, recipePatches);
+      r = await fetchSearch(text, speech, requestedDate, recipePatches);
       if (context?.productText && !r.error) {
         const products = await fetchSearch(context.productText, speech || context.speech, r.deliveryDate, patches.filter((p) => p.item < offset).map(({ item, patch }) => ({ item, patch })));
         if (mine !== seq || root.hidden) return;
@@ -232,7 +242,13 @@
         r = intent.combineSearchResults(products, r);
       }
     } catch (error) { r = { error: error instanceof TypeError || error instanceof SyntaxError ? 'Hakupalveluun ei saatu yhteyttä.' : error.message || 'Hakupalveluun ei saatu yhteyttä.' }; }
-    if (mine !== seq || root.hidden) return;
+    if (mine !== seq || root.hidden || searchClosed || storefrontCart && requestedDate !== storefrontCart.get().selectedDate) return;
+    if (!r.error && storefrontCart && r.deliveryDate !== storefrontCart.get().selectedDate) {
+      // Only the latest completed request may update the shared selection.
+      syncingDate = true;
+      try { storefrontCart.select(r.deliveryDate); selectedNeeds.clear(); }
+      finally { syncingDate = false; }
+    }
     render(r);
     // Säännöt eivät tunnistaneet sanaa: kirjoitustauon jälkeen kysytään kielimallilta. Vastaus tallentuu palvelimen
     // muistiin, joten sama sana tunnistuu seuraavalla kerralla heti.
@@ -247,6 +263,36 @@
     return !r.error;
   }
   const setText = (text) => { recipeContext = null; root.classList.remove('ask-recipe-mode'); q.value = text; q.focus({ preventScroll: true }); selectedNeeds.clear(); clearTimeout(timer); search(); };
+  async function refreshDeliveryDate(date) {
+    clearTimeout(timer); clearTimeout(deepTimer); clearTimeout(portionTimer);
+    const mine = ++seq; orderable = false; last = null; selectedNeeds.clear();
+    main.innerHTML = '<p class="ask-thinking">Tarkistan tuotteet ja saatavuuden…</p>';
+    const { withDeliveryDate } = await deliveryReady;
+    if (mine !== seq || root.hidden || searchClosed) return;
+    const label = withDeliveryDate(q.value, date);
+    if (override) override = { ...override, label, text: withDeliveryDate(override.text, date) };
+    if (recipeContext) {
+      recipeContext.deliveryText = date;
+      if (recipeContext.productText) recipeContext.productText = withDeliveryDate(recipeContext.productText, date);
+      if (recipeContext.label) recipeContext.label = label;
+    }
+    if (q.value.trim()) { q.value = label; search(); }
+    else idle();
+  }
+  if (storefrontCart) {
+    window.addEventListener('aimo:cart-change', () => {
+      const date = storefrontCart.get().selectedDate;
+      if (deliveryInput) deliveryInput.value = date;
+      if (date === observedDate) return;
+      observedDate = date;
+      if (!syncingDate && !root.hidden && !searchClosed) refreshDeliveryDate(date);
+    });
+    deliveryInput.addEventListener('change', () => {
+      if (!deliveryInput.value) { deliveryInput.value = storefrontCart.get().selectedDate; return; }
+      try { storefrontCart.select(deliveryInput.value); }
+      catch { deliveryInput.value = storefrontCart.get().selectedDate; }
+    });
+  }
   const cartProduct = (p) => ({ ...p, unit: p.unitLabel, image: `/img/${encodeURIComponent(p.id)}`, availableFrom: p.availability?.deliveryDate, taxUnknown: p.vat == null });
   async function addProducts(entries, date) {
     await storefrontCart.ready;
@@ -259,6 +305,7 @@
     const existing = storefrontCart.lines(date);
     const res = await fetch('/api/storefront/review', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deliveryDate: date, lines: rows.map((p) => ({ id: p.id, qty: p.qty + (existing.find((e) => e.id === p.id)?.qty || 0) })) }) });
     const review = await res.json();
+    if (date !== storefrontCart.get().selectedDate) throw new Error('Toimituspäivä muuttui. Tarkista uudet hakutulokset ennen lisäämistä.');
     if (!res.ok || !review.ok) throw new Error(review.error || 'Saatavuus muuttui. Hae tuotteet uudelleen.');
     for (const p of rows) {
       const checked = review.lines.find((l) => l.id === p.id).product;
@@ -366,6 +413,7 @@
   };
   function open(text = '') {
     if (!root.hidden && !closing) { if (text) setText(text); return; }
+    searchClosed = false;
     const from = closing ? frame(bar) : frame(origin);
     const id = ++motionId; stopMotion(); closing = false;
     if (!root.isConnected) document.body.append(root);
@@ -395,8 +443,10 @@
   }
   async function close() {
     if (root.hidden || closing) return;
+    searchClosed = true;
     const from = frame(bar); const id = ++motionId; stopMotion(); closing = true;
     voice?.cancel();
+    clearTimeout(timer); clearTimeout(deepTimer); clearTimeout(portionTimer);
     seq++;
     const to = frame(origin);
     if (!still() && from && to) {
