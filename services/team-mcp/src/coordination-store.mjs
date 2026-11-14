@@ -22,6 +22,17 @@ export function createCoordinationStore(store) {
     store.access(actor, project);
     db.prepare('INSERT INTO coord_runtime VALUES(?,?,?,?) ON CONFLICT(project) DO UPDATE SET actor=excluded.actor,mode=excluded.mode,last_tick=excluded.last_tick').run(project, actor, mode, now());
   }
+  function replyToJob(job, body) {
+    const inserted = db.prepare('INSERT INTO messages(project,sender,recipient,subject,body,request_key,created) VALUES(?,?,?,?,?,?,?)')
+      .run(job.project, job.actor, job.requester, 'Koordinaattorin vastaus', body, `coord-reply:${job.id}`, now());
+    db.prepare('INSERT INTO events(project,actor,type,data,created) VALUES(?,?,?,?,?)')
+      .run(job.project, job.actor, 'message_sent', JSON.stringify({ messageSeq: Number(inserted.lastInsertRowid), recipient: job.requester }), now());
+  }
+  function failedReply(job, code) {
+    if (store.member(job.actor)?.projects.includes(job.project) && store.member(job.requester)?.projects.includes(job.project)) {
+      replyToJob(job, `Koordinaattori ei saanut työpyyntöä käsiteltyä (${code}). Pyydä ylläpitäjää tarkistamaan koordinaattorin tila. Uuden yrityksen voi pyytää uutena viestinä.`);
+    }
+  }
   return {
     heartbeat,
     touch(actor, project, tool) {
@@ -57,8 +68,10 @@ export function createCoordinationStore(store) {
           const requester = store.member(message.sender);
           if (!requester?.projects.includes(project)) continue;
           const pending = db.prepare("SELECT COUNT(*) AS n FROM coord_jobs WHERE project=? AND actor=? AND status IN ('queued','running')").get(project, actor).n;
-          db.prepare('INSERT OR IGNORE INTO coord_jobs(id,project,actor,requester,source_seq,input,status,due,created,updated,error_code) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-            .run(crypto.randomUUID(), project, actor, message.sender, message.seq, JSON.stringify({ subject: message.subject, body: message.body }), pending < 100 ? 'queued' : 'failed', now(), now(), now(), pending < 100 ? null : 'QUEUE_FULL');
+          const id = crypto.randomUUID();
+          const created = db.prepare('INSERT OR IGNORE INTO coord_jobs(id,project,actor,requester,source_seq,input,status,due,created,updated,error_code) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+            .run(id, project, actor, message.sender, message.seq, JSON.stringify({ subject: message.subject, body: message.body }), pending < 100 ? 'queued' : 'failed', now(), now(), now(), pending < 100 ? null : 'QUEUE_FULL');
+          if (created.changes && pending >= 100) failedReply({ id, project, actor, requester: message.sender }, 'QUEUE_FULL');
         }
         db.prepare('INSERT INTO coord_offsets VALUES(?,?,?) ON CONFLICT(project,actor) DO UPDATE SET cursor=excluded.cursor').run(project, actor, events.at(-1)?.seq || cursor);
         return events;
@@ -67,8 +80,9 @@ export function createCoordinationStore(store) {
     claim({ project, actor, worker, maxPerHour = 12, leaseMs = 120000 }) {
       store.access(actor, project);
       return tx(() => {
-        db.prepare(`UPDATE coord_jobs SET status=CASE WHEN attempts<3 THEN 'queued' ELSE 'failed' END,error_code='LEASE_EXPIRED',lease_owner=NULL,updated=?
-          WHERE project=? AND actor=? AND status='running' AND lease_until<=?`).run(now(), project, actor, now());
+        const expired = db.prepare(`UPDATE coord_jobs SET status=CASE WHEN attempts<3 THEN 'queued' ELSE 'failed' END,error_code='LEASE_EXPIRED',lease_owner=NULL,updated=?
+          WHERE project=? AND actor=? AND status='running' AND lease_until<=? RETURNING *`).all(now(), project, actor, now());
+        for (const job of expired) if (job.status === 'failed') failedReply(job, 'LEASE_EXPIRED');
         if (db.prepare("SELECT id FROM coord_jobs WHERE project=? AND actor=? AND status='running' AND lease_until>?").get(project, actor, now())) return null;
         const calls = db.prepare('SELECT COUNT(*) AS n FROM coord_attempts WHERE project=? AND actor=? AND started>?').get(project, actor, now() - 3600000).n;
         if (calls >= maxPerHour) return null;
@@ -87,21 +101,18 @@ export function createCoordinationStore(store) {
       return tx(() => {
         const current = owns(job, worker);
         store.access(current.actor, current.project); store.access(current.requester, current.project);
-        const body = `OpenAI-koordinaattorin vastaus\n\n${result.reply}`;
-        const inserted = db.prepare('INSERT INTO messages(project,sender,recipient,subject,body,request_key,created) VALUES(?,?,?,?,?,?,?)')
-          .run(current.project, current.actor, current.requester, 'Koordinaattorin vastaus', body, `coord-reply:${job.id}`, now());
-        db.prepare('INSERT INTO events(project,actor,type,data,created) VALUES(?,?,?,?,?)')
-          .run(current.project, current.actor, 'message_sent', JSON.stringify({ messageSeq: Number(inserted.lastInsertRowid), recipient: current.requester }), now());
+        replyToJob(current, `OpenAI-koordinaattorin vastaus\n\n${result.reply}`);
         db.prepare("UPDATE coord_jobs SET status='succeeded',summary=?,reply=?,error_code=NULL,lease_owner=NULL,lease_until=0,updated=? WHERE id=?")
           .run(result.summary, result.reply, now(), job.id);
       });
     },
     fail(job, worker, code, retryable, retryAfterMs = 0) {
       return tx(() => {
-        owns(job, worker);
+        const current = owns(job, worker);
         const retry = retryable && job.attempts < 3;
         db.prepare('UPDATE coord_jobs SET status=?,error_code=?,lease_owner=NULL,lease_until=0,due=?,updated=? WHERE id=?')
           .run(retry ? 'queued' : 'failed', code, now() + Math.max(retryAfterMs, Math.min(60000, 5000 * 2 ** (job.attempts - 1))), now(), job.id);
+        if (!retry) failedReply(current, code);
       });
     },
   };

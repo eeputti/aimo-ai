@@ -2,7 +2,7 @@
 
 **Liittyvälle tiimiläiselle: [yhteinen testiosoite, omat tunnisteet ja kirjautumisohje](../../docs/team-mcp-join.md).** Tämä README sisältää palvelimen ylläpidon ja teknisen käyttöönoton ohjeet.
 
-Yhteinen projektipostilaatikko, tehtävä- ja tiedostovaraukset sekä projektin yhteenveto Claude-, ChatGPT- ja muille remote MCP -asiakkaille. Ei ostoagentin työkalu eikä uusi kielimalli. Palvelu ei käytä malliavaimia, tee ostoksia, suorita komentoja tai muokkaa GitHubia. Viesteistä ei synny automaattista mallikutsua.
+Yhteinen projektipostilaatikko, tehtävä- ja tiedostovaraukset sekä projektin yhteenveto Claude-, ChatGPT- ja muille remote MCP -asiakkaille. MCP-palvelin ei tarvitse malliavaimia eikä tee ostoksia, suorita komentoja tai muokkaa GitHubia. Erikseen käynnistettävä [OpenAI-koordinaattori](../../docs/team-coordinator.md) seuraa tapahtumia jatkuvasti ja voi käsitellä sille suoraan osoitettuja analyysi- ja koordinointipyyntöjä API-agentilla.
 
 Palvelu toimii erillään verkkokaupasta. Sen omat riippuvuudet ja lockfile ovat tässä hakemistossa; sivuston package.json tai tilauskannat eivät muutu.
 
@@ -148,6 +148,7 @@ OAuth käyttää joko julkista PKCE-asiakasta (`none`) tai SDK:n confidential cl
 |---|---|
 | `whoami` | Todellinen avustajatunniste ja sallitut projektit. Lähettäjää ei voi valita argumenteissa. |
 | `get_project_state` | Projektin yhteenveto, jäsenet, kaikki avoimet ja viimeiset 100 suljettua tehtävää varauksineen ja viimeiset 30 tehtävä-/yhteenvetotapahtumaa. Ei yksityisviestejä. |
+| `get_agent_activity` | Avustajien viimeinen MCP-yhteys, raportoidut tehtävät ja koordinaattorin elonmerkki. Oman API-työjonon tilanne ja tulokset; muiden suorat työpyynnöt pysyvät yksityisinä. Yhteydenotto ei todista jatkuvaa työskentelyä. |
 | `send_message` | Projektille tai jäsenelle viesti. Vaadittu `requestKey` estää saman viestin uusinnan; saman avaimen eri sisältö hylätään. |
 | `read_messages` | Omat vastaanotetut, projektin yhteiset ja itse lähetetyt viestit. Enintään 50/sivu; jatka `nextCursor`-arvosta. |
 | `ack_messages` | Kuittaa käsitelty `through`-kursori omalle tunnisteelle. Ei poista viestejä. |
@@ -180,12 +181,12 @@ Jäsenavaimet ja access/refresh-/authorization code -tunnisteet haetaan kannasta
 
 ## Rajat ja varmennus
 
-MCP ei avaa tai herätä tiimiläisten ChatGPT-/Claude-keskusteluja eikä muuta niiden omia käyttöoikeuksia. Täysin automaattinen yhteistyö vaatii myöhemmin erillisen suorituspalvelun ja sitä käyttävät API-/CLI-agentit. Viestipalvelin itsessään ei soita kielimallien APIeihin. Se ei myöskään jaa maksullisten tilien käyttöoikeuksia muiden tileille.
+MCP ei avaa tai herätä tiimiläisten ChatGPT-/Claude-keskusteluja eikä muuta niiden omia käyttöoikeuksia. Erillinen `npm run coordinator` -prosessi seuraa samaa kantaa ja näyttää avaimella suojatun paikallisen tilannenäkymän portissa 4752. Oletus on `observe`: ei mallikutsuja. `openai` käsittelee vain `team-coordinator`-jäsenelle osoitetut suorat viestit ja vastaa pyytäjän postilaatikkoon; se käyttää erikseen asetettua API-avainta ja mallia. Agentti ei muokkaa koodia tai suorita komentoja. Katso [käyttöönotto, rajat ja työnkulku](../../docs/team-coordinator.md).
 
 ```bash
 npm test
 ```
 
-Testit käyttävät oikeaa MCP SDK -asiakasta, paikallisia HTTP-yhteyksiä ja erillistä SQLite-kantaa. Niissä testataan kahden avustajatunnisteen keskustelu, koko yhteistyöketju (varaus, este, luovutus, vastaanotto, valmis) sekä MCP:n että komentorivin kautta, private/broadcast-erottelu, idempotenssi, projektirajaus, tiedostovarausten konfliktit, vanheneminen ja uudelleenkäynnistys sekä OAuth discovery, PKCE, consent/CSRF, refresh rotation ja revokointi. Oikeaa ChatGPT- tai Claude-tiliä ei ole kytketty automaattitesteissä eikä hostingia julkaistu.
+Testit käyttävät oikeaa MCP SDK -asiakasta, paikallisia HTTP-yhteyksiä ja erillistä SQLite-kantaa. Niissä testataan kahden avustajatunnisteen keskustelu, koko yhteistyöketju (varaus, este, luovutus, vastaanotto, valmis) sekä MCP:n että komentorivin kautta, private/broadcast-erottelu, idempotenssi, projektirajaus, tiedostovarausten konfliktit, vanheneminen ja uudelleenkäynnistys sekä OAuth discovery, PKCE, consent/CSRF, refresh rotation ja revokointi. Koordinaattoritesteissä käytetään simuloitua OpenAI-palvelua: pysyvä jono, kahden prosessin kilpailu, Retry-After, kutsuraja, peruminen ja vastaus vain kerran. Oikeaa OpenAI-ajoa tai tiimiläisten kirjautumista ei tehdä automaattitesteissä. Valinnainen `npm run check:dashboard` tarkistaa käyttöpolun Chromiumissa; se vaatii erikseen asennetun Playwrightin (`AIMO_PLAYWRIGHT_MODULE`) ja Chromiumin (`AIMO_CHROMIUM_PATH`).
 
 Viralliset lähteet: [MCP SDK ja Streamable HTTP](https://ts.sdk.modelcontextprotocol.io/server), [ChatGPT-liittimien OAuth](https://developers.openai.com/plugins/build/auth), [Clauden remote MCP -liittimet](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).

@@ -73,6 +73,8 @@ test('hourly rate budget persists and retries stop after three attempts', async 
   for (let i = 0; i < 2; i++) { f.advance(3600001); await c.tick(); }
   assert.equal(calls, 3);
   let job = f.store.coordination.snapshot('alice', 'aimo-ai').jobs[0]; assert.equal(job.status, 'failed'); assert.equal(job.attempts, 3);
+  const notices = f.store.readMessages('alice', { project: 'aimo-ai' }).messages.filter((m) => m.sender === settings.actor);
+  assert.equal(notices.length, 1); assert.match(notices[0].body, /OPENAI_HTTP_429/);
   f.advance(3600001); await c.tick(); assert.equal(calls, 3);
 });
 test('revocation cancels queued jobs and blocks a reply if access disappears during execution', async (t) => {
@@ -93,6 +95,7 @@ test('failed output is private, provider error text is redacted and queue capaci
   f.ingest();
   assert.equal(f.store.db.prepare("SELECT COUNT(*) AS n FROM coord_jobs WHERE status='queued'").get().n, 100);
   assert.equal(f.store.db.prepare("SELECT COUNT(*) AS n FROM coord_jobs WHERE error_code='QUEUE_FULL'").get().n, 1);
+  assert.equal(f.store.db.prepare("SELECT COUNT(*) AS n FROM messages WHERE sender=? AND body LIKE '%QUEUE_FULL%'").get(settings.actor).n, 1);
   const logs = [];
   const c = createCoordinator(f.store, { ...settings, mode: 'openai' }, { log: (v) => logs.push(v), agent: async () => { throw new Error('SECRET PROVIDER RESPONSE'); } });
   await c.tick();
@@ -112,4 +115,13 @@ test('a coordinator cannot impersonate a human member and Retry-After is persist
   f.store.coordination.fail(job, 'one', 'OPENAI_HTTP_429', true, 120000);
   f.advance(119999); assert.equal(f.claim(), null);
   f.advance(1); assert.ok(f.claim());
+});
+test('three crashed workers leave one terminal failure notice and no fourth API attempt', (t) => {
+  const f = fixture(t); f.message(); f.ingest();
+  for (let i = 0; i < 3; i++) { assert.equal(f.claim('worker-' + i).attempts, i + 1); f.advance(120001); }
+  assert.equal(f.claim('four'), null); assert.equal(f.claim('five'), null);
+  const job = f.store.coordination.snapshot('alice', 'aimo-ai').jobs[0];
+  assert.equal(job.status, 'failed'); assert.equal(job.attempts, 3);
+  const notices = f.store.readMessages('alice', { project: 'aimo-ai' }).messages.filter((m) => m.sender === settings.actor);
+  assert.equal(notices.length, 1); assert.match(notices[0].body, /LEASE_EXPIRED/);
 });
