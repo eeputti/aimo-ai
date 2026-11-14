@@ -6,6 +6,7 @@ const money = (n) => Number(n).toLocaleString('fi-FI', { style: 'currency', curr
 const labels = { confirmed: 'Vahvistettu', pending_approval: 'Odottaa hyväksyntää', rejected: 'Hylätty' };
 const flags = { STOCK_UNKNOWN: 'Saldomäärää ei ole vahvistettu', DELIVERY_DATE_SHIFT: 'Toimituspäivä muuttuu', PARTIAL_FILL_SPLIT: 'Osatoimitus ja korvaava tuote', SUBSTITUTION_WITHIN_POLICY: 'Korvaava tuote valtuuden sisällä', SUBSTITUTION_OUTSIDE_POLICY: 'Korvaava tuote vaatii hyväksynnän' };
 let buyers = []; let buyer; let orders = []; let busy = false; let view = 'orders'; let choices = [];
+const localShop = !!document.querySelector('meta[name="aimo-local-shop"]');
 const api = async (url, body, account) => {
   const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: { 'content-type': 'application/json', ...(account ? { authorization: `Bearer ${account.demoKey}` } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const result = await response.json();
@@ -22,18 +23,31 @@ dialog.innerHTML = `<header><h2>Tilaukset</h2><button type="button" data-sf="clo
   <nav aria-label="Tilauksen toiminnot"><button type="button" data-sf="cart">Tarkista ostoskori</button><button type="button" data-sf="orders">Tilaukset ja hyväksynnät</button><button type="button" data-sf="mandate">Valtuudet</button></nav>
   <p class="sf-note" data-sf-mode></p><p role="status" data-sf-message></p><div data-sf-content></div>`;
 document.body.append(dialog);
+if (localShop) dialog.querySelector('[data-sf-mode]').insertAdjacentHTML('beforebegin', '<p><a href="/demo" target="_blank" rel="noopener">Avaa tilausapuri</a></p>');
 const content = dialog.querySelector('[data-sf-content]'); const message = dialog.querySelector('[data-sf-message]'); const select = dialog.querySelector('[data-sf-buyer]');
 const say = (text, error = false) => { message.textContent = text; message.className = error ? 'sf-error' : ''; };
 const reasonList = (reasons = []) => `<ul>${reasons.map((r) => `<li>${esc(r.message || r.code)}</li>`).join('')}</ul>`;
 const lineList = (lines = []) => `<ul>${lines.map((l) => `<li>${esc(l.name)}: ${esc(l.quantity)} ${esc(l.salesUnitLabel)} — ${money(l.lineNet)}${l.substituteFor ? `, korvaa tuotteen ${esc(l.substituteFor)}` : ''}</li>`).join('')}</ul>`;
+const orderReference = (o) => localShop && /^whatsapp:WD-/.test(o.buyerReference || '') ? 'Tilattu tilausapurissa.' : o.buyerReference || '';
 const load = async () => {
-  const state = await api('/console/state'); buyers = state.buyers; orders = state.orders;
+  const [state, context] = await Promise.all([api('/console/state'), localShop ? api('/api/local-shop') : null]);
+  buyers = context ? state.buyers.filter((b) => context.accounts.some((a) => a.buyerId === b.id)) : state.buyers;
+  orders = state.orders;
   let savedBuyer; try { savedBuyer = localStorage.getItem('aimo.storefront.buyer'); } catch {}
-  const prior = buyer?.id || flow.pending?.buyerId || savedBuyer;
-  buyer = buyers.find((b) => b.id === prior) || buyers[0];
-  if (!buyer) throw new Error('Ostajatietoja ei saatu ladattua.');
+  const prior = buyer?.id || flow.pending?.buyerId || savedBuyer || context?.defaultBuyerId;
+  buyer = buyers.find((b) => b.id === prior) || buyers.find((b) => b.id === context?.defaultBuyerId) || buyers[0];
+  if (!buyer) {
+    select.innerHTML = ''; content.innerHTML = '';
+    throw new Error(localShop ? 'Lähetä tilausapurille ensimmäinen viesti. Testiasiakas ilmestyy tähän automaattisesti.' : 'Ostajatietoja ei saatu ladattua.');
+  }
   select.innerHTML = buyers.map((b) => `<option value="${esc(b.id)}"${b.id === buyer.id ? ' selected' : ''}>${esc(b.name)}</option>`).join('');
-  dialog.querySelector('[data-sf-mode]').textContent = `${state.mode.api === 'live' ? 'Hinnat ja saatavuus Valion mock-rajapinnasta.' : 'Simuloidut hinnat ja saatavuus.'} Tilaukset tallennetaan demoon. Maksamista ei ole kytketty.${state.clock?.simulated ? ' Käytössä on demon simuloitu kello.' : ''}`;
+  if (context) {
+    const account = context.accounts.find((a) => a.buyerId === buyer.id);
+    const company = document.querySelector('.account .customer'); const person = document.querySelector('.account .user-name');
+    if (company) company.textContent = account.name;
+    if (person) person.textContent = account.personName;
+  }
+  dialog.querySelector('[data-sf-mode]').textContent = `${localShop ? 'Paikallinen testikauppa. Tilausapurissa hyväksymäsi tilaus näkyy tässä samalla tilausnumerolla. ' : ''}${state.mode.api === 'live' ? 'Hinnat ja saatavuus Valion mock-rajapinnasta.' : 'Simuloidut hinnat ja saatavuus.'} Tilaukset tallennetaan demoon. Maksamista ei ole kytketty.${state.clock?.simulated ? ' Käytössä on demon simuloitu kello.' : ''}`;
 };
 function showQuote() {
   view = 'cart';
@@ -49,7 +63,7 @@ function showQuote() {
 function showOrders() {
   view = 'orders';
   const own = orders.filter((o) => o.buyerId === buyer.id);
-  content.innerHTML = `<button type="button" data-sf="refresh">Päivitä tilaukset</button>${own.length ? own.map((o) => `<article><h3>${esc(labels[o.status] || o.status)} — ${esc(o.orderId)}</h3><p>${esc(o.buyerReference || '')} Toimitus ${esc(o.deliveryDate || '')}, ${money(o.totals?.net || 0)} (alv 0 %)</p>${lineList(o.lines)}${reasonList(o.reasons)}${o.status === 'pending_approval' || o.pendingAddition ? `<button type="button" data-sf="approve" data-order="${esc(o.orderId)}">Hyväksy ${o.pendingAddition ? 'lisäys' : 'tilaus'}</button> <button type="button" data-sf="reject" data-order="${esc(o.orderId)}">Hylkää ${o.pendingAddition ? 'lisäys' : 'tilaus'}</button>${o.pendingAddition ? lineList(o.pendingAddition.lines) + reasonList(o.pendingAddition.reasons) : ''}` : ''}<p><button type="button" data-sf="audit" data-order="${esc(o.orderId)}">Näytä päätösketju</button></p><div data-audit="${esc(o.orderId)}"></div></article>`).join('') : '<p>Ei vielä tilauksia tälle ostajalle.</p>'}`;
+  content.innerHTML = `<button type="button" data-sf="refresh">Päivitä tilaukset</button>${own.length ? own.map((o) => `<article><h3>${esc(labels[o.status] || o.status)} — ${esc(o.orderId)}</h3><p>${esc(orderReference(o))} Toimitus ${esc(o.deliveryDate || '')}, ${money(o.totals?.net || 0)} (alv 0 %)</p>${lineList(o.lines)}${reasonList(o.reasons)}${o.status === 'pending_approval' || o.pendingAddition ? `<button type="button" data-sf="approve" data-order="${esc(o.orderId)}">Hyväksy ${o.pendingAddition ? 'lisäys' : 'tilaus'}</button> <button type="button" data-sf="reject" data-order="${esc(o.orderId)}">Hylkää ${o.pendingAddition ? 'lisäys' : 'tilaus'}</button>${o.pendingAddition ? lineList(o.pendingAddition.lines) + reasonList(o.pendingAddition.reasons) : ''}` : ''}<p><button type="button" data-sf="audit" data-order="${esc(o.orderId)}">Näytä päätösketju</button></p><div data-audit="${esc(o.orderId)}"></div></article>`).join('') : '<p>Ei vielä tilauksia tälle ostajalle.</p>'}`;
 }
 function showMandate() {
   view = 'mandate'; const m = buyer.mandate;
@@ -65,13 +79,14 @@ async function act(work) {
   finally { busy = false; dialog.removeAttribute('aria-busy'); }
 }
 launcher.addEventListener('click', () => open());
-select.addEventListener('change', () => { if (busy) { select.value = buyer.id; return; } buyer = buyers.find((b) => b.id === select.value); try { localStorage.setItem('aimo.storefront.buyer', buyer.id); } catch { /* preference only */ } say(''); choices = []; view === 'cart' ? showQuote() : view === 'mandate' ? showMandate() : showOrders(); });
+select.addEventListener('change', () => { if (busy) { select.value = buyer?.id || ''; return; } buyer = buyers.find((b) => b.id === select.value); if (!buyer) return; try { localStorage.setItem('aimo.storefront.buyer', buyer.id); } catch { /* preference only */ } say(''); choices = []; view === 'cart' ? showQuote() : view === 'mandate' ? showMandate() : showOrders(); if (localShop) act(load); });
 dialog.addEventListener('change', (event) => { if (event.target.dataset.sfChoice !== undefined) { choices[Number(event.target.dataset.sfChoice)] = Number(event.target.value); showQuote(); } });
 dialog.addEventListener('click', (event) => {
   const b = event.target.closest('[data-sf]'); if (!b || busy) return;
   act(async () => {
     const action = b.dataset.sf; say('');
     if (action === 'close') dialog.close();
+    if (!buyer && !['close', 'orders', 'refresh'].includes(action)) return;
     if (action === 'cart') showQuote();
     if (action === 'orders' || action === 'refresh') { await load(); showOrders(); }
     if (action === 'mandate') showMandate();
@@ -88,3 +103,9 @@ dialog.addEventListener('click', (event) => {
 });
 window.addEventListener('aimo:cart-change', () => { if (dialog.open && view === 'cart' && !busy) showQuote(); });
 window.addEventListener('aimo:order-checkout', () => open('cart'));
+if (localShop) {
+  setInterval(() => {
+    if (dialog.open && view === 'orders' && !busy && !document.hidden) act(async () => { await load(); showOrders(); say(''); });
+  }, 3000);
+  if (new URL(location.href).searchParams.get('shop') === 'orders') open();
+}

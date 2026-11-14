@@ -14,7 +14,7 @@ import { handleChat, addProduct, optionCard } from './agents/fast.mjs';
 import { evaluate, activeLines, setQty, removeLine, decide, applyQuote, findLine, fmtQty, fmtMoney, DEFAULT_RULES, normalizeRules } from './proposal.mjs';
 import { subscribe } from './bus.mjs';
 import { handleGateway, bootGateway } from './gateway/http.mjs';
-import { ledger as gatewayLedger } from './gateway/store.mjs'; // Aimo Agent Gateway: /v1, /mcp, /console, /.well-known, /openapi.json
+import { ledger as gatewayLedger, buyers as gatewayBuyers } from './gateway/store.mjs'; // Aimo Agent Gateway: /v1, /mcp, /console, /.well-known, /openapi.json
 import { serveImage } from './images.mjs';
 import { staticAssetHeaders } from './static-assets.mjs';
 import { orderMode, setOrderMode } from './mode.mjs';
@@ -25,9 +25,14 @@ import { searchStorefront, reviewStorefront, validDeliveryDate } from './storefr
 import { analyzeRecipeSource, recipeProducts } from './recipe-import.mjs';
 import { prepareCheckout, confirmCheckout } from './storefront-checkout.mjs';
 import { handleAssistantChat, assistantStatus } from './assistant.mjs'; // Tilausapuri: Danielin MCP-agentti sivulla /assistant.html
+import { createLocalShop } from './local-shop.mjs';
 
-import { createConfiguredWhatsApp } from './whatsapp/runtime.mjs';
-const whatsapp = process.env.WHATSAPP_ENABLED === 'true' ? createConfiguredWhatsApp() : null;
+import { createConfiguredWhatsApp, whatsappDbPath } from './whatsapp/runtime.mjs';
+const embeddedStorefront = process.env.AIMO_EMBEDDED_STOREFRONT === 'true';
+const localShop = embeddedStorefront ? createLocalShop({
+  whatsappDb: whatsappDbPath(), defaultPhone: process.env.WHATSAPP_DEMO_PHONE, buyers: () => gatewayBuyers.all(),
+}) : null;
+const whatsapp = !localShop && process.env.WHATSAPP_ENABLED === 'true' ? createConfiguredWhatsApp() : null;
 
 const PUBLIC = path.join(ROOT, 'public');
 
@@ -315,9 +320,10 @@ const routes = {
   },
 };
 
-const server = http.createServer(async (req, res) => {
+export async function handleStorefrontRequest(req, res) {
   const t0 = performance.now();
   const url = new URL(req.url, 'http://localhost');
+  if (localShop?.handle(req, res, url)) return;
   if (['/agent', '/agent/', '/agent.html'].includes(url.pathname)) {
     url.searchParams.set('shop', 'agent');
     res.writeHead(302, { location: '/' + url.search, 'cache-control': 'no-store' }); res.end(); return;
@@ -332,6 +338,9 @@ const server = http.createServer(async (req, res) => {
     const file = path.normalize(path.join(PUBLIC, url.pathname === '/' ? 'index.html' : url.pathname));
     if (!file.startsWith(PUBLIC) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
     const headers = staticAssetHeaders(file, fs.statSync(file));
+    if (localShop && path.extname(file) === '.html') {
+      res.writeHead(200, headers); res.end(localShop.decorateHtml(fs.readFileSync(file, 'utf8'))); return;
+    }
     if (headers.etag && req.headers['if-none-match'] === headers.etag) { res.writeHead(304, headers); return res.end(); }
     res.writeHead(200, headers);
     fs.createReadStream(file).pipe(res);
@@ -339,7 +348,8 @@ const server = http.createServer(async (req, res) => {
     console.error(err);
     if (!res.headersSent) json(res, 500, { error: String(err.message || err) }); else res.end();
   }
-});
+}
+const server = http.createServer(handleStorefrontRequest);
 
 async function boot() {
   const cat = loadCatalog();
@@ -373,4 +383,4 @@ async function boot() {
     if (now.getHours() === 2 && now.getMinutes() === 0 && done && !deepState.running) runDeep({ reason: 'ajastettu yöajo', deliveryDate: defaultDeliveryDate() }).catch((e) => console.error('[deep]', e));
   }, 60_000).unref();
 }
-boot().catch((err) => { console.error(err); process.exit(1); });
+if (!embeddedStorefront) boot().catch((err) => { console.error(err); process.exit(1); });

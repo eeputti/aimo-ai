@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+
+## 14.11.2026 — tilausapurin tilaus näkyy paikallisessa verkkokaupassa (Codex)
+
+**Käyttäjän tarve:** tilaus pitää saada verkkokauppaan. Oikean Aimo-testitilin numeroliitokseen ei päästä käsiksi, joten localhost sopii ensimmäiseksi kohteeksi. Toteutettu nykyinen verkkokauppanäkymä WhatsApp-palvelimen omaan localhost-osoitteeseen, samalla testiasiakkaalla ja samalla gatewayn tilauksella. Oikeaa Valio-tilausta tai tuotantotilin liittämistä ei väitetä tehdyksi.
+
+- `server/whatsapp-server.mjs` lataa nykyisen kaupan HTTP-käsittelijän paikalliselle pyynnölle tilaustilassa. `server/index.mjs` voidaan käyttää upotettuna ilman omaa palvelinta, toista WhatsApp-workeria tai keittiön alustus-/malliajoja. Molemmilla kanavilla on yksi gateway-yhteys, allekirjoittaja ja tilauskirjaus; tilausta ei kopioida toiseen kantaan.
+- `server/local-shop.mjs`: localhost-, alkuperä- ja välityspalvelinrajaukset, aktiivisten testiliitosten vain luku -konteksti ja nollaus-/testiskenaarioreittien esto. `public/storefront-agent.js` valitsee saman testiasiakkaan, näyttää sen otsakkeessa ja päivittää avoimen tilausnäkymän kolmessa sekunnissa. Selaindemolle oma valinta, linkki apuriin. Käyttö `http://localhost:4749/?shop=orders`; ohje `docs/local-shop.md`.
+- **Varmennus:** oikean standalone-prosessin HTTP-testit **2/2**, kohdistetut integraatio-/preflight-/kori-/tilauspolkutestit **34/34**. Selaimessa omilla väliaikaisilla kannoilla ja simuloiduilla tuotteilla: apurin 20 l maitoa + 5 l kermaa → valinta → TILAA → sama **AGW-20261114-0001**, 221,45 euroa, ilmestyi automaattisesti kauppaan; ei selaimen virheitä. Testi varmistaa myös uusintojen yhden tilauksen, hyväksynnän, päätösketjun, nollauseston, ulkoisten pyyntöjen torjunnan ja vain lukevan tilan säilymisen. Syntaksit ja oma diff tarkistettu.
+- **Yhteisen testisarjan raja:** ensimmäinen `npm test` 172/174. Oma health-skeeman yhteensopivuusvirhe korjattiin ja preflight-varmennus sen jälkeen läpi. Toinen virhe on rinnakkaisen keskeneräisen moniviestisen dialogin ja vanhan yhden vastauksen e2e-odotuksen ristiriita; ilmoitettu sen omistajalle, ei korjattu hänen tiedostojaan päällekkäin.
+
+**Käyttöönotto seuraavaksi:** tässä työssä ei muutettu nykyistä 4749-prosessia, .env-asetuksia, Metaa tai päädemokantoja. Uudet reitit tarvitsevat käyttöönoton omistajan yhden hallitun restartin commitoidun koodin ja muiden valmiiden WhatsApp-muutosten jälkeen. Varsinainen puhelinvastaus riippuu edelleen Metan lähetysoikeudesta. Oma tarkka raportti `docs/parallel/local-shop.md`; muiden keskeneräiset lähteet jätetään heidän committeihinsa.
+
 ## 14.11.2026 — ostoslista ranskalaisilla viivoilla (Codex)
 
 - Käyttäjän pyyntö: ostoslistan rivit näkyvät ranskalaisilla viivoilla pallukoiden sijaan. Selaimen tilausapurin Markdown-muotoilija muodostaa listoista HTML-luetteloita; `public/assistant.css` asettaa niiden listamerkiksi tavallisen `-`-viivan. Rivien sisältö, lihavoinnit ja luettelorakenne säilyvät.
