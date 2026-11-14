@@ -2,6 +2,17 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — verkkokaupan korvaajan hyväksyntä säilyttää korin virheessä (Codex)
+
+**Rajaus ja koordinointi:** käyttäjä pyysi seuraamaan muiden sessioiden työtä ja edistämään vapaata osuutta ilman ristiriitoja. Claudelle jäivät oikean mallin ja Valio-mock-API:n keskustelutestit, niistä löytyvät korjaukset, pitkien vastausten pilkkominen ja WhatsAppin selainvarademo. Muiden Codex-chattien Meta-/käyttöönottotyö ja käynnistyspaketti tarkistettiin chat-työkaluilla ja koordinointitaululta. Oma korityö varattiin ennen muutoksia. Yhteisen Gitin kesken ollutta yhdistämistä ei muokattu; oma tallennus odotti sen valmistumista.
+
+- **Korjattu virhe:** korvaajan hyväksyntä poisti vanhan rivin ja korissa jo olevan korvaajan ennen yhdistetyn määrän tarkistamista. Hylätty lisäys saattoi hävittää molemmat rivit myös selaimen tallennuksesta. Uusi `aimoCart.replace` validoi koko korvauksen ensin ja julkaisee yhden koripäivityksen. Virhe säilyttää rivit; onnistuminen yhdistää määrät kerran. Saman tuotteen hinnan/määrän päivitys ei lisää määrää itseensä.
+- **Rinnakkaiset korimuutokset:** hyväksyntä sidotaan alkuperäiseen päivään ja korisisältöön. Kesken asynkronisen operaation muuttuneita määriä tai valittua päivää ei ylikirjoiteta. Muutokset tiedostoissa `public/storefront-cart-store.js` ja `public/cart-workflow.js`.
+- **Tarkistukset:** korin, tilauspolun ja tarkistettujen lisäysten testit **29/29**. Kolme uutta regressiotestiä kattavat onnistumisen/tallennuksen, validointivirheet ja määrä-/päiväkilpailun. Laajennettu `scripts/check-storefront-order.mjs` läpi oikeassa headless-Chromessa: korvaajan virhe → rivit säilyvät päivityksessä; onnistuminen → yksi yhdistetty rivi; tarjous → hyväksynnän odotus → vahvistus → ehjä päätösketju → valtuuden tallennus → tilaus etusivulla. Ei JavaScript-virheitä. Syntaksit ja oma diff-tarkistus läpi.
+- **Eristys ja rajat:** testillä oma simuloitu palvelin satunnaisessa portissa, väliaikaiset kannat/allekirjoitusavain ja tyhjät malli-/Valio-avaimet; testipalvelimen WhatsApp-käynnistys erikseen estetty. Nykyisiin palvelimiin, Metaan tai tilauskantoihin ei koskettu. Koko testisarjaa ei ajettu muiden keskeneräisten moduulimuutosten päälle. Tarkka raportti `docs/parallel/storefront-finalization.md`.
+
+**Seuraava askel:** WhatsAppin oikea puhelinvastaus ja live-mockin/mallin keskusteluketju varmennetaan niitä omistavissa sessioissa. Tämä korikorjaus ei ratkaise Metan lähetysestoa.
+
 ## 14.11.2026 — WhatsApp-tilauskytkennän sovittu yksi restart valmis (Codex)
 
 **Valmis käyttöönotto-osuus:** Clauden `e52b00b` ja `4a0b358` löytyivät päivittyneestä Gitistä ja raportti luettiin. Kytkennän eristetyt testit 6/6 läpi. `.env.whatsapp.ordering-pending` aktivoitiin `.env.whatsapp`:ksi portilla 4749 (0600), alkuperäiset eristetyt kantapolut ja allekirjoitusavain säilyttäen. Snapshot-worker pysäytettiin ja projektin commitoitu `npm run whatsapp` käynnistettiin kerran. Uusittu Meta-token latautuu `.env`:stä ilman overlay-ohitusta.

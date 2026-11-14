@@ -212,3 +212,54 @@ test('an asynchronous batch refuses a basket changed after its availability chec
   await assert.rejects(cart.addMany([{ product: { id: 'one', name: 'One', price: 2 }, qty: 2 }], cart.get().selectedDate, { lines: old }), /muuttui/);
   assert.equal(cart.lines()[0].qty, 1);
 });
+
+test('accepting a replacement merges once, refreshes its price and persists one complete change', async () => {
+  const f = await fixture(new Map(), { reference: false });
+  const { cart } = f;
+  await cart.add({ id: 'old', name: 'Vanha tuote', price: 1 }, 3);
+  await cart.add({ id: 'replacement', name: 'Korvaaja', price: 2 }, 4);
+  await cart.add({ id: 'other', name: 'Muu tuote' }, 1, '2026-11-20');
+  cart.select('2026-11-16');
+  const events = f.events.length;
+  await cart.replace('old', { id: 'replacement', name: 'Korvaaja', price: 3, substitutionAccepted: true }, 2);
+  assert.equal(f.events.length, events + 1);
+  assert.equal(cart.lines().length, 1);
+  assert.equal(cart.lines()[0].qty, 6);
+  assert.equal(cart.lines()[0].price, 3);
+  assert.equal(cart.lines()[0].substitutionAccepted, true);
+  const reloaded = await fixture(f.storage, { reference: false });
+  assert.equal(JSON.stringify(reloaded.cart.get()), JSON.stringify(cart.get()));
+  assert.equal(cart.lines('2026-11-20')[0].qty, 1);
+  await cart.replace('replacement', { ...cart.lines()[0], price: 4 }, 5);
+  assert.equal(cart.lines()[0].qty, 5, 'updating the same product replaces its quantity');
+});
+
+test('a failed replacement never removes the original or an existing replacement', async () => {
+  const f = await fixture(new Map(), { reference: false });
+  const { cart } = f;
+  await cart.add({ id: 'old', name: 'Vanha tuote' }, 3);
+  await cart.add({ id: 'replacement', name: 'Korvaaja' }, 999999);
+  const before = JSON.stringify(cart.get()); const events = f.events.length;
+  await assert.rejects(cart.replace('old', { id: 'replacement', name: 'Korvaaja' }, 1), /enimmäismäärän/);
+  await assert.rejects(cart.replace('old', { id: 'replacement' }, 1), /Tarkista/);
+  await assert.rejects(cart.replace('old', { id: 'replacement', name: 'Korvaaja' }, -1), /Tarkista/);
+  await assert.rejects(cart.replace('missing', { id: 'replacement', name: 'Korvaaja' }, 1), /ei löydy/);
+  assert.equal(JSON.stringify(cart.get()), before);
+  assert.equal(f.events.length, events);
+  assert.equal(JSON.stringify((await fixture(f.storage, { reference: false })).cart.get()), before);
+});
+
+test('a replacement refuses a quantity or delivery-day edit during its asynchronous update', async () => {
+  for (const edit of [cart => cart.setQuantity('old', 7), cart => cart.select('2026-11-20')]) {
+    const { cart } = await fixture(new Map(), { reference: false });
+    await cart.add({ id: 'old', name: 'Vanha tuote' }, 3);
+    const date = cart.get().selectedDate;
+    const pending = cart.replace('old', { id: 'replacement', name: 'Korvaaja' }, 2, date, { lines: JSON.stringify(cart.lines(date)) });
+    edit(cart);
+    const before = JSON.stringify(cart.get());
+    await assert.rejects(pending, /muuttui/);
+    assert.equal(JSON.stringify(cart.get()), before);
+    assert.equal(cart.lines(date)[0].id, 'old');
+    assert.equal(cart.lines('2026-11-20').length, 0);
+  }
+});

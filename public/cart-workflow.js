@@ -59,13 +59,11 @@ async function runReview() {
   finally { busy = false; paint(); }
 }
 async function applyProduct(old, product, qty, extra = {}) {
+  const date = cart.get().selectedDate;
+  const expected = { lines: JSON.stringify(cart.lines(date)) };
   applying = true;
   try {
-    // Vanha rivi poistuu vasta käyttäjän hyväksynnällä. Määrä ei tuplaannu jo korissa olevaan korvaajaan.
-    const prior = cart.lines().find((p) => p.id === product.id && p.id !== old.id);
-    cart.remove(old.id);
-    if (prior) cart.remove(prior.id);
-    await cart.add({ ...old, ...product, unit: product.unitLabel || old.unit, availableFrom: product.availability?.deliveryDate, taxUnknown: product.vat == null, availabilityNote: null, image: `/img/${encodeURIComponent(product.id)}`, ...extra }, qty + (prior?.qty || 0));
+    await cart.replace(old.id, { ...old, ...product, unit: product.unitLabel || old.unit, availableFrom: product.availability?.deliveryDate, taxUnknown: product.vat == null, availabilityNote: null, image: `/img/${encodeURIComponent(product.id)}`, ...extra }, qty, date, expected);
     review = null;
   } finally { applying = false; }
   await runReview();

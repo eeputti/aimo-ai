@@ -98,6 +98,20 @@
     async add(product, qty = 1, date = state.selectedDate) {
       return this.addMany([{ product, qty }], date);
     },
+    async replace(id, product, qty, date = state.selectedDate, expected = null) {
+      await ready;
+      if (expected && (state.selectedDate !== date || JSON.stringify(lines(date)) !== expected.lines)) throw new Error('Ostoskori muuttui tarkistuksen aikana. Tarkista tuoterivit uudelleen.');
+      if (!validDate(date) || !lines(date).some((p) => p.id === id)) throw new Error('Korvattavaa tuotetta ei löydy.');
+      if (!product?.id || !product.name || !Number.isFinite(number(qty)) || amount(number(qty)) <= 0 || number(qty) > 999999) throw new Error('Tarkista tuote ja määrä.');
+      // Validate and merge a copy before publishing one basket change.
+      const combined = copy(lines(date)).filter((p) => p.id !== id);
+      const existing = combined.find((p) => p.id === String(product.id));
+      const total = amount((existing?.qty || 0) + number(qty));
+      if (total > 999999) throw new Error('Yhdistetty määrä ylittäisi enimmäismäärän 999 999.');
+      if (existing) Object.assign(existing, copy(product), { id: String(product.id), qty: total });
+      else combined.push({ ...copy(product), id: String(product.id), qty: total });
+      state.carts[date] = combined; save();
+    },
     async addMany(entries, date = state.selectedDate, expected = null) {
       await ready;
       if (expected && (state.selectedDate !== date || JSON.stringify(lines(date)) !== expected.lines)) throw new Error('Ostoskori muuttui tarkistuksen aikana. Paina lisäystä uudelleen.');

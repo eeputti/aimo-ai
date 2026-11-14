@@ -12,7 +12,7 @@ const { chromium } = await import(pathToFileURL(process.env.AIMO_PLAYWRIGHT_MODU
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-order-browser-'));
 const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'server/index.mjs'], {
   cwd: new URL('..', import.meta.url),
-  env: { ...process.env, PORT: '0', AIMO_DB: path.join(dir, 'kitchen.db'), GATEWAY_DB: path.join(dir, 'gateway.db'), VALIO_API_KEY: '', ANTHROPIC_API_KEY: '', DEMO_NOW: '2026-11-14T10:00:00+02:00', GATEWAY_PRIVATE_KEY_PEM: crypto.generateKeyPairSync('ed25519').privateKey.export({ format: 'pem', type: 'pkcs8' }) },
+  env: { ...process.env, PORT: '0', AIMO_DB: path.join(dir, 'kitchen.db'), GATEWAY_DB: path.join(dir, 'gateway.db'), WHATSAPP_ENABLED: 'false', VALIO_API_KEY: '', ANTHROPIC_API_KEY: '', DEMO_NOW: '2026-11-14T10:00:00+02:00', GATEWAY_PRIVATE_KEY_PEM: crypto.generateKeyPairSync('ed25519').privateKey.export({ format: 'pem', type: 'pkcs8' }) },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
 let browser; let page; let log = '';
@@ -30,6 +30,31 @@ try {
   await page.locator('.product-card .cart-button:not(.notify)').first().click();
   await page.getByText('Lisätty ostoskoriin.', { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.aimoCart.lines().length), 1);
+  // A replacement must not delete either row if merging exceeds the cart limit.
+  await page.evaluate(async () => {
+    const cart = window.aimoCart; await cart.ready; cart.clear(); cart.select('2026-11-16');
+    await cart.add({ id: '464306', name: 'Alkuperäinen maito', price: 1, vat: 13.5, unit: 'kpl' }, 3);
+    await cart.add({ id: '463335', name: 'Korvaava maito', price: 2, vat: 13.5, unit: 'kpl' }, 999999);
+  });
+  await page.route('**/api/storefront/review', (route) => {
+    const { lines } = route.request().postDataJSON();
+    return route.fulfill({ json: { ok: !lines.some((l) => l.id === '464306'), lines: lines.map((l) => l.id === '464306'
+      ? { id: l.id, ok: false, code: 'INSUFFICIENT_STOCK', alternatives: [{ id: '463335', name: 'Korvaava maito', price: 3, vat: 13.5, qty: 2, unitLabel: 'kpl' }] }
+      : { id: l.id, ok: true, product: { ...l, name: 'Korvaava maito', price: 3, vat: 13.5, unitLabel: 'kpl' } }) } });
+  });
+  await page.goto(`${base}/cart.html`);
+  await page.getByRole('button', { name: 'Tarkista tuoterivit ja korvaajat', exact: true }).click();
+  await page.getByRole('button', { name: 'Hyväksy korvaaja', exact: true }).click();
+  await page.getByText('Yhdistetty määrä ylittäisi enimmäismäärän 999 999.', { exact: true }).waitFor();
+  assert.deepEqual(await page.evaluate(() => window.aimoCart.lines().map((p) => [p.id, p.qty])), [['464306', 3], ['463335', 999999]]);
+  await page.reload();
+  assert.equal(await page.evaluate(async () => { await window.aimoCart.ready; return window.aimoCart.lines().length; }), 2);
+  await page.evaluate(() => window.aimoCart.setQuantity('463335', 4));
+  await page.getByRole('button', { name: 'Tarkista tuoterivit ja korvaajat', exact: true }).click();
+  await page.getByRole('button', { name: 'Hyväksy korvaaja', exact: true }).click();
+  await page.waitForFunction(() => window.aimoCart.lines().length === 1 && window.aimoCart.lines()[0].qty === 6);
+  assert.equal(await page.evaluate(() => window.aimoCart.lines()[0].price), 3);
+  await page.unroute('**/api/storefront/review');
   // A catalogue product, instead of a reference product absent from the challenge data.
   await page.evaluate(async () => { await window.aimoCart.ready; window.aimoCart.clear(); window.aimoCart.select('2026-11-16'); await window.aimoCart.add({ id: '464306', name: 'Maito', price: null, unit: 'kpl' }, 2); });
   await page.goto(`${base}/cart.html`);
@@ -59,7 +84,7 @@ try {
   await page.locator('.sf-agent').getByRole('heading', { name: /Vahvistettu/ }).waitFor();
   // Check that the existing header still displays the actual basket after module loading.
   assert.match(await page.locator('.header-actions').innerText(), /Ostoskori/);
-  console.log('PASS: storefront card → basket → signed quote → pending approval → confirmed → audit → mandate → homepage orders; no browser errors.');
+  console.log('PASS: replacement failure preserves both rows and reload; replacement success merges once; storefront card → basket → signed quote → pending approval → confirmed → audit → mandate → homepage orders; no browser errors.');
 } catch (error) {
   console.error(await page?.locator('body').innerText().catch(() => 'No page available'));
   throw error;
