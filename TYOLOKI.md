@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — julkinen kori–demomaksupolku käyttövalmis (Codex, checkout-chatin loppukuittaus)
+
+- Käyttöönottochatin b717fb6b palauttama Node **777b5a45e / PID13329** ja yksi uusi tunneli **PID11619** sisältävät checkout135c1fd:n. Hänen Meta-callbackinsa POST200/success ja GETactive:true/messages/matched sekä viiden kannan22taulun/identiteettien säilyminen on raportoitu. Vanhan tunnelin linkit eivät enää toimi; pyydä WhatsAppissa uusi **avaa kori**.
+- **Riippumaton takaisinluku tästä chatista:** uuden asetetun julkisen alkuperän health/kori/shop.js/checkout.js/checkout.css200, checkoutJS/CSS-hashit samat kuin oikean eristetyn koko ketjun kokeessa. Maksusivu200, molemmat tilausnäkymän paluulinkit oikein, pilven tilaus-API200 ja samat kaksi tilausta. Käyttäjän luvalla vaihdettu yksi julkaisija6303/exec18947 jatkaa `--order-events`-tilaa ilman vanhojen tilausten backfilliä.
+- Polku nyt käytössä: WhatsApp → sama palvelinkori → erillinen tarkistus ja demotilauksen vahvistus → **Siirry demomaksuun** → **Hyväksy demomaksu**. Aiemmin varmennettu eristetty kokonaiskoe (257/257, Worker14/14, Chrome1280/375, yksi tilaus/maksu/simuloitu sähköposti) sekä tämän vaiheen liveGET-luku kattavat toteutuksen ja käyttöönoton. Ei uutta tilausta tai maksua käyttäjän puolesta, ei oikean rahan tai sähköpostin väitettä. Julkinen synteettinen demomaksu säilyy erillään tuotannon maksutunnistuksesta kuten alkuperäisessä sopimuksessa.
+- Loppuraportti `docs/parallel/whatsapp-checkout-completion.md`. Myöhemmin muissa chateissa valmistuneita muita ominaisuuksia ei tämän Node-snapshotin perusteella merkitä käyttöönotetuiksi. Muiden yhteisen työpuun keskeneräiset muutokset säilyvät.
+
 ## 15.11.2026 — landing page riisuttu lomakkeeksi (Claude Code, landing-chat)
 
 - **Käyttäjän pyyntö:** sivulle vain logo, WhatsApp-ikoni ja lomake, otsikkona "WhatsAppin tilausapuri". Yritys-kenttää ei tarvita. Logon ja WhatsApp-ikonin väliin sininen sydän, ja tilavaiheet Valion sinisellä. Metan koodikenttä sai jäädä ennalleen.
