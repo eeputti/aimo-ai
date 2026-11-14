@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — tilauskeskustelu kytketty WhatsApp-kanavaan (Claude Code)
+
+**Käyttäjän pyyntö:** jatka tilauskeskustelun kytkentää, tarkista työpuun aiempi kytkentäehdotus, testaa ja vie GitHubiin. Codex hoitaa Metan lähetyseston ja restartin. Tässä työvaiheessa ei muutettu Meta-asetuksia, käynnistetty palvelinta, lähetetty viestejä tai koskettu `.env`-tiedostoihin ja käynnissä oleviin kantoihin.
+
+- **Ehdotus tarkistettu ja otettu pohjaksi:** alkuperäisen testinumerochatin (Codex) commitoimaton ehdotus on tässä commitissa: `server/whatsapp/ordering.mjs` (testiasiakas → asiakaskonteksti, tuore oikeustarkistus numeroliitoksesta, oma demo-ostaja gatewayhin), `runtime.mjs` (`WHATSAPP_ORDERING_ENABLED=true` vaihtaa kanavan tilauskeskusteluun), `channel.mjs` (Metan viestitunniste ja lähetysaika keskustelulle, tilaustilan tervehdys- ja tukitekstit, luonnoskantojen siivous), `/healthz`-tila `ordering-demo` ja `.env.whatsapp`-lisälataus npm-skripteissä. Vain lukeva tila säilyy oletuksena ja ennallaan.
+- **Clauden muutokset ehdotukseen:** käynnistys vaatii oman `AIMO_DB`-kannan `GATEWAY_DB`:n lisäksi, koska tuotetyökalut avaavat keittiökannan hintavälimuistiksi `valioApi.mjs`:n kautta ja prosessi olisi muuten kirjoittanut verkkokaupan `data/aimo.db`:hen. Polut verrataan projektin juureen, ja puuttuva katalogi pysäyttää käynnistyksen. Epäonnistunut tilausvuoro yritetään uudelleen samalla viestitunnisteella sen sijaan, että ensimmäinen virhe vastaisi "Tilausta ei ole tehty"; viimeisen yrityksen vastaus ei väitä tilauksen tilasta mitään.
+- **Dokumentit:** `docs/whatsapp.md` (kohta Tilausdemo), `.env.example`, ja restartin asetukset Codexille `docs/parallel/1.md`:ssä.
+
+**Tarkistukset:** `npm test` 147/147. WhatsApp-, kytkentä- ja päästä päähän -testit 22/22; henkilön 4 aiemmin ohitettu `test/ordering-e2e.test.mjs` ajetaan nyt, koska kytkentämoduuli on olemassa (allekirjoitettu webhook → yksi gatewayn demotilaus, simuloitu rajapinta, säännöt, väliaikaiset kannat). Kaksi uutta tarkistusta: kantojen eristysvaatimus ja tilausvuoron uusinta. Kokoonpanon luonti kokeiltu ilman HTTP-palvelinta väliaikaisilla kannoilla. Ei oikeita Meta-, malli- tai Valio-kutsuja.
+
+**Ei testattu ja avoinna:** oikea WhatsApp-ketju tilaustilassa, mallitulkki ja oikea mock-API tämän kytkennän läpi. Käynnissä oleva 4749-palvelin on yhä vain lukeva snapshot: tilaustila tulee käyttöön vasta Codexin restartissa (`.env.whatsapp.ordering-pending` → `.env.whatsapp`, portti 4758 vaihdettava 4749:ään). Metan 131005-esto estää myös tilaustilan vastaukset puhelimeen. Pitkiä vastauksia ei pilkota useaksi viestiksi.
+
 ## 14.11.2026 — puhelintestin vastaanotto toimii, Meta palauttaa 131005 (Codex)
 
 **Varmennettu katkos:** käyttäjän oikea WhatsApp-tekstiviesti saapui 4749-palvelimen pysyvään jonoon ja kanava muodosti tukivastauksen. Kolme automaattista lähetysyritystä epäonnistuivat HTTP 403:een; Metan tarkempi virhe on 131005 / Access denied. Vastausta puhelimeen ei siis ole varmennettu eikä tilauspolkua otettu käyttöön.

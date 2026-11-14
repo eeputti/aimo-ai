@@ -44,6 +44,30 @@ Palvelin ei tarvitse verkkokaupan paikallista katalogia tai demo-tilauskantoja. 
 
 Käytä vain yhtä WhatsApp-worker-prosessia kutakin tietokantaa kohti. Älä aja erillistä WhatsApp-palvelinta ja sivuston WhatsApp-workeria samanaikaisesti samalla kannalla.
 
+### Tilausdemo (valinnainen)
+
+Oletuksena kanava on vain lukeva. `WHATSAPP_ORDERING_ENABLED=true` vaihtaa `npm run whatsapp` -palvelimen tilauskeskusteluun: luonnos, vaihtoehdot, yhteenveto ja `TILAA`-vahvistus, josta syntyy gatewayn demotilaus. Oikeaa Valio-tilausta ei lähetetä. Keskustelun kulku on tiedostossa [ordering-demo.md](ordering-demo.md).
+
+```bash
+WHATSAPP_ORDERING_ENABLED=true
+GATEWAY_DB=/var/data/whatsapp-gateway.db
+AIMO_DB=/var/data/whatsapp-kitchen.db
+WHATSAPP_DRAFT_DB=/var/data/whatsapp-drafts.db
+WHATSAPP_QUOTE_DB=/var/data/whatsapp-quotes.db
+WHATSAPP_DEMO_PHONE=<valinnainen: yksi Metassa vahvistettu testinumero>
+WHATSAPP_DEMO_PERSON=<valinnainen: testaajan nimi>
+```
+
+- `GATEWAY_DB` ja `AIMO_DB` ovat pakollisia, eivätkä ne saa osoittaa verkkokaupan `data/gateway.db`- tai `data/aimo.db`-kantaan. Palvelin ei käynnisty muuten. Näin demotilaukset ja hintavälimuisti pysyvät erillään verkkokaupan tilauksista. Tästä syystä tilausdemoa ei voi liittää `npm start` -palvelimeen asetuksella `WHATSAPP_ENABLED=true`.
+- `WHATSAPP_DRAFT_DB` ja `WHATSAPP_QUOTE_DB` ovat valinnaisia; oletukset ovat `data/whatsapp-drafts.db` ja `data/whatsapp-quotes.db`. Pidä ne pysyvällä levyllä, jotta luonnos säilyy uudelleenkäynnistyksessä.
+- Tilauspolku tarvitsee paikallisen katalogin (`npm run catalog`), toisin kuin vain lukeva kanava. `ASSISTANT_MCP_URL` ja `ASSISTANT_MCP_TOKEN` eivät ole tarpeen tässä tilassa.
+- `VALIO_API_KEY` tuo oikeat hinnat ja saatavuuden, ilman sitä ne simuloidaan. `ANTHROPIC_API_KEY` ottaa käyttöön mallitulkin vapaalle puhekielelle, ilman sitä viestit tulkitaan säännöillä. Gatewayn allekirjoitusavain luetaan muuttujasta `GATEWAY_PRIVATE_KEY_PEM` tai luodaan `data/`-hakemistoon.
+- `WHATSAPP_DEMO_PHONE` yhdistää yhden numeron testiasiakkaaksi käynnistyksessä ilman kutsukoodia. Olemassa oleva yhdistäminen säilyy. Muut numerot yhdistetään kohdan 4 kutsulla. Jokainen yhdistetty numero saa oman demo-ostajan (hyväksyntä vain poikkeuksissa, 6 000 € per tilaus). Tämä on testitunnistus, ei Valion asiakastunnistus.
+- Asetukset voi pitää erillisessä `.env.whatsapp`-tiedostossa: `npm run whatsapp` ja `npm run whatsapp:member` lukevat sen `.env`:n jälkeen, ja sen arvot ohittavat `.env`:n arvot. Tiedosto on Gitin ohittama.
+- `/healthz` palauttaa tilaksi `ordering-demo`, kun tilausdemo on päällä, muuten `read-only-test`.
+
+Jos viestin käsittely epäonnistuu, sama viesti yritetään uudelleen samalla Metan viestitunnisteella (enintään kolme kertaa, 30 ja 60 sekunnin välein). Tilauskeskustelu palauttaa uusinnalle saman tuloksen, joten uusinta ei tee toista tilausta.
+
 ## 3. Webhook
 
 Anna palvelimelle julkinen HTTPS-osoite. Paikalliseen kokeiluun käy esimerkiksi `cloudflared tunnel --url http://localhost:4748`; vaihtuva tunneliosoite pitää päivittää Metaan. Suoraan localhostiin Meta ei pääse.

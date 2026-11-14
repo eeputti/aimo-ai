@@ -1,4 +1,4 @@
-// Standalone WhatsApp service: no storefront catalogue or order databases required.
+// Standalone WhatsApp service. Ordering demo uses an isolated gateway database.
 import http from 'node:http';
 import { createConfiguredWhatsApp } from './whatsapp/runtime.mjs';
 
@@ -8,7 +8,7 @@ const server = http.createServer(async (req, res) => {
   if (await channel.handle(req, res, url)) return;
   if (req.method === 'GET' && url.pathname === '/healthz') {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
-    res.end(JSON.stringify({ ok: true, channel: 'whatsapp', mode: 'read-only-test' }));
+    res.end(JSON.stringify({ ok: true, channel: 'whatsapp', mode: process.env.WHATSAPP_ORDERING_ENABLED === 'true' ? 'ordering-demo' : 'read-only-test' }));
   } else { res.writeHead(404); res.end('Not found'); }
 });
 server.listen(Number(process.env.WHATSAPP_PORT || process.env.PORT || 4748), () => {

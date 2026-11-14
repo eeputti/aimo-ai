@@ -61,7 +61,7 @@ export function createMetaSender(settings, fetchImpl = fetch) {
   };
 }
 
-export function createWhatsAppChannel({ settings, store, chat, send, now = Date.now }) {
+export function createWhatsAppChannel({ settings, store, chat, send, now = Date.now, onPrune = () => {} }) {
   let busy = false; let stopped = false; let timer; let active = Promise.resolve();
   let lastPrune = now();
   const support = `Asiakaspalvelu: ${settings.supportContact}`;
@@ -82,22 +82,28 @@ export function createWhatsAppChannel({ settings, store, chat, send, now = Date.
         if (job.kind === 'pair') {
           const paired = store.pair(job.phone, job.text, job.id);
           if (paired) job.binding = paired.binding;
-          reply = paired ? `Testiyhteys yhdistetty: ${paired.person}, ${paired.company}. Voit kysyä tuotteita, hintoja ja toimitusaikoja. Tämä testiversio ei tee tilauksia.\n${support}`
+          reply = paired ? `Testiyhteys yhdistetty: ${paired.person}, ${paired.company}. ${settings.orderingDemo ? 'Kerro tuotteet ja määrät, niin kokoan demotilausluonnoksen. Oikeaa Valio-tilausta ei lähetetä.' : 'Voit kysyä tuotteita, hintoja ja toimitusaikoja. Tämä testiversio ei tee tilauksia.'}\n${support}`
             : 'Yhdistämiskoodi on virheellinen, käytetty tai vanhentunut, tai yrityksiä on liikaa. Pyydä ylläpitäjältä uusi koodi ja tarvittaessa odota 15 minuuttia.';
         } else if (!member || !job.binding) {
           reply = `Numeroasi ei ole yhdistetty asiakastiliin. Pyydä yrityksesi ylläpitäjältä yhdistämiskoodi ja lähetä: YHDISTA koodi\n${support}`;
         } else if (job.kind === 'unsupported') {
           reply = 'Lähetä enintään 4000 merkin tekstiviesti. Tämä testiversio ei käsittele kuvia, ääniviestejä tai liitteitä.';
         } else if (/^(apua|tuki|asiakaspalvelu|help)$/iu.test(job.text)) {
-          reply = `Olen Aimon tuoteapuri. Voin hakea tuotteita, hintoja ja toimitusaikoja. Kiireelliset toimitusongelmat ja tilausmuutokset hoitaa asiakaspalvelu.\n${support}`;
+          reply = `${settings.orderingDemo ? 'Olen Valio Aimo Tilausapurin demo. Kerro tarvitsemasi tuotteet ja määrät, niin kokoan hyväksyttävän luonnoksen.' : 'Olen Aimon tuoteapuri. Voin hakea tuotteita, hintoja ja toimitusaikoja.'} Kiireelliset toimitusongelmat ja tilausmuutokset hoitaa asiakaspalvelu.\n${support}`;
         } else {
           try {
-            const result = await chat({ messages: [...store.history(member.binding), { role: 'user', content: job.text }], channel: 'whatsapp' });
+            const result = await chat({ messages: [...store.history(member.binding), { role: 'user', content: job.text }], channel: 'whatsapp',
+              member, messageId: job.id, receivedAt: job.sent_at });
             reply = formatReply(result.text);
             if (!reply) throw new Error('EMPTY_REPLY');
             historyBinding = member.binding;
-          } catch {
-            reply = `Tuotehaku ei nyt onnistunut. Yritä hetken kuluttua uudelleen. Tilausta ei ole tehty.\n${support}`;
+          } catch (err) {
+            // Ordering turns are idempotent by Meta message id: retry the same turn instead of guessing whether
+            // an order was saved. Only the last attempt answers, and it makes no claim about the order.
+            if (settings.orderingDemo && job.attempts < 3) throw err;
+            reply = settings.orderingDemo
+              ? `Viestin käsittely ei nyt onnistunut. Luonnoksesi säilyy. Lähetä viesti hetken kuluttua uudelleen, niin näet tilanteen ennen kuin vahvistat mitään.\n${support}`
+              : `Tuotehaku ei nyt onnistunut. Yritä hetken kuluttua uudelleen. Tilausta ei ole tehty.\n${support}`;
           }
         }
         // Recheck after a slow model call: a revoked identity must not receive its result.
@@ -116,10 +122,10 @@ export function createWhatsAppChannel({ settings, store, chat, send, now = Date.
     processNext,
     start() {
       if (timer) return;
-      store.recover(); store.prune();
+      store.recover(); store.prune(); onPrune();
       timer = setInterval(() => {
         if (!busy) {
-          if (now() - lastPrune >= 3600_000) { store.prune(); lastPrune = now(); }
+          if (now() - lastPrune >= 3600_000) { store.prune(); onPrune(); lastPrune = now(); }
           active = processNext();
         }
       }, 500);

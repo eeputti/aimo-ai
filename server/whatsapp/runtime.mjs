@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { openWhatsAppStore } from './store.mjs';
 import { createMetaSender, createWhatsAppChannel } from './channel.mjs';
 import { replyToAssistant } from '../assistant.mjs';
+import { bootstrapDemoMember, createDemoOrderingChat, validateOrderingEnvironment } from './ordering.mjs';
 
 export const whatsappDbPath = () => process.env.WHATSAPP_DB || fileURLToPath(new URL('../../data/whatsapp.db', import.meta.url));
 export function whatsappSettings(env = process.env) {
@@ -16,7 +17,21 @@ export function whatsappSettings(env = process.env) {
 }
 export function createConfiguredWhatsApp() {
   const settings = whatsappSettings();
+  settings.orderingDemo = process.env.WHATSAPP_ORDERING_ENABLED === 'true';
+  if (settings.orderingDemo) validateOrderingEnvironment();
   const store = openWhatsAppStore(whatsappDbPath());
-  const channel = createWhatsAppChannel({ settings, store, chat: replyToAssistant, send: createMetaSender(settings) });
-  return { ...channel, async close() { await channel.stop(); store.close(); } };
+  let ordering;
+  if (settings.orderingDemo) {
+    bootstrapDemoMember(store);
+    ordering = createDemoOrderingChat({ store, phoneId: settings.phoneId,
+      draftDb: process.env.WHATSAPP_DRAFT_DB || fileURLToPath(new URL('../../data/whatsapp-drafts.db', import.meta.url)),
+      quoteDb: process.env.WHATSAPP_QUOTE_DB || fileURLToPath(new URL('../../data/whatsapp-quotes.db', import.meta.url)),
+    });
+  }
+  const channel = createWhatsAppChannel({ settings, store, chat: ordering?.chat || replyToAssistant,
+    onPrune: () => ordering?.prune(), send: createMetaSender(settings) });
+  return { ...channel, async close() {
+    try { await channel.stop(); await ordering?.close(); }
+    finally { store.close(); }
+  } };
 }
