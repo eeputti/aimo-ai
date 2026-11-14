@@ -1,0 +1,154 @@
+import test, { after } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-order-tools-'));
+process.env.AIMO_DB = path.join(dir, 'kitchen.db');
+process.env.GATEWAY_DB = path.join(dir, 'gateway.db');
+process.env.VALIO_API_KEY = '';
+process.env.ANTHROPIC_API_KEY = '';
+process.env.DEMO_NOW = '2026-11-14T10:00:00+02:00';
+const { createOrderingTools, draftHash, lineQuery } = await import('../server/order-tools/index.mjs');
+after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+const date = '2026-11-16';
+const customer = { customerId: 'c1', buyerId: 'b1', bindingVersion: 'v1', personName: 'Testi', permissions: { readProducts: true, placeOrders: true } };
+const line = (ref, extra = {}) => ({ ref, productTerm: 'maito', quantity: { value: 20, unit: 'L' }, claims: [], excludeAllergens: [], ...extra });
+const draftOf = (lines, extra = {}) => ({ id: 'd1', revision: 1, deliveryDate: date, lines, ...extra });
+const found = (id, labels = [], extra = {}) => ({ id, name: `Tuote ${id}`, qty: 2, unitLabel: 'ltk', litres: 10, price: 5, labels, availability: { deliveryDate: date, stock: 50 }, ...extra });
+
+// Injektoidut testivastaukset: ei katalogia, verkkoa tai gatewayn kantaa.
+function fakes(over = {}) {
+  const calls = { quote: [], order: [] }; let t = Date.parse('2026-11-14T08:00:00Z');
+  const products = { 1: { hasAllergenData: true, contains: ['AM'] }, 2: { hasAllergenData: true, contains: [] }, 3: { hasAllergenData: false, contains: [] } };
+  const tools = createOrderingTools({
+    now: () => t, product: (id) => products[id], buyer: (id) => (id === 'b1' ? { id } : null),
+    search: async () => [found('1', ['FREE_FROM_LACTOSE']), found('2'), found('3'), found('4')],
+    requestQuote: async (buyer, input) => { calls.quote.push(input); return { quoteId: `Q${calls.quote.length}`, needs: input.needs.map((n) => ({ ref: n.ref, excluded: [], options: [{ kind: 'exact', deliveryDate: input.deliveryDate, expiresAt: new Date(t + 900_000).toISOString(), cutoff: null, cutoffLabel: null, offer: `jws-${n.ref}`,
+      lines: [{ productId: n.candidates[0], name: `Tuote ${n.candidates[0]}`, quantity: 2, salesUnitLabel: 'ltk', covers: 20, unitPriceNet: 5, lineNet: 10, vatRate: 13.5, availability: { stockKnown: true } }] }] })) }; },
+    placeOrder: async (buyer, input) => { calls.order.push(input); return { status: 'confirmed', orderId: 'AGW-1', deliveryDate: date, totals: { net: 10 }, reasons: [] }; },
+    ...over,
+  });
+  return { tools, calls, tick: (ms) => { t += ms; } };
+}
+const approved = (draft, quoteId) => ({ customer, draft, quoteId, approval: { draftId: draft.id, revision: draft.revision, quoteId }, idempotencyKey: `wa-${draft.id}-r${draft.revision}` });
+
+test('suggest vaatii päivän ja määrän eikä näytä tuotteita ilman oikeutta', async () => {
+  const { tools } = fakes();
+  const missing = await tools.suggest({ customer, draft: draftOf([line('a', { quantity: null })], { deliveryDate: null }) });
+  assert.deepEqual(missing.issues.map((i) => i.code), ['DELIVERY_DATE_MISSING', 'QUANTITY_MISSING']);
+  assert.equal(missing.lines.length, 0);
+  const denied = await tools.suggest({ customer: { ...customer, permissions: {} }, draft: draftOf([line('a')]) });
+  assert.equal(denied.issues[0].code, 'NOT_PERMITTED');
+});
+
+test('suggest antaa enintään kolme vaihtoehtoa, pyytää tarkennuksen vain jakavasta väittämästä ja pitää allergiakiellon', async () => {
+  const { tools } = fakes();
+  const s = await tools.suggest({ customer, draft: draftOf([line('a')]) });
+  assert.equal(s.lines[0].options.length, 3);
+  assert.equal(s.lines[0].total, 4);
+  assert.deepEqual(s.lines[0].clarify, ['FREE_FROM_LACTOSE']); // 1/4 tilattavista on laktoosittomia
+  assert.deepEqual(s.lines[0].options[0], { productId: '1', name: 'Tuote 1', brand: null, salesUnits: 2, salesUnitLabel: 'ltk', covers: { value: 20, unit: 'L' }, unitPriceNet: 5, lineNet: 10, deliveryDate: date, stock: 50, labels: ['FREE_FROM_LACTOSE'], note: null, why: null });
+  const asked = await tools.suggest({ customer, draft: draftOf([line('a', { claims: ['FREE_FROM_LACTOSE'] })]) });
+  assert.deepEqual(asked.lines[0].clarify, []);
+  // Maidoton: tuote 1 sisältää maitoa, tuotteilta 3 ja 4 puuttuu allergeenitieto. Vain 2 kelpaa.
+  const dairyFree = await tools.suggest({ customer, draft: draftOf([line('a', { excludeAllergens: ['AM'] })]) });
+  assert.deepEqual(dairyFree.lines[0].options.map((o) => o.productId), ['2']);
+  const failing = fakes({ search: async () => { throw new Error('verkko'); } });
+  const down = await failing.tools.suggest({ customer, draft: draftOf([line('a')]) });
+  assert.equal(down.issues[0].code, 'SEARCH_FAILED');
+  assert.equal(down.lines.length, 0);
+  assert.equal(lineQuery(line('a', { claims: ['FREE_FROM_LACTOSE'] })), '20 l laktoositon maito');
+});
+
+test('quote vaatii käyttäjän valinnan, ei vaihda toimituspäivää hiljaa ja estää allergiaristiriidan', async () => {
+  const { tools, calls } = fakes();
+  assert.equal((await tools.quote({ customer, draft: draftOf([line('a')]) })).issues[0].code, 'PRODUCT_NOT_SELECTED');
+  assert.equal((await tools.quote({ customer, draft: draftOf([line('a', { selectedProductId: '1', excludeAllergens: ['AM'] })]) })).issues[0].code, 'ALLERGEN_CONFLICT');
+  assert.equal(calls.quote.length, 0);
+  const ok = await tools.quote({ customer, draft: draftOf([line('a', { selectedProductId: '2' })]) });
+  assert.equal(ok.quoteId, 'Q1');
+  assert.deepEqual(ok.totals, { net: 10, vat: 1.35, gross: 11.35, currency: 'EUR' });
+  assert.deepEqual(calls.quote[0].needs[0], { ref: 'a', candidates: ['2'], quantity: { value: 20, unit: 'L' }, allowSubstitutes: false });
+  const shifted = fakes({ requestQuote: async (b, input) => ({ quoteId: 'Q9', needs: [{ ref: 'a', excluded: [], options: [{ kind: 'exact', deliveryDate: '2026-11-17', expiresAt: new Date().toISOString(), lines: [{ name: 'Tuote 2' }] }] }] }) });
+  const late = await shifted.tools.quote({ customer, draft: draftOf([line('a', { selectedProductId: '2' })]) });
+  assert.equal(late.quoteId, null);
+  assert.equal(late.issues[0].code, 'DELIVERY_DATE_SHIFT');
+  const broken = fakes({ requestQuote: async () => { throw new Error('alhaalla'); } });
+  assert.equal((await broken.tools.quote({ customer, draft: draftOf([line('a', { selectedProductId: '2' })]) })).issues[0].code, 'QUOTE_FAILED');
+});
+
+test('submit tallentaa hyväksytyn luonnoksen kerran ja palauttaa uusinnalle saman tilauksen', async () => {
+  const { tools, calls, tick } = fakes();
+  const draft = draftOf([line('a', { selectedProductId: '2' })]);
+  const q = await tools.quote({ customer, draft });
+  const first = await tools.submit(approved(draft, q.quoteId));
+  assert.equal(first.status, 'confirmed');
+  assert.deepEqual(calls.order[0], { offers: ['jws-a'], idempotencyKey: 'wa-d1-r1', buyerReference: 'whatsapp:d1', requestedBy: 'Testi' });
+  tick(3600_000); // uusinta tarjouksen vanhenemisen jälkeenkin palauttaa saman tuloksen
+  assert.deepEqual(await tools.submit(approved(draft, q.quoteId)), first);
+  assert.equal(calls.order.length, 1);
+  assert.equal((await tools.submit({ ...approved(draft, q.quoteId), idempotencyKey: 'toinen-avain' })).reasons[0].code, 'QUOTE_ALREADY_USED');
+});
+
+test('submit hylkää vanhan hyväksynnän, muuttuneen sisällön, vieraan asiakkaan, vanhentuneen tarjouksen ja puuttuvan oikeuden', async () => {
+  const { tools, calls, tick } = fakes();
+  const draft = draftOf([line('a', { selectedProductId: '2' })]);
+  const q = await tools.quote({ customer, draft });
+  const code = async (args) => { const r = await tools.submit(args); assert.equal(r.status, 'rejected'); assert.equal(r.orderId, null); return r.reasons[0].code; };
+  const bumped = { ...draft, revision: 2 };
+  assert.equal(await code(approved(bumped, q.quoteId)), 'APPROVAL_MISMATCH');
+  assert.equal(await code({ ...approved(draft, q.quoteId), approval: null }), 'APPROVAL_MISMATCH');
+  // Sama revisioluku, eri sisältö: tarjous on sidottu sisältöön eikä asiakkaan lähettämään numeroon.
+  const changed = { ...draft, lines: [line('a', { selectedProductId: '2', quantity: { value: 30, unit: 'L' } })] };
+  assert.notEqual(draftHash(customer, changed), draftHash(customer, draft));
+  assert.equal(await code(approved(changed, q.quoteId)), 'DRAFT_CHANGED');
+  assert.equal(await code({ ...approved(draft, q.quoteId), customer: { ...customer, customerId: 'c2' } }), 'QUOTE_NOT_FOUND');
+  assert.equal(await code({ ...approved(draft, q.quoteId), customer: { ...customer, bindingVersion: 'v2' } }), 'QUOTE_NOT_FOUND');
+  assert.equal(await code({ ...approved(draft, q.quoteId), customer: { ...customer, permissions: { readProducts: true } } }), 'NOT_PERMITTED');
+  assert.equal(await code({ ...approved(draft, q.quoteId), idempotencyKey: 'x' }), 'IDEMPOTENCY_KEY_REQUIRED');
+  tick(16 * 60_000);
+  assert.equal(await code(approved(draft, q.quoteId)), 'QUOTE_EXPIRED');
+  assert.equal(calls.order.length, 0);
+});
+
+test('oikeudet tarkistetaan tuoreesti ennen tilausta eikä tallennusvirhe näytä onnistumiselta', async () => {
+  let allowed = false; let fail = true;
+  const { tools, calls } = fakes({ permissions: async () => ({ readProducts: true, placeOrders: allowed }),
+    placeOrder: async (b, input) => { calls.order.push(input); if (fail) throw new Error('kanta'); return { status: 'pending_approval', orderId: 'AGW-2', reasons: [{ code: 'SPEND_CAP_ORDER', message: 'Katto', severity: 'approval' }] }; } });
+  const draft = draftOf([line('a', { selectedProductId: '2' })]);
+  const q = await tools.quote({ customer, draft });
+  assert.equal((await tools.submit(approved(draft, q.quoteId))).reasons[0].code, 'NOT_PERMITTED');
+  allowed = true;
+  assert.equal((await tools.submit(approved(draft, q.quoteId))).reasons[0].code, 'ORDER_FAILED');
+  fail = false; // epäonnistunut yritys ei kuluta tarjousta: sama hyväksyntä voidaan yrittää uudelleen
+  const ok = await tools.submit(approved(draft, q.quoteId));
+  assert.equal(ok.status, 'pending_approval');
+  assert.deepEqual(ok.reasons, [{ code: 'SPEND_CAP_ORDER', message: 'Katto', severity: 'approval' }]);
+});
+
+test('oikea haku ja gateway simuloidulla rajapinnalla: vaihtoehdot, tarjous ja yksi demotilaus', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
+  const { seedBuyers } = await import('../server/gateway/mandate.mjs');
+  const { orders } = await import('../server/gateway/store.mjs');
+  seedBuyers();
+  const tools = createOrderingTools();
+  const real = { ...customer, buyerId: 'ravintola-kulma' };
+  const draft = draftOf([line('a', { claims: ['FREE_FROM_LACTOSE'] }), line('b', { productTerm: 'kananmuna', quantity: { value: 100, unit: 'PCS', basis: 'items' } })]);
+  const s = await tools.suggest({ customer: real, draft });
+  assert.deepEqual(s.issues, []);
+  for (const l of s.lines) assert.ok(l.options.length >= 1 && l.options.length <= 3);
+  assert.ok(s.lines[0].options.every((o) => o.labels.includes('FREE_FROM_LACTOSE')));
+  assert.ok(s.lines[1].options[0].covers.unit === 'PCS' && s.lines[1].options[0].covers.value >= 100);
+  draft.lines.forEach((l, i) => { l.selectedProductId = s.lines[i].options[0].productId; });
+  const q = await tools.quote({ customer: real, draft });
+  assert.deepEqual(q.issues, []);
+  assert.equal(q.lines.length, 2);
+  const args = { ...approved(draft, q.quoteId), customer: real };
+  const first = await tools.submit(args);
+  assert.ok(['confirmed', 'pending_approval'].includes(first.status), JSON.stringify(first));
+  assert.equal((await tools.submit(args)).orderId, first.orderId);
+  assert.equal(orders.list('ravintola-kulma').length, 1);
+  assert.equal(orders.list('ravintola-kulma')[0].buyerReference, 'whatsapp:d1');
+});
