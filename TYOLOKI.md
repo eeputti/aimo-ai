@@ -12,7 +12,9 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 **Tarkistukset:** selaimessa `http://localhost:4747/` leveydellä 375 px: paneeli aukeaa, "laktoositonta kermaa 20 l ja 5 kg voita" näyttää tulkinnan ja tuotteet heti kentän alla, paneelin alareuna on ruudun alareunassa, ei vaakaylivuotoa. `node --check public/aimo-ask.js`. Reseptipolkua, siirtoa agenttikonsoliin ja oikeaa puhelinta ei kokeiltu.
 
-**Jäljellä:** valmiin tilauksen kortissa pitkät tuotenimet leikkautuvat ilman kolmea pistettä (`.ask-cname` on `display: grid`, jolloin `text-overflow` ei vaikuta). Se on toisen työvaiheen commitoimatonta koodia, joten sitä ei muutettu. Reseptin valinnan jälkeen tulokset nousevat puhelimella reseptikortin yläpuolelle, jolloin annoslaskuri jää niiden alle.
+**Jatko (Eeliksen pyynnöstä):** valmiin tilauksen kortissa pitkät tuotenimet katkesivat ilman kolmea pistettä, koska `.ask-cname` oli `display: grid` eikä `text-overflow` silloin vaikuta. Työpuussa se on nyt `display: block`, ja nimet päättyvät kolmeen pisteeseen (katsottu selaimessa 375 px:n leveydellä). Sääntö kuuluu toisen työvaiheen commitoimattomaan valmiin tilauksen korttiin, joten muutos ei ole vielä GitHubissa: se tulee mukaan, kun se työvaihe commitoidaan. Älä palauta arvoa `grid`.
+
+**Jäljellä:** reseptin valinnan jälkeen tulokset nousevat puhelimella reseptikortin yläpuolelle, jolloin annoslaskuri jää niiden alle.
 
 ## 14.11.2026 — toimituspäivä näkyy etusivun otsakkeessa myös puhelimella (Claude Code)
 
