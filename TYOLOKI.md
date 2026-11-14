@@ -2,6 +2,16 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — päivä-, määrä- ja korilinkkikorjaukset käytössä samassa WhatsApp-palvelimessa (Codex, tilausloppuchat)
+
+- Yksi hallittu päivitys klo 23.33 versioon **beda8e5c6f232837a5434fb7f2243020c686d99e**: mukana gatewayn valittu toimituspäivä, tarkka dl/cl/ml/g-muunnos, ajantasainen dialogi, saman luonnoksen API ja OK/avaa kori → julkinen rajattu korilinkki. **219/219 testiä läpi** ennen käyttöönottoa. Vanha PID 59831 poistui ennen uuden PID **70391** / istunnon **77669** käynnistystä. Sama token, allekirjoitusavain, tunneli ja viisi kantaa; muiden keskeneräisiä Worker-/demomaksumuutoksia ei ladattu.
+- Kaikkien sovellustaulujen lukumäärät ja koko members-taulun hash täsmäsivät ennen/jälkeen: muun muassa 2 jäsentä, 44 jonoriviä, 4 luonnosta, 35 vuorotulosta, 2 tilausta ja 28 ledger-riviä säilyivät. Paikallinen/julkinen health 200 / ordering-demo. Käyttäjän todellinen numeroliitos → buyerId → paikallinen handoff-API palautti saman ajantasaisen korin.
+- Käyttäjä oli sillä välin itse vahvistanut tilauksen **AGW-20261114-0002** klo 23.14.34, 72,90 € alv 0 %, toimitus 16.11. Sama tilaus näkyi oikeassa paikallisen kaupan selaimessa. Vanha tilaus sisältää vielä 5 l kermaa (syntyi ennen yksikkökorjauksen käyttöönottoa); tästä ilmoitettiin käyttäjälle eikä vahvistettua tilausta muutettu jälkikäteen.
+- Käyttäjä oli jo aloittanut uuden **5 kg voin korin**, 16.11. toimitukselle. Tämä luettiin ennen mahdollista kermakorjausta ja säilytettiin koskemattomana. Julkinen allekirjoitettu korilinkki ja sen API palauttivat 200 / saman draftId:n, revision, 5 KG -rivin ja päivän. Oikeassa selaimessa näkyvät tämä sama kori sekä ruokavalion/tuotevalinnan täydennys ja tarkistus. Linkki luotiin olemassa olevasta korista lukutilassa, ilman model-/tilauskutsua; henkilökohtaista URL:ia ei lisätä Gitiin. WhatsAppin avaa kori -lisäkuittaus pyydetty käyttäjältä; julkinen luku-/selainreitti on jo varmennettu.
+- Nykyisen uuden korin ruokavaliotieto, tarkka tuote ja lopullinen demovahvistus kuuluvat käyttäjälle näkyvään koriin. Tämän vaiheen perusteella ei väitetä oikeaa Valio-tilausta, maksua tai sähköpostia. Edellinen todellinen puhelin→worker→puhelin-kuittaus on jo fc29a0b:ssa. Raportti `docs/parallel/whatsapp-order-completion.md`; ennen/jälkeen-tulokset ja käyttäjän korilinkki vain yksityisessä paikallisessa ops-hakemistossa.
+
+Yhteinen MCP-tunneli palautti tämän vaiheen aikana 1033/530, joten samaan koneeseen rajattu varaus ja käyttöönoton koordinointi hoidettiin paikallisella taululla. Muiden töitä, kantoja tai tunnuksia ei siirretty. Seuraava mahdollinen demomaksu-/sähköpostivaihe säilyy omistajiensa erillisenä työnä.
+
 ## 14.11.2026 — WhatsAppin maksupolku: itsenäinen demomaksusivu ja maksun jälkeinen sähköpostivartio (Codex, maksupolkuchatti)
 
 - **Käyttäjän päätös:** WhatsApp-apurin kokoaman tilauksen pitää näkyä hostatussa tilausnäkymässä toimituspäivineen. Siitä avataan maksusivu, ja onnistunut maksu käynnistää sähköpostivahvistuksen. Käyttäjä valitsi ensin **demomaksun**, ilman rahansiirtoja. Tämä jatkaa korilinkki- ja sähköpostivaiheita eikä väitä oikean maksupalvelun olevan käytössä.
