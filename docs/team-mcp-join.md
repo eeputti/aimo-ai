@@ -1,6 +1,6 @@
 # Liity tiimin MCP-palvelimeen
 
-Eeliksen, Aleksin ja Peetun Claude- ja ChatGPT-avustajat käyttävät samaa projektipostilaatikkoa, tehtävävarauksia ja tilannekuvaa. Jokaisella avustajayhteydellä on oma tunniste ja tiimiavain.
+Danielin, Eeliksen, Aleksin ja Peetun Claude- ja ChatGPT-avustajat käyttävät samaa projektipostilaatikkoa, tehtävävarauksia ja tilannekuvaa. Jokaisella avustajayhteydellä on oma tunniste ja tiimiavain.
 
 ## Yhteinen osoite
 
@@ -8,16 +8,17 @@ Eeliksen, Aleksin ja Peetun Claude- ja ChatGPT-avustajat käyttävät samaa proj
 
 **<https://bench-butter-save-marsh.trycloudflare.com/mcp>**
 
-Osoite on tilapäinen Cloudflare-tunneli, kirjattu 14.11.2026. Palvelinkoneen ja tunnelin terminaalin pitää olla käynnissä. Jos tunneli käynnistetään uudelleen, ylläpitäjä päivittää uuden osoitteen tähän ohjeeseen ja jokainen yhdistää liittimensä uudelleen.
+Osoite on tilapäinen Cloudflare-tunneli, tarkistettu palvelimen OAuth-metatiedoista 14.11.2026. Palvelinkoneen ja tunnelin terminaalin pitää olla käynnissä. Jos tunneli käynnistetään uudelleen, ylläpitäjä päivittää uuden osoitteen tähän ohjeeseen ja projektin README:n Tiimin yhteinen MCP -kohtaan. Jokainen yhdistää liittimensä uudelleen.
 
 Osoite kuuluu MCP-liittimen URL-kenttään. Palvelimen juuriosoite ei tarjoa erillistä tiimin verkkosivua. Projektin koodi ja ohjeet löytyvät [aimo-ai-repositoriosta](https://github.com/eeputti/aimo-ai).
 
 ## Oma tunniste ja avain
 
-Nämä kuusi tunnistetta löytyivät yhteisen palvelimen jäsenrekisteristä 14.11.2026:
+Nämä kahdeksan tunnistetta löytyivät yhteisen palvelimen jäsenrekisteristä 14.11.2026:
 
 | Henkilö | Claude | ChatGPT |
 | --- | --- | --- |
+| Daniel | `daniel-claude` | `daniel-chatgpt` |
 | Eelis | `eelis-claude` | `eelis-chatgpt` |
 | Aleksi | `aleksi-claude` | `aleksi-chatgpt` |
 | Peetu | `peetu-claude` | `peetu-chatgpt` |
@@ -89,4 +90,4 @@ Jos palvelin ja tunneli ovat pysähtyneet, käynnistä ne projektin juuresta:
 npm.cmd --prefix services/team-mcp run tunnel
 ```
 
-Pidä terminaali auki ja päivitä sen tulostama uusi **MCP-osoite** tämän ohjeen alkuun. Kaikki käyttävät samaa osoitetta. Älä käynnistä toista tunnelia jo toimivan rinnalle. Tarkemmat asennus- ja palvelinasetukset: [Team MCP:n README](../services/team-mcp/README.md).
+Pidä terminaali auki ja päivitä sen tulostama uusi **MCP-osoite** tämän ohjeen alkuun sekä projektin README:n Tiimin yhteinen MCP -kohtaan. Kaikki käyttävät samaa osoitetta. Älä käynnistä toista tunnelia jo toimivan rinnalle. Tarkemmat asennus- ja palvelinasetukset: [Team MCP:n README](../services/team-mcp/README.md).

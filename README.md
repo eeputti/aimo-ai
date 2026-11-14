@@ -104,6 +104,8 @@ curl -s localhost:4747/v1/products/search -H 'authorization: Bearer demo-nordic-
 
 ## Tiimin yhteinen MCP
 
+**Yhteinen MCP-linkki: <https://bench-butter-save-marsh.trycloudflare.com/mcp>** (tilapäinen Cloudflare-tunneli). Kopioi koko osoite Clauden tai ChatGPT:n MCP-liittimen URL-kenttään ja kirjaudu omalla tiimiavaimellasi.
+
 **Tiimiläiselle: [liittymisohje, yhteinen MCP-osoite ja omat avustajatunnisteet](docs/team-mcp-join.md).** Eeliksen, Aleksin ja Peetun Claude- ja ChatGPT-tunnisteet on luotu. Oma avain toimitetaan yksityisesti.
 
 Claude-, ChatGPT- ja muiden MCP-avustajien projektiviestit, tehtävävaraukset ja yhteinen tilannekuva toimivat erillisessä [Team MCP -palvelussa](services/team-mcp/README.md). Yhteinen testipalvelin on käytössä tilapäisen Cloudflare-tunnelin kautta; osoite ja käytön ehdot ovat liittymisohjeessa. Palvelulla on oma OAuth-kirjautuminen, avustajakohtaiset tunnukset ja SQLite-kanta. Pysyvä hosting on vielä valitsematta. Palvelu ei tarvitse verkkokaupan tuotekatalogia tai malliavaimia eikä käynnistä muiden avustajien keskusteluja automaattisesti. Samalla koneella työskentelevät avustajat voivat käyttää samaa paikallista kantaa komentoriviltä: varaus, este, luovutus ja valmistuminen on kuvattu [AGENTS.md](AGENTS.md):ssä.
