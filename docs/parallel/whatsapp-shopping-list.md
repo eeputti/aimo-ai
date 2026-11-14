@@ -37,7 +37,7 @@ Tämä on vain olemassa olevan paikallisen testikaupan rajapinta. Palvelinkoneen
 
 ## Tarkistukset
 
-- Kohdistettu WhatsApp-, tilauskeskustelu-, tuotetyökalu- ja siirtotestisarja: **74 läpi, 0 virhettä, 2 katalogia vaativaa testiä ohitettu** (76 yhteensä).
+- Kohdistettu WhatsApp-, tilauskeskustelu-, tuotetyökalu- ja siirtotestisarja: **76 läpi, 0 virhettä, 2 katalogia vaativaa testiä ohitettu** (78 yhteensä), myös rinnakkain tulleen `27ee93b`-korjauksen yhdistämisen jälkeen.
 - Viisi uutta regressiotestiä: allekirjoitettu HTTP-webhook → lista → selain-API → sama luonnos → valinnat → yhteenveto → erillinen vahvistus → yksi demotilaus; puuttuvat tiedot/stale/revokointi; HTTP-rajaus/validointi; saman asiakkaan kanavien sarjoitus; reset → uusi keskustelujakso → uusi lista → restart. Työkalut injektoitu, aito suomenkielinen sääntötulkki ja väliaikainen synteettinen katalogi.
 - Oikea Chromium ja oikea standalone-WhatsApp-runtime, oma synteettinen katalogi ja väliaikaiset kannat: selain avaa listan, määräkorjaus näkyy takaisin WhatsApp-keskustelussa, toisessa kanavassa muuttuneen listan vanha muokkaus torjutaan ja päivitys palauttaa toiminnan. Ei JavaScript-virheitä. Malliavaimet tyhjinä; ei oikeita Meta-, malli- tai Valio-kutsuja. Sivuston olemassa oleva ulkoinen fonttipyyntö estettiin selaintestissä.
 - Ensimmäinen koko `npm test` ennen uusimpien reset-commitien yhdistämistä: 150 läpi, 21 epäonnistui ja 6 ohitettu, koska katalogia tarvitsevat vanhat testit eivät löydä `data/catalog.json`:ia. Koko sarjaa ei väitetä läpäistyksi.
