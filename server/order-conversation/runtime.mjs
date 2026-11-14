@@ -1,5 +1,6 @@
 // Valmis kokoonpano kytkentää varten (henkilö 1): luonnoskanta, tuotetyökalut ja tulkki oletusriippuvuuksilla.
 // Kielimalli on käytössä, kun ANTHROPIC_API_KEY on asetettu; muuten viestit tulkitaan säännöillä.
+import { storefrontCartProjection } from '../storefront-whatsapp-sync.mjs';
 import { shoppingListView } from '../shopping-list/index.mjs';
 import { openDraftStore } from './store.mjs';
 import { createOrderingConversation } from './index.mjs';
@@ -15,7 +16,19 @@ export async function createConfiguredOrdering({ draftDb = ':memory:', quoteDb =
   const rules = createRuleInterpreter({ understand });
   const interpretTurn = agentEnabled() ? createModelInterpreter({ ask: askAgent, fallback: rules }) : rules;
   const handleTurn = createOrderingConversation({ store, tools, interpretTurn, now: time });
+  const exports = new Map();
   return { handleTurn,
+    async getStorefrontCart({ conversationId, customer }) {
+      const draft = store.active(conversationId); const list = shoppingListView(draft, customer);
+      if (!list) return { source: `whatsapp:${customer.buyerId}`, state: 'empty', lines: [] };
+      if (list.status !== 'review') return storefrontCartProjection(list, null);
+      const key = `${list.id}:${list.revision}`; const previous = exports.get(key);
+      if (previous?.until > time()) return previous.value;
+      const quote = await tools.quote({ customer, draft });
+      const value = storefrontCartProjection(list, quote);
+      exports.clear(); exports.set(key, { value, until: Math.min(time() + 30000, Date.parse(quote.expiresAt) || time()) });
+      return value;
+    },
     getShoppingList({ conversationId, customer }) { return shoppingListView(store.active(conversationId), customer); },
     hasTurnResult({ messageId, customer }) {
       const result = store.result(messageId); const draft = result?.draftId && store.get(result.draftId);
