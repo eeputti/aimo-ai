@@ -33,6 +33,20 @@ export function createStorefrontOrder({ cart, request, uuid = () => crypto.rando
       quote = result; snapshot = before; buyerId = buyer.id;
       return result;
     },
+    // Sends the order review e-mail. This never places an order: the customer confirms on the page the e-mail links to.
+    async sendReview(buyer, choices, email) {
+      if (pending) throw new Error('Selvitä ensin aiemman tilauspyynnön tulos painamalla Yritä uudelleen.');
+      if (!valid(buyer)) throw new Error('Ostoskori tai ostaja muuttui. Tarkista hinnat ja saatavuus uudelleen.');
+      const rows = cart.lines(); const state = cart.get();
+      const selected = quote.needs.map((n, i) => n.options?.[choices[i] ?? 0]);
+      if (selected.some((o) => !o?.offer)) throw new Error('Kaikille tuotteille ei ole tarjousta. Muokkaa ostoskoria.');
+      // The e-mail order covers the cart as it is: a substitute must first be accepted in the cart.
+      if (selected.some((o, i) => o.lines.length !== 1 || o.lines[0].productId !== String(rows[i]?.id) || Number(o.lines[0].quantity) !== Number(rows[i]?.qty) || o.deliveryDate !== state.selectedDate)) throw new Error('Valittu vaihtoehto poikkeaa ostoskorista. Hyväksy korvaava tuote tai päivämuutos ostoskorissa ja tarkista tarjous uudelleen.');
+      return request('/api/storefront/order-email', {
+        email, deliveryDate: state.selectedDate, reference: state.references[state.selectedDate] || '',
+        lines: rows.map((p) => ({ id: String(p.id), qty: Number(p.qty), price: Number(p.price), vat: Number(p.vat) })),
+      });
+    },
     async submit(buyer, choices) {
       if (!pending) {
         if (!valid(buyer)) throw new Error('Ostoskori tai ostaja muuttui. Tarkista hinnat ja saatavuus uudelleen.');

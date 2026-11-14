@@ -112,6 +112,10 @@ curl -s localhost:4747/v1/products/search -H 'authorization: Bearer demo-nordic-
 
 Claude-, ChatGPT- ja muiden MCP-avustajien projektiviestit, tehtävävaraukset ja yhteinen tilannekuva toimivat erillisessä [Team MCP -palvelussa](services/team-mcp/README.md). Yhteinen testipalvelin on käytössä tilapäisen Cloudflare-tunnelin kautta; osoite ja käytön ehdot ovat liittymisohjeessa. Palvelulla on oma OAuth-kirjautuminen, avustajakohtaiset tunnukset ja SQLite-kanta. Pysyvä hosting on vielä valitsematta. Palvelu ei tarvitse verkkokaupan tuotekatalogia tai malliavaimia eikä käynnistä muiden avustajien keskusteluja automaattisesti. Samalla koneella työskentelevät avustajat voivat käyttää samaa paikallista kantaa komentoriviltä: varaus, este, luovutus ja valmistuminen on kuvattu [AGENTS.md](AGENTS.md):ssä.
 
+## Tilaussähköpostit
+
+Tilausdialogi kysyy tarjouksen tarkistuksen jälkeen sähköpostiosoitteen ja lähettää tilausyhteenvedon, jonka **Confirm order** -painike avaa vahvistussivun. Tilaus syntyy vasta sivun painikkeesta; sen jälkeen lähtee erillinen tilausvahvistus. Lähetys käyttää Resendiä ja tarvitsee palvelimen asetukset `RESEND_API_KEY`, `ORDER_EMAIL_FROM` ja `ORDER_EMAIL_PUBLIC_URL` (tyhjät mallit `.env.example`-tiedostossa). Ohje ja turvaominaisuudet: [tilaussähköpostit](docs/order-emails.md).
+
 ## WhatsApp-testikanava
 
 Nykyinen Tilausapuri toimii myös WhatsApp Cloud API -kanavan kautta: numeron yhdistäminen kertakäyttökoodilla, tuotehaku ja keskustelumuisti. Tämä testiversio vain hakee tietoja; se ei tee tilauksia tai muuta selaimen koria. Käynnistä erikseen `npm run whatsapp` tai liitä sivuston palvelimeen asetuksella `WHATSAPP_ENABLED=true`. Meta-asetukset, julkinen HTTPS-webhook, henkilön yhdistäminen ja testaus: [WhatsAppin käyttöönotto](docs/whatsapp.md).

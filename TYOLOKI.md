@@ -2,6 +2,19 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — tilausyhteenveto ja tilausvahvistus sähköpostilla (Claude Code, haara `feature/order-email-confirmation`)
+
+**Tehtävä (Eelis):** tarjouksen tarkistuksen jälkeen kysytään sähköposti ja lähetetään tilausyhteenveto; vahvistuspainike avaa sivun, tilaus syntyy vasta sivun painikkeesta; sen jälkeen erillinen tilausvahvistus. Resend, palvelinpuolen asetukset, ei live-lähetystä, ei julkaisua, työ PR:nä eikä suoraan `mainiin` (tämä poikkeaa AGENTS.md:n oletuksesta tehtävän nimenomaisen ohjeen vuoksi).
+
+- Uudet `server/order-email.mjs` (Resend-asiakas, asetusten tarkistus; vain muuttujien nimet raportoidaan), `order-email-templates.mjs` (Aimo-tyyliset sähköpostit ja vahvistussivu, kaikki arvot escapattu), `order-email-flow.mjs` (tila: tarkistuslinkki → vahvistus → gateway-tilaus → vahvistusviesti), `order-email-http.mjs` (`GET`/`HEAD /order/confirm` vain lukee, `POST /order/confirm` tilaa). `server/index.mjs`: reitti `POST /api/storefront/order-email` ja käsittelijä. `storefront-checkout.mjs`: vain luku -apufunktio `checkoutStatus`; tilaus kulkee yhä `prepareCheckout`/`confirmCheckout`-polun kautta.
+- Päätökset: linkin tunniste 256 bittiä, kantaan vain SHA-256; tarjoukset vanhenevat 15 min, joten vahvistus hakee tuoreen tarjouksen ja vertaa sitä lähetettyyn yhteenvetoon (muutos → ei tilausta). Checkout-tunniste säilyy tietueessa, joten uusinnat osuvat gatewayn idempotenssiin. Resendin `Idempotency-Key` molemmille viesteille. Osoite poistetaan tietueesta kun viimeinen viesti on lähtenyt. Korvaajat on hyväksyttävä ostoskorissa ennen sähköpostitilausta.
+- UI: `storefront-agent.js` ("Lähetä tilaus" → sähköpostikenttä), `storefront-order.js` (`sendReview`). Aiempi suora `submit` ja sessionStorage-palautus säilyvät vain keskeneräisten pyyntöjen uusintaan.
+- `.env.example` (tyhjät mallit), `docs/order-emails.md`, README.
+
+**Tarkistukset:** uudet 9 testiä (`test/order-email.test.mjs`) + 1 (`test/storefront-order.test.mjs`) läpi; koko sarja 161/188, 21 epäonnistumista, jotka ovat identtiset puhtaan `main`in kanssa (puuttuva `data/catalog.json` tässä pilvikloonissa). Reittikytkentä varmistettu `server/index.mjs`:n kautta (503 ilman asetuksia, 404 virheelliselle linkille). **Ei tehty:** selaintarkistus, oikea Resend-lähetys, julkaisu. Mitään sähköpostia ei lähetetty. Koordinointitaulua ei ajettu (paikallinen kanta on käyttäjän koneella).
+
+**Käyttöönotto:** palvelimelle `RESEND_API_KEY`, vahvistettu `ORDER_EMAIL_FROM` ja julkinen `ORDER_EMAIL_PUBLIC_URL`, uudelleenkäynnistys; sama prosessi (muistinvaraiset rajat).
+
 ## 14.11.2026 — koordinaattorin ytimen viimeistely ja työn todellinen luovutus Aleksille (Codex)
 
 - Tarkistettava pohja d2c899a vietiin GitHubiin ja sen SHA varmennettiin ennen luovutuksia. Aleksin Codexille (`aleksi-chatgpt`, tehtävä b073701e) luovutettiin käyttöohje ja oma raportti; se kuittasi vastaanoton ja aloitti erillisessä työpuussa. Aleksin Claudelle (`aleksi-claude`, tehtävä 2e683d3d) luovutettiin riippumaton jono-/API-tarkistus, oma raportti ja mahdollinen uusi regressiotiedosto. Viime tarkistuksessa jälkimmäinen odotti vastaanottoa. Molempiin tehtäviin toimitettu pohja, rajaus, tarkistuskohteet ja raportointitapa MCP:n `handoff_task`-kutsulla käyttäjän nimenomaisesta pyynnöstä.

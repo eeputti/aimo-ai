@@ -19,3 +19,4 @@
 .sf-agent dd { margin: 0; }
 @media (max-width: 600px) { .sf-agent { padding: 16px; } .sf-agent select { width: 100%; } }
 @media print { .sf-agent-launch, .sf-agent { display: none; } }
+.sf-agent form[data-sf-review-form] input[type="email"] { width: min(420px, 100%); box-sizing: border-box; }
