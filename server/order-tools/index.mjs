@@ -28,6 +28,28 @@ export function lineQuery(line) {
   return `${amount}${claims ? `${claims} ` : ''}${line.productTerm}`.trim();
 }
 
+// Vaihtoehtojen järjestys ostajalle. Haku palauttaa halvimman tarpeen kattavan ensin, jolloin kärkeen nousi maustettuja
+// tuotteita ja annospakkauksia. Tässä perustuote tulee ennen maustettua ja tarpeeseen sopiva pakkaus ennen ylisuurta tai
+// kymmeniä pikkupakkauksia. Hinta ja haun oma hyllyjärjestys ratkaisevat tasatilanteet. Heuristiikka nimen sanoista:
+// se vain järjestää, ei pudota mitään pois, ja ostaja valitsee aina itse.
+const NEUTRAL = /^(\d+([.,]\d+)?|x|l|dl|cl|ml|g|kg|kpl|uht|esl|hyla|fi|ja|laktoosit\w*|vähälaktoosi\w*|gluteenit\w*|luomu|rasvat\w*|kevyt|täys\w*|d-vitaminoitu|suomesta|suomi|suomalainen|kotimainen|pakaste|tuore|pesty|\w*suola\w*)$/;
+const words = (text) => String(text || '').toLowerCase().replace(/[®™%&(),+]/g, ' ').split(/[\s/]+/).filter(Boolean);
+export function rankOptions(found, line) {
+  const term = words(line.productTerm).map((w) => (w.length > 4 ? w.slice(0, -1) : w)); // taivutus: kerma ~ kerman, maito ~ maitoa
+  const need = line.quantity?.value || 0;
+  const score = (o) => {
+    const brand = words(o.brand);
+    // Kuvailevat sanat, jotka eivät ole merkki, koko, ruokavaliomerkintä tai itse tuote: "kolme sipulia", "mansikka".
+    const extras = words(o.name).filter((w) => w.length > 2 && !/\d/.test(w) && !NEUTRAL.test(w) && !brand.includes(w) && !term.some((t) => w.includes(t))).length;
+    const covered = o.quantityExplanation?.providedItems ?? (line.quantity?.unit === 'L' && o.litres ? o.qty * o.litres : line.quantity?.unit === 'KG' && o.kg ? o.qty * o.kg : null);
+    const over = need && covered ? (covered - need) / need : 0;
+    const fit = (over > 0.5 ? 2 : over > 0.1 ? 1 : 0) + (o.qty > 30 ? 2 : o.qty > 12 ? 1 : 0);
+    // Yksi kuvaileva sana (lajike, tuotesarja) ei vielä tee tuotteesta maustettua. Näin haun oma hyllyjärjestys säilyy.
+    return [extras >= 2 ? 1 : 0, fit];
+  };
+  return found.map((o, i) => ({ o, i, s: score(o) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.i - b.i).map((x) => x.o);
+}
+
 async function defaultDeps() {
   const [storefront, service, gwStore, catalog] = await Promise.all([
     import('../storefront.mjs'), import('../gateway/service.mjs'), import('../gateway/store.mjs'), import('../catalog.mjs'),
@@ -79,7 +101,7 @@ export function createOrderingTools(deps = {}) {
     for (const line of draft.lines) {
       let found;
       try { found = await search(line, draft.deliveryDate); } catch { issues.push(issue('SEARCH_FAILED', `Tuotehaku ei onnistunut: ${line.productTerm}. Hintoja tai saatavuutta ei näytetä.`, { ref: line.ref })); continue; }
-      const fit = found.filter((o) => !unsafe(product(o.id), line));
+      const fit = rankOptions(found.filter((o) => !unsafe(product(o.id), line)), line);
       if (!fit.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${draft.deliveryDate}: ${line.productTerm}.`, { ref: line.ref })); continue; }
       const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim)).map((c) => ({ claim: c.claim, share: fit.filter((o) => o.labels?.includes(c.claim)).length / fit.length, ...c }))
         .filter((c) => fit.length >= 3 && c.share >= c.min && c.share <= c.max).map((c) => c.claim);

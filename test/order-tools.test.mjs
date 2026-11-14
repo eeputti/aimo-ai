@@ -10,7 +10,7 @@ process.env.GATEWAY_DB = path.join(dir, 'gateway.db');
 process.env.VALIO_API_KEY = '';
 process.env.ANTHROPIC_API_KEY = '';
 process.env.DEMO_NOW = '2026-11-14T10:00:00+02:00';
-const { createOrderingTools, draftHash, lineQuery } = await import('../server/order-tools/index.mjs');
+const { createOrderingTools, draftHash, lineQuery, rankOptions } = await import('../server/order-tools/index.mjs');
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const date = '2026-11-16';
@@ -129,6 +129,24 @@ test('oikeudet tarkistetaan tuoreesti ennen tilausta eikä tallennusvirhe näyt�
   assert.deepEqual(ok.reasons, [{ code: 'SPEND_CAP_ORDER', message: 'Katto', severity: 'approval' }]);
 });
 
+test('vaihtoehtojen järjestys: perustuote ennen maustettua ja sopiva pakkaus ennen pikkupakkauksia, mitään ei pudoteta', () => {
+  const o = (name, qty, size, brand = 'Valio') => ({ id: name, name, brand, qty, litres: size, kg: size });
+  const cream = [o('Valio Keittiön ruokakerma 2,5 dl kolme sipulia UHT laktoositon', 2, 3.75), o('Millac Gold Ruoka & Vispi 33 kasvirasvan ja kerman sekoitus UHT 1L', 5, 1, 'Millac Gold'), o('Valio Keittiön kuohukerma 2 dl', 5, 1), o('Valio ruokakerma 15 % 1 l UHT laktoositon', 5, 1)];
+  const ranked = rankOptions(cream, { productTerm: 'kerma', quantity: { value: 5, unit: 'L' } }).map((x) => x.name);
+  assert.deepEqual(ranked.slice(0, 2), ['Valio Keittiön kuohukerma 2 dl', 'Valio ruokakerma 15 % 1 l UHT laktoositon']);
+  assert.equal(ranked.length, 4);
+  // 25 pikkupakkausta jää 10 isomman taakse, vaikka haku antoi sen halvempana ensin.
+  const butter = [o('Valio Eila® voi 200 g laktoositon', 25, 0.2), o('Valio voi 500 g normaalisuolainen', 10, 0.5)];
+  assert.equal(rankOptions(butter, { productTerm: 'voi', quantity: { value: 5, unit: 'KG' } })[0].name, 'Valio voi 500 g normaalisuolainen');
+  // Lajikenimi ei ole mauste: haun oma järjestys säilyy tuoretuotteilla.
+  const potato = [o('VARHAISPERUNA (KESÄPERUNA) PESTY FI', 10, 1, null), o('PP PUIKULA PERUNA PESTY', 10, 1, null), o('PERUNA ROSAMUNDA PESTY', 10, 1, null)];
+  assert.deepEqual(rankOptions(potato, { productTerm: 'peruna', quantity: { value: 10, unit: 'KG' } }), potato);
+  // Ostajan itse pyytämä maku on osa tuotetta, ei poikkeama.
+  const yoghurt = [o('Valiojogurtti® 1 kg mansikka vanilja', 10, 1), o('Valio luonnonjogurtti 1 kg', 10, 1)];
+  assert.equal(rankOptions(yoghurt, { productTerm: 'jogurtti', quantity: { value: 10, unit: 'KG' } })[0].name, 'Valio luonnonjogurtti 1 kg');
+  assert.equal(rankOptions(yoghurt, { productTerm: 'mansikka vanilja jogurtti', quantity: { value: 10, unit: 'KG' } })[0].name, 'Valiojogurtti® 1 kg mansikka vanilja');
+});
+
 test('oikea haku ja gateway simuloidulla rajapinnalla: vaihtoehdot, tarjous ja yksi demotilaus', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const { seedBuyers } = await import('../server/gateway/mandate.mjs');
   const { orders } = await import('../server/gateway/store.mjs');
@@ -141,6 +159,8 @@ test('oikea haku ja gateway simuloidulla rajapinnalla: vaihtoehdot, tarjous ja y
   for (const l of s.lines) assert.ok(l.options.length >= 1 && l.options.length <= 3);
   assert.ok(s.lines[0].options.every((o) => o.labels.includes('FREE_FROM_LACTOSE')));
   assert.ok(s.lines[1].options[0].covers.unit === 'PCS' && s.lines[1].options[0].covers.value >= 100);
+  const cream = await tools.suggest({ customer: real, draft: draftOf([line('k', { productTerm: 'kerma', quantity: { value: 5, unit: 'L' } })]) });
+  assert.doesNotMatch(cream.lines[0].options[0].name, /sipuli|Millac/i);
   draft.lines.forEach((l, i) => { l.selectedProductId = s.lines[i].options[0].productId; });
   const q = await tools.quote({ customer: real, draft });
   assert.deepEqual(q.issues, []);
