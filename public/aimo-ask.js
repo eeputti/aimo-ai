@@ -214,7 +214,10 @@
     if (!root.hidden) { if (text) setText(text); return; }
     if (!root.isConnected) document.body.append(root);
     const b = origin?.getBoundingClientRect();
-    sheet.style.top = `${Math.max(0, Math.round((b?.top ?? 0) - 16))}px`;
+    const top = Math.max(0, Math.round((b?.top ?? 0) - 16));
+    sheet.style.top = `${top}px`;
+    // Paneeli alkaa hakukentän kohdalta, joten korkeus rajataan sen alle jäävään ruutuun: muuten alaosa jää näkymättömiin.
+    sheet.style.maxHeight = `calc(100dvh - ${top}px)`;
     root.hidden = false; document.documentElement.classList.add('ask-open');
     q.value = text; if (text) search(); else idle();
     loadReady();

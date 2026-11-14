@@ -137,6 +137,9 @@ html.ask-open { overflow: hidden; }
 @media (max-width: 900px) {
   .ask-needs.compact { grid-template-columns: 1fr; }
   .ask-body { grid-template-columns: 1fr; gap: 16px; }
+  /* Yhdessä sarakkeessa hakutulokset nousevat heti hakukentän alle; tyhjällä haulla oikotiet pysyvät ensin. */
+  .ask-main { order: -1; }
+  .ask-body:has(.ask-idle) .ask-main { order: 0; }
   .ask-need { grid-template-columns: 1fr; }
   .ask-main { min-height: 0; padding: 14px; }
   .ask-idle { min-height: 160px; }

@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — hakupaneeli puhelinleveydellä: tulokset kentän alle, alaosa näkyviin (Claude Code)
+
+**Käyttäjän kysymys:** Eelis kysyi, toimiiko hakupaneeli puhelimessa. Paneeli aukesi ja haku toimi, mutta asettelussa oli kaksi vikaa, jotka korjattiin.
+
+- `public/aimo-ask.css`: enintään 900 px:n leveydellä (yksi sarake) hakutulokset nousevat heti hakukentän alle. Aiemmin ne jäivät resepti- ja tilauskorttien alle, joten kirjoittaessa ruudulla ei muuttunut mikään. Tyhjällä haulla oikotiet ovat yhä ensin (`:has(.ask-idle)`).
+- `public/aimo-ask.js`: paneelin enimmäiskorkeus lasketaan sen yläreunasta (`100dvh - top`). Aiemmin paneeli alkoi hakukentän kohdalta mutta sai lähes koko ruudun korkeuden, joten alaosa (puhelimella 114 px) jäi ruudun alle eikä sinne voinut vierittää. Sama vika oli pienempänä myös leveällä näytöllä.
+- Commitissa on vain nämä kaksi kohtaa. Tiedostojen muut commitoimattomat muutokset (toinen työvaihe) jäivät työpuuhun.
+
+**Tarkistukset:** selaimessa `http://localhost:4747/` leveydellä 375 px: paneeli aukeaa, "laktoositonta kermaa 20 l ja 5 kg voita" näyttää tulkinnan ja tuotteet heti kentän alla, paneelin alareuna on ruudun alareunassa, ei vaakaylivuotoa. `node --check public/aimo-ask.js`. Reseptipolkua, siirtoa agenttikonsoliin ja oikeaa puhelinta ei kokeiltu.
+
+**Jäljellä:** valmiin tilauksen kortissa pitkät tuotenimet leikkautuvat ilman kolmea pistettä (`.ask-cname` on `display: grid`, jolloin `text-overflow` ei vaikuta). Se on toisen työvaiheen commitoimatonta koodia, joten sitä ei muutettu. Reseptin valinnan jälkeen tulokset nousevat puhelimella reseptikortin yläpuolelle, jolloin annoslaskuri jää niiden alle.
+
 ## 14.11.2026 — toimituspäivä näkyy etusivun otsakkeessa myös puhelimella (Claude Code)
 
 **Käyttäjän pyyntö:** Eelis huomasi, että puhelinleveydellä otsakkeessa näkyi vain ostoskori, ei toimituspäivää.
