@@ -2,6 +2,22 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — Tilausapuri: Danielin agentti sivustolle (Claude Code, Danielin istunto)
+
+**Käyttäjän pyyntö:** Daniel halusi, että hänen ostosagenttiaan voi käyttää sivuston kautta.
+
+**Ratkaisu:** uusi sivu `/assistant.html` (yhteinen `aimo-shell.js`-kehys). Selain lähettää keskustelun reitille `POST /api/assistant/chat`; palvelin kutsuu Claudea Claude API:n MCP connectorilla (beta `mcp-client-2025-11-20`), ja Anthropic kutsuu Danielin Render-palvelimen työkaluja (`search_products`, `quote` ym.). Vastaus striimataan SSE:nä (`status`, `tool`, `text`, `done`, `error`) ja näytetään taulukkona: Tuote, Aikaisin toimitus, Tilaa viimeistään, Hinta (alv 0), Korvaava tuote. Kapealla näytöllä rivit ovat kortteja.
+
+- `server/aimoAgent.mjs`: uusi `chatWithMcp` (malli `config.deepModel` = Opus 5.5, effort `medium`, palvelinpuolen fallback `default` ja uusinta ilman sitä 400:lla, `pause_turn`-jatko enintään 4 kierrosta, samat laskurit `byPurpose.assistant_chat`). Kaikki mallikutsut kulkevat yhä tämän moduulin kautta.
+- `server/assistant.mjs` (uusi): syötteen tarkistus (enintään 20 viestiä, 4000 merkkiä, viimeinen käyttäjältä), järjestelmäohje tämän päivän päivämäärällä (Helsinki), Render-palvelun herätys `/healthz`-kutsulla ennen mallikutsua (ilmainen taso nukahtaa).
+- `server/index.mjs`: kaksi reittiä (`GET /api/assistant/status`, `POST /api/assistant/chat`) ja tuonti. `server/config.mjs` ja `.env.example`: `ASSISTANT_MCP_URL`, `ASSISTANT_MCP_TOKEN`. README:n osoitetaulukkoon rivi.
+- Uudet `public/assistant.html`, `assistant.js`, `assistant.css` (luokat `ta-`). Hakupaneeliin (`aimo-ask.js`) ja saneluun ei koskettu, koska Eelis työsti niitä samaan aikaan; linkki tai paneeliin kytkentä on Eeliksen päätettävissä.
+- **Kustannus:** kutsut maksetaan palvelimen `ANTHROPIC_API_KEY`-avaimelta (Opus 5.5, yksi kysymys = useita API-kierroksia työkalutuloksineen).
+
+**Tarkistukset:** `node --check` muutetuille tiedostoille. Päästä päähän -testi jäljiteltyä Claude API:a vasten (ei oikeaa avainta, 15/15): striimattu teksti merkilleen sama, työkalukutsut tilaviesteinä, pyynnössä `mcp_servers` (osoite, nimi, `authorization_token`) ja `mcp_toolset`, fallbackin 400-uusinta, `pause_turn`-jatko, virheellinen syöte 400 ilman API-kutsua, Markdown-taulukon muunnos ja HTML:n escapointi. `npm test` ei käynnistynyt Danielin koneella, koska `data/catalog.json` puuttuu (ei liity muutokseen). **Ei testattu:** oikea Claude API ja oikea MCP-yhteys Renderiin, sivun ulkoasu selaimessa.
+
+**Käyttöönotto:** lisää `.env`:iin `ASSISTANT_MCP_URL` (Render-osoite + `/mcp`, ilman tokenia) ja `ASSISTANT_MCP_TOKEN` (Danielilta), käynnistä palvelin uudelleen ja avaa `/assistant.html`.
+
 ## 14.11.2026 — Danielin MCP-palvelin päivitetty ja pysyvästi Renderissä (Claude Code, Danielin istunto)
 
 **Käyttäjän pyyntö:** Daniel pyysi päivittämään juuren `server.py`:n reposta `DanielTurkkinen/valio-aimo-agent` (yksityinen), jossa sitä nyt kehitetään. Palvelin pyörii Renderissä pysyvässä osoitteessa; tunneliosoite ei enää vaihdu. Osoitetta ja tokenia ei kirjata tähän julkiseen repoon, ne saa Danielilta.

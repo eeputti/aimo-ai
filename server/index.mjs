@@ -20,6 +20,7 @@ import { orderMode, setOrderMode } from './mode.mjs';
 import { packHint } from './packs.mjs';
 import { validatePlanning } from './planning.mjs';
 import { interpret as aimoInterpret, warm as aimoWarm, loadLexicon as aimoLexicon } from './aimo/index.mjs'; // Aimo-malli: vapaa teksti → rakenteinen pyyntö
+import { handleAssistantChat, assistantStatus } from './assistant.mjs'; // Tilausapuri: Danielin MCP-agentti sivulla /assistant.html
 
 const PUBLIC = path.join(ROOT, 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon' };
@@ -121,6 +122,8 @@ const routes = {
       ms: +(performance.now() - t0).toFixed(1),
     });
   },
+  'GET /api/assistant/status': (req, res) => json(res, 200, assistantStatus()),
+  'POST /api/assistant/chat': async (req, res) => handleAssistantChat(req, res, await readBody(req)),
   'GET /api/aimo/lexicon': (req, res) => { const l = aimoLexicon(); json(res, 200, { stats: l.stats, categories: [...l.categories.values()].sort((a, b) => b.size - a.size) }); },
 
   'GET /api/events': (req, res) => {
