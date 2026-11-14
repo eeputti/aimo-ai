@@ -2,6 +2,19 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — budjettiominaisuus pois tämän vaiheen demosta (Codex)
+
+**Käyttäjän päätös:** budjettiominaisuutta ei tarvita nyt, joten se poistetaan.
+
+- `public/app.js` ja `styles.css`: budjettikortti, mittari, asetus, ylityslupa, karsintapainikkeet ja budjettitekstit poistettu. Avustajan oikotie kysyy nyt tilauksen hintaa.
+- `server/proposal.mjs`, `agents/deep.mjs`, `agents/fast.mjs`, `demo.mjs`, `llm.mjs`, `planning.mjs` ja `index.mjs`: budjettikatto ei estä tilausta, ylityksiä ei hyväksytetä eikä määriä karsita budjettiin. `/api/budget` poistettu. Demon budjetin kalibrointi ja vain sitä varten tehty hintahaku poistettu. Tilauksen hinnat ja summat sekä muut hyväksyntäsäännöt säilyvät.
+- Vanhasta kannasta luetaan vain nykyiset sääntöasetukset. Käynnistyksessä vanhan, lähettämättömän luonnoksen budjettipäätös ja tiivistelmä päivitetään ilman uutta ennusteajoa tai käyttäjän tuote- ja määrämuutosten hävittämistä. Lähetettyjä tilauksia ei muuteta.
+- Vanhat karsintatestit päivitetty ostotarvelaskennan testeiksi. HTTP-regressio käynnistää palvelimen vanhan version tallennetulla luonnoksella ja tarkistaa määrämuutosten säilymisen, varoituksen poistumisen ja poistetun reitin 404-vastauksen. Ohjeesta `docs/kitchen-planning.md` poistettu vanha karsintaväite.
+
+**Tarkistukset:** pelkästä tästä työvaiheesta eristetty kopio commitin `a73c808` päälle: `npm test` **35/35**, `npm run aimo:eval` **26/26**, 0 mallikutsua. Yhteisessä työpuussa tehty testiajo oli **49/49**; sen erillinen tulkintatesti jäi samanaikaisen kananmunien kappalemäärätyön uuden `basis`-kentän vuoksi 24/26:een. Budjettimuutoksen oma eristetty tulkintatesti varmisti, ettei poisto aiheuta näitä eroja. JavaScriptin syntaksi ja rajattu `git diff --check` läpi. Selaimessa erillinen simuloitu testipalvelin: tilaus, päätökset, hinnat ja sääntöasetukset renderöityvät, budjettimainintoja ei ole ja konsolissa ei JavaScript-virheitä. Ei live-API- tai kielimallikutsuja.
+
+**Käyttöönotto ja työnjako:** portin 4747 demopalvelinta tai käyttäjän tilauskantaa ei käynnistetty uudelleen eikä nollattu. Palvelinpuolen poisto ja vanhan luonnoksen päivitys tulevat voimaan uudelleenkäynnistyksessä; korityövaiheen kanssa suunniteltu yhteinen uudelleenkäynnistys on yhä tekemättä. Commit rajataan tähän poistoon ja tähän lokimerkintään. Muiden chattien ostoskori-, haku- ja kappalemäärätyöt jäävät niiden omiin committeihin.
+
 ## 14.11.2026 — kananmunien kappaleet erotetaan myyntipakkauksista (Codex, sanelu)
 
 **Käyttäjän päätös:** "100 kananmunaa" tarkoittaa sataa munaa, ei sataa rasiaa. Kappalemäärä ja myyntipakkausten määrä erotetaan valitulle tuotteelle, ja lasku näytetään ennen koriin lisäämistä.

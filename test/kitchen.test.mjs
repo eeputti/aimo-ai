@@ -12,15 +12,14 @@ process.env.ANTHROPIC_API_KEY = '';
 process.env.DEMO_NOW = '2026-11-14T10:00:00+02:00';
 const { kv, history, bookings, wipe } = await import('../server/db.mjs');
 const { runDeep } = await import('../server/agents/deep.mjs');
-const { DEFAULT_RULES, evaluate, activeLines, applyTrim } = await import('../server/proposal.mjs');
+const { DEFAULT_RULES, evaluate, activeLines } = await import('../server/proposal.mjs');
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 beforeEach(() => {
   wipe();
   kv.set('deliveryDate', '2026-11-16');
   kv.set('kitchen', { name: 'Testikeittiö', demo: true });
-  kv.set('rules', { ...DEFAULT_RULES, budgetCap: 10000, autonomy: 'auto_within_rules' });
-  kv.set('budgetCalibrated', true);
+  kv.set('rules', { ...DEFAULT_RULES, autonomy: 'auto_within_rules' });
   kv.set('planningRevision', 4);
   kv.set('staples', [{ id: '464201', tags: ['dairy'] }]);
   history.add('2026-W46', '2026-11-09', '464201', 10);
@@ -53,7 +52,7 @@ test('muuntamaton reseptimäärä pysäyttää tilauksen myös uusintatarkistuks
   const p = await runDeep({ reason: 'testi' });
   assert.ok(p.lines.length > 0);
   assert.match(p.planningIssues.join(' '), /ei voida muuntaa/);
-  evaluate(p, { ...DEFAULT_RULES, budgetCap: 10000 });
+  evaluate(p, DEFAULT_RULES);
   assert.equal(p.canOrder, false);
   assert.ok(p.approvals.some((a) => a.type === 'planning'));
 });
@@ -66,16 +65,21 @@ test('varastovähennys näkyy lopullisessa ostomäärässä', async () => {
   assert.ok(p.lines[0].reason.sources.includes('Käyttökelpoinen varasto'));
 });
 
-test('budjettikarsinta huomioi varaston myös kun ostomäärä on historiaa pienempi', async () => {
+test('vanha budjettiraja ei estä tilausta eikä karsi varaston jälkeen laskettua ostotarvetta', async () => {
   kv.set('menuEvents', []);
   for (let i = 0; i < 7; i++) {
     const d = new Date('2026-11-16T12:00:00Z'); d.setUTCDate(d.getUTCDate() + i);
     bookings.add(d.toISOString().slice(0, 10), 12);
   }
   kv.set('inventory', { asOf: '2026-11-16', items: [{ id: 'milk-stock', productId: '464201', amount: 6, unit: 'l', expiresOn: '2026-11-22' }] });
+  kv.set('rules', { ...DEFAULT_RULES, budgetCap: 1 }); // vanhan version tallentama asetus
   const p = await runDeep({ reason: 'testi' });
   assert.equal(p.lines[0].qty, 6);
   evaluate(p, { ...DEFAULT_RULES, budgetCap: 1 });
-  applyTrim(p);
-  assert.equal(p.lines[0].qty, 4);
+  assert.equal(p.lines[0].qty, 6);
+  assert.equal(p.canOrder, true);
+  assert.deepEqual(p.approvals, []);
+  assert.equal(Object.hasOwn(p.rulesSnapshot, 'budgetCap'), false);
+  assert.equal(Object.hasOwn(p.totals, 'budgetCap'), false);
+  assert.doesNotMatch(p.briefing, /budjet/i);
 });

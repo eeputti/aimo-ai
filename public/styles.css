@@ -164,11 +164,6 @@ main { display: grid; gap: 32px; min-width: 0; }
 .facts li.note::before { background: var(--petrol); }
 .opt .btn { margin-top: auto; }
 .card-foot { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
-.meter { height: 8px; border-radius: 30px; background: var(--petrol-light); border: 1px solid var(--line); overflow: hidden; margin-top: 12px; position: relative; }
-.meter > i { display: block; height: 100%; background: var(--petrol); }
-.meter > i.over { background: var(--red); }
-.trim { margin: 12px 0 0; padding: 0; list-style: none; font-size: 14px; display: grid; gap: 4px; color: var(--muted); }
-.trim b { color: var(--ink); }
 
 /* ---------- Painikkeet: kulmikas, versaali, tiivis fontti ---------- */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 6px 24px; border: 2px solid var(--petrol); border-radius: 0; font: 800 18px/1.1 var(--display); letter-spacing: 0.5px; text-transform: uppercase; text-align: center; background: var(--petrol); color: #fff; transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease; }
@@ -308,8 +303,6 @@ input[type="radio"], input[type="checkbox"] { accent-color: var(--petrol); }
 .bar .sum { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
 .bar .total { font: 800 40px/1 var(--display); color: var(--petrol); font-variant-numeric: tabular-nums; }
 .bar .meta { font-size: 14px; color: var(--muted); display: grid; gap: 2px; }
-.bar .budget { min-width: 200px; color: var(--ink); }
-.bar .budget .meter { margin-top: 4px; }
 .bar .eco { display: flex; gap: 6px; flex-wrap: wrap; }
 @media (max-width: 720px) { .bar .eco { display: none; } .bar .btn.big { flex: 1; } .bar .total { font-size: 32px; } }
 

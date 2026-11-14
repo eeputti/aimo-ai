@@ -172,13 +172,11 @@ export function buildDemandPlan({ cat, planned, bookingRows = [], menuEvents = [
     const qty = roundToStep(exact, p, 'up'); // myös 0,1 pakkausta tarvetta tarvitsee kokonaisen pakkauksen
     if (qty <= 0) { skipped.push({ productId: p.id, name: p.name, reason: available ? 'Käyttökelpoinen varasto ja saapuvat toimitukset kattavat tarpeen' : 'Ei ostotarvetta tämän viikon asiakasmäärällä' }); continue; }
     const baselineQty = roundToStep(pl.base, p, 'up');
-    const trimFloorQty = roundToStep(Math.max(0, Math.min(target, pl.base) + extraUnits - available), p, 'up');
-    const minimumQty = roundToStep(Math.max(0, extraUnits - available), p, 'up');
     if (qty > exact + 1e-8) factors.push({ label: 'Myyntierä', detail: `Tarve ${fmt(exact)} ${ul}, pyöristys tilattavaan erään`, value: `→ ${fmt(qty)} ${ul}`, kind: 'lot' });
     const deltaPct = baselineQty ? Math.round((qty / baselineQty - 1) * 100) : null;
     const detail = factors.filter((f) => f.kind !== 'base').map((f) => `${f.label.toLowerCase()} ${f.value}`).join(', ');
     const text = baselineQty ? `${deltaPct === 0 ? 'Sama kuin tavallisesti' : `${deltaPct > 0 ? '+' : ''}${deltaPct} %`}${detail ? `: ${detail}` : ''}` : `Uusi reseptitarve: ${detail}`;
-    lines.push({ productId: p.id, qty, extra: { baselineQty, expectedQty: qty, minimumQty, trimFloorQty, lastWeekQty: pl.lastWeekQty ?? null, history: pl.series, weekLabels, group: pl.group, tags: pl.tags,
+    lines.push({ productId: p.id, qty, extra: { baselineQty, expectedQty: qty, lastWeekQty: pl.lastWeekQty ?? null, history: pl.series, weekLabels, group: pl.group, tags: pl.tags,
       origin: pl.base ? 'history' : 'recipe', menuExtra: extraUnits, recipeRequired: extraUnits > 0, supply: stock, deltaPct, reason: { text, factors, sources: [...new Set(sources)] } } });
   }
   return { lines, issues: [...new Set(issues)], warnings: [...new Set(warnings)], signals, skipped, booking };

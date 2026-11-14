@@ -9,9 +9,9 @@ import { kv, proposals, orders, history, audit, auditList, onAudit } from './db.
 import { apiStats, fetchQuotes, ping } from './valioApi.mjs';
 import { llmStats } from './llm.mjs';
 import { seedDemo, todayIso, weekKey, defaultDeliveryDate } from './demo.mjs';
-import { runDeep, deepState } from './agents/deep.mjs';
+import { runDeep, deepState, templateBriefing } from './agents/deep.mjs';
 import { handleChat, addProduct, optionCard } from './agents/fast.mjs';
-import { evaluate, activeLines, setQty, removeLine, decide, applyTrim, applyQuote, findLine, fmtQty, fmtMoney, DEFAULT_RULES } from './proposal.mjs';
+import { evaluate, activeLines, setQty, removeLine, decide, applyQuote, findLine, fmtQty, fmtMoney, DEFAULT_RULES, normalizeRules } from './proposal.mjs';
 import { subscribe } from './bus.mjs';
 import { handleGateway, bootGateway } from './gateway/http.mjs';
 import { ledger as gatewayLedger } from './gateway/store.mjs'; // Aimo Agent Gateway: /v1, /mcp, /console, /.well-known, /openapi.json
@@ -31,7 +31,7 @@ function sse(res) {
   return (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
 }
 
-const rulesNow = () => kv.get('rules', DEFAULT_RULES);
+const rulesNow = () => normalizeRules(kv.get('rules', {}));
 const planningCurrent = (p) => (p.planningRevision ?? 0) === kv.get('planningRevision', 0);
 function statePayload(t0) {
   const proposal = proposals.current();
@@ -169,7 +169,7 @@ const routes = {
     json(res, 200, commit(p, t0, { focus: r.sub?.lineId || null }));
   },
 
-  // "Yhdellä napilla": hyväksyy agentin suositteleman korvaajan jokaiselle saatavuuspoikkeamalle. Budjettia tämä ei hyväksy.
+  // "Yhdellä napilla": hyväksyy agentin suositteleman korvaajan jokaiselle saatavuuspoikkeamalle.
   'POST /api/accept-recommended': async (req, res, t0) => {
     const p = draftOr(res); if (!p) return;
     const focus = []; const done = [];
@@ -194,23 +194,14 @@ const routes = {
     json(res, 200, commit(p, t0, { focus: r.line.lineId }));
   },
 
-  'POST /api/budget': async (req, res, t0) => {
-    const p = draftOr(res); if (!p) return;
-    const { action } = await readBody(req);
-    if (action === 'approve') { p.budgetOverride = { approvedUpTo: p.totals.expected, at: new Date().toISOString() }; audit('käyttäjä', `Hyväksyi budjetin ylityksen ${fmtMoney(p.totals.overBy)}`, { summa: p.totals.net, budjetti: p.totals.budgetCap }, null, p.id); }
-    else if (action === 'trim') { const done = applyTrim(p); audit('käyttäjä', 'Hyväksyi agentin karsintaehdotuksen', { rivit: done.map((d) => `${d.name}: ${fmtQty(d.from)} → ${fmtQty(d.to)}`) }, null, p.id); }
-    json(res, 200, commit(p, t0));
-  },
-
   'POST /api/rules': async (req, res, t0) => {
     const body = await readBody(req);
     const rules = { ...rulesNow() };
     for (const key of Object.keys(DEFAULT_RULES)) if (key in body) rules[key] = body[key];
-    rules.budgetCap = Math.max(0, Number(rules.budgetCap) || 0);
     kv.set('rules', rules);
     audit('käyttäjä', 'Muutti sääntöjä', body);
     const p = proposals.current();
-    if (p && p.status !== 'ordered') { delete p.budgetOverride; return json(res, 200, { rules, ...commit(p, t0) }); }
+    if (p && p.status !== 'ordered') return json(res, 200, { rules, ...commit(p, t0) });
     json(res, 200, { rules, proposal: p, ms: +(performance.now() - t0).toFixed(2) });
   },
 
@@ -306,9 +297,15 @@ async function boot() {
   console.log(`Aimo-malli: sanasto ${aimoLexicon().stats.concepts} käsitettä, ${aimoLexicon().stats.categories} tuoteryhmää, ${aimoLexicon().stats.brands} merkkiä (${aimoLexicon().stats.ms} ms)`);
   server.listen(config.port, () => console.log(`\n→ http://localhost:${server.address().port}\n`));
 
-  // Hintalähteen vaihtuessa (simuloitu ↔ live) demodata alustetaan uudelleen, jotta demobudjetti kalibroituu oikeilla hinnoilla.
+  // Hintalähteen vaihtuessa (simuloitu ↔ live) demodata alustetaan uudelleen.
   if (!kv.get('kitchen') || (proposals.current() && proposals.current().source !== apiMode())) await seedDemo();
   const current = proposals.current();
+  if (current && current.status !== 'ordered' && Object.hasOwn(current.totals || {}, 'budgetCap')) {
+    // Poistetaan vanhan luonnoksen budjettipäätös muuttamatta käyttäjän tuotteita tai määriä.
+    evaluate(current, rulesNow());
+    current.briefing = templateBriefing(current, current.signals || [], activeLines(current).filter((l) => l.state === 'decision'));
+    proposals.save(current);
+  }
   const stale = !current || current.source !== apiMode() || (current.status !== 'ordered' && current.deliveryDate <= todayIso());
   if (stale) await runDeep({ reason: 'käynnistys', deliveryDate: !current || current.deliveryDate <= todayIso() ? defaultDeliveryDate() : current.deliveryDate }).catch((e) => console.error('[deep]', e));
 

@@ -51,7 +51,7 @@ Toiminnot (type):
 - why: käyttäjä kysyy miksi rivillä on tietty määrä.
 - search: käyttäjä haluaa vain nähdä vaihtoehtoja, ei lisätä.
 - approve: käyttäjä haluaa hyväksyä tai lähettää tilauksen.
-- question: muu kysymys tilauksesta, budjetista, toimituksesta tai tuotteista. term = kysymys sellaisenaan.
+- question: muu kysymys tilauksesta, toimituksesta tai tuotteista. term = kysymys sellaisenaan.
 
 Yksi viesti voi sisältää monta toimintoa: palauta ne kaikki järjestyksessä. term on aina perusmuodossa ilman määriä. Jos viesti koskee useaa riviä ("kaikkea kermaa"), palauta oma adjust jokaiselle riville. Älä keksi rivejä tai tuotteita, joita viestissä ei mainita.`;
 

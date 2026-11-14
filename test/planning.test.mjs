@@ -115,11 +115,11 @@ test('epäselvä toimitus tai toistuva erätunnus ei voi pienentää ostotarvett
   assert.equal(r.lines.length, 0);
 });
 
-test('budjettikarsinnan alaraja huomioi reseptit ja käytettävissä olevan varaston', () => {
+test('ostotarve yhdistää varauskasvun, reseptit ja käytettävissä olevan varaston', () => {
   const r = plan({ bookingRows: bookings(12), menuEvents: [menu('cream', 20)], inventory: { asOf: date, items: [batch('stock', 1)] } });
   assert.equal(qty(r), 13);
-  assert.equal(r.lines[0].extra.trimFloorQty, 11);
-  assert.equal(r.lines[0].extra.minimumQty, 1);
+  assert.equal(r.lines[0].extra.menuExtra, 2);
+  assert.deepEqual(r.lines[0].extra.supply, { inventory: 1, incoming: 0 });
 });
 
 test('virheellinen saanto, päivämäärä tai tuntematon tuote torjutaan', () => {

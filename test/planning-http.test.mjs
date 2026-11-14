@@ -4,17 +4,40 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 
 test('suunnittelutietojen HTTP-ketju erillisessä demossa', { timeout: 20000 }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-planning-http-'));
+  const env = { ...process.env, PORT: '0', AIMO_DB: path.join(dir, 'kitchen.db'), GATEWAY_DB: path.join(dir, 'gateway.db'),
+    VALIO_API_KEY: '', ANTHROPIC_API_KEY: '', DEMO_NOW: '2026-11-14T10:00:00+02:00',
+    GATEWAY_PRIVATE_KEY_PEM: crypto.generateKeyPairSync('ed25519').privateKey.export({ format: 'pem', type: 'pkcs8' }) };
+  // Oikea tallennettu luonnos vanhasta versiosta: mukana budjettipäätös ja käyttäjän määrämuutos.
+  const setup = spawnSync(process.execPath, ['--disable-warning=ExperimentalWarning', '--input-type=module', '-e', `
+    import { seedDemo } from './server/demo.mjs';
+    import { runDeep } from './server/agents/deep.mjs';
+    import { kv, proposals } from './server/db.mjs';
+    await seedDemo();
+    const p = await runDeep({ reason: 'vanhan version testiluonnos' });
+    p.lines[0].qty += 1;
+    p.lines[0].reason.userEdit = 'Käyttäjän määrämuutos';
+    p.totals.budgetCap = 1;
+    p.totals.budgetOk = false;
+    p.totals.overBy = p.totals.expected - 1;
+    p.approvals.push({ id: 'budget', type: 'budget', text: 'Tilaus ylittää budjetin' });
+    p.canOrder = false;
+    p.budgetOverride = { approvedUpTo: 1 };
+    p.briefing = 'Budjetti ylittyy: tarvitsen luvan.';
+    proposals.save(p);
+    kv.set('rules', { ...kv.get('rules'), budgetCap: 1 });
+    console.log(JSON.stringify({ id: p.id, lines: p.lines.map(l => [l.lineId, l.productId, l.qty]) }));
+  `], { cwd: new URL('..', import.meta.url), env, encoding: 'utf8' });
+  if (setup.status !== 0) { fs.rmSync(dir, { recursive: true, force: true }); assert.fail(setup.stderr); }
+  const legacy = JSON.parse(setup.stdout.trim());
   const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'server/index.mjs'], {
     cwd: new URL('..', import.meta.url),
-    env: { ...process.env, PORT: '0', AIMO_DB: path.join(dir, 'kitchen.db'), GATEWAY_DB: path.join(dir, 'gateway.db'),
-      VALIO_API_KEY: '', ANTHROPIC_API_KEY: '', DEMO_NOW: '2026-11-14T10:00:00+02:00',
-      GATEWAY_PRIVATE_KEY_PEM: crypto.generateKeyPairSync('ed25519').privateKey.export({ format: 'pem', type: 'pkcs8' }) },
+    env,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(async () => {
@@ -48,6 +71,21 @@ test('suunnittelutietojen HTTP-ketju erillisessä demossa', { timeout: 20000 }, 
   const initial = await settled();
   const deliveryDate = initial.deliveryDate;
   const initialData = (await request('/api/planning')).body;
+
+  await t.test('vanhan luonnoksen budjettivaroitus poistuu ja omat määrämuutokset säilyvät', async () => {
+    assert.equal(initial.id, legacy.id);
+    assert.deepEqual(initial.lines.map((l) => [l.lineId, l.productId, l.qty]), legacy.lines);
+    assert.equal(initial.lines[0].reason.userEdit, 'Käyttäjän määrämuutos');
+    assert.ok(initial.approvals.every((a) => a.type !== 'budget'));
+    assert.doesNotMatch(initial.briefing, /budjet/i);
+    for (const key of ['budgetCap', 'budgetOk', 'overBy']) assert.equal(Object.hasOwn(initial.totals, key), false);
+    assert.equal(Object.hasOwn(initial, 'budgetOverride'), false);
+    assert.equal(Object.hasOwn((await request('/api/state')).body.rules, 'budgetCap'), false);
+    assert.equal((await request('/api/budget', { action: 'trim' })).status, 404);
+    const update = await request('/api/rules', { budgetCap: 1 });
+    assert.equal(Object.hasOwn(update.body.rules, 'budgetCap'), false);
+    assert.ok(update.body.proposal.approvals.every((a) => a.type !== 'budget'));
+  });
 
   await t.test('epäselvää ryhmän jäsenyyttä ei tallenneta', async () => {
     const r = await request('/api/planning', { menuEvents: [{ id: 'new', groups: [{ date: deliveryDate, pax: 10 }], recipe: [{ productId: '460460', amount: 0.01, unit: 'kg' }] }] });

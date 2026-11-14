@@ -8,7 +8,7 @@ import { loadCatalog, unitLabel, TEMP_LABEL } from '../catalog.mjs';
 import { kv, history, bookings, proposals, audit } from '../db.mjs';
 import { fetchQuotes, apiStats } from '../valioApi.mjs';
 import { apiMode, llmEnabled, config } from '../config.mjs';
-import { makeLine, applyQuote, evaluate, activeLines, decide, fmtQty, fmtMoney, fmtDate, DEFAULT_RULES } from '../proposal.mjs';
+import { makeLine, applyQuote, evaluate, activeLines, decide, fmtQty, fmtMoney, fmtDate, normalizeRules } from '../proposal.mjs';
 import { findSubstitutes } from '../substitutes.mjs';
 import { buildDemandPlan } from '../planning.mjs';
 import { publish } from '../bus.mjs';
@@ -64,7 +64,7 @@ export async function runDeep({ reason = 'ajastettu yöajo', deliveryDate } = {}
   try {
     const cat = loadCatalog();
     const planningRevision = kv.get('planningRevision', 0);
-    const rules = kv.get('rules', DEFAULT_RULES);
+    const rules = normalizeRules(kv.get('rules', {}));
     const date = deliveryDate || kv.get('deliveryDate');
     kv.set('deliveryDate', date);
     const steps = [];
@@ -109,13 +109,6 @@ export async function runDeep({ reason = 'ajastettu yöajo', deliveryDate } = {}
     lines.forEach((l) => applyQuote(l, quotes.get(l.productId)));
     const proposal = { id: `P-${date}-${Date.now().toString(36)}`, kitchen: kv.get('kitchen'), deliveryDate: date, createdAt: new Date().toISOString(), status: 'draft', lines, signals, skipped, planningIssues: demand.issues, planningWarnings: demand.warnings, planningRevision, source: apiMode() };
     evaluate(proposal, rules);
-    if (!kv.get('budgetCalibrated') && !demand.issues.length && lines.length) {
-      // DEMO: budjettikatto asetetaan ensimmäisen ehdotuksen perusteella noin 4 % sen alle, jotta "agentti kysyy luvan" -polku
-      // näkyy samanlaisena sekä simuloidulla että live-datalla. Oikeassa käytössä katto tulee asiakkaan asetuksista.
-      rules.budgetCap = Math.max(100, Math.floor((proposal.totals.expected * 0.962) / 50) * 50);
-      kv.set('rules', rules); kv.set('budgetCalibrated', true);
-      evaluate(proposal, rules);
-    }
     step(steps, 'Saatavuus ja hinnat', `${lines.length} tuotetta, ${apiStats.calls - callsBefore} API-kutsua (${apiMode() === 'live' ? 'live' : 'simuloitu'})`, t);
 
     // 5) Poikkeamille korvaajat valmiiksi (rinnakkain)
@@ -187,7 +180,7 @@ export async function runDeep({ reason = 'ajastettu yöajo', deliveryDate } = {}
   }
 }
 
-function templateBriefing(proposal, signals, exceptions) {
+export function templateBriefing(proposal, signals, exceptions) {
   const t = proposal.totals;
   const parts = [`${weekdayLong(proposal.deliveryDate)} ${fmtDate(proposal.deliveryDate)} tilaus on valmiina: ${t.lines} riviä, ${fmtMoney(t.expected)} (alv 0 %).`];
   const booking = signals.find((s) => s.id === 'bookings');
@@ -196,7 +189,6 @@ function templateBriefing(proposal, signals, exceptions) {
   if (menu) parts.push(`${menu.label} (${menu.detail.split(' (')[0]}) on laskettu reseptistä mukaan.`);
   const outs = exceptions.filter((l) => l.state !== 'replaced');
   if (outs.length) parts.push(`${outs.length} ${outs.length === 1 ? 'tuote ei ole' : 'tuotetta ei ole'} saatavilla sellaisenaan: ${outs.map((l) => l.name.split(' ').slice(0, 3).join(' ')).join(', ')}. Korvaajat on valittu valmiiksi, sinun tarvitsee vain hyväksyä.`);
-  if (!t.budgetOk) parts.push(`Budjetti ylittyy ${fmtMoney(t.overBy)}: tarvitsen siihen luvan tai karsin ehdotukseni mukaan.`);
   return parts.join(' ');
 }
 const weekdayLong = (iso) => ['Sunnuntain', 'Maanantain', 'Tiistain', 'Keskiviikon', 'Torstain', 'Perjantain', 'Lauantain'][new Date(`${iso}T12:00:00Z`).getUTCDay()];

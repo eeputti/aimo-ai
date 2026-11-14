@@ -64,7 +64,6 @@ export async function addProduct(proposal, productId, qty, note) {
 function knownAnswer(q, proposal) {
   const t = proposal.totals;
   const s = q.toLowerCase();
-  if (/budjet/.test(s)) return t.budgetOk && !t.overBy ? `Budjetti on ${fmtMoney(t.budgetCap)} ja tilaus on nyt ${fmtMoney(t.expected)}, eli varaa on ${fmtMoney(t.budgetCap - t.expected)}.` : `Budjetti on ${fmtMoney(t.budgetCap)} ja tilaus on nyt ${fmtMoney(t.expected)}: ylitys ${fmtMoney(t.overBy)}${proposal.budgetOverride ? ' (ylitys hyväksytty)' : ', odottaa hyväksyntääsi'}.`;
   if (/yhteensä|summa|paljonko.*(tilau|maksa)|loppusumma/.test(s)) return `Tilaus on nyt ${fmtMoney(t.expected)} (alv 0 %)${t.pendingNet ? `, josta ${fmtMoney(t.pendingNet)} odottaa päätöstäsi` : ''}. Rivejä ${t.lines}.`;
   if (/mihin\s+mennessä|tilausaika|viimeistään|cut.?off|ehdin/.test(s)) return proposal.cutoff ? `Tilaus pitää lähettää viimeistään ${fmtDate(proposal.cutoff.slice(0, 10))} klo ${proposal.cutoff.slice(11, 16).replace(':', '.')}, jotta toimitus ehtii ${fmtDate(proposal.deliveryDate)}.` : 'Rajapinta ei palauttanut tilausaikarajaa näille tuotteille.';
   if (/puuttu|loppu|poikkeam|saatavill|ongelm/.test(s)) return proposal.approvals.length ? `Päätöstäsi odottaa ${proposal.approvals.length} asiaa: ${proposal.approvals.map((a) => a.text).join('; ')}.` : 'Ei poikkeamia: kaikki rivit ovat saatavilla ja sääntöjen sisällä.';
@@ -221,7 +220,7 @@ export async function handleChat(text, emit) {
   const fresh = proposal.approvals.filter((x) => !before.has(x.id));
   emit('agent', { name: 'Säännöt', state: fresh.length ? 'warn' : 'done', ms: policyMs, detail: fresh.length ? `${fresh.length} uutta päätettävää` : 'sääntöjen sisällä', path: 'fast' });
   if (changes.length) {
-    say.push(`Tilaus nyt ${fmtMoney(proposal.totals.expected)}${proposal.totals.budgetOk ? '' : `, budjetti ylittyy ${fmtMoney(proposal.totals.overBy)}`}.`);
+    say.push(`Tilaus nyt ${fmtMoney(proposal.totals.expected)}.`);
     for (const f of fresh) say.push(`Huom: ${f.text}.`);
   }
   proposals.save(proposal);
@@ -237,9 +236,9 @@ export async function handleChat(text, emit) {
         reply += await answerQuestion(question, facts, (tok) => emit('token', { text: tok }));
         emit('agent', { name: 'Vastaus', state: 'done', ms: Math.round(performance.now() - tl), detail: config.fastModel, path: 'fast' });
         emit('say', { text: reply, streamed: true });
-      } catch (err) { reply += `En saanut kielimallilta vastausta (${String(err.message || err).slice(0, 80)}). Kokeile kysyä budjetista, summasta, tilausaikarajasta tai poikkeamista.`; emit('say', { text: reply }); }
+      } catch (err) { reply += `En saanut kielimallilta vastausta (${String(err.message || err).slice(0, 80)}). Kokeile kysyä summasta, tilausaikarajasta tai poikkeamista.`; emit('say', { text: reply }); }
     } else {
-      reply += `${reply ? ' ' : ''}Tähän kysymykseen tarvitsen kielimallin (ANTHROPIC_API_KEY puuttuu). Ilman sitä osaan: "lisää lohta", "20 % enemmän kermaa", "poista kahvi", "korvaava kurkulle", "miksi kermaa on näin paljon", "paljonko budjettia on jäljellä".`;
+      reply += `${reply ? ' ' : ''}Tähän kysymykseen tarvitsen kielimallin (ANTHROPIC_API_KEY puuttuu). Ilman sitä osaan: "lisää lohta", "20 % enemmän kermaa", "poista kahvi", "korvaava kurkulle", "miksi kermaa on näin paljon", "paljonko tilaus maksaa".`;
       emit('say', { text: reply });
     }
   } else emit('say', { text: reply || 'Valmis.' });

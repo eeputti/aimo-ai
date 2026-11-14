@@ -179,21 +179,6 @@ function availabilityCard(line) {
     </div>
   </article>`;
 }
-function budgetCard(a, p) {
-  const t = p.totals; const share = Math.min(100, (t.budgetCap / t.expected) * 100);
-  const trim = a.trim;
-  return `<article class="card budget" id="card-budget">
-    <div class="card-head"><h3>Tilaus ylittää budjetin ${money(a.overBy)}</h3><span class="tag warn">Tarvitsen luvan</span></div>
-    <p class="need">${money(t.expected)} / budjetti ${money(t.budgetCap)}. Tavallinen viikko näillä hinnoilla olisi ${money(t.baselineNet)}; ero tulee varauksista ja ryhmämenusta.</p>
-    <div class="meter" aria-hidden="true"><i style="width:${share}%"></i></div>
-    ${trim.lines.length ? `<ul class="trim">${trim.lines.map((l) => `<li>${esc(l.name)}: ${qty(l.from)} → <b>${qty(l.to)} ${esc(l.unitLabel)}</b> (−${money(l.saves)})</li>`).join('')}</ul>` : ''}
-    <div class="card-foot">
-      <button class="btn" data-action="budget" data-choice="approve">Hyväksy ylitys tälle tilaukselle</button>
-      ${trim.lines.length ? `<button class="btn ghost" data-action="budget" data-choice="trim">Karsi ehdotukseni mukaan (−${money(trim.saves)})${trim.enough ? '' : ', ei riitä kokonaan'}</button>` : ''}
-      <span class="small muted">Karsinta palauttaa korotuksia kohti perustasoa. Ryhmämenun tarpeisiin ei kosketa.</span>
-    </div>
-  </article>`;
-}
 function simpleCard(line, a) {
   const blocked = a.type === 'blocked';
   return `<article class="card ${blocked ? '' : 'confirm'}" id="card-${line.lineId}">
@@ -209,13 +194,13 @@ function renderDecisions() {
   const p = state.d.proposal; const el = $('#decisions');
   if (!p || state.deepRunning || p.status === 'ordered') { el.innerHTML = ''; return; }
   const byId = new Map(p.lines.map((l) => [l.lineId, l]));
-  const order = { planning: -1, availability: 0, blocked: 1, qtyjump: 2, budget: 3 };
+  const order = { planning: -1, availability: 0, blocked: 1, qtyjump: 2 };
   const list = [...p.approvals].sort((a, b) => order[a.type] - order[b.type]);
   if (!list.length) { el.innerHTML = '<div class="section-head"><h2>Ei avoimia päätöksiä</h2><span class="count ok">✓</span></div>'; return; }
   const recommendable = list.filter((a) => a.type === 'availability' && byId.get(a.lineId)?.options?.some((o) => o.recommended)).length;
   el.innerHTML = `<div class="section-head"><h2>Tarvitsen päätöksesi</h2><span class="count">${list.length}</span>
       ${recommendable > 1 ? `<button class="btn" style="margin-left:auto" data-action="accept-all">Hyväksy ${recommendable} suositeltua korvaajaa</button>` : ''}</div>
-    <div class="cards">${list.map((a) => (a.type === 'planning' ? `<article class="card"><div class="card-head"><h3>Ostotarvetta ei voitu laskea kokonaan</h3></div><p class="need">${esc(a.text)}</p><p class="small muted">Täydennä resepti- tai varastotiedot ja laadi ehdotus uudelleen.</p><button class="btn ghost" data-action="deep-run">Laske uudelleen</button></article>` : a.type === 'budget' ? budgetCard(a, p) : a.type === 'availability' ? availabilityCard(byId.get(a.lineId)) : simpleCard(byId.get(a.lineId), a))).join('')}</div>`;
+    <div class="cards">${list.map((a) => (a.type === 'planning' ? `<article class="card"><div class="card-head"><h3>Ostotarvetta ei voitu laskea kokonaan</h3></div><p class="need">${esc(a.text)}</p><p class="small muted">Täydennä resepti- tai varastotiedot ja laadi ehdotus uudelleen.</p><button class="btn ghost" data-action="deep-run">Laske uudelleen</button></article>` : a.type === 'availability' ? availabilityCard(byId.get(a.lineId)) : simpleCard(byId.get(a.lineId), a))).join('')}</div>`;
 }
 
 // ---------- rivit ----------
@@ -293,20 +278,19 @@ function renderSkipped() {
 function renderBar() {
   const p = state.d.proposal; const el = $('#bar');
   if (!p || state.deepRunning) { el.innerHTML = '<span class="running"><span class="spinner"></span> Lasketaan…</span>'; return; }
-  const t = p.totals; const over = t.expected > t.budgetCap;
+  const t = p.totals;
   const pending = p.approvals.length;
   const btn = p.status === 'ordered' ? '<button class="btn big ghost" disabled>Tilaus lähetetty ✓</button>'
     : pending ? `<button class="btn big" data-action="goto-decisions">Ratkaise ensin ${pending} ${pending === 1 ? 'päätös' : 'päätöstä'}</button>`
     : '<button class="btn big primary" data-action="open-review">Tarkista ja hyväksy tilaus</button>';
   el.innerHTML = `<div class="sum">
       <div><div class="total">${money(t.expected)}</div><div class="meta">${t.lines} riviä, alv 0 %${t.pendingNet ? `, ${money(t.pendingNet)} odottaa päätöstä` : ''}</div></div>
-      <div class="meta budget"><span>Budjetti ${money(t.budgetCap)}, ${over ? `<b style="color:var(--warn)">ylitys ${money(t.expected - t.budgetCap)}${t.budgetOk ? ' (hyväksytty)' : ''}</b>` : `jäljellä ${money(t.budgetCap - t.expected)}`}</span><div class="meter"><i class="${over ? 'over' : ''}" style="width:${Math.min(100, (t.expected / t.budgetCap) * 100)}%"></i></div></div>
       <div class="eco"><span class="tag" title="Arvio tuoteryhmäkeskiarvoilla, kattaa ${t.co2Lines}/${t.lines} riviä">CO₂ ≈ ${t.co2Kg.toLocaleString('fi-FI')} kg</span><span class="tag">Kotimaisia ${t.domesticShare} % arvosta</span></div>
     </div>${btn}`;
 }
 
 // ---------- avustaja ----------
-const PRESETS = ['Sama kuin viime viikolla, mutta 20 % enemmän kermaa', 'Lisää 10 kg lohta ja poista kahvi', 'Miksi lohta on näin paljon?', 'Tarvitsen tofua', 'Paljonko budjettia on jäljellä?'];
+const PRESETS = ['Sama kuin viime viikolla, mutta 20 % enemmän kermaa', 'Lisää 10 kg lohta ja poista kahvi', 'Miksi lohta on näin paljon?', 'Tarvitsen tofua', 'Paljonko tilaus maksaa?'];
 // Chatin tuote-ehdotus kuvakorttina: kuva, hinta, saatavuus värinä ja toimitusvarmuus palkkina.
 function chatProduct(it) {
   const ok = it.availability.kind === 'ok' && it.price;
@@ -376,7 +360,7 @@ function focusLine(lineId) {
 }
 
 // ---------- välilehdet ----------
-const AUTONOMY = [['suggest', 'Vain ehdottaa', 'Agentti laatii ehdotuksen, sinä hyväksyt jokaisen poikkeaman.'], ['ask_exceptions', 'Kysyy luvan poikkeuksiin', 'Sääntöjen sisällä olevat rivit ovat valmiina. Korvaukset ja budjetin ylitys kysytään.'], ['auto_within_rules', 'Hoitaa itse sääntöjen sisällä', 'Agentti hyväksyy itse korvaajat, jotka täyttävät säännöt. Kaikki muu kysytään.']];
+const AUTONOMY = [['suggest', 'Vain ehdottaa', 'Agentti laatii ehdotuksen, sinä hyväksyt jokaisen poikkeaman.'], ['ask_exceptions', 'Kysyy luvan poikkeuksiin', 'Sääntöjen sisällä olevat rivit ovat valmiina. Korvaukset kysytään erikseen.'], ['auto_within_rules', 'Hoitaa itse sääntöjen sisällä', 'Agentti hyväksyy itse korvaajat, jotka täyttävät säännöt. Kaikki muu kysytään.']];
 const ALLERGENS = [['AP', 'maapähkinä'], ['AN', 'pähkinät'], ['AF', 'kala'], ['AC', 'äyriäiset'], ['AW', 'gluteeni'], ['AM', 'maito'], ['AE', 'kananmuna'], ['AY', 'soija'], ['AS', 'seesami'], ['BC', 'selleri'], ['BM', 'sinappi']];
 function renderTab() {
   document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
@@ -384,7 +368,6 @@ function renderTab() {
   if (state.tab === 'rules') {
     el.innerHTML = `<div class="radio">${AUTONOMY.map(([v, t, desc]) => `<label><input type="radio" name="autonomy" data-rule="autonomy" value="${v}" ${r.autonomy === v ? 'checked' : ''}><span title="${desc}"><b>${t}</b></span></label>`).join('')}</div>
       <div class="field2">
-        <label class="field"><span>Budjettikatto € / tilaus</span><input type="number" data-rule="budgetCap" value="${r.budgetCap}" step="50" min="0"></label>
         <label class="field"><span>Määrä yli ennusteen, max %</span><input type="number" data-rule="maxQtyJumpPct" value="${r.maxQtyJumpPct}" step="10" min="0"></label>
         <label class="field"><span>Korvaajan hinta, max + %</span><input type="number" data-rule="subMaxPriceIncreasePct" value="${r.subMaxPriceIncreasePct}" step="1" min="0"></label>
         <label class="field"><span>Toimitusvarmuus, min %</span><input type="number" data-rule="minReliability" data-scale="100" value="${Math.round(r.minReliability * 100)}" step="1" min="0" max="100"></label>
@@ -406,7 +389,7 @@ function renderTab() {
       <div class="lanebox fast"><span class="path-tag fast">Nopea polku, kun kysyt</span><h4 style="margin-top:6px">Reititin → agentit rinnakkain → vastaus</h4>
         <div class="big">${state.last ? ms(state.last.ms) : '–'}</div><div class="small">viimeisin vastaus${state.last ? ` (${esc(state.last.via)})` : ''}</div>
         <ol><li>Reititin: säännöt ensin, ${d.mode.llm ? esc(d.mode.fastModel) : 'pieni malli'} vain tarvittaessa</li><li>Tuotehaku muistista (${s.catalog.products.toLocaleString('fi-FI')} tuotetta)</li><li>Saatavuus + hinta välimuistista tai rajapinnasta</li><li>Korvaajat staattisesta datasta</li></ol></div>
-      <div class="lanebox gate"><h4>Sääntöportti</h4><div class="small">Budjetti, allergeenit, määrärajat ja korvaussäännöt tarkistetaan koodilla jokaisen muutoksen jälkeen. Ennen lähetystä hinnat ja saatavuus haetaan vielä kerran tuoreena.</div></div>
+      <div class="lanebox gate"><h4>Sääntöportti</h4><div class="small">Allergeenit, määrärajat ja korvaussäännöt tarkistetaan koodilla jokaisen muutoksen jälkeen. Ennen lähetystä hinnat ja saatavuus haetaan vielä kerran tuoreena.</div></div>
       <div class="small muted">Aimo API tällä istunnolla: ${s.api.calls} kutsua, ${s.api.ids} tuotekyselyä, ${s.api.cacheHits} osumaa välimuistista${s.api.errors ? `, ${s.api.errors} virhettä` : ''}. Koko valikoimaa ei koskaan kysytä kerralla.</div>
       <button class="linkbtn small" data-action="reset" style="justify-self:start">Nollaa demo alkutilaan</button></div>`;
   }
@@ -426,7 +409,7 @@ function renderReview() {
   if (r.step === 'checking') dlg.innerHTML = '<div class="review-body"><h2>Tarkistan tilauksen…</h2><p class="running"><span class="spinner"></span> Haen tuoreet hinnat ja saatavuuden ja ajan sääntötarkistuksen.</p></div>';
   else if (r.step === 'blocked') dlg.innerHTML = `<div class="review-body"><h2>Tilausta ei voi vielä lähettää</h2><ul class="checks">${p.approvals.map((a) => `<li class="bad">${esc(a.text)}</li>`).join('')}</ul></div><div class="review-foot"><button class="btn" data-action="review-close">Palaa tilaukseen</button></div>`;
   else if (r.step === 'summary') dlg.innerHTML = `<div class="review-body">${head(1, 'Tarkista tilaus')}
-      <ul class="checks"><li>Saatavuus ja hinnat haettu juuri nyt ${lines.length} tuotteelle (${ms(r.ms)}, ${state.d.mode.api === 'live' ? 'Aimo API' : 'simuloitu'})</li><li>Budjetti: ${money(t.expected)} / ${money(t.budgetCap)}${t.expected > t.budgetCap ? ' (ylitys hyväksytty)' : ''}</li><li>Allergeeni- ja toimittajasäännöt: ei rikkomuksia</li><li>Korvauksia ${lines.filter((l) => l.substituteFor).length} kpl, kaikki hyväksymiäsi</li>${r.diffs.map((x) => `<li class="bad">${esc(x.name)}: ${esc(x.text)}</li>`).join('')}</ul>
+      <ul class="checks"><li>Saatavuus ja hinnat haettu juuri nyt ${lines.length} tuotteelle (${ms(r.ms)}, ${state.d.mode.api === 'live' ? 'Aimo API' : 'simuloitu'})</li><li>Allergeeni- ja toimittajasäännöt: ei rikkomuksia</li><li>Korvauksia ${lines.filter((l) => l.substituteFor).length} kpl, kaikki hyväksymiäsi</li>${r.diffs.map((x) => `<li class="bad">${esc(x.name)}: ${esc(x.text)}</li>`).join('')}</ul>
       <div class="scroll"><table><thead><tr><th>Tuote</th><th class="r">Määrä</th><th class="r">à</th><th class="r">Yhteensä</th></tr></thead><tbody>${lines.map((l) => `<tr><td>${esc(l.name)}${l.substituteFor ? `<div class="small muted">korvaa: ${esc(l.substituteFor.name)}</div>` : ''}<div class="small muted">${esc(l.productId)}, ${esc(l.availabilityView?.text || '')}</div></td><td class="r">${qty(l.qty)} ${esc(l.unitLabel)}</td><td class="r">${money(l.price.net)}</td><td class="r">${money(l.total)}</td></tr>`).join('')}</tbody></table></div>
       <div class="totals"><span>Välisumma (alv 0 %)</span><span class="num">${money(t.net)}</span><span>Arvonlisävero</span><span class="num">${money(t.vat)}</span><span class="grand">Yhteensä</span><span class="grand num">${money(t.gross)}</span><span class="muted">Toimitus</span><span>${esc(dateLabel(p.deliveryDate))}${p.cutoff ? `, tilattava viimeistään ${esc(dateLabel(p.cutoff))} klo ${esc(clock(p.cutoff))}` : ''}</span></div>
     </div><div class="review-foot"><button class="btn ghost" data-action="review-close">Peruuta</button><button class="btn big" data-action="review-confirm">Vahvista tilaus</button></div>`;
@@ -453,7 +436,6 @@ const actions = {
   remove: async (b) => { applyProposal(await api('/api/line', { lineId: b.dataset.line, remove: true })); toast('Rivi poistettu'); },
   decide: async (b) => { const r = await api('/api/decide', { lineId: b.dataset.line, choice: b.dataset.choice }); applyProposal(r, [r.focus, b.dataset.line]); if (r.focus) document.getElementById(`row-${r.focus}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); },
   'accept-all': async () => { const r = await api('/api/accept-recommended', {}); applyProposal(r, r.focus || []); toast(`${r.accepted} korvaajaa hyväksytty`); },
-  budget: async (b) => applyProposal(await api('/api/budget', { action: b.dataset.choice })),
   'add-product': async (b) => { const r = await api('/api/add', { productId: b.dataset.product, qty: Number(b.dataset.qty) || null }); applyProposal(r, [r.focus]); toast('Lisätty tilaukseen'); },
   'ask-sub': (b) => { const l = state.d.proposal.lines.find((x) => x.lineId === b.dataset.line); send(`korvaava tuotteelle ${l.name.split(' ').slice(0, 3).join(' ')}`); },
   allergen: async (b) => { const cur = new Set(state.d.rules.bannedAllergens); cur.has(b.dataset.code) ? cur.delete(b.dataset.code) : cur.add(b.dataset.code); applyProposal(await api('/api/rules', { bannedAllergens: [...cur] })); },

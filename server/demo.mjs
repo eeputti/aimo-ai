@@ -5,7 +5,7 @@
 import { loadCatalog } from './catalog.mjs';
 import { kv, history, bookings, wipe, audit } from './db.mjs';
 import { DEFAULT_RULES } from './proposal.mjs';
-import { fetchQuotes, clearApiCache } from './valioApi.mjs';
+import { clearApiCache } from './valioApi.mjs';
 import { apiMode } from './config.mjs';
 
 export const KITCHEN = { id: 'kulma', name: 'Ravintola Kulma', kind: 'Lounas + à la carte, 70 asiakaspaikkaa', city: 'Helsinki', contact: 'Keittiöpäällikkö', demo: true };
@@ -110,12 +110,7 @@ export async function seedDemo({ deliveryDate = defaultDeliveryDate() } = {}) {
   kv.set('staples', staples.map(({ id, group, tags }) => ({ id, group, tags })));
   kv.set('deliveryDate', deliveryDate);
 
-  // Budjettikatto: tavallisen viikon ostot + 8 % pelivaraa, pyöristettynä. Hinnat rajapinnasta (yksi kutsu rajatulle joukolle).
-  const quotes = await fetchQuotes(staples.map((s) => s.id), deliveryDate);
-  let normalWeek = 0;
-  for (const s of staples) { const price = quotes.get(s.id)?.price; if (price && !price.error && !s.until) normalWeek += price.net * s.base / (s.every || 1); }
-  const budgetCap = Math.max(200, Math.round((normalWeek * 1.2) / 50) * 50); // alustava; kalibroidaan ensimmäisen ehdotuksen jälkeen (ks. deep.mjs)
-  kv.set('rules', { ...DEFAULT_RULES, budgetCap });
-  audit('system', 'Demodata alustettu', { keittio: KITCHEN.name, tuotteita: staples.length, historiaviikkoja: WEEKS, toimituspaiva: deliveryDate, budjetti: budgetCap, huom: 'Historia, varaukset ja menu ovat generoitua demodataa' });
-  return { deliveryDate, staples: staples.length, budgetCap };
+  kv.set('rules', { ...DEFAULT_RULES });
+  audit('system', 'Demodata alustettu', { keittio: KITCHEN.name, tuotteita: staples.length, historiaviikkoja: WEEKS, toimituspaiva: deliveryDate, huom: 'Historia, varaukset ja menu ovat generoitua demodataa' });
+  return { deliveryDate, staples: staples.length };
 }

@@ -6,7 +6,6 @@ import { cutoffPassed, helsinkiLabel } from './gateway/clock.mjs';
 
 export const DEFAULT_RULES = {
   autonomy: 'ask_exceptions', // 'suggest' = vain ehdottaa, 'ask_exceptions' = kysyy luvan poikkeuksiin, 'auto_within_rules' = hyväksyy itse sääntöjen sisällä
-  budgetCap: 1800, // € alv 0 % / tilaus
   maxQtyJumpPct: 60, // rivin määrä yli tämän verran perustasosta → varmistus
   bannedAllergens: [],
   blockedVendors: [],
@@ -15,6 +14,9 @@ export const DEFAULT_RULES = {
   subSameAllergens: true,
   subMaxPriceIncreasePct: 10,
 };
+
+// Vanhassa kannassa voi olla poistettuja asetuksia; käytetään vain nykyisiä sääntöjä.
+export const normalizeRules = (rules = {}) => Object.fromEntries(Object.entries(DEFAULT_RULES).map(([key, value]) => [key, rules[key] ?? value]));
 
 let lineSeq = 0;
 export const newLineId = () => `L${Date.now().toString(36)}${(lineSeq++).toString(36)}`;
@@ -65,6 +67,8 @@ export function lineAvailability(line, deliveryDate) {
  * Tila: ok | decision (saatavuuspoikkeama, vaatii valinnan) | confirm (epätavallinen määrä) | blocked (sääntö kieltää).
  */
 export function evaluate(proposal, rules) {
+  rules = normalizeRules(rules);
+  delete proposal.budgetOverride; // aiemmin tallennettu ylityslupa ei enää kuulu ehdotukseen
   const lines = activeLines(proposal);
   for (const line of lines) {
     const flags = [];
@@ -105,10 +109,8 @@ export function evaluate(proposal, rules) {
     if (l.country === 'fi') domesticNet += l.total;
   }
 
-  const expected = money(net + pendingNet); // budjettia verrataan koko odotettuun summaan, myös päätöstä odottaviin riveihin
-  const overBy = money(expected - rules.budgetCap);
-  const budgetOk = overBy <= 0 || !!(proposal.budgetOverride && expected <= proposal.budgetOverride.approvedUpTo + 0.005);
-  proposal.totals = { net, vat, gross: money(net + vat), pendingNet, expected, baselineNet, budgetCap: rules.budgetCap, overBy: Math.max(0, overBy), budgetOk, lines: lines.length, co2Kg: Math.round(co2), co2Lines, domesticShare: net ? Math.round((domesticNet / net) * 100) : 0 };
+  const expected = money(net + pendingNet); // mukana myös päätöstä odottavien rivien hinnat
+  proposal.totals = { net, vat, gross: money(net + vat), pendingNet, expected, baselineNet, lines: lines.length, co2Kg: Math.round(co2), co2Lines, domesticShare: net ? Math.round((domesticNet / net) * 100) : 0 };
 
   const approvals = (proposal.planningIssues || []).map((text, i) => ({ id: `planning:${i}`, type: 'planning', text }));
   for (const l of lines) {
@@ -116,7 +118,6 @@ export function evaluate(proposal, rules) {
     if (l.state === 'blocked') approvals.push({ id: `line:${l.lineId}`, type: 'blocked', lineId: l.lineId, text: `${l.name}: ${l.flags.find((f) => f.severity === 'blocked').text}` });
     if (l.state === 'confirm') approvals.push({ id: `line:${l.lineId}`, type: 'qtyjump', lineId: l.lineId, text: `${l.name}: ${l.flags.find((f) => f.severity === 'confirm').text}` });
   }
-  if (!budgetOk) approvals.push({ id: 'budget', type: 'budget', text: `Tilaus ylittää budjetin ${fmtMoney(overBy)} (${fmtMoney(expected)} / ${fmtMoney(rules.budgetCap)})`, overBy, trim: planTrim(proposal, overBy) });
   proposal.approvals = approvals;
   proposal.canOrder = approvals.length === 0 && lines.length > 0;
   proposal.rulesSnapshot = rules;
@@ -125,23 +126,6 @@ export function evaluate(proposal, rules) {
 }
 
 export const fmtMoney = (n) => `${(+n).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
-
-/** Karsintaehdotus budjettiin: palautetaan korotettuja rivejä kohti perustasoa, isoimmasta korotuksesta alkaen. Menusta johdettuihin lisäyksiin ei kosketa. */
-export function planTrim(proposal, overBy) {
-  const cat = loadCatalog();
-  const cands = activeLines(proposal)
-    .filter((l) => l.price && l.state === 'ok' && l.baselineQty != null && l.qty > (l.trimFloorQty ?? l.baselineQty))
-    .map((l) => { const floor = l.trimFloorQty ?? roundToStep(l.baselineQty + (l.menuExtra || 0), cat.get(l.productId), 'up'); return { l, floor, save: (l.qty - floor) * l.price.net }; })
-    .filter((c) => c.save > 0.01)
-    .sort((a, b) => b.save - a.save);
-  const plan = []; let saved = 0;
-  for (const c of cands) {
-    if (saved >= overBy) break;
-    plan.push({ lineId: c.l.lineId, name: c.l.name, from: c.l.qty, to: c.floor, unitLabel: c.l.unitLabel, saves: money(c.save) });
-    saved += c.save;
-  }
-  return { lines: plan, saves: money(saved), enough: saved >= overBy };
-}
 
 // ---------- Muutokset (nopea polku ja UI käyttävät samoja funktioita) ----------
 export const findLine = (proposal, lineId) => proposal.lines.find((l) => l.lineId === lineId);
@@ -200,14 +184,4 @@ export function decide(proposal, lineId, choice) {
   }
   proposal.lines.splice(proposal.lines.indexOf(line) + 1, 0, sub);
   return { line, sub, action: opt.type };
-}
-
-export function applyTrim(proposal) {
-  const budget = proposal.approvals?.find((a) => a.id === 'budget');
-  if (!budget?.trim?.lines.length) return [];
-  for (const t of budget.trim.lines) {
-    const line = findLine(proposal, t.lineId);
-    if (line) { line.qty = t.to; line.reason.userEdit = `Karsittu budjettiin: ${fmtQty(t.from)} → ${fmtQty(t.to)} ${line.unitLabel}`; }
-  }
-  return budget.trim.lines;
 }

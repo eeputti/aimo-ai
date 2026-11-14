@@ -32,7 +32,7 @@ Inventaario on erillinen, käyttäjän tai integraation antama saldo. Toimittaja
 
 Vähennykseen hyväksytään vain koko viikon loppuun säilyvät erät. Saapuvan toimituksen pitää olla tilassa `confirmed`, saapua viikon alkupäivänä ja säilyä viikon loppuun. `received`-toimitus kuuluu inventaarioon, eikä sitä lasketa uudelleen saapuvana. Tunnukset eivät saa toistua saman listan sisällä. Inventaarion ja saapuvien erien pitää kuvata eri fyysisiä määriä.
 
-Vanhasta inventaariosta, puuttuvasta säilyvyydestä, kesken viikon vanhenevasta erästä ja eri päivänä saapuvasta toimituksesta näytetään huomio ja erä jätetään vähentämättä. Päiväkohtainen varaston kierto tai säilyvyysoptimointi ei vielä kuulu laskentaan. Puuttuva inventaario ei pienennä ostomäärää. Budjettikarsinta huomioi nämä vähennykset ja säilyttää reseptitarpeen.
+Vanhasta inventaariosta, puuttuvasta säilyvyydestä, kesken viikon vanhenevasta erästä ja eri päivänä saapuvasta toimituksesta näytetään huomio ja erä jätetään vähentämättä. Päiväkohtainen varaston kierto tai säilyvyysoptimointi ei vielä kuulu laskentaan. Puuttuva inventaario ei pienennä ostomäärää.
 
 ## Tietojen päivittäminen
 
