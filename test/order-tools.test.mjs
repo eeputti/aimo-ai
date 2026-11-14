@@ -233,3 +233,15 @@ test('näytettävissä kolmessa yli kaksi kertaa halvimman hintainen vaihtoehto 
   const even = fakes({ search: async () => [found('1'), found('2', [], { price: 6 }), found('3', [], { price: 4 })] });
   assert.deepEqual((await even.tools.suggest({ customer, draft: draftOf([line('a')]) })).lines[0].options.map((o) => o.productId), ['1', '2', '3']);
 });
+
+test('laktoositarkennus vain, kun oikeissa vaihtoehdoissa on tunnettu maitoainesosa', async () => {
+  // Kananmunat: vaihtelevat laktoositon-merkinnät eivät tee kysymyksestä olennaista, jos missään ei ole maitoa.
+  const eggs = fakes({ product: () => ({ hasAllergenData: true, contains: ['AE'] }) });
+  const e = await eggs.tools.suggest({ customer, draft: draftOf([line('a', { productTerm: 'kananmunat' })]) });
+  assert.equal(e.lines[0].options.length, 3);
+  assert.deepEqual(e.lines[0].clarify, []);
+  // Maito: sama merkintöjen jakauma ja maitoainesosa säilyttävät kohdennetun tarkennuksen.
+  const milk = fakes({ product: () => ({ hasAllergenData: true, contains: ['AM'] }) });
+  const m = await milk.tools.suggest({ customer, draft: draftOf([line('a')]) });
+  assert.deepEqual(m.lines[0].clarify, ['FREE_FROM_LACTOSE']);
+});

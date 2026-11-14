@@ -13,7 +13,17 @@ export function isFreshStart(text) {
     .replace(/^(?:voitko|voisitko|voiks|voisit|haluan|haluaisin)\s+/iu, '').replace(/[,\s]+(?:kiitos|pliis)$/iu, '').trim();
   return /^(?:(?:tyhjää|tyhjennä|tyhjentää|nollaa|nollata)(?:\s+(?:ihan\s+)?(?:kaikki(?:\s+(?:rivit|tuotteet))?|(?:koko\s+)?(?:ostoslista|lista|luonnos)(?:n)?))?|(?:poista|poistaa|unohda)\s+(?:kaikki(?:\s+(?:rivit|tuotteet))?|(?:koko\s+)?(?:ostoslista|lista|luonnos))|(?:aloita|aloittaa|aloitetaan|aloitetaanko|alotetaan|alotetaanko)\s+(?:ihan\s+)?alusta|peru|peruuta)$/iu.test(request);
 }
-const CONTROL = /^(?:(?:(?:joo|kyllä|ok|okei)[,\s]+)?(?:tilaa|vahvista|vahvistan|hyväksy|hyväksyn|peru|peruuta|tyhjennä|aloita alusta|näytä|lista)|\d+(?:\s+\d+)*)[.!\s]*$/iu;
+// Vaihtoehtolistan vastaukset (numero, näytä lisää, halvin) menevät suoraan tilausmoottorille ilman dialogimallia.
+const CONTROL = /^(?:(?:(?:joo|kyllä|ok|okei)[,\s]+)?(?:tilaa|vahvista|vahvistan|hyväksy|hyväksyn|peru|peruuta|tyhjennä|aloita alusta|näytä|lista)|\d+(?:\s+\d+)*|(?:(?:näytä|anna|hae)\s+)?(?:lisää|muita)\s+vaihtoehtoja|näytä\s+(?:lisää|muita)|onko\s+muita(?:\s+vaihtoehtoja)?|(?:se\s+)?(?:halvin|halvinta|edullisin))[.!?\s]*$/iu;
+// Saman tuotteen variantti ei ole lisäidea: ruokakerma kerman rinnalla, voi voin rinnalla.
+const stem = (word) => (word.length > 4 ? word.slice(0, -1) : word);
+export function sameFamily(term, names) {
+  const a = stem(String(term || '').toLocaleLowerCase('fi-FI').trim());
+  return !!a && names.some((name) => {
+    const b = stem(String(name || '').toLocaleLowerCase('fi-FI').trim());
+    return !!b && (a === b || (b.length >= 4 && a.includes(b)) || (a.length >= 4 && b.includes(a)));
+  });
+}
 const SCHEMA = { type: 'object', additionalProperties: false, required: ['route', 'text', 'lookupQuery', 'suggestionTerm', 'openCart'], properties: {
   route: { type: 'string', enum: ['order', 'chat', 'reset', 'cart'] },
   text: { type: 'string', description: 'Lyhyt vastaus asiakkaan kysymykseen. Myös order-reitillä vastaa viestin kysymykseen, jos siinä on sekä muutos että kysymys. Muuten tyhjä.' },
@@ -159,14 +169,17 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
         }
         state.lastOrder = result;
         state.pendingSuggestion = null;
-        if (result.status === 'ready' && !plan && ask && !(state.suggested || []).length) {
+        // Enintään yksi lisäidea luonnosta kohden: ei toistuvaa lisämyyntiä samalle listalle.
+        const ideaAllowed = result.status === 'ready' && state.suggestedFor !== result.draftId;
+        if (ideaAllowed && !plan && ask) {
           try { plan = (await ask({ purpose: 'whatsapp_optional_addition', tier: 'fast', system: SYSTEM, schema: SCHEMA, maxTokens: 300, timeoutMs: 5000, retries: 0,
             user: JSON.stringify({ shoppingList: result.text, message: text, history: state.history || [], task: 'Tarvitseeko tämä lista yhden hyödyllisen täydentävän tuotteen mainittuun ruokaan? Muuten suggestionTerm tyhjä.' }) })).json; } catch { /* optional */ }
         }
         // One optional addition at a ready list, never before missing quantities/diet/date are settled.
         const term = plan?.suggestionTerm?.trim();
-        if (result.status === 'ready' && !result.text.includes('Huomioitu:') && term && term.length <= 80 && !/[\d\n€]/u.test(term) && !state.suggested?.includes(term.toLowerCase())
-          && !result.text.toLowerCase().includes(term.toLowerCase())) {
+        const onList = (getShoppingList({ epoch: state.epoch || '' })?.lines || []).map((line) => line.productTerm);
+        if (ideaAllowed && !result.text.includes('Huomioitu:') && term && term.length <= 80 && !/[\d\n€]/u.test(term)
+          && !sameFamily(term, [...onList, ...(state.suggested || [])]) && !result.text.toLowerCase().includes(term.toLowerCase())) {
           try {
             const found = await lookup(term);
             if (found.length) {
@@ -176,6 +189,8 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
             }
           } catch { /* An optional suggestion must not block the prepared list. */ }
         }
+        // Yksi ideointimahdollisuus luonnosta kohden, ehdotettiin tai ei: valmiin listan muokkaus ei tuo uutta lisämyyntiä.
+        if (ideaAllowed) state.suggestedFor = result.draftId || null;
       }
       if (!allowed()) return { status: 'error', text: 'Testiyhteys ei ole enää voimassa.' };
       let out = { ...result, messages, text: messages.join('\n\n'), ...(canOpenCart && plan?.openCart ? { cartRequested: true } : {}) };

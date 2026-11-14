@@ -142,7 +142,9 @@ test('signed WhatsApp → shared list API → explicit approval → exactly one 
 
   // Exercise the local storefront's human approval as well as the shopper's explicit TILAA.
   await request(`/console/buyers/${buyerId}/mandate`, { body: { approval: 'always' } });
-  const selected = await turn(buyerId, '1 1', dietary);
+  const half = await turn(buyerId, '1', dietary);
+  assert.equal(half.status, 'choosing'); // yksi tuoterivi kerrallaan
+  const selected = await turn(buyerId, '1', half.shoppingList);
   assert.equal(selected.status, 'ready');
   assert.match(selected.text, /TILAA/);
   assert.ok(selected.shoppingList.lines.every((line) => line.selectedProductId));

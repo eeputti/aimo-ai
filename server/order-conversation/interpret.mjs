@@ -63,7 +63,7 @@ const SCHEMA = {
     ops: { type: 'array', items: {
       type: 'object', additionalProperties: false, required: ['op', 'ref', 'productTerm', 'quantityValue', 'quantityUnit', 'quantityBasis', 'addClaims', 'removeClaims', 'excludeAllergens', 'option'],
       properties: {
-        op: { type: 'string', enum: ['add', 'update', 'remove', 'select', 'diet', 'site', 'no_preference'] },
+        op: { type: 'string', enum: ['add', 'update', 'remove', 'select', 'more', 'diet', 'site', 'no_preference'] },
         ref: { type: 'string', description: 'olemassa olevan rivin ref tai tyhjä' },
         productTerm: { type: 'string', description: 'tuotteen perusmuoto suomeksi, esim. maito; tyhjä jos ei muutu' },
         quantityValue: { type: 'number', description: '0 jos määrää ei annettu' },
@@ -82,6 +82,7 @@ Säännöt:
 - Et valitse tuotteita, et keksi määriä, päiviä tai ruokavaatimuksia. Kirjaa vain se, mitä ostaja sanoi.
 - Korjaus ("eikun 30 litraa", "maitoa sittenkin 30") on update oikealle riville. Käytä annettuja ref-arvoja. Uusi tuote on add.
 - Numerovalinta ("1", "eka", "se keskimmäinen") on select: ref ja vaihtoehdon numero tarjotusta listasta. Jos ei ole selvää, mitä vaihtoehtoa ostaja tarkoittaa, älä arvaa.
+- Vaihtoehdot näytetään yksi rivi kerrallaan: pendingQuestion.kind=choose ja pendingQuestion.refs kertoo rivin. Numero viittaa aina viimeksi näytettyyn offered-listaan. pendingQuestion.more on "Näytä lisää vaihtoehtoja" -numero: se tai pyyntö nähdä muita vaihtoehtoja ("onko muita", "jotain muuta") on op more tälle ref:lle, ei select.
 - Valinta "halvin" vertaa offered-vaihtoehtojen lineNet-kokonaishintoja. Valinta voi koskea yhtä nimettyä riviä tai kaikkia, jos ostaja sanoo niin. Tavallisten saman tuotteen vaihtoehtojen valinnassa käytä tarjottuja nimiä ja ominaisuuksia.
 - Tunnista puhekieli ja oikea yksikkö: "5 desii" = 5 DL, "pari desiä" = 2 DL, 250 ml = 250 ML, 500 g = 500 G. Palauta alkuperäisen yksikön arvo; palvelin muuntaa DL/CL/ML litroiksi ja G kiloiksi. Älä koskaan vaihda 5 desiä 5 litraksi.
 - context.history kertoo aiemman keskustelun, myös apurin tarkentavan kysymyksen. Ymmärrä siihen annettu vastaus ("sitä", "molemmat", "ihan normina") nykyisten ref-rivien avulla. Ajantasainen luonnos ratkaisee, ei vanha määrä historiassa.

@@ -36,6 +36,8 @@ function setup({ script = {}, over = {}, file = ':memory:' } = {}) {
   const say = (text, extra = {}) => handleTurn({ messageId: extra.messageId || `m${++n}`, conversationId: 'conv', customer: 'customer' in extra ? extra.customer : customer, text, receivedAt: t });
   return { say, calls, store, tick: (ms) => { t += ms; } };
 }
+// Vaihtoehdot näytetään yksi rivi kerrallaan: kahden rivin valinta on kaksi peräkkäistä vastausta.
+const pick = async (say, ...numbers) => { let r; for (const n of numbers) r = await say(String(n)); return r; };
 const add = (productTerm, quantity = null, claims = []) => ({ op: 'add', productTerm, quantity, claims, excludeAllergens: [] });
 const ref = (draft, term) => draft.lines.find((l) => l.productTerm === term).ref;
 const ready = {
@@ -44,7 +46,7 @@ const ready = {
   'maitoa 30': (d) => ({ intent: 'order', ops: [{ op: 'update', ref: ref(d, 'maito'), quantity: { value: 30, unit: 'L' } }] }),
 };
 
-test('päivä ja määrät ensin, ruokavalintaa kysytään vasta relevanttien ehdokkaiden perusteella', async () => {
+test('päivä ensin yksin, sitten määrät, ruokavalintaa kysytään vasta relevanttien ehdokkaiden perusteella', async () => {
   const { say, calls, store } = setup({ script: {
     'maitoa ja kermaa': { intent: 'order', ops: [add('maito'), add('kerma')] },
     maanantaiksi: { intent: 'order', deliveryDate: '2026-11-16', ops: [] },
@@ -56,10 +58,11 @@ test('päivä ja määrät ensin, ruokavalintaa kysytään vasta relevanttien eh
   assert.match((await say('moi')).text, /tilausapuri/);
   const a = await say('maitoa ja kermaa');
   assert.equal(a.status, 'collecting');
-  assert.match(a.text, /Mille päivälle toimitus\?\nKuinka paljon: maito, kerma\?$/);
-  assert.doesNotMatch(a.text, /allergioita|gluteeniton|pähkinätön/);
-  assert.deepEqual(store.active('conv').pending, { kind: 'checklist', asks: ['date', 'quantity'], refs: ['L1', 'L2'] });
+  assert.match(a.text, /\n\nMille päivälle toimitus\?[^\n]*$/);
+  assert.doesNotMatch(a.text, /Kuinka paljon|allergioita|gluteeniton|pähkinätön/);
+  assert.deepEqual(store.active('conv').pending, { kind: 'checklist', asks: ['date'], refs: [] });
   const b = await say('maanantaiksi');
+  assert.match(b.text, /Kuinka paljon: maito, kerma\?$/);
   assert.doesNotMatch(b.text, /Mille päivälle/);
   assert.doesNotMatch(b.text, /Onko allergioita/);
   await say('20 l maitoa');
@@ -71,7 +74,7 @@ test('päivä ja määrät ensin, ruokavalintaa kysytään vasta relevanttien eh
   assert.equal(d.status, 'choosing');
   assert.match(d.text, /Toimitus ma 16\.11\., hinnat alv 0 %\. Huomioitu: pähkinätön, ei maapähkinää\./);
   assert.deepEqual(store.active('conv').diet, { known: true, claims: [], excludeAllergens: ['AN', 'AP'] });
-  assert.match(d.text, /1\. maito 1: 2 ltk \(20 l\), 10,00 €/);
+  assert.match(d.text, /\*Maito 20 l:\*\n1\) maito 1, 2 laatikkoa \(20 l\), 10,00 €\n2\) maito 2, 2 laatikkoa \(20 l\), 20,00 €\nVastaa 1 tai 2\. Sen jälkeen valitaan kerma\./);
   assert.doesNotMatch((await say('näytä')).text, /Onko allergioita/); // ei kysytä toista kertaa
   const past = await say('huomenna');
   assert.match(past.text, /Toimituspäivän pitää olla tuleva päivä/);
@@ -170,7 +173,7 @@ test('tuotevalinta tulee vain näytetyistä vaihtoehdoista ja TILAA tallentaa ju
   assert.equal(bad.status, 'choosing');
   assert.match(bad.text, /Valitse numero näytetyistä vaihtoehdoista/);
   assert.equal(bad.revision, options.revision);
-  const summary = await say('1 2');
+  const summary = await pick(say, 1, 2);
   assert.equal(summary.status, 'ready');
   assert.match(summary.text, /Tilausluonnos\*, toimitus ma 16\.11\., Keittiö/);
   assert.match(summary.text, /Yhteensä 20,00 € \(alv 0 %\)/);
@@ -195,7 +198,7 @@ test('tuotevalinta tulee vain näytetyistä vaihtoehdoista ja TILAA tallentaa ju
 test('määrän muutos kasvattaa revisiota, mitätöi hyväksynnän ja vaatii uuden yhteenvedon', async () => {
   const { say, calls } = setup({ script: ready });
   await say('maitoa ja kermaa');
-  const first = await say('1 2');
+  const first = await pick(say, 1, 2);
   const changed = await say('maitoa 30');
   assert.equal(changed.status, 'ready');
   assert.equal(changed.revision, first.revision + 1);
@@ -209,7 +212,7 @@ test('määrän muutos kasvattaa revisiota, mitätöi hyväksynnän ja vaatii uu
 test('ruokavaatimuksen muutos purkaa tuotevalinnan eikä tilaa vanhalla tuotteella', async () => {
   const { say, calls } = setup({ script: { ...ready,
     'kerma laktoosittomana': (d) => ({ intent: 'order', ops: [{ op: 'update', ref: ref(d, 'kerma'), addClaims: ['FREE_FROM_LACTOSE', 'KEKSITTY'] }] }) } });
-  await say('maitoa ja kermaa'); await say('1 2');
+  await say('maitoa ja kermaa'); await pick(say, 1, 2);
   const again = await say('kerma laktoosittomana');
   assert.equal(again.status, 'choosing');
   assert.match(again.text, /Kerma 5 l \(laktoositon\)/);
@@ -227,17 +230,17 @@ test('epäonnistunut tarjous tai tilaus ei tuota onnistumiskuittausta ja luonnos
     submit: async (args) => { calls.submit.push(args); return { status: 'rejected', orderId: null, reasons: [{ code: 'OFFER_STALE', message: 'Hinta on muuttunut.' }] }; },
   } });
   await say('maitoa ja kermaa');
-  const failed = await say('1 2');
+  const failed = await pick(say, 1, 2);
   assert.notEqual(failed.status, 'ready');
   assert.match(failed.text, /Ei tilattavissa: kerma\.\nTilausta ei ole tehty\./);
-  assert.match(failed.text, /\*Kerma 5 l\*/); // ostaja valitsee uudelleen, mitään ei vaihdeta hiljaa
+  assert.match(failed.text, /\*Kerma 5 l:\*/); // ostaja valitsee uudelleen, mitään ei vaihdeta hiljaa
   assert.equal(store.active('conv').lines[1].selectedProductId, null);
   assert.equal(store.active('conv').lines[0].selectedProductId, 'maito-1');
   quoteOk = true;
   assert.equal((await say('näytä')).status, 'choosing');
-  await say('1 2'.slice(2)); // tuntematon viesti: ei muutoksia
+  await say('jotain muuta'); // tuntematon viesti: ei muutoksia
   const s = setup({ script: ready, over: { submit: async () => ({ status: 'rejected', orderId: null, reasons: [{ code: 'OFFER_STALE', message: 'Hinta on muuttunut.' }] }) } });
-  await s.say('maitoa ja kermaa'); await s.say('1 2');
+  await s.say('maitoa ja kermaa'); await pick(s.say, 1, 2);
   const rejected = await s.say('tilaa');
   assert.equal(rejected.status, 'rejected');
   assert.match(rejected.text, /Tilausta ei tehty:\n- Hinta on muuttunut\./);
@@ -247,7 +250,7 @@ test('epäonnistunut tarjous tai tilaus ei tuota onnistumiskuittausta ja luonnos
 
 test('vanhentunut tarjous tarkistetaan uudelleen eikä tilata ilman uutta vahvistusta', async () => {
   const { say, calls, tick } = setup({ script: ready });
-  await say('maitoa ja kermaa'); await say('1 2');
+  await say('maitoa ja kermaa'); await pick(say, 1, 2);
   tick(16 * 60_000);
   const again = await say('tilaa');
   assert.equal(again.status, 'ready');
@@ -262,7 +265,7 @@ test('oikeudet, sidoksen vaihtuminen, peruminen ja tulkin virhe', async () => {
   assert.equal((await say('maitoa ja kermaa', { customer: { ...customer, permissions: {} } })).status, 'error');
   assert.equal((await say('maitoa ja kermaa', { customer: null })).status, 'error');
   assert.equal(store.active('conv'), null);
-  await say('maitoa ja kermaa'); const before = await say('1 2');
+  await say('maitoa ja kermaa'); const before = await pick(say, 1, 2);
   const crash = await say('kaatuu');
   assert.equal(crash.status, 'error');
   assert.match(crash.text, /tilausta ole tehty/);
@@ -282,7 +285,7 @@ test('oikeudet, sidoksen vaihtuminen, peruminen ja tulkin virhe', async () => {
 test('luonnos säilyy palvelimen uudelleenkäynnistyksen yli', async () => {
   const file = path.join(dir, 'drafts.db');
   const a = setup({ script: ready, file });
-  await a.say('maitoa ja kermaa'); const summary = await a.say('1 2');
+  await a.say('maitoa ja kermaa'); const summary = await pick(a.say, 1, 2);
   a.store.close();
   const b = setup({ script: ready, file });
   const shown = await b.say('näytä', { messageId: 'uusi' });
@@ -325,8 +328,9 @@ test('oikea ketju säännöillä ja simuloidulla rajapinnalla: viestit, korjaus,
   assert.match((await say('kermaa 5 litraa')).text, /laktoositonta vai käykö tavallinen/);
   const options = await say('laktoositon');
   assert.equal(options.status, 'choosing');
-  assert.match(options.text, /\*Maito 20 l \(laktoositon\)\*\n1\. [^\n]*laktoositon/i);
-  const summary = await say('1 1');
+  assert.match(options.text, /\*Maito 20 l \(laktoositon\):\*\n1\) [^\n]*laktoositon/i);
+  assert.match((await say('1')).text, /\*Kerma 5 l:\*\n1\) /); // sitten seuraava rivi omana listanaan
+  const summary = await say('1');
   assert.equal(summary.status, 'ready');
   // Pelkkä määrä kahden rivin luonnoksessa: kysytään, ei arvata.
   const unclear = await say('eikun 30 litraa');
@@ -352,7 +356,7 @@ test('muutosvihje käyttää tilauksen omia rivejä ja kiitos ei tulosta yhteenv
   const open = await say('Kiitos paljon!');
   assert.equal(open.status, 'collecting');
   assert.match(open.text, /^Ole hyvä! Luonnos on tallessa/);
-  const summary = await say('1 2');
+  const summary = await pick(say, 1, 2);
   assert.match(summary.text, /esim\. "maito 30 l" tai "poista kerma"\.$/);
   const thanks = await say('kiitos');
   assert.equal(thanks.status, 'ready');

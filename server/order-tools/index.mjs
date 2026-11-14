@@ -8,8 +8,8 @@ import { clock } from '../gateway/clock.mjs';
 
 const CLAIM_WORD = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
 const UNIT_WORD = { L: 'l', KG: 'kg', PCS: 'kpl' };
-// Ruokavaatimus kysytään vain, kun se oikeasti jakaa tilattavat vaihtoehdot.
-const CLARIFY = [{ claim: 'FREE_FROM_LACTOSE', min: 0.2, max: 0.8 }];
+// Ruokavaatimus kysytään vain, kun se oikeasti jakaa tilattavat vaihtoehdot ja koskee niiden ainesosia (AM = maito).
+const CLARIFY = [{ claim: 'FREE_FROM_LACTOSE', min: 0.2, max: 0.8, needsAllergen: 'AM' }];
 const issue = (code, fi, extra = {}) => ({ code, message: fi, ...extra });
 const validQuantity = (q) => q && Number.isFinite(q.value) && q.value > 0 && q.value <= 100000 && ['L', 'KG', 'PCS'].includes(q.unit);
 const dayLabel = (iso) => new Intl.DateTimeFormat('fi-FI', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'numeric' }).format(new Date(`${iso}T12:00:00Z`));
@@ -38,7 +38,15 @@ export function lineQuery(line) {
 // se vain järjestää, ei pudota mitään pois, ja ostaja valitsee aina itse.
 const NEUTRAL = /^(\d+([.,]\d+)?|x|l|dl|cl|ml|g|kg|kpl|uht|esl|hyla|fi|ja|laktoosit\w*|vähälaktoosi\w*|gluteenit\w*|luomu|rasvat\w*|kevyt|täys\w*|d-vitaminoitu|suomesta|suomi|suomalainen|kotimainen|pakaste|tuore|pesty|\w*suola\w*)$/;
 const words = (text) => String(text || '').toLowerCase().replace(/[®™%&(),+]/g, ' ').split(/[\s/]+/).filter(Boolean);
-export function rankOptions(found, line) {
+// Maun tai mausteen sana tuotenimessä ("kolme sipulia", "valkosipuli", "mansikka"). Ostajan itse pyytämä maku ei ole poikkeama.
+const FLAVOUR = /sipul|yrtt|chili|pippur|tilli|basilik|curry|pesto|tomaat|herkkusien|kantarell|savu|sitruun|lime|appelsiin|mansik|vadelm|mustik|banaan|mango|persik|kirsik|vanilj|suklaa|kaakao|karamel|kinuski|toffee|grilli|bbq|paprik/i;
+const stemsOf = (line) => words(line.productTerm).map((w) => (w.length > 4 ? w.slice(0, -1) : w));
+/** Ostaja pyysi nimenomaan maustamatonta: maustetut eivät kelpaa vaihtoehdoiksi lainkaan. */
+export const wantsPlain = (line) => /maustamat|ilman\s+mau|luonnollinen|natural|plain/i.test(line.productTerm || '');
+export const flavoured = (o, line) => { const term = stemsOf(line); return words(o.name).some((w) => FLAVOUR.test(w) && !term.some((t) => w.includes(t))); };
+export function rankOptions(found, line) { return scoreOptions(found, line).map((x) => x.o); }
+/** Järjestetyt vaihtoehdot; regular = ei maustettu eikä hintapoikkeama, eli kelpaa halvimman nostoon kärkeen. */
+export function scoreOptions(found, line) {
   const term = words(line.productTerm).map((w) => (w.length > 4 ? w.slice(0, -1) : w)); // taivutus: kerma ~ kerman, maito ~ maitoa
   const need = line.quantity?.value || 0;
   // Yli kaksi kertaa tavallisen (mediaani) hintainen vaihtoehto, kuten erikoistuote tai annospakkaus, ei kuulu kärkeen.
@@ -55,9 +63,10 @@ export function rankOptions(found, line) {
     const fit = (over > 0.5 ? 2 : over > 0.1 ? 1 : 0) + (o.qty > 30 ? 2 : o.qty > 12 ? 1 : 0);
     // Yksi kuvaileva sana (lajike, tuotesarja) ei vielä tee tuotteesta maustettua. Näin haun oma hyllyjärjestys säilyy.
     // Isossa tilauksessa kaikki vaihtoehdot ovat kymmeniä eriä: silloin vähemmän käsiteltäviä eriä ensin.
-    return [extras >= 2 || (cost(o) !== null && cost(o) > 2 * typical) ? 1 : 0, fit, o.qty > 30 ? o.qty : 0];
+    return [extras >= 2 || flavoured(o, line) || (cost(o) !== null && cost(o) > 2 * typical) ? 1 : 0, fit, o.qty > 30 ? o.qty : 0];
   };
-  return found.map((o, i) => ({ o, i, s: score(o) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.s[2] - b.s[2] || a.i - b.i).map((x) => x.o);
+  return found.map((o, i) => ({ o, i, s: score(o) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.s[2] - b.s[2] || a.i - b.i)
+    .map((x) => ({ o: x.o, regular: x.s[0] === 0 }));
 }
 
 async function defaultDeps() {
@@ -100,8 +109,15 @@ export function createOrderingTools(deps = {}) {
     return !product || !product.hasAllergenData || banned.some((a) => product.contains?.includes(a) || product.mayContain?.includes(a));
   }
 
-  async function suggest({ customer, draft }) {
+  /**
+   * @param {object} o
+   * @param {object} [o.exclude] { [ref]: productId[] } jo näytetyt vaihtoehdot. Annettuna palautetaan seuraavat samalle
+   *   päivälle tilattavat vaihtoehdot ilman toistoja ("Näytä lisää vaihtoehtoja"). Ilman sitä ensimmäinen sivu.
+   * @param {number} [o.limit] vaihtoehtoja riviä kohden (1–5, oletus 3).
+   */
+  async function suggest({ customer, draft, exclude = {}, limit = 3 }) {
     if (!allowed(customer, 'readProducts')) return { lines: [], issues: [issue('NOT_PERMITTED', 'Asiakkuudella ei ole oikeutta tuotetietoihin.')] };
+    const size = Math.min(5, Math.max(1, Math.floor(Number(limit) || 3)));
     const issues = [];
     if (!validDate(draft.deliveryDate)) issues.push(issue('DELIVERY_DATE_MISSING', 'Toimituspäivä puuttuu.'));
     for (const l of draft.lines) if (!validQuantity(l.quantity)) issues.push(issue('QUANTITY_MISSING', `Määrä puuttuu: ${l.productTerm}.`, { ref: l.ref }));
@@ -129,20 +145,44 @@ export function createOrderingTools(deps = {}) {
         const has = (o) => diet.excludeAllergens.some((a) => product(o.id)?.contains?.includes(a) || product(o.id)?.mayContain?.includes(a));
         fit = fit.filter((o) => !has(o));
       }
-      fit = rankOptions(fit, line);
-      if (!fit.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref })); continue; }
-      const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim)).map((c) => ({ claim: c.claim, share: fit.filter((o) => o.labels?.includes(c.claim)).length / fit.length, ...c }))
+      let scored = scoreOptions(fit, line);
+      if (!scored.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref })); continue; }
+      // Asiakkaan selvä ehto (maustamaton) rajaa vaihtoehdot: maustettua ei tarjota edes halvimpana.
+      if (wantsPlain(line)) {
+        scored = scored.filter((x) => !flavoured(x.o, line));
+        if (!scored.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Maustamatonta vaihtoehtoa ei löytynyt päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref })); continue; }
+      }
+      fit = scored.map((x) => x.o);
+      // Laktoosikysymys vain, jos ainakin yhdessä oikeassa vaihtoehdossa on tunnettu maitoainesosa: kananmunien
+      // satunnaiset laktoositon-merkinnät eivät tee kysymyksestä olennaista.
+      const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim) && (!c.needsAllergen || fit.some((o) => product(o.id)?.contains?.includes(c.needsAllergen))))
+        .map((c) => ({ claim: c.claim, share: fit.filter((o) => o.labels?.includes(c.claim)).length / fit.length, ...c }))
         .filter((c) => fit.length >= 3 && c.share >= c.min && c.share <= c.max).map((c) => c.claim);
-      // Halvin tarpeen kattava vaihtoehto on aina kolmen joukossa, vaikka järjestys suosisi isompaa pakkausta.
-      const top = fit.slice(0, 3);
-      const cheapest = fit.reduce((a, b) => (b.price * b.qty < a.price * a.qty ? b : a));
-      if (!top.includes(cheapest)) top[top.length - 1] = cheapest;
-      // Näytettävien kolmen sisällä yli kaksi kertaa halvimman hintainen vaihtoehto siirtyy muiden jälkeen
+      // Halvin nostetaan kärkeen vain tavallisista: maustettu tai poikkeava tuote ei ohita järjestystä halvimpana.
+      const regular = scored.filter((x) => x.regular).map((x) => x.o);
+      const cheapest = (regular.length ? regular : fit).reduce((a, b) => (b.price * b.qty < a.price * a.qty ? b : a));
+      const seen = new Set((exclude[line.ref] || []).map(String));
+      let top; let rest;
+      if (seen.size) {
+        // Lisäsivu: seuraavat järjestyksessä, jo näytetyt pois. Ensimmäisen sivun nostama halvin on jo näytetty.
+        rest = fit.filter((o) => !seen.has(String(o.id)));
+        if (!rest.length) { issues.push(issue('NO_MORE_OPTIONS', `Muita vaihtoehtoja päivälle ${dayLabel(draft.deliveryDate)} ei löytynyt: ${line.productTerm}.`, { ref: line.ref })); continue; }
+        top = rest.slice(0, size);
+      } else {
+        // Halvin tarpeen kattava vaihtoehto on aina ensimmäisellä sivulla, vaikka järjestys suosisi isompaa pakkausta.
+        rest = fit;
+        top = fit.slice(0, size);
+        if (!top.includes(cheapest)) top[top.length - 1] = cheapest;
+      }
+      // Näytettävien sisällä yli kaksi kertaa halvimman hintainen vaihtoehto siirtyy muiden jälkeen
       // (peruna 20 kg näytti ensin 72,40 €:n säkin ja halvimman 13,30 € kolmantena). Muu järjestys säilyy.
       const floor = cheapest.price * cheapest.qty;
       const pricey = (o) => (Number.isFinite(floor) && floor > 0 && o.price * o.qty > 2 * floor ? 1 : 0);
       top.sort((a, b) => pricey(a) - pricey(b));
-      lines.push({ ref: line.ref, total: fit.length, clarify, options: top.map((o) => ({
+      // more: tälle päivälle on vielä näyttämättömiä vaihtoehtoja seuraavalle sivulle.
+      const more = rest.some((o) => !top.includes(o));
+      // exact=false: yksikään tilattava vaihtoehto ei ole pyydettyä tuotetta (strutsinmuna -> viiriäisen munat). Kerrotaan ostajalle.
+      lines.push({ ref: line.ref, total: fit.length, more, shownBefore: seen.size, exact: fit.some(onTerm), clarify, options: top.map((o) => ({
         productId: String(o.id), name: o.name, brand: o.brand || null, salesUnits: o.qty, salesUnitLabel: o.unitLabel,
         covers: o.quantityExplanation ? { value: o.quantityExplanation.providedItems, unit: 'PCS' } : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
         unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,

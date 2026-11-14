@@ -143,7 +143,8 @@ test('the WhatsApp cart link opens the storefront cart through the tunnel, price
   };
   await say('20 l maitoa ja 5 l kermaa maanantaiksi');
   await say('laktoositon');
-  assert.match(await say('1 1'), /TILAA/);
+  assert.match(await say('1'), /\*Kerma 5 l:\*/); // yksi tuoterivi kerrallaan
+  assert.match(await say('1'), /TILAA/);
   const token = cartToken(dir);
 
   // Through the tunnel only the cart page, its own assets and the signed API answer.

@@ -115,7 +115,9 @@ test('signed WhatsApp message becomes a structured list; storefront continues th
   assert.match(await f.whatsapp('näytä'), /30 l/);
   const lateRetry = await f.post(edit); assert.equal(lateRetry.status, 200); // show did not change contents
   const selected = await f.get();
-  const choice = await (await f.post({ buyerId: initial.buyerId, expectedList: version(selected.shoppingList), messageId: crypto.randomUUID(), text: '1 1' })).json();
+  const half = await (await f.post({ buyerId: initial.buyerId, expectedList: version(selected.shoppingList), messageId: crypto.randomUUID(), text: '1' })).json();
+  assert.equal(half.status, 'choosing'); // yksi tuoterivi kerrallaan
+  const choice = await (await f.post({ buyerId: initial.buyerId, expectedList: version(half.shoppingList), messageId: crypto.randomUUID(), text: '1' })).json();
   assert.equal(choice.status, 'ready'); assert.match(choice.text, /TILAA/); assert.equal(f.stats().submits, 0);
   const finalRequest = { buyerId: initial.buyerId, expectedList: version(choice.shoppingList), messageId: crypto.randomUUID(), text: 'TILAA' };
   const confirmed = await (await f.post(finalRequest)).json(); assert.equal(confirmed.status, 'confirmed');

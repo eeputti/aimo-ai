@@ -49,7 +49,10 @@ export async function presentCollectingCart({ result, shoppingList, previousList
   const missing = shoppingList.lines.filter((line) => !line.quantity);
   const canonicalQuestion = `Kuinka paljon: ${missing.map((line) => line.productTerm).join(', ')}?`;
   const questions = blocks[1].split('\n');
-  if (missing.length && !questions.includes(canonicalQuestion)) return null;
+  // Toimituspäivä kysytään ensin ja yksin: puuttuvat määrät kysytään vasta päivän jälkeen.
+  const asksQuantity = missing.length > 0 && questions.includes(canonicalQuestion);
+  const dateFirst = !shoppingList.deliveryDate && questions.length === 1 && questions[0].startsWith('Mille päivälle toimitus?');
+  if (missing.length && !asksQuantity && !dateFirst) return null;
   const partitives = missing.map((line) => PARTITIVE[line.productTerm.toLocaleLowerCase('fi-FI')]);
   const productCase = partitives.every(Boolean) ? 'partitive' : 'labels';
   const quantityProducts = join(productCase === 'partitive' ? partitives : missing.map((line) => line.productTerm));
@@ -60,14 +63,14 @@ export async function presentCollectingCart({ result, shoppingList, previousList
     try {
       const { json } = await ask({ purpose: 'whatsapp_cart_reply', tier: 'deep', system: SYSTEM, schema: SCHEMA,
         maxTokens: 1600, timeoutMs: 45000, retries: 0,
-        user: JSON.stringify({ message: userText, changed, productCase, missingQuantityCount: missing.length }) });
+        user: JSON.stringify({ message: userText, changed, productCase, missingQuantityCount: asksQuantity ? missing.length : 0 }) });
       if (changed && safeAcknowledgement(json?.acknowledgement)) acknowledgement = json.acknowledgement.trim();
       const question = json?.quantityQuestion;
       if (QUESTION_FORMS.includes(question) && question.includes('näitä:') === (productCase === 'labels')) quantityQuestion = question;
     } catch { /* The saved cart and required questions remain available if the copy model fails. */ }
   }
   const cart = blocks[0].replace('Luonnoksessa nyt:', 'Ostoskorissasi nyt:');
-  const rest = questions.filter((question) => !missing.length || question !== canonicalQuestion);
-  const followUp = [...(missing.length ? [quantityQuestion.replace(PRODUCTS, () => quantityProducts)] : []), ...rest].join('\n');
+  const rest = questions.filter((question) => !asksQuantity || question !== canonicalQuestion);
+  const followUp = [...(asksQuantity ? [quantityQuestion.replace(PRODUCTS, () => quantityProducts)] : []), ...rest].join('\n');
   return [...(acknowledgement ? [acknowledgement] : []), cart, ...(followUp ? [followUp] : [])];
 }

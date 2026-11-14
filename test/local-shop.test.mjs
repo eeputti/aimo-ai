@@ -70,7 +70,8 @@ test('local storefront shows the exact conversation order once and approvals use
   assert.equal(context.defaultBuyerId, context.accounts[0].buyerId);
   assert.doesNotMatch(JSON.stringify(context), /358000000001|apiKey|demoKey/);
   await post(`/console/buyers/${context.defaultBuyerId}/mandate`, { approval: 'always' });
-  assert.match(await say('1 1'), /Vahvista vastaamalla \*TILAA\*/);
+  assert.match(await say('1'), /\*Kerma 5 l:\*/); // yksi tuoterivi kerrallaan
+  assert.match(await say('1'), /Vahvista vastaamalla \*TILAA\*/);
   const done = await say('TILAA'); assert.match(done, /Tilaus AGW-/);
   const state = await get('/console/state');
   assert.equal(state.orders.length, 1);

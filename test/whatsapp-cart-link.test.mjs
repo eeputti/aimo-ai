@@ -130,7 +130,9 @@ test('browser reviews and explicitly confirms exactly once; a stale version cann
   const f = await fixture(t);
   const token = await startCart(f, '20 l laktoositonta maitoa ja 5 kg voita maanantaiksi');
   const first = (await (await f.read(token)).json()).shoppingList;
-  const choice = await (await f.post(token, input(first, '1 1'))).json();
+  const half = await (await f.post(token, input(first, '1'))).json();
+  assert.equal(half.status, 'choosing'); // yksi tuoterivi kerrallaan
+  const choice = await (await f.post(token, input(half.shoppingList, '1'))).json();
   assert.equal(choice.status, 'ready'); assert.match(choice.text, /TILAA/);
   await f.whatsapp('maitoa sittenkin 30 litraa');
   assert.equal((await f.post(token, input(choice.shoppingList, 'TILAA'))).status, 409);
@@ -191,7 +193,8 @@ test('link route is opt-in and refuses non-HTTPS or ambiguous configured origins
 test('ready WhatsApp summary asks for ok; ok and legacy TILAA open the cart without submitting or invoking the model', async (t) => {
   const f = await fixture(t);
   await f.whatsapp('20 l laktoositonta maitoa ja 5 kg voita maanantaiksi');
-  const review = await f.whatsapp('1 1');
+  await f.whatsapp('1');
+  const review = await f.whatsapp('1');
   assert.match(review, /Vastaa \*ok\*/); assert.doesNotMatch(review, /TILAA/);
   const before = f.stats();
   for (const message of ['ok', 'okei', 'joo', 'TILAA']) {

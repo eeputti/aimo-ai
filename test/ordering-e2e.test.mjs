@@ -76,11 +76,13 @@ test('WhatsApp-viestistä demotilaukseen: tarkistuslista, valinta, muutos, vahvi
   const options = await say('m3', 'laktoositon');
   assert.match(options, /Toimitus ma 16\.11\./);
   assert.match(options, /Maito 20 l \(laktoositon\)/);
-  assert.match(options, /\*Maito 20 l \(laktoositon\)\*\n1\. [^\n]+€/);
-  assert.match(options, /\*Kerma 5 l\*\n1\. [^\n]+€/);
+  assert.match(options, /\*Maito 20 l \(laktoositon\):\*\n1\) [^\n]+€/);
+  assert.match(options, /Sen jälkeen valitaan kerma\./);
+  assert.doesNotMatch(options, /\*Kerma 5 l:\*/); // yksi tuoterivi kerrallaan
   assert.equal(orders.list(buyerId).length, 0);
 
-  const summary = await say('m4', '1 1');
+  assert.match(await say('m4a', '1'), /\*Kerma 5 l:\*\n1\) [^\n]+€/);
+  const summary = await say('m4', '1');
   assert.match(summary, /\*Tilausluonnos\*, toimitus ma 16\.11\./);
   assert.match(summary, /laktoositon/i); // rivikohtainen vaatimus säilyy valitussa tuotteessa
   assert.match(summary, /Vahvista vastaamalla \*TILAA\*/);
@@ -130,8 +132,9 @@ test('selaindemo: sama ketju HTTP:n yli oikeilla moduuleilla tuottaa yhden demot
   assert.match((await say('20 l maitoa ja 5 l kermaa maanantaiksi')).text, /laktoositonta vai käykö tavallinen/);
   const options = await say('laktoositon');
   assert.equal(options.status, 'choosing');
-  assert.match(options.text, /\*Maito 20 l \(laktoositon\)\*\n1\. [^\n]+€/);
-  assert.equal((await say('1 1')).status, 'ready');
+  assert.match(options.text, /\*Maito 20 l \(laktoositon\):\*\n1\) [^\n]+€/);
+  assert.equal((await say('1')).status, 'choosing');
+  assert.equal((await say('1')).status, 'ready');
   const done = await say('TILAA');
   assert.match(done.text, /Tilaus AGW-\S+ (on tallennettu|odottaa yrityksesi hyväksyjän kuittausta)/);
   assert.match((await say('tilaa')).text, /on jo tallennettu\. Uutta tilausta ei tehty/);

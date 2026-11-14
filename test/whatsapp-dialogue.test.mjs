@@ -191,7 +191,7 @@ test('the real saved cart gets a natural acknowledgement, exact bullet rows and 
   assert.equal(copyCall.input.missingQuantityCount, 2); assert.equal(copyCall.tier, 'deep');
   const router = f.calls.filter((c) => c.purpose === 'whatsapp_dialogue').at(-1);
   assert.equal(router.input.shoppingList.lines[0].quantity.value, 50);
-  assert.match(router.input.lastOrderReply, /Kuinka paljon/); assert.equal(router.tier, 'deep'); assert.ok(router.timeoutMs >= 45000);
+  assert.match(router.input.lastOrderReply, /Mille päivälle toimitus/); assert.equal(router.tier, 'deep'); // päivä kysyttiin ensin assert.ok(router.timeoutMs >= 45000);
   const before = f.calls.length;
   assert.deepEqual(await f.turn('maanantaiksi', 'details'), result);
   assert.equal(f.calls.length, before);
@@ -219,7 +219,8 @@ test('a failed or ungrounded copy model cannot change rows, invent quantities or
     const result = await f.turn('50 l maitoa, kananmunia ja kermaa');
     assert.equal(result.messages[0], 'Joo, päivitin ostoskorin!');
     assert.match(result.messages[1], /- maito 50 l\n- kananmuna\n- kerma$/);
-    assert.match(result.messages[2], /^Kuinka paljon laitetaan kananmunia ja kermaa\?/);
+    assert.match(result.messages[2], /^Mille päivälle toimitus\?/); // ennen päivää ei kysytä määriä
+    assert.doesNotMatch(result.text, /Kuinka paljon/);
     assert.doesNotMatch(result.text, /kermaa 50|lähetetty|saatavilla/);
   }
 });
