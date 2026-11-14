@@ -176,7 +176,7 @@
     const notes = (u.assumptions || []).filter((a) => !['QUANTITY_MISSING', 'DATE_MISSING'].includes(a.code)).map((a) => a.fi).filter(Boolean);
     main.innerHTML = `
       <div class="ask-head">
-        <h2>${override ? esc(override.title) : r.recipe?.name ? `${esc(r.recipe.name)}, ${r.recipe.portions} annosta` : 'Näin ymmärsin'}</h2>
+        ${override || r.recipe?.name ? `<h2>${override ? esc(override.title) : `${esc(r.recipe.name)}, ${r.recipe.portions} annosta`}</h2>` : ''}
         ${r.deliveryDate ? `<span class="ask-date">${I.cal}${day(r.deliveryDate)}${r.dateAssumed ? ' (valittu toimituspäivä)' : ''}</span>` : edit && items.length ? `<span class="ask-dayadd"><button type="button" class="ask-plus" data-ask="date">${I.cal}Lisää toimituspäivä</button></span>` : ''}
         ${override ? `<span class="ask-aitag">${I.spark(14)}Tekoälyn ehdotus, tarkista tuotteet</span>` : ''}
       </div>

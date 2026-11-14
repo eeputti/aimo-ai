@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — haun Näin ymmärsin -otsikko pois (Codex)
+
+**Käyttäjän pyyntö ja ratkaisu:** poistetaan haun Näin ymmärsin -teksti. Sille ei lisätä korvaavaa yleisotsikkoa: tuotteet, määrät ja toimituspäivä kertovat tulkinnan jo itsessään.
+
+- `public/aimo-ask.js`: tavallinen tuotehaku ei piirrä yleisotsikkoa eikä tyhjää h2-elementtiä. Reseptin nimi ja annosmäärä säilyvät reseptituloksen otsikkona. Muut hakutiedoston keskeneräiset resepti- ja määrävalintamuutokset jätetään niiden omiin työvaiheisiin.
+- **Varmennus:** JavaScriptin syntaksi ja diff-tarkistus läpi. Oikea hakupaneeli avattu selaimessa erillisellä 4793-esikatselulla ja kiinteällä testivastauksella: 20 l maitoa näyttää tuotteen, määrän, hinnan ja toimituspäivän; Näin ymmärsin -tekstiä tai tyhjää h2-elementtiä ei ole, vaakaylivuoto 0 px eikä JavaScript-virheitä. Ei Valio- tai kielimallikutsuja, ei korilisäyksiä tai tilauksia. Pelkän tekstin poiston vuoksi koko testisarjaa ei ajettu. Muutos tulee käyttöön sivun päivityksellä.
+
 ## 14.11.2026 — yhteinen toimituspäivä ja korien päivähallinta (Codex)
 
 **Käyttäjän päätös:** yläkulman valinta on haun oletustoimituspäivä. Haussa kirjoitettu, saneltu tai valittu päivä päivittää saman valinnan. Ostoskorin toimitusvälilehti pitää voida muuttaa tai poistaa järjestelmällisesti.
