@@ -29,6 +29,7 @@ npm start                   # http://localhost:4747
 | URL | What |
 |---|---|
 | `/` or `/gateway.html` | Static local copy of the Toimitustukku homepage, based on the 14 Nov 2026 reference |
+| `/cart.html` | Editable storefront cart based on the user's Toimitustukku cart; separate from kitchen proposals and agent orders |
 | `/agent.html` | Console: run a buyer agent, approve, edit the mandate, read the audit trail |
 | `/approve.html?order=…` | The human approval view, built for a phone: what was asked, what is proposed, why it stopped, Approve / Reject |
 | `/openapi.json` | The contract (OpenAPI 3.1) |
@@ -37,7 +38,9 @@ npm start                   # http://localhost:4747
 | `/.well-known/jwks.json` | Public key for verifying offers |
 | `/kitchen.html` | Demo client: a kitchen ordering agent (Ravintola Kulma) |
 
-The homepage uses local images, fonts and a fixed product snapshot. Its prices, availability, delivery date and cart are display data; the homepage does not place orders. Product carousels and the assistant greeting open and close locally. Asset sources are recorded in `public/storefront-assets/sources.json`.
+The homepage uses local images, fonts and a fixed product snapshot. Product carousels and the assistant greeting open and close locally. Asset sources are recorded in `public/storefront-assets/sources.json`.
+
+The header and search panel open the same browser-local storefront cart (`aimo.storefront.cart.v1`). Quantity edits, removal, delivery-date moves and the order reference persist in that browser. The cart never imports the kitchen proposal or existing gateway orders. Its initial reference rows and prices are a display snapshot from the real cart's first delivery tab; the uncaptured second tab starts empty. Those reference product IDs may be absent from the challenge catalogue. Add current products through search for availability checks. Payment processing is not connected. The cart's **Lisää tuotteita** field uses the same AI search and microphone as the header, and the panel opens from the field that was used.
 
 The kitchen demo combines history, ordinary bookings and recipe demand, including new ingredients, yield factors and explicitly supplied usable inventory/incoming deliveries. See [kitchen planning inputs and limitations](docs/kitchen-planning.md). Run `npm test` for isolated planning and HTTP regression tests; the local catalogue is required, and the tests do not use live API keys or the running demo databases.
 

@@ -342,6 +342,126 @@
       "page": "https://www.s-kaupat.fi/tuote/6-x-hartwall-original-long-drink-glogg-5-5-0-33-l/6413605320970",
       "bytes": 60072,
       "sha256": "e8772094311481e88d9e1734fb8f850ea87ab2f3f13fb64e6db3d5b3540be812"
+    },
+    {
+      "file": "610329.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MzczMjJ8aW1hZ2UvanBlZ3xhRGxtTDJnNE9TODRPRGN6T1RrME1ESTNNRE00fDRiMTRmMTMzZGU1YWQwMDRiYmUzN2I1MDU0MWUxNTE4YTdhMWMzZDNhN2ExOGQ2YWU3YmZiZDlhOGI3MjhjMGY",
+      "page": "https://www.valioaimo.fi/toimitustukku/dafgard-357-x14-g-lihapulla-pakaste/",
+      "bytes": 90718,
+      "sha256": "60479ee98b53fe2b0beac11f0dcb1101a4a982bf3293bd512f2fa3bfa296d18c",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "8097348.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MjIxNTk4NnxpbWFnZS9qcGVnfGFESTNMMmhrWVM4NU1UY3hOVE0zTWpNeE9UQXl8NTNlMTExZGNhOTYzYTFhZWU0Nzc5YWI4MDc3YmM1OTk4YzBmNmVjOWZhOTFmODAzNzY4YzAzZmQzMjdiMzlhNw",
+      "page": "https://www.valioaimo.fi/toimitustukku/fazer-pihlaja-mustikka-marmeladi-rasia-320-g/",
+      "bytes": 36187,
+      "sha256": "384f8eb8fa1515cd5fdc10166aea3f983993ac34550a810203a2c5b5485f2f01",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "9901719.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8NjE5MTIwfGltYWdlL3BuZ3xhR001TDJnek55ODVNVFUzTVRZNE5ETXhNVE0wfDJjYmYwNDBiZGFmZDZjZGUxMTA5N2Y5NzM0N2IyMzg2NmNjNGYyZTYzNjkzYTc5OTc3OGE1MzY1MTY3YmMzM2I",
+      "page": "https://www.valioaimo.fi/toimitustukku/hk-kalaasi-lihahyytelo-n-09-kg/",
+      "bytes": 399409,
+      "sha256": "bf44bc3878f04310928c26f7a282d78813739d39e1d98a970247983dda49efab",
+      "mime": "image/png"
+    },
+    {
+      "file": "8055469.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8ODMwMjI0fGltYWdlL2pwZWd8YUdFeEwyaGpOUzg1TVRVME1UY3lNRFU1TmpjNHxkZWY5OWExN2Y0Yjg1MGJmOWM2NWRjODUyOTljN2ZiZjFiZWM2MmZlNTBlNDliZGNhOTQ5NTlhODljYWExMDM2",
+      "page": "https://www.valioaimo.fi/toimitustukku/atria-perunasalaatti-3-kg/",
+      "bytes": 28174,
+      "sha256": "a0b2bdd33b497686c8fb4339745c1066cb4aa2cff855f120877a25de0a3001f4",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "874495.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MjYyODExNnxpbWFnZS9qcGVnfGFHUXdMMmc1T1M4NU1UVTJPVEF6TVRReE5EQTJ8ODg1ZWVmNWQ0YmQwYTc1YmEwN2FhOWY0YmI5N2Q0M2NmY2I4NmViNWY5MGVmNjU2YzcyM2ExMWI2ODJiOTkzNQ",
+      "page": "https://www.valioaimo.fi/toimitustukku/kymppi-lanttulaatikko-25-kg-kypsa-pakaste/",
+      "bytes": 102622,
+      "sha256": "9f6d4d96b4f53aa7410e71dda437142e45b711f842bf2115baa9aea3197107d0",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "8090880.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MTU2Nzk2N3xpbWFnZS9qcGVnfGFHUTVMMmhtTlM4NU1UWTFOelE0T1RrME1EYzR8ZGY2M2JhYzk4MDE1Mjk0M2QyMjg2MmZmMTQ2MzkyMjIxZDA4MDA2Y2FkOWZmYTE5MjYyY2U4ZmVmODAxY2IxMw",
+      "page": "https://www.valioaimo.fi/toimitustukku/vegem-seitankunkku-sliced-900-g/",
+      "bytes": 62082,
+      "sha256": "ea7a1f6bb7efa65e5ed78320b1002c9bde4eef2bfffc64bf976b57f623cdd6c8",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "8096833.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/N-ytt-kuva-2026-03-27-131531.png?context=bWFzdGVyfHJvb3R8MTc3MjI3fGltYWdlL3BuZ3xhRGhrTDJneU55ODVNRGcwTkRrNE5UUXlOakl5TDA3RHBIbDBkTU8yYTNWMllTQXlNREkyTFRBekxUSTNJREV6TVRVek1TNXdibWN8MjY5MGNkMGMwMjQzNTRjYmY0MzJmN2I1MTE2ODFjYzY1NWYxNmYwYmVkMGQxYzZjYjU4ZThlYjBjNjFlZjRkMA",
+      "page": "https://www.valioaimo.fi/toimitustukku/hendi-uunikinnaspari/",
+      "bytes": 211796,
+      "sha256": "b263ff46810236594a4c42796ddee21c21f3057598da6d9eca1ef386246f0a6f",
+      "mime": "image/png"
+    },
+    {
+      "file": "8076442.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8NjY1MDAxfGltYWdlL2pwZWd8YUdNMUwyZzRZUzg1TVRVMU5EazJNalEzTXpJMnw4Y2RkMDMxNGRiNzIwY2YwMzQ1ODY1YTcwYjlmN2NmODk0MWQ0OGQ0ODkwMTEwODVkNzVkN2YzNGQ5ZTgyZTll",
+      "page": "https://www.valioaimo.fi/toimitustukku/voner-original-lastu-600-g/",
+      "bytes": 91915,
+      "sha256": "8c62c1469935ba98e8b5b05743afa7aed6228b5867998dc7f28236fdb3f032f1",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "8097595.png",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8Mjc0ODQ2Mjl8aW1hZ2UvcG5nfGFHTTBMMmd4TlM4NU1UY3hOakE0T1Rrek9ESXl8YzU5OTM2NDBjYmQ5OTU2YWUyZmYwM2RkODQwNGVkYWYzMDg0NDRiOWVjNDk3ZDUxMTY2NjA4Y2E3M2ZiYjc1ZQ",
+      "page": "https://www.valioaimo.fi/toimitustukku/atria-jouluateria-3-x340-g/",
+      "bytes": 893290,
+      "sha256": "6d6b220d56559a7add479b0fa6165303c5a6f95c330536455569ce5875d2b1f5",
+      "mime": "image/png"
+    },
+    {
+      "file": "8510.png",
+      "source": "https://www.valio.fi/cdn-cgi/image/format=auto/https://cdn-wp.valio.fi/valio-fi/2026/05/valio-aura-3700.png",
+      "page": "https://www.valio.fi/tuotteet/valio-aura/",
+      "bytes": 2062597,
+      "sha256": "d03d66a39e71af40cf61d53ff811926854bbffb915850a3c334f2d7531b06caf",
+      "mime": "image/png"
+    },
+    {
+      "file": "8082064.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8ODUyODU1fGltYWdlL2pwZWd8YURZNEwyZ3pPUzg1TVRZMU16VTFNREkwTkRFMHxmMTY1N2I0MmY3ZjI5MGRkOWE2NjMwZGZjMGJmNzZkYjVhNTMwNDI0NTQ5OTg0YTMyMWNkMzY3NTA5YWIyNjE2",
+      "page": "https://www.valioaimo.fi/toimitustukku/vaasan-taskutorttu-80-x65-g/",
+      "bytes": 29344,
+      "sha256": "4ca769f4a8b41ff52ec5ed200a57e3d5c2259031acd0c4403db23fcb948e0254",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "8093815.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MTg3NzA4M3xpbWFnZS9qcGVnfGFHVXpMMmd4WlM4NU1UWTNOamN6TVRZek9EQTJ8Yzk3ZTExZDhlN2JjNzVhMTYzYTRiMjFmOWQyMGQzZjQzY2U3ZWIzYWRlMGQzMWQyMjM2NjA5NWZjMzgzZjA4ZQ",
+      "page": "https://www.valioaimo.fi/toimitustukku/vaasan-aura-tahtitorttu-40-x60-g/",
+      "bytes": 32488,
+      "sha256": "79cf2797e85012d6cfca38f264d4d174141eff2558aeaf968343fb37d3cf5558",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "8097382.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8MTcyNDUwNXxpbWFnZS9qcGVnfGFHTTFMMmhpTUM4NU1UY3hOVEE1TnpBMk56Z3l8ZGUzYzI0M2VkMWMxY2RjNjkwZDFlOTJiZjg4ODhmYTNmZjMwZGE2YzRjM2UyYmNhNDNlODJjZjliYzlhZjVjOQ",
+      "page": "https://www.valioaimo.fi/toimitustukku/huhtamaki-80-x250-ml-kartonkinen-kuumakuppi-christmas-2/",
+      "bytes": 167125,
+      "sha256": "6bee66e7b3af66e1baa7511b6840c59e0f772295c34b169764044e94c55d3d34",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "8047279.jpg",
+      "source": "https://imgfly.scarabresearch.com/w_800/https://api.valioaimo.fi/medias/?context=bWFzdGVyfHJvb3R8NDI4MDQwMXxpbWFnZS9qcGVnfGFEVTBMMmc0Tnk4NU1UVXpPVEUxTWpnNU5qTXd8MWY1ZmZiNmZmOTkwNzgyNzg2ZjVhZmU4NzQ0YzBhNmE3ODNlYjFlM2E3NjA4YzhiZjViMDJjZjNmYjJhY2QxYg",
+      "page": "https://www.valioaimo.fi/toimitustukku/havi-tuikku-lampokynttila-valkoinen-100-kpl-4-h/",
+      "bytes": 49452,
+      "sha256": "b13a77b4695e826b0db5f89cf6080490f2edd9ad80ac5a1304256fdd818c42aa",
+      "mime": "image/jpeg"
+    },
+    {
+      "file": "8097472.png",
+      "source": "https://www.valio.fi/cdn-cgi/image/format=auto/https://cdn-wp.valio.fi/valio-fi/2026/08/valio-punainen-juustopakkaus-34842.png",
+      "page": "https://www.valio.fi/tuotteet/valio-punainen-juustopakkaus-3/",
+      "bytes": 2853859,
+      "sha256": "80d9112901ccddb78b2f29d3220b440a18d8c0a0354ff53b3306613de6a33cea",
+      "mime": "image/png"
     }
   ]
 }

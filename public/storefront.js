@@ -69,4 +69,5 @@ document.addEventListener('click', (event) => {
   if (event.target.closest('.chat-launch')) { const intro = document.querySelector('.chat-intro'); intro.hidden = !intro.hidden; }
 });
 
-render().catch((error) => { document.querySelector('#storefront-content').innerHTML = `<div class="container"><p>${esc(error.message)}</p></div>`; });
+export { product, rail };
+if (document.querySelector('#storefront-content')) render().catch((error) => { document.querySelector('#storefront-content').innerHTML = `<div class="container"><p>${esc(error.message)}</p></div>`; });
