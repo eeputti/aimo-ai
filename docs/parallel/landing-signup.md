@@ -13,6 +13,10 @@
 
 Sivulla on nyt vain Valio Aimo -logo, sininen sydän, WhatsApp-ikoni, otsikko **WhatsAppin tilausapuri**, yksi rivi ohjetta ja lomake (puhelinnumero, nimi, suostumus). Esittely, puhelinkuva, vaiheet ja yritys-kenttä poistettiin. Palvelin käyttää yrityksenä oletusta Demokeittiö. Tilavaiheet ovat sinisiä, ja WhatsApp-napit vihreitä. Worker-versio `3c4a8c81-6d21-499c-bc31-f629c5badcf4`, julkaistu 477131e:n päältä niin, että sen demomaksulinkki säilyi. Paikallinen selainketju (lomake → liitos → koodi → hyväksyntä → Avaa WhatsApp) toistettiin 375 px:n leveydellä, Workerin testit 20/20.
 
+## Valion fontit ja sininen korostus (klo 01.50)
+
+Sivu käyttää samoja Valio Aimon fontteja kuin paikallinen Toimitustukku-kauppa: Matter leipätekstissä ja National 2 Compressed otsikoissa. Tiedostot on kopioitu `public/storefront-assets/`:sta Workerin `public/fonts/`-kansioon, ja niiden lähde on kirjattu `public/storefront-assets/sources.json`:iin. Valitun kentän korostus on sininen oranssin sijaan. Worker-versio `169b93b7-c221-4694-bd61-a32c3cb87dfe`. Fontit latautuvat tuotannosta tyypillä `font/otf`, ja Workerin testit ovat 20/20.
+
 ## Esittäjän ohje
 
 Käynnistä seuranta projektin juuressa ja jätä se auki:
