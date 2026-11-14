@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsAppin vastaamattomuus varmennettu nykyisestä jonosta ja Metasta (Codex, vastaustarkistuschat)
+
+- Käyttäjä pyysi tarkistamaan, vastaako WhatsApp, ja miksi se ei vastaa. Klo 22.29 tehdyt lukutarkistukset: paikallinen ja julkinen `/healthz` HTTP 200, 4749-prosessi käynnissä. **Klo 22.25.59 saapunut viesti vastaanotettiin ja vastaus tallennettiin, mutta kolme lähetysyritystä epäonnistuivat `META_HTTP_401`:een.** Viimeisin Metan hyväksymäksi merkitty vastaus on klo 21.58.34; puhelintoimitusta ei päätellä tästä.
+- Nykyisillä asetuksilla Metan vain lukeva numerokysely palautti HTTP 401 / OAuthException **190, alikoodi 463** ja session päättymisajaksi **14.11.2026 klo 22.00 Suomen aikaa**. Vanhentunut token estää ulosmenevät vastaukset; vastaanotto ja vastausten muodostus toimivat. Tarkka raportti `docs/parallel/whatsapp-response-check.md`.
+- Ei koodi-, credential-, demo- tai tilausmuutoksia eikä viestilähetyksiä, uusintoja tai restarteja. Dokumenttidiff tarkistettu; muuttumattomalle koodille ei ajettu testisarjaa. Muiden työt säilytetään. Token-korjauschat on jo aktiivinen ja paikallisen taulun mukaan saanut uuden tokenin luontihyväksynnän; se hoitaa korjauksen sekä sen jälkeisen puhelinvarmennuksen. Tämä tarkistus ei väitä korjausta valmiiksi.
+
 ## 14.11.2026 — Eeliksen MCP-yhteyden raportti ja WhatsApp/API-työnjaon vahvistettu tilanne (Codex)
 
 **Käyttäjän päätös MCP-yhteyschatissa:** Eelis hoitaa WhatsAppin alkupään. Muu tiimi jakaa loppupään, jossa viesteistä kerätty ostoslista/tilaus välitetään käytettävissä olevan API:n kautta verkkokaupan ostosapurille ja nimenomaisesti hyväksytyksi tilaukseksi. Käyttäjä valtuutti ilmoittamaan työnjaon koko tiimille ja paikallisille toteutuschateille; valtuutus tarkistettiin alkuperäisen chatin käyttäjäviestistä ennen jatkokoordinointia.
