@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — oikea MCP-linkki näkyviin GitHubin README:hen (Codex)
+
+- Käyttäjä pyysi lisäämään oikean linkin GitHubiin. Liittymisohjeessa oli jo käyttäjän antama toimiva `/mcp`-osoite; sama koko osoite lisättiin nyt suoraan projektin README:n Tiimin yhteinen MCP -kohtaan, jotta sen voi kopioida ilman ohjesivun avaamista.
+- Liittymisohjeeseen lisättiin Danielin Claude-/ChatGPT-tunnisteet. Kaikki kahdeksan löytyvät oikean palvelimen jäsenlistasta; avaimia ei luettu tai tallennettu. Tunneli-osoitteen vaihtuessa ohje neuvoo päivittämään sekä liittymisohjeen että README:n.
+- Tarkistus: julkisen OAuth-metadatan resource vastaa dokumentoitua osoitetta; oikea Tiimialusta-yhteys toimii. Molempien dokumenttien koko osoitteen täsmääminen ja paikalliset linkkikohteet tarkistettu, `git diff --check` läpi. Sovelluskoodia tai palvelinasetuksia ei muutettu, eikä sovellustestejä tarvita. Muiden commitit 52d8241:een asti säilytettiin. Työ varattiin paikalliselta ja yhteiseltä koordinointitaululta.
+
 ## 14.11.2026 — ostoslista ranskalaisilla viivoilla (Codex)
 
 - Käyttäjän pyyntö: ostoslistan rivit näkyvät ranskalaisilla viivoilla pallukoiden sijaan. Selaimen tilausapurin Markdown-muotoilija muodostaa listoista HTML-luetteloita; `public/assistant.css` asettaa niiden listamerkiksi tavallisen `-`-viivan. Rivien sisältö, lihavoinnit ja luettelorakenne säilyvät.
