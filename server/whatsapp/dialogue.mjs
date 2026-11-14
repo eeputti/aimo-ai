@@ -5,7 +5,23 @@ import { withCartHandoffHint } from './cart-handoff.mjs';
 const YES = /^(kyllä|joo|juu|jep|sopii|lisää se|lisää vaan|otetaan)[.!\s]*$/iu;
 const NO = /^(ei|ei kiitos|ei tarvitse|ei tarvi|ei muuta)[.!\s]*$/iu;
 const QUANTITY = /^\d+(?:[.,]\d+)?\s*(?:l|litra\w*|kg|kilo\w*|kpl|pakett\w*|laatik\w*|ltk)[.!\s]*$/iu;
-const GREETING = /^(moi|moikka|moro|morjens|hei|heippa|terve|hello|hi|huomenta|hyvää (huomenta|päivää|iltaa))[.!\s]*$/iu;
+const GREETING = /^(moi|moikka|moro|morjens|morjes|hei|heippa|terve|hello|hi|huomenta|päivää|iltaa|hyvää (huomenta|päivää|iltaa))[.!\s]*$/iu;
+// Tervehdys Helsingin ajasta (viestin vastaanottohetki tai demokello). Asiakkaan oma arkinen tervehdys peilataan;
+// vuorokaudenaikaan sidottu tervehdys tulee aina kellosta, joten väärää vuorokaudenaikaa ei sanota.
+const MIRROR = { morjes: 'Morjes!', morjens: 'Morjes!', moro: 'Moro!', moi: 'Moi!', moikka: 'Moi!', hei: 'Hei!', heippa: 'Hei!', terve: 'Terve!', hello: 'Hei!', hi: 'Hei!' };
+const LEADING_GREETING = /^(?:(?:hyvää\s+)?(?:huomenta|päivää|iltaa|yötä)|moi(?:kka)?|moro|morjen?s|hei(?:ppa)?|terve|hello|hi)(?=$|[\s!.,])[!.,]*\s*/iu;
+export function greetingFor(text, at) {
+  const word = (String(text || '').trim().toLocaleLowerCase('fi-FI').match(/^\p{L}+/u) || [''])[0];
+  if (MIRROR[word]) return MIRROR[word];
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Helsinki', hour: 'numeric', hourCycle: 'h23' }).format(new Date(at)));
+  return hour >= 5 && hour < 10 ? 'Huomenta!' : hour >= 10 && hour < 17 ? 'Päivää!' : hour >= 17 && hour < 22 ? 'Iltaa!' : 'Moi!';
+}
+/** Korvaa viestin alun tervehdyksen annetulla, tai poistaa sen (greeting=null). */
+export function withGreeting(greeting, text) {
+  const rest = String(text || '').replace(LEADING_GREETING, '').trim();
+  if (!greeting) return rest || String(text || '');
+  return rest ? `${greeting} ${rest.charAt(0).toLocaleUpperCase('fi-FI')}${rest.slice(1)}` : greeting;
+}
 const blocksReset = (text) => (text.toLowerCase().match(/\p{L}+/gu) || []).some((word) => ['älä', 'en', 'emme', 'ei', 'miten', 'kuinka', 'voiko', 'voinko'].includes(word));
 export function isFreshStart(text) {
   if (blocksReset(text)) return false;
@@ -61,7 +77,7 @@ export function orderMessages(result) {
     ? [result.text] : parts.length ? parts : [result.text];
 }
 
-export function createOrderingDialogue({ db, ask, lookup = async () => [], now = Date.now }) {
+export function createOrderingDialogue({ db, ask, lookup = async () => [], now = Date.now, timeOf = (receivedAt) => receivedAt || now() }) {
   db.exec(`CREATE TABLE IF NOT EXISTS wa_dialogue (binding TEXT PRIMARY KEY, json TEXT NOT NULL, updated INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS wa_dialogue_results (message_id TEXT PRIMARY KEY, binding TEXT NOT NULL, json TEXT NOT NULL, created INTEGER NOT NULL);`);
   const save = (binding, messageId, state, result, userText, reset = false) => {
@@ -76,11 +92,13 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], now =
     return result;
   };
   return {
-    async respond({ binding, messageId, text, runOrder, getShoppingList = () => null, canOpenCart = false, inCart = false, allowed = () => true }) {
+    async respond({ binding, messageId, text, runOrder, getShoppingList = () => null, canOpenCart = false, inCart = false, allowed = () => true, receivedAt }) {
       const cached = db.prepare('SELECT json FROM wa_dialogue_results WHERE message_id=? AND binding=?').get(messageId, binding);
       if (cached) return JSON.parse(cached.json);
       const row = db.prepare('SELECT json FROM wa_dialogue WHERE binding=?').get(binding);
       let state = row ? JSON.parse(row.json) : {};
+      // Tervehdys vain vastauksena asiakkaan tervehdykseen (tyypillisesti keskustelun alussa), ei joka viestiin eikä selainkorissa.
+      const greeting = !inCart && LEADING_GREETING.test(text.trim()) ? greetingFor(text, timeOf(receivedAt)) : null;
       let orderText = text; let plan; let result; let messages; let reset = false;
       const freshStart = async () => {
         // Cancel only this customer's current draft. A new namespace also excludes old completed orders
@@ -108,7 +126,7 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], now =
         try {
           plan = (await ask({ purpose: 'whatsapp_dialogue', tier: 'deep', system: SYSTEM, schema: SCHEMA, maxTokens: 2000, timeoutMs: 60000, retries: 0,
             user: JSON.stringify(GREETING.test(text)
-              ? { message: text, task: 'Tämä on pelkkä tervehdys. Vastaa lyhyesti tervehdyksellä, älä kertaa vanhaa listaa tai tarkennuskysymyksiä.' }
+              ? { message: text, greeting, task: `Tämä on pelkkä tervehdys. Koodi aloittaa vastauksen tervehdyksellä "${greeting || 'Moi!'}". Kirjoita vain lyhyt jatko ilman omaa tervehdystä, esim. kysy mitä keittiöön tarvitaan. Älä kertaa vanhaa listaa tai tarkennuskysymyksiä.` }
               : { today: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Helsinki' }).format(new Date(now())),
                 history: state.history || [], shoppingList: getShoppingList({ epoch: state.epoch || '' }) || null,
                 lastOrderReply: canOpenCart && state.lastOrder ? withCartHandoffHint(state.lastOrder).text : state.lastOrder?.text || '',
@@ -126,7 +144,7 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], now =
           plan = { ...plan, text: [...remaining, ...(!alreadyExplained ? ['Olet jo ostoskorissa. Voit tarkistaa tilauksen tässä näkymässä.'] : [])].join(' ') };
         }
       }
-      if (!result && GREETING.test(text) && plan?.route !== 'chat') plan = { route: 'chat', text: 'Hei! Mitä tarvitset keittiöön? Voin auttaa ostoslistan kanssa.' };
+      if (!result && GREETING.test(text) && plan?.route !== 'chat') plan = { route: 'chat', text: 'Mitä tarvitset keittiöön? Voin auttaa ostoslistan kanssa.' };
       if (!result && plan?.route === 'reset' && !blocksReset(text)) await freshStart();
       if (!result && plan?.route === 'cart') {
         const list = getShoppingList({ epoch: state.epoch || '' });
@@ -153,7 +171,7 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
             if (typeof question === 'string' && question.length <= 250 && question.includes('?') && !/[\d€]|tilattu|tilaus vahvistettu/iu.test(question)) addQuestion = question.trim();
           } catch { answer = 'Voin auttaa tuotteen käyttötavoissa, mutta tarkat tuotetiedot eivät nyt latautuneet. Kerro, mihin ruokaan tuotetta tarvitset.'; }
         }
-        if (!answer) answer = 'Hei! Kootaan ostoslista kuntoon. Mitä keittiöön tarvitaan?';
+        if (!answer) answer = 'Kootaan ostoslista kuntoon. Mitä keittiöön tarvitaan?';
         result = { status: state.lastOrder?.status || 'collecting', text: answer };
         messages = [answer];
         if (adviceTerm && !state.lastOrder?.text.includes('Huomioitu:')) {
@@ -206,6 +224,8 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
         if (ideaAllowed) state.suggestedFor = result.draftId || null;
       }
       if (!allowed()) return { status: 'error', text: 'Testiyhteys ei ole enää voimassa.' };
+      // Mallin oma tervehdys ei koskaan jää voimaan: oikea tervehdys alkuun tai ei tervehdystä kesken keskustelun.
+      if (messages?.length && !['error', 'rejected'].includes(result.status)) messages = [withGreeting(greeting, messages[0]), ...messages.slice(1)];
       let out = { ...result, messages, text: messages.join('\n\n'), ...(canOpenCart && plan?.openCart ? { cartRequested: true } : {}) };
       if (canOpenCart) out = withCartHandoffHint(out);
       return save(binding, messageId, state, out, text, reset);
@@ -220,6 +240,8 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
 export async function createConfiguredDialogue(store) {
   const [{ askAgent, agentEnabled }, { loadCatalog, publicProduct }, { clock }] = await Promise.all([import('../aimoAgent.mjs'), import('../catalog.mjs'), import('../gateway/clock.mjs')]);
   return createOrderingDialogue({ db: store.db, ask: agentEnabled() ? askAgent : null, now: () => clock.now().getTime(),
+    // Demokellolla (DEMO_NOW) tervehdys seuraa demoaikaa, muuten viestin vastaanottohetkeä.
+    timeOf: (receivedAt) => (clock.simulated || !receivedAt ? clock.now().getTime() : receivedAt),
     lookup: async (query) => loadCatalog().search(query, { limit: 4 }).map((hit) => publicProduct(hit.product)),
   });
 }

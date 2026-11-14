@@ -4,6 +4,7 @@
 // työkalujen palauttamista tiedoista. Tilaus lähtee vain, kun ostaja vastaa TILAA juuri näytettyyn yhteenvetoon.
 import crypto from 'node:crypto';
 import { CLAIMS } from './interpret.mjs';
+import { helsinkiLabel, parseApiTime } from '../gateway/clock.mjs';
 
 const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
@@ -24,6 +25,14 @@ const PICK = /^(?:nro\s*|numero\s*)?(\d{1,2})[.)]?(?:\s*kiitos)?[.!\s]*$/iu;
 const SHOW = /^(?:näytä(?:\s+(?:lista|ostoslista|tilaus|yhteenveto))?|lista)[.!?\s]*$/iu;
 const MORE = /^(?:(?:näytä|anna|hae|katso)\s+)?(?:lisää|muita|muut|enemmän)(?:\s+(?:vaihtoehtoja|vaihtoehdot|tuotteita|tuotteet))?(?:\s+kiitos)?[.!?\s]*$|^onko\s+(?:muita|muuta|lisää)(?:\s+(?:vaihtoehtoja|tuotteita))?[?.!\s]*$/iu;
 const CHEAPEST = /^(?:(?:otetaan|ota|laita|valitse|se|joo)\s+)*(?:halvin|halvinta|halvimman|halvempi|edullisin|edullisinta)(?:\s+(?:vaihtoehto|kiitos))?[.!\s]*$/iu;
+// Kiire: asiakas haluaa toimituksen mahdollisimman pian. Kellonaikatoive kirjataan, mutta sitä ei luvata:
+// tilausjärjestelmä kertoo vain toimituspäivän ja tilausaikarajan.
+const RUSH = /(?:^|[\s,.!?])(?:tänään|tänää|heti|nyt\s+heti|asap|kiire\p{L}*|pikaisesti|pikana|mahd(?:ollisimman)?\.?\s+pian|aikaisin\s+mahdollinen)(?=$|[\s,.!?])/iu;
+const TIME_WISH = /(?:ennen|viimeistään)\s+(?:klo|kello)\s*\d{1,2}(?:[.:]\d{2})?|(?:klo|kello)\s*\d{1,2}(?:[.:]\d{2})?\s*(?:mennessä|asti)|(?:huomenna\s+)?aamu(?:lla|ks(?:i|een)?|päivällä|seitsemäksi)|aamuun|iltapäivällä/iu;
+const RUSH_DATE_QUESTION = 'Mille päivälle toimitus? Jos on kiire, kirjoita esim. "huomenna", niin katson aikaisimman päivän, jolle ehtii.';
+const DATE_YES = /^(?:1[.)]?|kyllä|joo|juu|jep|ok|okei|sopii|vaihda|vaihdetaan|käy)(?:[,\s]+(?:kiitos|vaan|vain|sopii|käy|vaihda|vaihdetaan|se))*[.!\s]*$/iu;
+const DATE_NO = /^(?:2[.)]?|ei|ei kiitos|pidetään|pidä|ei käy)(?:[,\s]+(?:kiitos|pidetään|pidä|se|sama|päivä))*[.!\s]*$/iu;
+const addDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 // Myyntierän sana lukumäärän kanssa: "5 rasiaa", "1 rasia". Tuntematon tunnus näytetään sellaisenaan.
 const PACK = { ras: ['rasia', 'rasiaa'], ltk: ['laatikko', 'laatikkoa'], pkt: ['paketti', 'pakettia'], pss: ['pussi', 'pussia'], prk: ['purkki', 'purkkia'],
   pl: ['pullo', 'pulloa'], krt: ['kartonki', 'kartonkia'], kan: ['kanisteri', 'kanisteria'], sk: ['säkki', 'säkkiä'], kää: ['kääre', 'käärettä'] };
@@ -145,8 +154,9 @@ function summary(draft, q, customer) {
   const diet = dietLabel(draft.diet);
   const cutoff = q.lines.map((l) => l.cutoffLabel).filter(Boolean)[0];
   return [`*Tilausluonnos*, toimitus ${dateLabel(draft.deliveryDate)}${site ? `, ${site.label}` : ''}`, ...(diet ? [`Huomioitu: ${diet}`] : []), ...rows, `Yhteensä ${eur(q.totals.net)} (alv 0 %)`,
-    ...(cutoff ? [`Tilattava viimeistään ${cutoff}.`] : []), '', `Vahvista vastaamalla *TILAA*. ${changeHint(draft)}`].join('\n');
+    ...(cutoff ? [`Tilattava viimeistään ${cutoff}.`] : []), ...(draft.timeWish ? [timeWishNote(draft)] : []), '', `Vahvista vastaamalla *TILAA*. ${changeHint(draft)}`].join('\n');
 }
+const timeWishNote = (draft) => `Toivoit toimitusta "${draft.timeWish}": kellonaikaa en näe tilausjärjestelmästä, joten en voi luvata sitä. Toimituspäivä on ${dateLabel(draft.deliveryDate)}`;
 
 /**
  * @param {object} o
@@ -165,7 +175,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
     // Toimituspäivä ensin ja yksin: saatavuus, hinnat ja vaihtoehdot riippuvat päivästä. Mainitut tuotteet säilyvät luonnoksessa.
     if (!draft.deliveryDate) {
       draft.pending = { kind: 'checklist', asks: ['date'], refs: [] };
-      return { status: 'collecting', text: `Luonnoksessa nyt:\n${list}\n\n${DATE_QUESTION}` };
+      return { status: 'collecting', text: `Luonnoksessa nyt:\n${list}\n\n${draft.rush ? RUSH_DATE_QUESTION : DATE_QUESTION}` };
     }
     // Sitten määrät. Ruokavaliotarkennus kysytään vasta, kun oikeat tilattavat vaihtoehdot eroavat siinä;
     // asiakkaan itse ilmoittamat vaatimukset pätevät aina.
@@ -201,11 +211,30 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         }
       }
       if (!x && again) { x = { ref: again.ref, options: draft.offered[again.ref], more: opts.again.more === true, exact: opts.again.exact }; line = again; }
+      // Kiireellinen päivä (tänään, huomenna tai kiireeksi sanottu): jos pyydetylle päivälle ei ehdi, haetaan aikaisin
+      // päivä, jolle sama tuote on tilattavissa, ja kysytään päivän vaihtoa. Ostajan hylkäämää vaihtoa ei tarjota uudestaan.
+      const today = helsinki(now());
+      const urgent = draft.rush || draft.deliveryDate <= addDays(today, 1);
       if (!x) {
         for (const l of open) {
           const s = await tools.suggest({ customer, draft: { ...draft, lines: [l] } });
+          if (s.lines[0]?.options?.length) { problems.push(...s.issues.map((i) => i.message)); x = s.lines[0]; line = l; draft.seen[l.ref] = x.options.map((o) => o.productId); break; }
+          const none = s.issues.find((i) => i.code === 'NO_ORDERABLE_PRODUCT' && i.ref === l.ref);
+          if (none && urgent && !(draft.keptDates || []).includes(draft.deliveryDate)) {
+            let earliest = none.nextDeliveryDate && none.nextDeliveryDate > draft.deliveryDate ? none.nextDeliveryDate : null;
+            for (let k = 1; !earliest && k <= 5; k += 1) {
+              const probe = await tools.suggest({ customer, draft: { ...draft, deliveryDate: addDays(draft.deliveryDate, k), lines: [l] } });
+              if (probe.lines[0]?.options?.length) earliest = addDays(draft.deliveryDate, k);
+            }
+            if (earliest) {
+              const from = draft.deliveryDate;
+              draft.pending = { kind: 'date_offer', date: earliest, from, refs: [l.ref] };
+              const when = from === today ? 'Tänään' : from === addDays(today, 1) ? `Huomiseksi (${dateLabel(from)})` : `Päivälle ${dateLabel(from)}`;
+              return { status: 'collecting', text: [...problems, `${when} ei enää ehdi: ${l.productTerm}. Aikaisin toimitettava päivä on ${dateLabel(earliest)}`,
+                `Vaihdetaanko koko tilauksen toimitus päivälle ${dateLabel(earliest)}?`, `1) kyllä, ${dateLabel(earliest)}`, `2) ei, pidetään ${dateLabel(from)}`].join('\n') };
+            }
+          }
           problems.push(...s.issues.map((i) => i.message));
-          if (s.lines[0]?.options?.length) { x = s.lines[0]; line = l; draft.seen[l.ref] = x.options.map((o) => o.productId); break; }
         }
       }
       if (!x) return { status: 'collecting', text: `${problems.join('\n')}\nKokeile toista päivää tai tarkenna tuotetta. Tilausta ei ole tehty.` };
@@ -227,6 +256,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       const smallest = covered.length ? Math.min(...covered) : null;
       const notes = [...(smallest > line.quantity.value ? [`Tarve on ${qty(line.quantity)}; pienin näistä myyntieristä kattaa ${qty({ value: smallest, unit: line.quantity.unit })}.`] : []),
         ...(!line.claims.includes('EU_ORGANIC_FARMING') && x.options.every((o) => o.labels?.includes('EU_ORGANIC_FARMING')) ? ['Näytetyt vaihtoehdot ovat luomua.'] : [])];
+      // Kiireessä tilausaikaraja näkyy jo vaihtoehdoissa (aikaisin näytetyistä, työkalujen tiedoista). Kellonaikaa ei luvata.
+      const cutoffAt = urgent ? x.options.map((o) => o.cutoff).filter((c) => parseApiTime(c)).sort((a, b) => parseApiTime(a) - parseApiTime(b))[0] : null;
+      const day = draft.deliveryDate === today ? 'Tämän päivän toimitukseen' : draft.deliveryDate === addDays(today, 1) ? 'Huomiselle' : `Päivälle ${dateLabel(draft.deliveryDate)}`;
+      if (cutoffAt) notes.push(`${day} ehtii tilata ${helsinkiLabel(cutoffAt)} asti.`);
+      if (draft.timeWish && !draft.timeWishNoted) { notes.push(timeWishNote(draft)); draft.timeWishNoted = true; }
       const block = [`Toimitus ${dateLabel(draft.deliveryDate)}, hinnat alv 0 %.${diet ? ` Huomioitu: ${diet}.` : ''}`,
         ...(x.exact === false ? [`Tarkkaa osumaa ei löytynyt: ${line.productTerm}. Lähimmät tilattavat vaihtoehdot:`] : []),
         `*${cap(lineLabel(line))}:*`, ...x.options.map((o, i) => `${i + 1}) ${optionLabel(o, line)}`),
@@ -305,6 +339,14 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         // Tarkennus on numeroitu kuten vaihtoehdot: 1 = laktoositon, 2 = tavallinen käy.
         const preferenceYes = draft.pending?.kind === 'preference' && (VAGUE_YES.test(t) || /^(?:1[.)]?|laktoosit(?:tomana|tomina|onta|on))[.!\s]*$/iu.test(t));
         const preferenceNo = draft.pending?.kind === 'preference' && /^(?:2[.)]?|ei|ei väliä|ei tarvitse|ei tarvi|tavallinen|tavallista|tavalliset|ihan tavallista|ihan tavalliset|normaali|normaalia|ihan normi|kumpikin käy|kaikki käy)[.!\s]*$/iu.test(t);
+        // Kiire ja kellonaikatoive kirjataan viestistä; ne eivät muuta luonnoksen sisältöä eivätkä ole lupaus.
+        const wish = t.match(TIME_WISH)?.[0];
+        if (wish) { draft.timeWish = wish.slice(0, 40); draft.timeWishNoted = false; }
+        if (wish || RUSH.test(t)) draft.rush = true;
+        // Vastaus aikaisimman päivän ehdotukseen: 1/kyllä vaihtaa koko tilauksen päivän, 2/ei pitää pyydetyn.
+        const offer = draft.pending?.kind === 'date_offer' ? draft.pending : null;
+        const dateAnswer = offer && DATE_YES.test(t) ? { intent: 'order', deliveryDate: offer.date, ops: [] }
+          : offer && DATE_NO.test(t) ? (draft.keptDates = [...new Set([...(draft.keptDates || []), offer.from])], { intent: 'order', ops: [] }) : null;
         // Vastaus viimeksi näytettyyn vaihtoehtolistaan: numero, "halvin" tai "näytä lisää". Koodissa, ei mallikutsua.
         const choosing = draft.pending?.kind === 'choose' && draft.pending.refs?.length === 1 ? draft.pending : null;
         const shownOptions = choosing ? draft.offered[choosing.refs[0]] || [] : [];
@@ -318,7 +360,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
           : wantsMore ? { intent: 'order', ops: [] }
           : picked ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: picked }] }
             : cheapest ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: cheapest }] } : null;
-        const turn = choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
+        const turn = dateAnswer || choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
           ? { op: 'update', ref, addClaims: [draft.pending.claim] } : { op: 'no_preference', ref }) }
           : await interpretTurn({ text: t, draft: structuredClone(draft), today, now: now(), receivedAt, context }));
         const moreAsked = wantsMore || Boolean(choosing && (turn.ops || []).some((o) => o.op === 'more' && (!o.ref || o.ref === choosing.refs[0])));

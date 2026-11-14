@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — WhatsApp: kellonajan mukainen tervehdys ja kiireiset tilaukset (Claude Code, päivä ensin -chat)
+
+- **Käyttäjän pyyntö (Eelis klo 01.25):** apurin tervehdys seuraa kellonaikaa, ja kiireiset tilaukset ("tänään", "heti", "huomenna aamulla", "ennen klo 7") hoidetaan fiksusti: viimeinen tilausaika ja aikaisin toimituspäivä kerrotaan, aikaisinta päivää ehdotetaan, eikä luvata mitään, mitä työkalut eivät vahvista. Toimituspäivä kysytään edelleen ensin.
+- **Tervehdys:** Helsingin aika viestin vastaanottohetkestä (`receivedAt`) tai demokellosta. Klo 5–10 Huomenta, 10–17 Päivää, 17–22 Iltaa, yöllä Moi. Arkinen tervehdys peilataan (morjes, moro, moi, hei, terve), vuorokaudenaika tulee aina kellosta. Tervehdys vain vastauksena asiakkaan tervehdykseen, ei joka viestissä eikä selainkorissa; mallin oma tervehdys korvataan tai poistetaan.
+- **Kiire:** jos tämän päivän, huomisen tai kiireeksi sanotun päivän toimitukseen ei ehdi, sama tuote haetaan työkaluista enintään viideltä seuraavalta päivältä ja ehdotetaan numeroituna (1 vaihda, 2 pidä). Päivää ei vaihdeta ilman lupaa, hylättyä ei tarjota uudestaan. Kellonaikatoiveeseen vastataan, ettei kellonaikaa näe tilausjärjestelmästä eikä sitä voi luvata. Kun ehtii, listan alle tulee `Huomiselle ehtii tilata … asti` vaihtoehtojen `cutoff`-kentästä.
+- **Riippuvuus:** vaihtoehtojen `cutoff` (storefrontin `closingTime`) pyydetty hakujärjestys-sessiolta (ad2e5f06), joka omistaa `storefront.mjs`:n ja `order-tools`:n. Siihen asti tilausaika näkyy yhteenvedossa kuten ennenkin.
+- **Tarkistukset:** uusi `test/whatsapp-greeting-rush.test.mjs` 6/6, puhdas worktree `origin/main` 2ddc0a9 + vaihe 289/289; oikea malli eri vastaanottohetkillä 3 keskustelua, 8 vuoroa, 13 mallikutsua, 0 virhettä (20.30 huomenta → Iltaa, 07.15 moro → Moro, 02.10 hyvää päivää → Moi; tänään ennen klo 7 → aikaisin ma 16.11., ei kellonaikalupausta). Ei Metaa, oikeaa Valio-APIa, tilauksia eikä 4749-restarttia. Raportti `docs/parallel/whatsapp-greeting-rush.md`.
+
 ## 15.11.2026 — Workers-demosta landing page ja WhatsApp-numerolomake (Claude Code, landing-chat)
 
 - **Käyttäjän pyyntö ja päätökset:** demon julkinen osoite `aimo-order-demo…workers.dev` on nyt landing page, jossa kokeilija antaa puhelinnumeronsa ja pääsee WhatsApp-keskusteluun. Käyttäjä valitsi **testiversion**: Metan testinumero vaatii yhä jokaisen numeron hyväksynnän Metassa käsin, ja rajana on viisi vastaanottajaa. Täysin avoin versio odottaa apurin omaa numeroa. Lisäpyyntö: Metan vahvistuskoodi kirjoitetaan suoraan sivulle eikä välitetä tiimille erikseen. Apuri ei aloita keskustelua, koska yrityksen aloittama viesti vaatisi viestipohjan ja maksutavan (aiempi 141006-este): käyttäjä avaa WhatsAppin sivun linkistä ja lähettää ensimmäisen viestin.
