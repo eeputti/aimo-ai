@@ -41,6 +41,30 @@ Jos sovellus jakaa yhden MCP-liittimen usean keskustelun kesken, keskustelut kä
 
 Oletusosoite omalla koneella on `http://127.0.0.1:4750/mcp`. Terveystarkistus on `/healthz`. Oletuskanta on palvelun `data/team-mcp.db`. Se luodaan automaattisesti; tuotekatalogia, Valion APIa tai olemassa olevaa verkkokauppapalvelinta ei tarvita. Sama osoite localhostissa eri tiimiläisten koneilla ei tarkoita samaa palvelinta.
 
+## Nopea Cloudflare-tunnelikokeilu
+
+Tässä kokeilussa Node-palvelin ja Cloudflare-tunneli toimivat samalla koneella. Renderiä, Cloudflare-tiliä, omaa verkkotunnusta tai Cloudflaren API-avainta ei tarvita. Asenna ensin Node 22.13+ sekä [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/). Windowsissa PowerShell:
+
+```powershell
+winget install --id Cloudflare.cloudflared --exact
+```
+
+Avaa asennuksen jälkeen uusi terminaali projektin juuressa. Jos paikallisia muutoksia ei ole, päivitä ensin `git pull --ff-only`. Aja:
+
+```bash
+npm --prefix services/team-mcp ci
+npm --prefix services/team-mcp run admin -- add-member --id daniel-chatgpt --name "Daniel / ChatGPT" --projects aimo-ai
+npm --prefix services/team-mcp run tunnel
+```
+
+Jos jäsen on jo luotu, älä suorita add-member-komentoa uudelleen. Hae tarvittaessa uusi avain `npm --prefix services/team-mcp run admin -- rotate-key --id daniel-chatgpt` -komennolla (mitätöi tämän jäsenen vanhat yhteydet). Jäsenavaimen näkee vain omassa terminaalissa; syötä se MCP-liittimen OAuth-kirjautumissivulle. Luo muille avustajille omat jäsenet `add-member`-komennolla toisessa terminaalissa.
+
+`run tunnel` tulostaa **MCP-osoitteen** muodossa `https://satunnainen-nimi.trycloudflare.com/mcp`. Lisää tämä sama osoite kaikkien avustajien mukautettuun MCP-liittimeen ja valitse OAuth. Käynnistys asettaa julkisen OAuth-osoitteen automaattisesti ja sitoo palvelimen vain `127.0.0.1`:een. `.env`:n `TEAM_MCP_PUBLIC_URL` ja `TEAM_MCP_HOST` ohitetaan vain tämän komennon ajaksi; tiedostoja ei muuteta. Olemassa olevaa portissa 4750 toimivaa palvelinta ei julkaista vahingossa: varattu portti keskeyttää käynnistyksen.
+
+Pidä terminaali ja kone käynnissä. **Ctrl+C sulkee sekä tunnelin että MCP-palvelimen.** Uusi käynnistys antaa uuden osoitteen, jolloin liittimet on yhdistettävä uudelleen. Kanta ja jäsenet säilyvät `data/team-mcp.db`:ssä. Tunneli ei siirrä paikallista kantaa muiden koneiden kanssa samaan paikkaan: kaikkien on käytettävä juuri tätä yhtä MCP-osoitetta. Komento ei käynnistä verkkokauppaa tai WhatsApp-palvelinta.
+
+Jos `cloudflared` ei löydy PATHista, määritä `CLOUDFLARED_BIN` sen koko tiedostopoluksi. Quick Tunnel ei toimi kaikissa verkoissa; Cloudflaren yhteyksien on oltava sallittuja. Käyttäjän oma `~/.cloudflared/config.yaml` voi myös estää Quick Tunnelin; tarkista silloin [Cloudflaren kokeiluohje](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/). Käynnistysskripti ei muuta omia Cloudflare-asetuksiasi. Tämä on tilapäinen testi ilman saatavuustakuuta.
+
 ## Kaikille yhteinen HTTPS-palvelin
 
 Valitkaa yksi hosting tai palvelin ja yksi pysyvä HTTPS-osoite. Kaikki käyttävät **samaa** kantaa ja osoitetta. Aseta palvelimen ympäristöön:

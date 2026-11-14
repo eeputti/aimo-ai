@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — Team MCP:n yhden komennon Cloudflare-tunnelikokeilu (Codex)
+
+**Käyttäjän päätös:** Renderin sijasta ensin nopea Cloudflare-tunnelikokeilu; pysyvää hostingia ei vielä valita. Tämä työ tehtiin erillisessä pilvikloonissa. Toisen koneen verkkokauppa-, WhatsApp- tai koordinointiprosesseja ja kantoja ei muutettu. Muiden uudet commitit edb9b91 ja 1e58b43 haettiin ja säilytettiin.
+
+- Uusi `npm --prefix services/team-mcp run tunnel`: käynnistää cloudflaredin ja nykyisen autentikoidun MCP-sovelluksen yhtenä valvottuna kokonaisuutena. Saadun Quick Tunnel -osoitteen origin asetetaan OAuthin issueriin ja resourceen automaattisesti muuttamatta `.env`:iä. Ei Cloudflare-tiliä tai API-avainta. Node-palvelin sidotaan loopbackiin; varattu portti torjutaan ennen tunnelin käynnistystä. Sama oletuskanta ja jäsenet kuin paikallisella CLI:llä. Ctrl+C tai tunnelin loppuminen sulkee paikallisen HTTP-palvelimen.
+- README: Windowsin cloudflared-asennus, projektijuuren komennot, omat jäsenavaimet, OAuth-yhdistäminen, ympäristömuuttujien käsittely ja uuden satunnaisen osoitteen vaatima uudelleenyhdistäminen. Avaimia ei luotu tai toimitettu tavallisena chat-viestinä, eikä salaisuuksia lisätty Gitiin.
+- Uusi polku käyttää samoja `config`-, `store`- ja `createApp`-moduuleja kuin tavallinen palvelin. Pääpaketin riippuvuuksia tai verkkokaupan/WhatsAppin sovelluskoodia ei muutettu. Uusia npm-riippuvuuksia ei lisätty.
+
+**Tarkistukset:** Team MCP:n **22/22 testiä läpi**, mukaan lukien neljä uutta: simuloidun cloudflared-prosessin osoite → oikean HTTP-sovelluksen julkiset OAuth-metatiedot ja autentikoimattoman MCP:n 401; varatun portin suojaus; puuttuva binääri / ennenaikainen loppuminen / aikakatkaisu; käynnissä olevan tunnelin loppuminen ja HTTP-portin vapautus. Virhelokin api.trycloudflare.com-osoitetta ei tulkita onnistuneeksi tunneliksi. Syntaksi ja `git diff --check` tarkistettu. Oikea cloudflared 2026.11.0 ladattiin virallisesta GitHub-julkaisusta työskentelyhakemistoon ja uusi CLI ajettiin sillä; virhepolku sulki palvelimen hallitusti.
+
+**Käyttöönotto estyi tässä ympäristössä:** cloudflaredin suora yhteys api.trycloudflare.com:443:een palauttaa connection refused; saman API:n POST normaalin HTTPS-proxyn kautta palauttaa 403 / Your request was blocked. Julkista tunneliosoitetta ei saatu, eikä oikeita ChatGPT-/Claude-liittimiä kytketty. Verkon rajoituksia ei kierretty. Käyttäjä saa ajaa yllä olevat komennot omalla koneellaan; oikea tunnelin yli kulkeva pilviyhteys on vielä varmennettava. Tässä pilvikloonissa ei jäänyt palvelinta tai tunnelia käyntiin. Käynnistystestin verkkotarkistus ei ole automaattisen hyväksyntätarkistuksen hylkäys.
+
 ## 14.11.2026 — WhatsApp-lähetyseston lisärajaus, tilauslogiikka erillään (Codex)
 
 **Uusi näyttö:** 131005 toistuu myös Hello World -pohjalla sekä API-version, appsecret_proofin, vastaanottajamuodon ja eksplisiittisen testitilin valinnan vertailuissa. Meta ei hyväksynyt yhtäkään vertailulähetystä. Tokenin omistajan sovellusrooli on ylläpitäjä, vastaanottaja vastaa vahvistettua numeroa, ja molemmat WhatsApp-oikeudet näkyvät Metassa Ready for testing. Numeron tila CONNECTED/VERIFIED/LIVE, PIN pois päältä. Varsinaista Metan resursoikeus-/tilieston juurisyytä ei vielä väitetä ratkaistuksi. Ei maksutapa- tai rekisteröintimuutoksia.
