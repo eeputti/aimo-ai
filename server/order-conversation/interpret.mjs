@@ -45,6 +45,8 @@ export function createRuleInterpreter({ understand }) {
       if (line) ops.push({ op: 'update', ref: line.ref, ...(it.quantity ? { quantity: it.quantity } : {}), addClaims: it.claims || [], excludeAllergens: it.excludeAllergens || [] });
       else ops.push({ op: 'add', productTerm: it.productTerm, quantity: it.quantity || null, claims: it.claims || [], excludeAllergens: it.excludeAllergens || [] });
     }
+    // "tavallinen käy" jo ensiviestissä: tuotteiden laktoositarkennusta ei kysytä myöhemmin.
+    if (/\b(?:tavallinen|tavallista|tavalliset|normaali|normaalia|normi)\w*(?:\s+\p{L}+)?\s+(?:käy|kelpaa|riittää)\b|\bei\s+(?:tarvi\w*|tarvitse)\s+(?:olla\s+)?laktoosit/iu.test(t)) ops.push({ op: 'no_preference' });
     // "eikun 30 litraa": pelkkä määrä kohdistuu kysyttyyn riviin tai viimeksi käsiteltyyn riviin.
     const q = !u.items.length && bareQuantity(t);
     // Viimeksi käsitelty rivi kelpaa vain edellisestä viestistä. Muuten monen rivin luonnoksessa kysytään, ei arvata.
@@ -86,6 +88,7 @@ Säännöt:
 - Valinta "halvin" vertaa offered-vaihtoehtojen lineNet-kokonaishintoja. Valinta voi koskea yhtä nimettyä riviä tai kaikkia, jos ostaja sanoo niin. Tavallisten saman tuotteen vaihtoehtojen valinnassa käytä tarjottuja nimiä ja ominaisuuksia.
 - Tunnista puhekieli ja oikea yksikkö: "5 desii" = 5 DL, "pari desiä" = 2 DL, 250 ml = 250 ML, 500 g = 500 G. Palauta alkuperäisen yksikön arvo; palvelin muuntaa DL/CL/ML litroiksi ja G kiloiksi. Älä koskaan vaihda 5 desiä 5 litraksi.
 - context.history kertoo aiemman keskustelun, myös apurin tarkentavan kysymyksen. Ymmärrä siihen annettu vastaus ("sitä", "molemmat", "ihan normina") nykyisten ref-rivien avulla. Ajantasainen luonnos ratkaisee, ei vanha määrä historiassa.
+- Jos ostaja sanoo jo itse, että tavallinen käy tai ettei laktoosittomuutta tarvita ("tavallinen maito käy", "ei tarvi olla laktoositonta"), lisää no_preference-operaatio (ref tyhjä) ja jätä laktoositon-vaatimus pois. Näin samaa ei kysytä myöhemmin.
 - pendingQuestion.kind=preference on vain nimettyjen refs-rivien tuoteominaisuuden tarkennus. "ei väliä", "tavallinen käy" tai "ihan normina" on no_preference oikeille riveille. Myöntävä vastaus lisää pendingQuestion.claim-vaatimuksen vain kysyttyihin riveihin. Pelkkä "ei" tähän kysymykseen ei ole kaikkien ruokarajoitusten nollaus.
 - excludeAllergens vain, kun ostaja itse kieltää allergeenin (maidoton, pähkinätön, gluteeniton allergian vuoksi). Tuotteen oma ainesosa ei ole kielto: kananmunalle ei tule AE-kieltoa.
 - Laktoositon on FREE_FROM_LACTOSE. Maidoton ei ole väittämä vaan allergeenikielto AM. Älä sekoita näitä.

@@ -43,4 +43,5 @@ Vanhojen testien odotukset päivitetty uuteen käytökseen (kahden rivin "1 1" o
 
 - Ei Meta-lähetyksiä, oikeita Valio-kutsuja, tilauksia eikä 4749-palvelimen restarttia. Käyttöönotto kuuluu Codexin käyttöönottochatille.
 - Selfplay-100:n hakulöydökset (#152: olemattomat tuotteet saavat lähimmän osuman ilman merkintää, väärä tuotetyyppi kärjessä kuten kanafilee → stroganoff, sipulinippu ei kata kilomäärää) ovat pääosin storefront-haun järjestyksessä eivätkä kuulu tähän vaiheeseen.
-- Maksupolun pyyntö (#133/#140): rakenteinen `orderId` vahvistustulokseen keskusteluytimessä on erillinen pieni muutos ytimen seuraavalle omistajalle.
+- Jatkocommit: vahvistus palauttaa rakenteisen `orderId`:n ja `orderStatus`-tilan (maksupolku #133/#159/#165); uusi TILAA säilyttää `pending_approval`-tilan; vanha luonnos ilman tilaa ei saa tunnusta. Ensiviestin "tavallinen käy" kirjataan `no_preference`-operaationa (100 profiilin #161). Testit 10/10, puhdas worktree 253/253, yhteinen työpuu 266/266.
+- Selainkorin linkkikonteksti (#163, `dialogue.mjs`/`ordering.mjs`) jää Codexin itsekeskusteluchatille; `dialogue.mjs` vapautetaan sille.

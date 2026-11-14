@@ -16,6 +16,7 @@ process.env.DEMO_NOW = '2026-11-14T10:00:00+02:00';
 const { createOrderingTools } = await import('../server/order-tools/index.mjs');
 const { createOrderingConversation } = await import('../server/order-conversation/index.mjs');
 const { openDraftStore } = await import('../server/order-conversation/store.mjs');
+const { createRuleInterpreter } = await import('../server/order-conversation/interpret.mjs');
 const { presentCollectingCart } = await import('../server/whatsapp/cart-presentation.mjs');
 const { createOrderingDialogue, sameFamily } = await import('../server/whatsapp/dialogue.mjs');
 const { openWhatsAppStore } = await import('../server/whatsapp/store.mjs');
@@ -273,4 +274,47 @@ test('laktoositarkennus on numeroitu kuten vaihtoehdot: 2 = tavallinen käy, ja 
   assert.equal(options.status, 'choosing');
   assert.match(options.text, /\*Maito 20 l:\*\n1\) Valio maito/);
   assert.deepEqual(interpreted, ['20 l maitoa maanantaiksi']); // numerovastaus ilman tulkkia
+});
+
+test('ensiviestin "tavallinen käy" kirjataan, joten laktoosia ei kysytä myöhemmin', async () => {
+  const rules = createRuleInterpreter({ understand: () => ({ items: [], deliveryDate: null }) });
+  for (const text of ['tavallinen maito käy', 'ei tarvi olla laktoositonta', 'Tavallista käy']) {
+    assert.ok((await rules({ text, draft: { lines: [], pending: null }, now: 0 })).ops.some((o) => o.op === 'no_preference'), text);
+  }
+  assert.ok(!(await rules({ text: 'laktoositonta maitoa', draft: { lines: [], pending: null }, now: 0 })).ops.some((o) => o.op === 'no_preference'));
+  const milk = (id, labels) => ({ id, name: `Valio maito ${id} 1 l`, brand: 'Valio', qty: 20, unitLabel: 'kpl', litres: 1, price: 1, labels, availability: { deliveryDate: MONDAY, stock: 99 } });
+  const tools = createOrderingTools({ search: async () => [milk('M1', ['FREE_FROM_LACTOSE']), milk('M2', []), milk('M3', []), milk('M4', [])],
+    product: () => ({ hasAllergenData: true, contains: ['AM'] }), buyer: () => null, requestQuote: async () => ({}), placeOrder: async () => ({}), now: () => 0 });
+  const handleTurn = createOrderingConversation({ store: openDraftStore(':memory:', () => 0), tools, now: () => Date.parse('2026-11-14T08:00:00Z'),
+    interpretTurn: async () => ({ intent: 'order', deliveryDate: MONDAY, ops: [{ op: 'add', productTerm: 'maito', quantity: { value: 20, unit: 'L' }, claims: [], excludeAllergens: [] }, { op: 'no_preference' }] }) });
+  const r = await handleTurn({ messageId: 't1', conversationId: 'c', customer, text: '20 l maitoa maanantaiksi, tavallinen käy', receivedAt: 0 });
+  assert.equal(r.status, 'choosing');
+  assert.doesNotMatch(r.text, /laktoositonta vai/);
+});
+
+test('vahvistus palauttaa rakenteisen tilaustunnuksen ja tilan, myös uusinnassa ja uudessa TILAA-viestissä', async () => {
+  for (const status of ['confirmed', 'pending_approval']) {
+    let submitted = 0; const t = Date.parse('2026-11-14T08:00:00Z');
+    const store = openDraftStore(':memory:', () => t);
+    const tools = { suggest: async () => ({ lines: [], issues: [] }),
+      quote: async ({ draft }) => ({ quoteId: 'Q1', draftId: draft.id, revision: draft.revision, expiresAt: new Date(t + 900_000).toISOString(), issues: [], totals: { net: 10 },
+        lines: [{ ref: 'L1', name: 'Maito', salesUnits: 2, salesUnitLabel: 'ltk', covers: { value: 20, unit: 'L' }, lineNet: 10 }] }),
+      submit: async () => { submitted++; return { status, orderId: 'AGW-20261115-0001', totals: { net: 10 }, reasons: [] }; } };
+    const handleTurn = createOrderingConversation({ store, tools, now: () => t, interpretTurn: async () => ({ intent: 'order', ops: [] }) });
+    store.save('c', { id: 'WD-1', state: 'active', revision: 1, customerId: customer.customerId, bindingVersion: customer.bindingVersion, deliveryDate: MONDAY, deliverySiteId: 's1',
+      diet: { known: true, claims: [], excludeAllergens: [] }, lines: [{ ref: 'L1', productTerm: 'maito', quantity: { value: 20, unit: 'L' }, claims: [], excludeAllergens: [], selectedProductId: 'M2', selectedName: 'Maito' }],
+      offered: {}, seen: {}, quote: { quoteId: 'Q1', revision: 1, expiresAt: new Date(t + 900_000).toISOString() }, pending: null, turn: 0, seq: 1 }, 'seed', {});
+    const say = (messageId) => handleTurn({ messageId, conversationId: 'c', customer, text: 'TILAA', receivedAt: t });
+    const first = await say('o1');
+    assert.equal(first.status, status); assert.equal(first.orderId, 'AGW-20261115-0001');
+    assert.deepEqual(await say('o1'), first);
+    const later = await say('o2');
+    assert.equal(later.status, status); assert.equal(later.orderId, first.orderId); assert.match(later.text, /on jo tallennettu\. Uutta tilausta ei tehty/);
+    assert.equal(submitted, 1);
+  }
+  // Vanha tallennettu luonnos ilman tilaa: ei tunnusta pelkän tekstin perusteella.
+  const store = openDraftStore(':memory:', () => 0);
+  store.save('c', { id: 'WD-old', state: 'ordered', orderId: 'AGW-OLD', revision: 1, customerId: customer.customerId, bindingVersion: customer.bindingVersion, lines: [], diet: { known: true, claims: [], excludeAllergens: [] } }, 'seed', {});
+  const legacy = await createOrderingConversation({ store, tools: {}, now: () => 0, interpretTurn: async () => ({ intent: 'order', ops: [] }) })({ messageId: 'x', conversationId: 'c', customer, text: 'TILAA', receivedAt: 0 });
+  assert.equal(legacy.status, 'confirmed'); assert.equal(legacy.orderId, undefined);
 });

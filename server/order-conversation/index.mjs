@@ -260,9 +260,10 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
     const quoteId = draft.quote.quoteId;
     const r = await tools.submit({ customer, draft, quoteId, approval: { draftId: draft.id, revision: draft.revision, quoteId }, idempotencyKey: `wa-${draft.id}-r${draft.revision}` });
     if (r.status === 'confirmed' || r.status === 'pending_approval') {
-      draft.state = 'ordered'; draft.orderId = r.orderId;
+      // Rakenteinen tilaustunnus ja tila talteen: maksupolku ei poimi tunnusta tekstistä, ja uusinta säilyttää hyväksyntätilan.
+      draft.state = 'ordered'; draft.orderId = r.orderId; draft.orderStatus = r.status;
       const total = r.totals ? `, yhteensä ${eur(r.totals.net)} (alv 0 %)` : '';
-      return { status: r.status, text: r.status === 'confirmed'
+      return { status: r.status, orderId: r.orderId, text: r.status === 'confirmed'
         ? `Tilaus ${r.orderId} on tallennettu. Toimitus ${dateLabel(r.deliveryDate || draft.deliveryDate)}${total}.\nTämä on demoympäristö: oikeaa Valio-tilausta ei lähetetty.`
         : `Tilaus ${r.orderId} odottaa yrityksesi hyväksyjän kuittausta${total}. Tilaus ei ole vielä vahvistettu.\nTämä on demoympäristö: oikeaa Valio-tilausta ei lähetetty.` };
     }
@@ -288,7 +289,9 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         result = { status: 'collecting', text: 'Luonnos tyhjennetty. Tilausta ei tehty.' };
       } else if (CONFIRM.test(t)) {
         const last = !draft.lines.length && store.lastOrdered(conversationId);
-        result = last ? { status: 'confirmed', text: `Tilaus ${last.orderId} on jo tallennettu. Uutta tilausta ei tehty.` } : await confirm(draft, customer);
+        // Tunnus vain, kun tallennetun tilauksen tila tiedetään. Vanha luonnos ilman tilaa ei tuota maksulinkkiä tekstin perusteella.
+        result = last ? { status: last.orderStatus || 'confirmed', ...(last.orderStatus && last.orderId ? { orderId: last.orderId } : {}),
+          text: `Tilaus ${last.orderId} on jo tallennettu. Uutta tilausta ei tehty.` } : await confirm(draft, customer);
       } else if (THANKS.test(t)) {
         const ready = draft.quote?.revision === draft.revision && !draft.pending;
         result = ready ? { status: 'ready', text: 'Ole hyvä! Luonnos odottaa vahvistusta: vastaa *TILAA*, kun haluat tilata.' }
@@ -335,7 +338,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       store.save(conversationId, null, messageId, { ...result, draftId: draft.id, revision: draft.revision });
       return { ...result, draftId: draft.id, revision: draft.revision };
     }
-    const out = { text: result.text, status: result.status, draftId: draft.id, revision: draft.revision };
+    const out = { text: result.text, status: result.status, draftId: draft.id, revision: draft.revision, ...(result.orderId ? { orderId: result.orderId } : {}) };
     store.save(conversationId, draft.lines.length || draft.state !== 'active' ? draft : null, messageId, out);
     return out;
   };
