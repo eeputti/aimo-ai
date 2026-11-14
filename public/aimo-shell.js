@@ -72,6 +72,12 @@
   document.currentScript.replaceWith(el);
   if (compact) return;
 
+  // Hakukenttä avaa sivun levyisen hakupaneelin (aimo-ask.js). Jos skripti ei lataudu, alla oleva ehdotuslista toimii kuten ennen.
+  const ask = document.createElement('script');
+  ask.src = '/aimo-ask.js';
+  ask.onload = () => { const box = el.querySelector('#as-search'); window.aimoAsk?.attach({ box, input: box.querySelector('#as-q'), icon: box.querySelector('svg') }); };
+  document.head.append(ask);
+
   // ---------- yhteinen tila: sama /console/state, jota konsoli lukee ----------
   let state = null; let types = null;
   const load = async () => { try { state = await (await fetch('/console/state')).json(); } catch { /* valikot näyttävät tyhjän tilan */ } return state; };
@@ -164,7 +170,7 @@
   const closeAll = (except) => el.querySelectorAll('.as-pop:not([hidden])').forEach((p) => { if (p !== except) { p.hidden = true; p.parentElement.querySelector('[aria-expanded]')?.setAttribute('aria-expanded', 'false'); } });
   el.addEventListener('click', async (ev) => {
     const typeBtn = ev.target.closest('[data-type]');
-    if (typeBtn) { closeAll(); const q = el.querySelector('#as-q'); q.value = typeBtn.dataset.type; q.focus(); suggest(); return; }
+    if (typeBtn) { closeAll(); if (window.aimoAsk) { window.aimoAsk.open(typeBtn.dataset.type); return; } const q = el.querySelector('#as-q'); q.value = typeBtn.dataset.type; q.focus(); suggest(); return; }
     const calBtn = ev.target.closest('[data-cal], [data-day]');
     if (calBtn) {
       if (calBtn.dataset.day) { cal.sel = calBtn.dataset.day; cal.month = cal.sel.slice(0, 7); }

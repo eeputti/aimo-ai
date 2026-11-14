@@ -2,6 +2,25 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — hakukenttä avaa sivun levyisen hakupaneelin (Claude Code)
+
+**Käyttäjän pyyntö:** Eelis halusi, että otsakkeen hakukentän suurennuslasi vaihtuu pieneksi tekoälykuvakkeeksi ja klikkaus avaa sivun levyisen valkoisen paneelin, joka kasvaa hakukentän kohdalta. Vasemmalle kaksi oikotietä (resepti, valmis tilaus), oikealle tuotteet kirjoittaessa, mukana hinta ja saatavuus. Tämä on käyttäjän tietoinen poikkeus aiempaan linjaukseen "ei AI-nappia".
+
+- **Uusi moduuli** `public/aimo-ask.js` ja `public/aimo-ask.css`: yksi paneeli kaikille sivuille. Etusivu (`index.html`, `gateway.html`) lataa sen suoraan; yhteinen kehys (`aimo-shell.js`) lataa sen keittiö- ja agenttisivulle. Otsakkeen kenttä on enää avain (vain luku, vihjeteksti "Hae tuotteitasi"); kirjoittaminen tapahtuu paneelin omassa kentässä.
+- **Animaatio:** paneelin leikkausalue (`clip-path`) kasvaa hakukentän reunoista koko paneelin kokoiseksi, 340 ms. `prefers-reduced-motion` ohittaa animaation. Esc, rasti ja tausta sulkevat.
+- **Vasen sarake:** "Hae tuotteita reseptin perusteella" (neljä reseptiä ja annosmäärä napeista, täyttää hakukentän) ja "Katso valmis tilauksesi, perustuen aiempiin tilauksiisi" (keittiön tallennettu ehdotus `GET /api/state`: viikonpäivä, rivit, summa, kuvat; linkki `/kitchen.html`).
+- **Oikea sarake:** tulkinta ja tuotteet `POST /api/aimo/interpret` (`llm: false`), kuten aiemmassa etusivun haussa. "Tilaa agentin kautta" ja Enter vievät pyynnön agenttikonsoliin (`sessionStorage` `aimo.ask`).
+- **Hinta ja saatavuus:** uusi vain luku -reitti `GET /console/availability?ids=…&date=…` (`server/gateway/http.mjs`), enintään 12 tuotetta, sama välimuisti kuin tarjouksilla. Ei tarjousta, allekirjoitusta eikä merkintää päätösketjuun. Selain kutsuu sitä 450 ms kirjoitustauon jälkeen. Näytetään nettohinta sekä tila: saatavilla (päivä, saldo jos tiedossa), myöhässä, ei saatavilla, tilausaika umpeutunut tai ei tiedossa.
+- `public/storefront-search.js` ei enää lataudu etusivulla (skriptitagi vaihdettu); tiedosto on tallella. Kehyksen vanha ehdotuslista jää varatieksi, jos `aimo-ask.js` ei lataudu.
+
+**Tarkistukset:** `node --check` muutetuille tiedostoille, `npm test` 26/26. Selaimessa portissa 4748 (live-mock-API): paneeli avautuu etusivulla ja keittiösivulla, "1000 litraa maitoa maanantaiksi" näyttää kolme tuotetta hintoineen (yksi merkitty "Tilausaika umpeutunut"), "Lohikeitto 100 annosta" näyttää 8 raaka-ainetta hintoineen ja saldoineen, sulkeminen toimii, agenttisivulla kenttä on kytketty. Animaatiota ei nähty liikkeessä (selainpaneeli oli piilossa, jolloin animaatiot eivät etene); siirtoa agenttikonsoliin ei klikattu läpi.
+
+**Keskeneräistä ja huomiot:**
+
+- **Päällekkäinen työ:** toinen työvaihe lisää samaan aikaan hintaa ja saatavuutta vanhaan etusivun hakuun (`storefront-search.js`, `storefront.css`, `POST /api/storefront/quotes` tiedostossa `server/index.mjs`, commitoimatta). Ne eivät ole tässä commitissa, eikä vanha haku enää näy etusivulla. Päätettävä, kumpi reitti jää; `aimo-ask.js` voidaan vaihtaa käyttämään `/api/storefront/quotes`-reittiä.
+- Reseptit ja esimerkkipyynnöt ovat kiinteitä tekstejä `aimo-ask.js`:ssä; "valmis tilaus" on aina keittiödemon ehdotus. Daniel rakentaa mallin, johon nämä myöhemmin perustuvat.
+- Saldo näytetään sellaisenaan; pyydettyä määrää ei verrata saldoon (1000 litran pyyntö näyttää tuotteen saatavilla olevana, vaikka saldo ei riittäisi). Sen tarkistaa agentin tarjous.
+
 ## 14.11.2026 — rajaus: työstetään vain hakukenttää ja ostoskoria (Claude Code)
 
 **Käyttäjän päätös:** Eelis rajasi työn: fiksuksi tehdään vain etusivun hakukenttä ja ostoskori, kaikki muu pysyy samanlaisena kuin Toimitustukussa. Ensin hakukenttä. Uusia elementtejä, merkkejä tai paneeleja ei lisätä näiden kahden ulkopuolelle.

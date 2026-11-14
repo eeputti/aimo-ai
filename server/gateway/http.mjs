@@ -4,10 +4,10 @@ import { searchProducts, requestQuote, placeOrder, addToOrder, getOrder, listOrd
 import { buyers, ledger, onLedger, wipeGateway } from './store.mjs';
 import { seedBuyers, updateMandate, publicMandate } from './mandate.mjs';
 import { jwks } from './signing.mjs';
-import { clock } from './clock.mjs';
+import { clock, cutoffPassed, helsinkiLabel } from './clock.mjs';
 import { runBuyerAgent } from './buyerAgent.mjs';
 import { apiMode, config } from '../config.mjs';
-import { apiStats } from '../valioApi.mjs';
+import { apiStats, fetchQuotes } from '../valioApi.mjs';
 import { watchReport, WATCH_DISCLOSURE } from './watch.mjs';
 import { SUGGEST_DISCLOSURE } from './suggest.mjs';
 
@@ -149,6 +149,25 @@ export async function handleGateway(req, res, url) {
         clock: clock.info(), mode: { api: apiMode(), base: config.valioBase }, apiStats,
         buyers: buyers.all().map((b) => ({ id: b.id, name: b.name, kind: b.kind, approver: b.approver, demoKey: b.apiKey, ...publicMandate(b) })),
         orders: listOrders(null), ledger: ledger.recent(80), chain: ledger.verify(),
+      }), true;
+    }
+    // Hakupaneelin esikatselu (aimo-ask.js): hinta ja saatavuus muutamalle tuotteelle samasta välimuistista kuin tarjoukset.
+    // Vain luku: ei tarjousta, ei allekirjoitusta eikä merkintää päätösketjuun. Tuntematonta ei tulkita saatavilla olevaksi.
+    if (p === '/console/availability' && m === 'GET') {
+      const ids = [...new Set((url.searchParams.get('ids') || '').split(',').map((v) => v.trim()).filter((v) => /^\d{1,12}$/.test(v)))].slice(0, 12);
+      const asked = url.searchParams.get('date') || '';
+      const date = /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : clock.today();
+      const live = ids.length ? await fetchQuotes(ids, date) : new Map();
+      return send(res, 200, {
+        date, source: apiMode(),
+        items: ids.map((id) => {
+          const { avail, price } = live.get(id) || {};
+          return {
+            productId: id, status: avail?.status || 'unknown', stock: avail?.amount ?? null, deliveryDate: avail?.date || null, closingTime: avail?.closingTime || null, cutoffLabel: avail?.closingTime ? helsinkiLabel(avail.closingTime) : null, cutoffPassed: avail?.closingTime ? cutoffPassed(avail.closingTime) : false,
+            priceNet: price && !price.error && price.net != null ? price.net : null, comparison: price?.comparison ?? null, comparisonUnit: price?.comparisonUnit || null,
+            stale: !!(avail?.stale || price?.stale),
+          };
+        }),
       }), true;
     }
     if (p === '/console/watch' && m === 'GET') return send(res, 200, watchReport(buyers.all())), true;
