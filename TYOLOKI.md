@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — yhdistetty WhatsApp-kori ja päivämääräkorjaus: 219/219 läpi (Codex, käyttöönottochat)
+
+- Viimeinen yhteisen testisarjan virhe oli etusivun klassisen VM-testituplan syntaksissa: `storefront.js` on ES-moduuli ja uusi WhatsApp-aloitusfunktio on nimetty export. `test/storefront-cart.test.mjs` poistaa nyt VM-ajosta myös function-exportin samoin kuin se poisti jo product/rail-exportin. Tuotantokoodia tai korin testin klikkaus-, pysyvyys- ja unavailable-odotuksia ei muutettu. Kohdistettu kori **20/20 läpi**.
+- Tällä testituplan päivityksellä yhteinen nykykoodi (gatewayn päiväkorjaus `f7f7222`, määrä-/dialogikorjaus `812783a`, rajattu korilinkki + OK-ohjaus `445bee8`) läpäisi **koko `npm test` 219/219, 0 virhettä tai ohitusta**. Eristetyt kannat ja simuloidut ulkoiset palvelut; ei käyttäjätilauksen vahvistusta tai oikeita Meta-/Valio-/mallikutsuja tässä ajossa. Syntaksi/whitespace tarkistettu. Vain tämä testitupla, oma vaihekuvaus ja loki tallennetaan, muiden keskeneräiset Worker-/demomaksutiedostot säilyvät omistajille.
+- Käyttöönoton seuraava askel on yksi tarkistettu snapshot näistä valmiista commiteista samoilla kannoilla/tunnelilla. Nykyinen käyttäjäluonnos säilytetään, kerma korjataan alkuperäiseen 5 dl:aan normaalin keskustelurajapinnan kautta ja 18.11. pidetään asiakkaan päivänä. Lopullinen vahvistus tapahtuu käyttäjän toimesta; uutta erillistä demomaksumoduulia ei oteta keskeneräisenä mukaan.
+
 ## 14.11.2026 — WhatsAppin ok-kuittauksesta linkki samaan ostoskoriin (Codex, korilinkki- ja OK-chatit)
 
 - **Käyttäjän päätös:** WhatsApp antaa linkin juuri keskustelussa koottuun koriin; valmis yhteenveto voidaan kuitata esimerkiksi **ok**. Kuittaus avaa korin ja lopullinen vahvistus tehdään siellä. Tämä korvaa tämän linkkipolun WhatsAppin TILAA-vaatimuksen. Demossa ei ole oikeaa maksupalvelua: selain vahvistaa demotilauksen.
