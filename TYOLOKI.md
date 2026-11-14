@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — paikallisen CLI-heräteajurin toteutussopimus ja työnjaon aloitus (Codex)
+
+- Käyttäjä pyysi toteuttamaan automaattisen heräteajurin sekä välittämään työtehtävän koordinaattorille ja jakamaan työtä Aleksin agenttien kesken. Suora työpyyntö toimitettu MCP:n `team-coordinator`-jäsenelle (viesti #79); jäsen löytyy, mutta vastausta ei vielä ole eikä API-tilaa voi vahvistaa vanhan liittimen työkaluilla. Nykyinen koordinaattori voi vain ehdottaa jakoa, ei väittää suorittaneensa delegointia.
+- `docs/runner-contract.md`: tarkistettava rajapinta ja työnjako. Suunnitelma: kolme tokenilla sidottua runner-työkalua, pysyvä yhden ajon varaus, paikallinen eristetty Git-työpuu, normaalein CLI-oikeuksin toimivat Codex/Claude-sovittimet, katkon jälkeinen sovittaminen ja rajattu automaattinen delegointi. Tämä commit on sopimus, ei vielä ajurin toteutus tai käyttöönotto.
+- Daniel tekee ytimen ja palvelinrajapinnan. Aleksin Codexille valmistellaan riippumattomat testit ja Aleksin Claudelle käyttöohje/CLI-tarkistus erillisiin tiedostoihin; varsinaiset MCP-luovutukset tehdään tämän pohjan pushin jälkeen. Vanhaa vastaanottamatonta koordinaattoritarkistusta ei merkitä valmiiksi. Muiden päivitykset a1cdbe1:een asti säilytetty.
+- Tarkistus: pelkkä dokumenttivaihe, diff tarkistetaan ennen committia. Nykyistä MCP-palvelinta, tunnuksia tai käyttäjän kantoja ei muuteta. Seuraava vaihe toteuttaa ja testaa sopimuksen omassa eristetyssä ympäristössä.
+
 ## 14.11.2026 — vahvistettu tilaus Workeriin ja asiakkaan sähköposti (Claude Code)
 
 - **Käyttäjän päätös:** WhatsApp-keskustelu ja tilausydin pysyvät Node-palvelimella. Cloudflare Workeriin siirtyy vain asiakkaan vahvistama (TILAA, `confirmed`) tilaus, ja Worker lähettää asiakkaalle Peetun pohjaan perustuvan vahvistusviestin. Koko localhostia ei porteta Workersiin ennen demoa; koko taustan alustavalinta pysyy avoimena. Sopimus ja käyttöönotto: `docs/order-events.md`.
