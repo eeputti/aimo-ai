@@ -2,6 +2,17 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — historiaan perustuva tilausehdotus takaisin hakupaneeliin (Codex)
+
+**Käyttäjän pyyntö:** Katso tilausehdotus -toiminnon pitää jälleen avata aiempien tilausten perusteella laadittu ehdotus. Yhteisen hakukorin uudistuksessa kortin linkki oli vaihdettu selaimen omaan koriin ja esikatselu lukemaan sen rivejä. Tyhjällä alkukorilla esikatselu katosi, vaikka keittiön historiaennuste oli yhä tallessa.
+
+- `public/aimo-ask.js`: kortti avaa jälleen `/kitchen.html`-ehdotuksen ja kertoo perustuvansa aiempiin tilauksiin. Nuolen esikatselu lukee tallennetun ehdotuksen `/api/state`-reitiltä riippumatta selaimen korin sisällöstä. Se näyttää aktiiviset rivit, määrät, toimituspäivän ja ehdotuksen summan; poistettuja rivejä ei näytetä. Puuttuva ehdotus, latausvirhe ja jo lähetetty tilaus saavat omat tekstit. Koria ei täytetä automaattisesti eikä ehdotusta lasketa uudelleen avaamisen yhteydessä.
+- `README.md`: hakukorin ja historiaehdotuksen oikotien toiminta täsmennetty.
+
+**Varmennus:** `node --check public/aimo-ask.js` ja diff-tarkistus läpi. `npm test` **67/67** eristetyillä testikannoilla; ensimmäisen ajon HTTP-palvelimen portti estyi hiekkalaatikossa, oikeuslaajennuksella uusinta läpi. Selaimessa päädemon 4747-etusivun kori oli tyhjä, mutta nuoli näytti tallennetun ma 16.11. ehdotuksen (32 riviä, 5 515,93 € alv 0 %). Kortin painaminen avasi saman ehdotuksen määrineen ja perusteluineen keittiönäkymässä. Esikatselun Enter-avaus toimii, ei selaimen JavaScript-virheitä. Palvelinta ei tarvinnut käynnistää uudelleen, eikä käyttäjän koria, ehdotusta tai tilauksia muutettu. Korjaus tulee käyttöön sivun päivityksellä.
+
+**Työnjako:** työpuussa ovat muiden työvaiheiden reseptituonnin ja toimituspäivän muutokset, myös samassa `aimo-ask.js`-tiedostossa. Tähän commitiin rajataan vain yllä kuvattu tilausehdotuksen palautus ja oma dokumentointi.
+
 ## 14.11.2026 — tyhjän demokorin lopputarkistus (Codex)
 
 Tämän korityövaiheen tyhjä alkukori, erillinen `referenceCart` ja käyttäjän muokkausten säilyttäminen ehtivät rinnakkaisen, käyttäjän pyytämän tilannetallennuksen commitiin `d20e017`. Samaa koodia ei commitoitu uudelleen.

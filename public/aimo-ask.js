@@ -1,5 +1,5 @@
 // HAKUPANEELI. Otsakkeen hakukenttä on vain avain: klikkaus avaa sivun levyisen valkoisen paneelin, joka kasvaa hakukentän kohdalta.
-// Haku on päätoiminto. Resepti ja ostoskorin tilausehdotus ovat pienet oikotiet.
+// Haku on päätoiminto. Resepti ja historiaan perustuva tilausehdotus ovat pienet oikotiet.
 // Saatavuus tarkistetaan valitulle toimituspäivälle ennen tuotteiden näyttämistä.
 // Etusivun Kokoa ostoskori valmistaa valinnat samaan selaimen koriin. Erillinen agenttikonsoli säilyy debug-polulla.
 // Käyttö: window.aimoAsk.attach({ box, input, icon }) ja window.aimoAsk.open(teksti).
@@ -73,11 +73,11 @@
                 <div class="ask-ideas" aria-live="polite"></div>
               </div>
             </div>
-            <a class="ask-card" data-card="order" href="${storefrontCart ? '/cart.html#tarkista' : '/kitchen.html'}" title="Avaa ostoskori">
+            <a class="ask-card" data-card="order" href="/kitchen.html" title="Avaa aiempiin tilauksiin perustuva ehdotus">
               <span class="ask-card-head">
                 <span class="ask-ico">${I.order}</span>
-                <span class="ask-card-txt"><b>Katso tilausehdotus</b><small>Valitsemasi tuotteet ja toimituspäivä</small></span>
-                <span class="ask-peek" role="button" tabindex="0" aria-expanded="false" aria-label="Näytä tilauksen esikatselu" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+                <span class="ask-card-txt"><b>Katso tilausehdotus</b><small>Perustuu aiempiin tilauksiisi</small></span>
+                <span class="ask-peek" role="button" tabindex="0" aria-expanded="false" aria-label="Näytä tilausehdotuksen esikatselu" hidden><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
               </span>
               <span class="ask-ready" hidden></span>
             </a>
@@ -89,7 +89,7 @@
   const sheet = root.querySelector('.ask-sheet'); const dim = root.querySelector('.ask-dim');
   const q = root.querySelector('.ask-q'); const main = root.querySelector('.ask-main');
   const recipes = root.querySelector('.ask-recipes'); const ready = root.querySelector('.ask-ready'); const peek = root.querySelector('.ask-peek');
-  // Nuoli avaa tilauksen esikatselun; muu osa kortista vie suoraan ostoskoriin.
+  // Nuoli avaa esikatselun; muu osa kortista vie historiaan perustuvaan ehdotukseen.
   const togglePeek = (ev) => { ev.preventDefault(); ev.stopPropagation(); const open = peek.closest('.ask-card').classList.toggle('open'); peek.setAttribute('aria-expanded', String(open)); };
   peek.addEventListener('click', togglePeek);
   peek.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') togglePeek(ev); });
@@ -297,14 +297,26 @@
     } catch (e) { btn.disabled = false; btn.textContent = e.message; }
   }
 
-  // Valmis tilaus: keittiön tallennettu ehdotus. Jos sitä ei ole, kortti jää pelkäksi linkiksi.
+  // Keittiön historiaennuste on eri asia kuin selaimen oma hakukori. Avaaminen vain lukee ehdotuksen.
   async function loadReady() {
-    if (!storefrontCart) return;
-    await storefrontCart.ready.catch(() => {});
-    const s = storefrontCart.get(); const rows = storefrontCart.lines(); const t = storefrontCart.totals();
-    const shown = rows.slice(0, 6);
-    ready.innerHTML = `<b>Tilausehdotus</b><span class="ask-thumbs">${shown.map((p) => `<span class="ask-thumb" title="${esc(p.name)}"><img src="${esc(p.image || `/img/${encodeURIComponent(p.id)}`)}" alt="${esc(p.name)}" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove()"><i class="ask-tq">${num(p.qty)}</i></span>`).join('')}${rows.length > shown.length ? `<span class="ask-thumb more">+${rows.length - shown.length}</span>` : ''}</span><span class="ask-cfoot"><span><b>${rows.length}</b> tuotetta</span><span>${I.cal}${day(s.selectedDate)}</span><b class="ask-ctotal">${t.unpriced ? 'Hinta ei tiedossa' : money(t.net)}</b></span><span class="ask-ready-go">Tarkista ostoskori${I.go}</span>`;
-    ready.hidden = !rows.length; peek.hidden = !rows.length;
+    ready.hidden = false; peek.hidden = false;
+    ready.innerHTML = '<span>Ladataan tilausehdotusta…</span>';
+    try {
+      const res = await fetch('/api/state');
+      if (!res.ok) throw new Error('Tilausehdotuksen lataus epäonnistui');
+      const p = (await res.json()).proposal;
+      const rows = (p?.lines || []).filter((l) => l.qty > 0 && l.state !== 'removed');
+      if (!p || !rows.length) {
+        ready.innerHTML = `<span>Tilausehdotusta ei ole vielä valmiina. Avaa ehdotusnäkymä ja laadi ehdotus.</span><span class="ask-ready-go">Avaa tilausehdotus${I.go}</span>`;
+        return;
+      }
+      const shown = [...rows].sort((a, b) => Math.abs(b.deltaPct || 0) - Math.abs(a.deltaPct || 0) || (b.total || 0) - (a.total || 0)).slice(0, 6);
+      const date = p.deliveryDate ? `<span>${I.cal}${day(p.deliveryDate)}</span>` : '';
+      const title = p.status === 'ordered' ? 'Viimeisin tilaus' : p.deliveryDate ? `${WD_GEN[utcDay(p.deliveryDate).wd]} tilausehdotus` : 'Tilausehdotus';
+      ready.innerHTML = `<b>${title}</b><span class="ask-thumbs">${shown.map((l) => `<span class="ask-thumb" title="${esc(l.name)}, ${num(l.qty)} ${esc(l.unitLabel || '')}"><img src="/img/${encodeURIComponent(l.productId)}" alt="${esc(l.name)}" loading="lazy" onerror="this.parentElement.classList.add('noimg');this.remove()"><i class="ask-tname">${esc(String(l.name).split(' ').slice(0, 2).join(' '))}</i><i class="ask-tq">${num(l.qty)}</i></span>`).join('')}${rows.length > shown.length ? `<span class="ask-thumb more">+${rows.length - shown.length}</span>` : ''}</span><span class="ask-cfoot"><span><b>${rows.length}</b> tuotetta</span>${date}<b class="ask-ctotal">${p.totals?.expected == null ? 'Hinta ei tiedossa' : money(p.totals.expected)}</b></span><span class="ask-ready-go">Avaa tilausehdotus${I.go}</span>`;
+    } catch {
+      ready.innerHTML = `<span>Esikatselua ei voitu ladata. Voit yrittää uudelleen tilausehdotusnäkymässä.</span><span class="ask-ready-go">Avaa tilausehdotus${I.go}</span>`;
+    }
   }
 
   // Paneeli kasvaa hakukentän kohdalta: leikkausalue lähtee kentän reunoista ja avautuu koko paneelin kokoiseksi.
@@ -460,7 +472,6 @@
     origin ||= box;
   }
 
-  if (storefrontCart) window.addEventListener('aimo:cart-change', () => { if (!root.hidden) loadReady(); });
   if (location.pathname === '/cart.html') import('/cart-workflow.js').catch(() => {});
   window.aimoAsk = { attach, open: (text) => open(text), close };
   // Etusivun otsake (index.html, gateway.html) kytketään suoraan; yhteinen kehys (aimo-shell.js) kutsuu attach-funktiota itse.
