@@ -198,9 +198,3 @@ details.ai-note[open] summary { margin-bottom: 2px; }
 .aimo-ask { display: grid; gap: 8px; padding: 12px 14px; background: var(--agent-bg); border-left: 4px solid var(--agent); border-radius: var(--radius); }
 .aimo-ask .refine button { min-height: 40px; padding: 0 14px; font-weight: 700; background: #fff; }
 .aimo-ask .refine button.plain { background: transparent; font-weight: 500; text-decoration: underline; border-color: transparent; }
-
-/* Toimitusvarmuus- ja hiilijalanjälkimerkit tuoterivillä */
-.eco { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.eco-b { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: #f2f6f8; color: #40535a; font-size: 12.5px; font-weight: 600; line-height: 1.5; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.eco-b.ok { background: #e3f4e8; color: #1a7f37; }
-.eco-b.warn { background: #fdf3c4; color: #6b5300; }

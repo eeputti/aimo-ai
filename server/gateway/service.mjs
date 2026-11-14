@@ -334,7 +334,7 @@ async function liveRecheck(payloads, reasons) {
     else if (!q.avail || ['out', 'blocked', 'unknown'].includes(q.avail.status)) reasons.push(reason('OFFER_STALE', 'block', { productId: l.productId, availability: q.avail?.status || 'unknown' }));
     else if (cutoffPassed(q.avail.closingTime)) reasons.push(reason('CUTOFF_PASSED', 'block', { productId: l.productId, closingTime: q.avail.closingTime, closingLabel: helsinkiLabel(q.avail.closingTime) }));
     else if (q.avail.amount != null && q.avail.amount < l.quantity) reasons.push(reason('INSUFFICIENT_STOCK', 'block', { productId: l.productId, available: q.avail.amount, needed: l.quantity }));
-    lines.push({ ...l, name: p?.name || l.productId, salesUnitLabel: unitLabel(l.salesUnit), allergens: p?.contains || [], closingTime: q.avail?.closingTime || null, deliveryReliability: p?.reliability ?? null, co2PerKg: p?.co2 ?? null });
+    lines.push({ ...l, name: p?.name || l.productId, salesUnitLabel: unitLabel(l.salesUnit), allergens: p?.contains || [], closingTime: q.avail?.closingTime || null });
   }
   return { lines, deliveryDate: payloads.map((p) => p.deliveryDate).sort().at(-1), requestedDeliveryDate, cutoff: earliest(payloads.map((p) => p.cutoff)) };
 }

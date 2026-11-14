@@ -102,7 +102,7 @@ body.aimo-page .rail { top: 16px; max-height: calc(100vh - 136px); }
 .pc-arrow:hover { background: #00455a; }
 .pc-arrow.prev { left: -30px; }
 .pc-arrow.next { right: -30px; }
-.pcard { position: relative; flex: 0 0 clamp(250px, 21vw, 342px); scroll-snap-align: start; background: #fff; border: 1px solid #dee4e6; border-radius: 4px; padding: 26px 20px 22px; display: grid; grid-template-rows: auto auto auto auto auto 1fr auto; gap: 0; min-height: 520px; }
+.pcard { position: relative; flex: 0 0 clamp(250px, 21vw, 342px); scroll-snap-align: start; background: #fff; border: 1px solid #dee4e6; border-radius: 4px; padding: 26px 20px 22px; display: grid; grid-template-rows: auto auto auto auto 1fr auto; gap: 0; min-height: 520px; }
 .pc-tags { position: absolute; left: -1px; top: 24px; display: grid; gap: 0; justify-items: start; z-index: 1; }
 .pc-tag { font: 800 19px/1 "Sofia Sans Extra Condensed", "Arial Narrow", sans-serif; letter-spacing: 0.03em; text-transform: uppercase; padding: 8px 10px 7px; color: #0a1a20; }
 .pc-tag.sub { background: #fddb32; }
@@ -206,8 +206,3 @@ body.aimo-page .rail { top: 16px; max-height: calc(100vh - 136px); }
 .as-cal-legend i { flex: none; width: 16px; height: 16px; border-radius: 50%; border: 2px solid transparent; }
 .as-cal-legend b { width: 16px; text-align: center; }
 @media (max-width: 760px) { .as-hits th:nth-child(2), .as-hits td:nth-child(2), .as-hits th:nth-child(3), .as-hits td:nth-child(3) { display: none; } }
-
-/* Tuotekortin toimitusvarmuus- ja hiilijalanjälkimerkit: merkkien tyyli on gateway.css-tiedostossa */
-.pc-eco { min-height: 28px; margin-top: 8px; }
-.pc-eco .eco { margin-top: 0; }
-.pc-eco .eco-b { font-size: 14px; }

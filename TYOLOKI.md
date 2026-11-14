@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — konsolin toimitusvarmuus- ja hiilijalanjälkimerkit poistettu (Claude Code)
+
+**Käyttäjän päätös:** Eelis pyysi poistamaan commitissa `c991ca2` lisätyt merkit, koska työ on rajattu hakukenttään ja ostoskoriin.
+
+- Poistettu merkkien piirto (`public/gateway.js`, `public/gateway-products.js`), tyylit (`public/gateway.css`, `public/aimo-shell.css`) ja tilausrivin kentät `deliveryReliability` ja `co2PerKg` (`server/gateway/service.mjs`). Nämä neljä muuta tiedostoa ovat nyt samat kuin ennen merkkejä (commit `22853c9`). Tarjousrivien vastaavat kentät ovat ennallaan, kuten ennen merkkejä.
+- `public/gateway.js`: commitissa on vain merkkien poisto. Tiedoston toisen työvaiheen commitoimattomat muutokset jätettiin työpuuhun koskematta.
+
+**Tarkistukset:** `node --check` kolmelle JavaScript-tiedostolle, `npm test`, haku merkkien luokkanimillä ei löydä osumia. Selaimessa ei katsottu.
+
 ## 14.11.2026 — hakupaneelin reseptihaku kielimallilla ja annoslaskuri (Claude Code)
 
 **Käyttäjän pyyntö:** Eelis halusi, että reseptin voi hakea kirjoittamalla ("lohikeitto", "kermainen lohikeitto"), ehdotuksia tulee paljon ja ne tulevat tekoälymallilta. Annosmäärälle laskuri: miinus vasemmalla, plus oikealla, luku keskellä muokattavana.

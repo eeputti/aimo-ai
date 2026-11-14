@@ -13,21 +13,6 @@ const STATUS = { confirmed: 'Vahvistettu', pending_approval: 'Odottaa hyväksynt
 const api = async (path, body) => { const r = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error?.message || r.status); return j; };
 
 // Syyn selitys ihmiselle: koodi + luvut auki kirjoitettuna.
-// Toimitusvarmuus ja hiilijalanjälki pieninä merkkeinä tuoterivillä. Puuttuva tieto ei näy lainkaan: tyhjä ei saa näyttää tarkistetulta.
-const ECO_ICON = {
-  truck: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h11v10H2zM13 10h4l4 3v3h-8z"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>',
-  leaf: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-9 5-14 15-14 0 10-5 15-14 14zM5 19l7-7"/></svg>',
-};
-const ecoNum = (n, d) => n.toLocaleString('fi-FI', { minimumFractionDigits: d, maximumFractionDigits: d });
-function ecoBadges(l) {
-  const out = [];
-  if (l.deliveryReliability != null) {
-    const pct = l.deliveryReliability * 100;
-    out.push(`<span class="eco-b ${pct >= 95 ? 'ok' : 'warn'}" title="Toimitusvarmuus ${ecoNum(pct, 1)} % Valion toimitusvarmuusdatan mukaan">${ECO_ICON.truck}${ecoNum(pct, 0)} %</span>`);
-  }
-  if (l.co2PerKg != null) out.push(`<span class="eco-b" title="Hiilijalanjälki ${ecoNum(l.co2PerKg, 2)} kg CO₂-ekv tuotekiloa kohti">${ECO_ICON.leaf}${ecoNum(l.co2PerKg, 1)} kg CO₂e/kg</span>`);
-  return out.length ? `<span class="eco">${out.join('')}</span>` : '';
-}
 
 function reasonText(r) {
   const d = r.detail || {};
@@ -55,7 +40,7 @@ function orderCard(o, { actions = true, link = true } = {}) {
     </div>
     ${o.pendingAddition ? additionCard(o, actions) : ''}
     ${o.totals ? `<div><div class="total">${money(o.totals.net)}</div><div class="small muted" title="alv 0 %, verollisena ${money(o.totals.gross)}">toimitus ${day(o.deliveryDate)}${o.cutoffLabel && o.status === 'pending_approval' ? `, päätä ennen ${esc(o.cutoffLabel)}` : ''}</div></div>` : ''}
-    ${o.lines?.length ? `<ul class="lines">${o.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span>${ecoBadges(l)}</span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span>${l.substituteFor ? `<span class="sub">korvaa tuotteen ${esc(l.substituteFor)}</span>` : ''}${l.addedIn ? '<span class="sub">lisätty jälkikäteen</span>' : ''}</li>`).join('')}</ul>` : ''}
+    ${o.lines?.length ? `<ul class="lines">${o.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span>${l.substituteFor ? `<span class="sub">korvaa tuotteen ${esc(l.substituteFor)}</span>` : ''}${l.addedIn ? '<span class="sub">lisätty jälkikäteen</span>' : ''}</li>`).join('')}</ul>` : ''}
     ${o.suggestions?.length ? suggestBlock(o) : ''}
     ${o.approval?.explanation && o.status === 'pending_approval' ? `<details class="ai-note"><summary><b>${{ approve: 'Tekoäly suosittelee: hyväksy', reject: 'Tekoäly suosittelee: hylkää', review: 'Tekoäly suosittelee: tarkista' }[o.approval.explanation.suggestion] || 'Tekoälyn selitys'}</b></summary><p class="small">${esc(o.approval.explanation.text)} ${esc(o.approval.explanation.suggestionWhy)}</p><p class="small muted">${esc(o.approval.explanation.model)}, päätös on sinun</p></details>` : ''}
     ${o.substitutions?.some((s) => s.modelNote) ? `<div class="ai-note"><p class="small">${o.substitutions.filter((s) => s.modelNote).map((s) => esc(s.modelNote)).join(' ')} <span class="muted">Korvaajan valitsi tekoäly portin tarkistamista vaihtoehdoista (${esc(o.substitutions.find((s) => s.modelNote).chosenBy)}).</span></p></div>` : ''}
@@ -80,7 +65,7 @@ function additionCard(o, actions) {
   const a = o.pendingAddition;
   return `<div class="addition">
     <div class="who">Lisäys odottaa hyväksyntääsi</div>${a.requestedBy ? `<div class="asked">"${esc(a.requestedBy)}"</div>` : ''}
-    <ul class="lines">${a.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span>${ecoBadges(l)}</span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span></li>`).join('')}</ul>
+    <ul class="lines">${a.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span></li>`).join('')}</ul>
     <div class="small muted">+${money(a.addedNet)}, uusi summa olisi ${money(a.orderNetIfApproved)}${a.approval?.expiresAt ? ', tilaus pysyy ennallaan, jos et hyväksy' : ''}</div>
     <ul class="why">${a.reasons.filter((r) => r.severity === 'approval').map((r) => `<li class="${r.severity}">${esc(reasonText(r))}<code>${esc(r.code)}</code></li>`).join('')}</ul>
     ${actions ? `<div class="actions"><button class="btn approve big" data-act="approve" data-order="${o.orderId}"><span aria-hidden="true">✓</span> Hyväksy lisäys</button><button class="btn danger big" data-act="reject" data-order="${o.orderId}">Hylkää lisäys</button></div>` : ''}
