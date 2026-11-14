@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsApp-käyttöönotto valmis: puhelinvastaus, webhook ja PNG-lähtöinen logo (Codex)
+
+- Käyttäjä vahvisti nyt pyydetyn `tuki`-testin vastauksen saapuneen puhelimeen. Toisen korjauschatin sovittu token-reload ja erillinen oikea viestiketju on raportoitu commitissa `fc29a0b`: yksi worker PID 59831, sama `27ee93b`-snapshot ja kaikki viisi kantaa/jäsenliitokset säilyvät. Tuoreissa tarkistetuissa jonoriveissä done / yrityksiä 1 / Meta-tunniste / ei virhettä. Vanhoja epäonnistuneita rivejä ei nollattu.
+- Lopputarkistus: paikallinen ja julkinen `/healthz` 200 / ordering-demo, molempien GET-vahvistuksen haaste täsmää. Metan takaisinluvussa webhook active=true, oikea callback ja messages tilattuna. `.env` ja `.env.whatsapp` ovat 0600 ja Git-ohitettuja. AimoDemon rajattu messaging-only-palvelintoken on voimassa 13.1.2027 klo 22.25.29 Suomen aikaa.
+- **Logo asetettu pyydetystä PNG:stä:** alkuperäisen 380 × 132 kuvan virhe täsmentyi Metan API:ssa liian pieneksi resoluutioksi / JPG-vaatimukseksi (3441013). Latausta varten tehtiin samasta tiedostosta JPG-kopio ja 512 × 512 valkoinen kehys, logoa tai lähde-PNG:tä muuttamatta. Upload ja profiilin kirjoitus 200 / success=true. Takaisinluvun kuva-URL vaihtui ja oikea mediakuva tarkistettiin kuvasta. Erillistä management-tokenia tai numeron hallintaoikeuden laajennusta ei tarvittu; vain aiemmin hyväksytty Test Messaging Accountin Full access oli käytössä.
+- Käyttöönoton vaiheet 1–6 on koottu `docs/parallel/1.md`:hen. Tämän chatin lähdekoodin omistusrajat säilyivät. Muiden keskeneräisiä keskustelu-/gateway-muutoksia ei sisällytetä tähän dokumentointicommittiin. Danielin myöhempi handoff-API ja uudet keskustelukorjaukset tarvitsevat oman sovitun commitoidun version käyttöönoton; nykyistä vakaata workeria ei käynnistetty sitä varten uudelleen tässä vaiheessa.
+
 ## 14.11.2026 — demopolku: etusivulta WhatsAppiin, kori localhostissa (Claude Code)
 
 - **Käyttäjän päätös:** demo kulkee etusivu → WhatsApp-keskustelu → TILAA → päivittynyt kori/tilaus paikallisessa kaupassa (`http://localhost:4749/?shop=orders`) demokoneella. Kauppaa ei siirretä Workersiin ennen demoa: WhatsApp tarvitsee läppärin joka tapauksessa, ja vain localhostissa haku, kori ja tilaus toimivat oikeasti. Julkinen `aimo-order-demo…workers.dev` jää jaettavaksi linkiksi samasta tilauksesta.
