@@ -1,0 +1,24 @@
+{
+  "source": "https://toimitustukku.valioaimo.fi/fi/cart",
+  "capturedOn": "2026-11-14",
+  "note": "First delivery tab transcribed from the user-opened Chrome cart. The second tab's rows were not captured; no products are invented for it. This is local display data, independent of all agent orders.",
+  "cart": {
+    "selectedDate": "2026-11-16",
+    "references": {},
+    "carts": {
+      "2026-11-16": [
+        {"id":"8097348","name":"Fazer Pihlaja Mustikka marmeladi rasia 320g","price":8.35,"comparison":26.09,"unit":"kpl","qty":3,"image":"/storefront-assets/8097348.jpg","vat":13.5},
+        {"id":"8097326","name":"Panda Hienoja konvehteja 170g","price":4.66,"oldPrice":6.38,"comparison":27.41,"oldComparison":37.53,"unit":"kpl","qty":3,"image":"/storefront-assets/8097326.png","vat":13.5},
+        {"id":"8090880","name":"Vegem seitankunkku sliced 900g","price":15.23,"oldPrice":18.83,"comparison":16.92,"oldComparison":20.92,"unit":"kpl","qty":1,"image":"/storefront-assets/8090880.jpg","vat":13.5,"availableFrom":"2026-11-23"},
+        {"id":"8076442","name":"Vöner Original Sliced 600g x 4","price":36.95,"comparison":15.40,"unit":"ltk","qty":1,"pack":"4 kpl / ltk","contains":4,"image":"/storefront-assets/8076442.jpg","vat":13.5,"availableFrom":"2026-11-18"},
+        {"id":"8096833","name":"HENDI UUNIKINNASPARI 38CM","price":17.37,"unit":"kpl","qty":1,"image":"/storefront-assets/8096833.jpg","vat":25.5},
+        {"id":"874495","name":"Kymppi Lanttulaatikko 2,5 kg kypsä, pakaste","price":12.59,"oldPrice":16.62,"comparison":5.04,"oldComparison":6.65,"unit":"kpl","qty":1,"image":"/storefront-assets/874495.jpg","vat":13.5,"frozen":true},
+        {"id":"8055469","name":"Atria Perunasalaatti 3kg","price":10.83,"oldPrice":13.85,"comparison":3.61,"oldComparison":4.62,"unit":"ras","qty":1,"image":"/storefront-assets/8055469.jpg","vat":13.5,"availableFrom":"2026-11-18"},
+        {"id":"9901719","name":"HK Kalaasi Lihahyytelö n. 0,9 kg","price":11.27,"oldPrice":13.67,"comparison":11.27,"oldComparison":13.67,"unit":"kg","qty":0.9,"step":0.9,"image":"/storefront-assets/9901719.png","vat":13.5,"availableFrom":"2026-11-18","availabilityNote":"Tuote ei ole saatavilla 10.11.2026 - 16.11.2026"},
+        {"id":"610329","name":"Dafgård 357x14g lihapulla pakaste","price":55.25,"comparison":11.05,"unit":"ltk","qty":25,"image":"/storefront-assets/610329.jpg","vat":13.5,"frozen":true},
+        {"id":"8097595","name":"Atria Jouluateria 3x340g","price":11.34,"oldPrice":14.00,"comparison":11.12,"oldComparison":13.73,"unit":"ltk","qty":1,"pack":"3 kpl / ltk","contains":3,"image":"/storefront-assets/8097595.jpg","vat":13.5,"availableFrom":"2026-11-18"}
+      ],
+      "2026-11-18": []
+    }
+  }
+}

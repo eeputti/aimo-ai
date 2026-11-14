@@ -106,6 +106,21 @@ const routes = {
     if (out.trace.llmCalls || out.trace.modelError) gatewayLedger.append('model', 'MODEL_CALL', { purpose: 'interpret_request', model: out.trace.via, ms: Math.round(out.trace.ms), text, output: out.trace.modelError ? undefined : { items: out.understood.items.map((i) => ({ productTerm: i.productTerm, quantity: i.quantity, claims: i.claims })), deliveryDate: out.understood.deliveryDate, unparsed: out.understood.unparsed }, error: out.trace.modelError || undefined, usedByCode: !out.trace.modelError && !out.handoff, note: 'säännöt eivät ymmärtäneet pyyntöä riittävän varmasti' });
     json(res, 200, out);
   },
+  // Etusivun fiksu haku: hinta ja saatavuus vain näkyville osumille (enintään 30 tuotetta). Yksi pyyntö on korkeintaan
+  // kaksi Valion API-kutsua (saatavuus + hinta) ja välimuistista ei yhtään; selain kutsuu tätä vasta kirjoitustauon jälkeen.
+  'POST /api/storefront/quotes': async (req, res, t0) => {
+    const body = await readBody(req);
+    const cat = loadCatalog();
+    const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(String))].filter((id) => cat.get(id)).slice(0, 30);
+    const asked = typeof body.deliveryDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.deliveryDate) && body.deliveryDate >= todayIso() ? body.deliveryDate : null;
+    const deliveryDate = asked || defaultDeliveryDate();
+    const quotes = ids.length ? await fetchQuotes(ids, deliveryDate) : new Map();
+    json(res, 200, {
+      deliveryDate, dateAssumed: !asked, mode: apiMode(),
+      items: ids.map((id) => { const c = optionCard(cat.get(id), quotes.get(id)); return { productId: id, unitLabel: c.unitLabel, price: c.price, availability: c.availability }; }),
+      ms: +(performance.now() - t0).toFixed(1),
+    });
+  },
   'GET /api/aimo/lexicon': (req, res) => { const l = aimoLexicon(); json(res, 200, { stats: l.stats, categories: [...l.categories.values()].sort((a, b) => b.size - a.size) }); },
 
   'GET /api/events': (req, res) => {

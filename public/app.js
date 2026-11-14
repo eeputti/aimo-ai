@@ -72,38 +72,38 @@ function renderHero() {
   }
   const order = d.order;
   const deep = p.deep;
+  const shown = p.lines.filter((l) => l.state !== 'dropped'); const withImg = shown.filter((l) => l.productId && !noImg.has(l.productId));
   const title = order ? `Tilaus ${esc(order.id)} on lähetetty` : `${WDL[dayOf(p.deliveryDate).getDay()]} tilaus on valmiina`;
   el.innerHTML = `
-    <h1>${title}</h1>
-    <div class="hero-stats">
-      <div><b>${p.lines.filter((l) => l.state !== 'dropped').length}</b><span>riviä</span></div>
-      <div><b>${money(p.totals.expected)}</b><span>alv 0 %</span></div>
-      <div><b>${esc(dateLabel(p.deliveryDate))}</b><span>toimitus</span></div>
-      ${!order && p.approvals?.length ? `<div class="warn"><b>${p.approvals.length}</b><span>päätöstä sinulle</span></div>` : ''}
+    <div class="wh-top">
+      <div><h1>${title}</h1><div class="wh-sub">${esc(d.kitchen?.name || '')}${d.kitchen?.demo ? ' <span title="Tilaushistoria, varaukset ja ryhmämenu ovat generoitua demodataa. Tuotteet, allergeenit, korvaavuudet, toimitusvarmuus ja CO₂ ovat Aimon challenge-datasta.">· demodata</span>' : ''}</div></div>
+      <div class="wh-price"><b>${money(p.totals.expected)}</b><span>alv 0 %</span></div>
     </div>
-    <div class="hero-strip">${p.lines.filter((l) => l.productId && !noImg.has(l.productId)).slice(0, 14).map((l) => `<span title="${esc(l.name)}">${thumb(l.productId)}</span>`).join('')}</div>
+    <div class="wh-pills">
+      <span class="wh-pill"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>${esc(dateLabel(p.deliveryDate))}</span>
+      <a class="wh-pill" href="#lines"><svg viewBox="0 0 24 24"><path d="M3 8l9-5 9 5v8l-9 5-9-5zM3 8l9 5 9-5M12 13v8"/></svg>${shown.length} tuotetta</a>
+      ${!order && p.approvals?.length ? `<a class="wh-pill warn" href="#decisions"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>${p.approvals.length} päätöstä sinulle</a>` : ''}
+    </div>
+    <div class="wh-rail">${withImg.slice(0, 12).map((l) => `<a class="wh-card" href="#${['ok', 'confirm'].includes(l.state) ? 'lines' : 'decisions'}"><span class="wh-img"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" data-pid="${esc(l.productId)}"></span><span class="wh-name">${esc(l.name)}</span><span class="wh-row"><b>${money(l.total || 0)}</b><span>${qty(l.qty)} ${esc(l.unitLabel)}</span></span></a>`).join('')}${shown.length > Math.min(withImg.length, 12) ? `<a class="wh-card more" href="#lines"><b>+${shown.length - Math.min(withImg.length, 12)}</b><span>muuta</span></a>` : ''}</div>
     ${state.showSteps ? `<p class="briefing">${esc(p.briefing)}</p>` : ''}
-    ${(p.risks || []).length ? `<div class="banner">${p.risks.map((r) => `<div>${esc(r)}</div>`).join('')}</div>` : ''}
+    ${state.showSteps && (p.risks || []).length ? `<div class="banner">${p.risks.map((r) => `<div>${esc(r)}</div>`).join('')}</div>` : ''}
     ${order ? `<div class="banner ok"><b>${order.lines.length} riviä, ${money(order.totals.net)}, toimitus ${esc(dateLabel(order.deliveryDate))}.</b> ${esc(order.note)} <button class="linkbtn" data-action="next-week">Laadi seuraavan viikon ehdotus</button></div>` : ''}
     <div class="hero-meta">
-      <span class="tag deep" title="${esc(deep.reason)}, ${deep.weeks} vk historiaa, ${deep.quotedProducts} hintaa/saatavuutta kysytty${deep.apiCalls ? `, ${deep.apiCalls} API-kutsua` : ''}">Syvä agentti, ${esc(clock(deep.finishedAt))}, ${ms(deep.ms)}</span>
-      ${p.signals.map((s) => `<span class="tag signal" title="${esc(s.source || '')}">${esc(s.label)}: ${esc(s.detail)}</span>`).join('')}
       <button class="linkbtn small" data-action="toggle-steps">${state.showSteps ? 'Piilota perustelu' : 'Perustelu'}</button>
-      <button class="linkbtn small" data-action="deep-run">Aja uudelleen</button>
+      <button class="linkbtn small" data-action="deep-run">Päivitä</button>
     </div>
-    ${state.showSteps ? stepList : ''}
-    ${d.kitchen?.demo ? '<p class="small muted" style="margin-top:10px" title="Tilaushistoria, varaukset ja ryhmämenu ovat generoitua demodataa. Tuotteet, allergeenit, korvaavuudet, toimitusvarmuus ja CO₂ ovat Aimon challenge-datasta.">Demokeittiö, osa datasta generoitu</p>' : ''}`;
+    ${state.showSteps ? stepList : ''}`;
 }
 
 // ---------- päätöskortit ----------
 function optionHtml(line, o, i, { combo } = {}) {
   const delta = o.price.deltaPct;
   return `<div class="opt ${o.recommended ? 'recommended' : ''}">
-    ${o.recommended ? '<span class="badge">Agentin suositus</span>' : ''}
+    ${o.recommended ? '<span class="badge">Suositus</span>' : ''}
     <div class="ohead">${thumb(o.productId)}<div class="oname">${esc(o.name)}</div></div>
     <div class="oqty">${combo ? `${qty(o.keepOriginalQty)} ${esc(line.unitLabel)} alkuperäistä + ` : ''}<b>${qty(o.qty)} ${esc(o.unitLabel)}</b> tätä</div>
     <div class="oprice"><b>${money(o.price.total)}</b>${delta != null ? `<span class="delta ${delta > 0.5 ? 'up' : ''}">${pctText(delta)}</span>` : ''}<span class="small muted">${money(o.price.net)} / ${esc(o.unitLabel)}</span></div>
-    <ul class="facts">${o.agentNote ? `<li class="note">${esc(o.agentNote)}</li>` : ''}${o.why.map((w) => `<li>${esc(w)}</li>`).join('')}${o.warnings.map((w) => `<li class="warn">${esc(w)}</li>`).join('')}</ul>
+    <ul class="facts" title="${esc(o.why.join(' · '))}">${o.warnings.length ? o.warnings.slice(0, 2).map((w) => `<li class="warn">${esc(w)}</li>`).join('') : o.why.slice(0, 1).map((w) => `<li>${esc(w)}</li>`).join('')}</ul>
     <button class="btn ${o.recommended ? '' : 'ghost'}" data-action="decide" data-line="${line.lineId}" data-choice="${i}">${combo ? 'Täydennä tällä' : 'Korvaa tällä'}</button>
   </div>`;
 }
@@ -162,10 +162,16 @@ function availabilityCard(line) {
   const kind = line.availabilityView?.kind;
   const opts = line.options || [];
   const partial = kind === 'partial';
-  return `<article class="card" id="card-${line.lineId}">
-    <div class="card-head">${thumb(line.productId)}<h3>${esc(line.name)}</h3><span class="tag out">${esc(flag?.text || 'Poikkeama')}</span></div>
-    <p class="need vz-need"><span>Tarve <b>${qty(line.qty)} ${esc(line.unitLabel)}</b></span>${reasonViz(line) || `, ${esc(line.reason.text)}`}</p>
-    ${opts.length ? `<div class="options">${opts.map((o, i) => optionHtml(line, o, i, { combo: o.type === 'combo' })).join('')}</div>` : '<p class="need" title="Vaatimus: sama allergeeniprofiili, saatavilla, hinnoiteltu">Ei sopivaa korvaajaa</p>'}
+  const why = (line.reason?.factors || []).filter((f) => f.kind !== 'base');
+  return `<article class="card dc" id="card-${line.lineId}">
+    <div class="dc-head">${thumb(line.productId)}
+      <div class="dc-main"><h3>${esc(line.name)}</h3>
+        <div class="dc-code">${esc(line.productId)}${line.price?.net != null ? ` · ${money(line.price.net)} / ${esc(line.unitLabel)}` : ''}</div>
+        <div class="dc-status"><i></i>${esc(flag?.text || 'Poikkeama')}</div></div>
+      <div class="dc-qty"><b>${qty(line.qty)} ${esc(line.unitLabel)}</b><span>${line.baselineQty != null && line.baselineQty !== line.qty ? `tavallisesti ${qty(line.baselineQty)} ${esc(line.unitLabel)}` : 'kuten tavallisesti'}</span></div>
+    </div>
+    ${why.length ? `<details class="dc-why"><summary>Miksi ${line.qty > (line.baselineQty ?? line.qty) ? 'enemmän kuin tavallisesti' : 'tämä määrä'}?</summary><ul>${why.map((f) => `<li>${esc(f.kind === 'signal' ? `Pöytävarauksia on tavallista enemmän: ${f.detail}` : f.kind === 'menu' ? `Ryhmätilaus (${f.label.toLowerCase()}): ${f.detail}` : f.kind === 'lot' ? `Myydään vain erissä: ${f.detail}` : `${f.label}: ${f.detail || ''}`)}<span>${esc(f.value || '')}</span></li>`).join('')}</ul></details>` : ''}
+    ${opts.length ? `<div class="dc-label">Korvaa tällä</div><div class="options">${opts.map((o, i) => optionHtml(line, o, i, { combo: o.type === 'combo' })).join('')}</div>` : '<p class="dc-none">Tuoteryhmässä ei ole juuri nyt mitään tilattavaa tälle toimituspäivälle.</p>'}
     <div class="card-foot">
       ${partial ? `<button class="btn ghost" data-action="decide" data-line="${line.lineId}" data-choice="keep">Ota vain ${qty(line.availabilityView.amount)} ${esc(line.unitLabel)}</button>` : ''}
       ${kind === 'late' ? `<button class="btn ghost" data-action="decide" data-line="${line.lineId}" data-choice="late">Hyväksy toimitus ${esc(dateLabel(line.availability.date))}</button>` : ''}
@@ -254,8 +260,8 @@ function rowHtml(line) {
         ${thumb(line.productId)}
         <div class="rname">${esc(line.name)}</div>
         <div class="rsub">
-          ${edited || !reasonViz(line) ? `<button class="why ${whyClass}" data-action="toggle" data-line="${line.lineId}" aria-expanded="${open}">${esc(edited ? 'Muokattu' : line.reason.text)}</button>` : `<button class="why viz" data-action="toggle" data-line="${line.lineId}" aria-expanded="${open}" aria-label="${esc(line.reason.text)}. Näytä laskelma">${reasonViz(line, { compact: true })}</button>`}
           <span class="avail ${av.kind === 'ok' ? '' : 'warn'}"><span class="dot"></span>${esc(av.text || '')}</span>
+          <button class="why plain ${whyClass}" data-action="toggle" data-line="${line.lineId}" aria-expanded="${open}">${esc(edited ? 'Muokattu' : line.deltaPct == null || !reasonViz(line) ? line.reason.text : Math.abs(line.deltaPct) < 0.5 ? 'Sama kuin tavallisesti' : `${Math.round(Math.abs(line.deltaPct))} % ${line.deltaPct > 0 ? 'enemmän' : 'vähemmän'} kuin tavallisesti`)}</button>
           ${tags.join('')}
         </div>
       </div>

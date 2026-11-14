@@ -253,3 +253,19 @@ h2 { font-size: 32px; line-height: 1.1; }
 .ss-img { position: relative; }
 .ss-img::before { content: ''; position: absolute; inset: 18px; background: var(--line); mask: url('/storefront-assets/icons/package.svg') center / contain no-repeat; -webkit-mask: url('/storefront-assets/icons/package.svg') center / contain no-repeat; }
 .ss-img img { position: relative; background: #fff; }
+/* Fiksun haun hinta ja saatavuus: täyttyvät kirjoitustauon jälkeen. */
+.ss-tile { grid-template-rows: auto auto auto; }
+.ss-img { grid-row: 1 / 4; align-self: center; }
+.ss-quote { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; min-height: 20px; font-size: 13px; }
+.ss-price { font-size: 16px; color: #000; white-space: nowrap; }
+.ss-price small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.ss-stock { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.stock-dot.warn { background: #f5a623; }
+.stock-dot.unknown { background: #b8c2c5; }
+.ss-skel { display: block; width: 120px; height: 12px; border-radius: 6px; background: linear-gradient(90deg, #e3e9eb 25%, #f2f6f8 50%, #e3e9eb 75%) 0 0 / 200% 100%; animation: ss-skel 1.2s linear infinite; }
+@keyframes ss-skel { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .ss-skel { animation: none; } }
+.ss-qnote { display: inline-flex; align-items: center; gap: 8px; }
+.ss-qnote:empty { display: none; }
+.ss-qnote .icon { width: 16px; height: 16px; }
+.ss-sim { margin-left: 4px; padding: 2px 8px; border-radius: 10px; background: #ffe58a; color: #5a4500; font-size: 12px; }

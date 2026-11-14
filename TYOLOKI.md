@@ -2,6 +2,19 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — koko työpuun tilannetallennus GitHubiin (Claude Code)
+
+**Käyttäjän pyyntö:** Eelis kysyi, onko kaikki GitHubissa, jotta muut voivat jatkaa, koska hänen käyttörajansa lähestyy. Ei ollut: työpuussa oli 16 muutettua ja 10 uutta tiedostoa commitoimatta. Ne tallennettiin yhtenä tilannetallennuksena. **Suurin osa on muiden työvaiheiden keskeneräistä työtä, jota tämä istunto ei ole tehnyt eikä tarkistanut selaimessa.**
+
+- Lokiin jo kirjattu, aiemmin commitoimaton työ: valmis tilaus tuotekuvina, esikatselun nuoli, oikoteiden kutistuminen kirjoittaessa ja `RAW_INGREDIENT`-rajaus (`public/aimo-ask.js`, `aimo-ask.css`, `server/aimo/resolve.mjs`, `server/aimo/index.mjs`); ks. merkintä "valmis tilaus tuotekuvina" alla.
+- Ilman omaa lokimerkintää, tekijä ja tila tuntematon: hyväksyntänäkymän seurantatyylit (`public/approve-track.css`, `approve.html`, `agent.html`, `gateway.js`), `public/app.js`, `styles.css`, `storefront-search.js`, `storefront.css`, `server/index.mjs` (mm. `/api/storefront/quotes`), `server/images.mjs`, `server/substitutes.mjs` sekä 9 tuotekuvaa hakemistossa `public/storefront-assets/` (yhteensä noin 1,9 Mt, lähteitä ei ole tarkistettu `sources.json`-tiedostosta).
+- `.claude/launch.json`: testipalvelinasetukset portteihin 4752, 4755, 4756 ja 4766. Kantapolut osoittavat päättyneiden istuntojen väliaikaishakemistoihin: vaihda polku ennen käyttöä.
+- **Jätetty pois:** `public/aimo-voice.js` ja `aimo-voice.css`. Toinen työvaihe muokkasi niitä tallennushetkellä (klo 15.50), joten ne jäävät sen omaan commitiin.
+
+**Tarkistukset:** `node --check` muutetuille JavaScript-tiedostoille, `git diff --check`, `npm test` 34/34, `npm run aimo:eval` 26/26, `npm run aimo:eval:spoken` 54/54. Diffistä haettu avaimia ja yksityisavaimia, ei osumia. Selaimessa ei katsottu mitään, eikä palvelimia käynnistetty uudelleen.
+
+**Jatkajalle:** lue tämä loki ja `git log`. Portin 4747 demopalvelin ajaa vanhempaa palvelinkoodia, kunnes se käynnistetään uudelleen (`npm start`, ei watch-tilaa). Avoimet kohdat ovat alla olevissa merkinnöissä: mustikkajogurtin näyttäminen marjojen jälkeen, "luomupottu", reseptikortin järjestys puhelimella ja korvaajan valinta oikealla mallilla.
+
 ## 14.11.2026 — sanelupallo litteäksi (Codex)
 
 **Käyttäjän päätös:** kuuntelupallon ei tarvitse näyttää kolmiulotteiselta. `public/aimo-voice.css`: pallon säteittäinen liukuväri sekä sisä- ja ulkovarjot poistettu; tilalla hakupaneelin tasainen sininen (`--ask-blue`). Ääneen reagoiva liike ja kehät säilyvät.
@@ -43,6 +56,24 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 **Tarkistukset:** `npm test` 34/34, `npm run aimo:eval` 26/26 (0 mallikutsua), JS-syntaksi ja `git diff --check`. HTTP-testin portin avaamiseen tarvittiin hiekkalaatikon oikeuslaajennus. Selaimessa erillinen simuloitu palvelin 4762/4763 omilla väliaikaisilla kannoilla, ilman API-avaimia ja simuloidulla puheella: kuuntelu, väliteksti, Valmis ja Enter (ei tilaussiirtymää), 20 l laktoositonta kermaa + 5 kg voita pe 20.11., peruutuksen tekstinpalautus, estetty lupa, sulkeminen sekä 1280/375/320 px ilman vaakaylivuotoa. Käyttäjän demopalvelinta tai tilauskantaa ei muutettu eikä käynnistetty uudelleen.
 
 **Rajaus ja jatko:** oikeaa puhetta, selaimen palvelun toimintaa, mikrofonilupaa ja tunnistustarkkuutta ei voitu todentaa simuloidulla äänilähteellä. Kokeile omalla mikrofonilla selaimessa. Commit sisältää vain sanelun sekä tämän kirjauksen; työpuun muiden työvaiheiden muutokset, myös `aimo-ask.js`:n muu työ ja vanhempi lokiluonnos, jätettiin paikalleen commitoimatta. Staattiset tiedostot tulevat käyttöön sivun päivityksellä.
+
+## 14.11.2026 — valmis tilaus tuotekuvina, ei rivilistana (Claude Code, työpuussa)
+
+**Käyttäjän päätös:** Eelis ei pidä hakupaneelin "tilaus on valmiina" -kortin rivilistasta (kuva, nimi, määrä, summa riveittäin). Kortti näyttää tilauksen tuotekuvina Woltin tilauskortin tapaan, kuten aiemmassa versiossa. Älä palauta rivilistaa.
+
+- `public/aimo-ask.js` (`loadReady`): kuusi tuotekuvaa, määrä vihreänä merkkinä kuvan kulmassa, loput lukuna viimeisessä ruudussa ("+24"). Kuvalliset tuotteet valitaan ensin (18 kärkirivin kuvat kokeillaan), koska osalta tuotteista kuva puuttuu; kuvaton tuote näkyy nimiruutuna. Alarivi (tuotemäärä, päivä, summa) ja "Avaa tilaus" ovat ennallaan.
+- `public/aimo-ask.css`: uudet säännöt tiedoston lopussa. Rivilistan säännöt (`.ask-crow`, `.ask-cname`, `.ask-csum`, `.ask-cmore`) jäivät käyttämättöminä paikalleen, koska ne kuuluvat toisen työvaiheen commitoimattomaan työhön.
+- Muutos on samoissa tiedostoissa kuin toisen työvaiheen commitoimaton työ, joten sitä ei commitoitu erikseen: se tulee mukaan, kun ne tiedostot commitoidaan. Tämäkin lokimerkintä on commitoimatta.
+- **Tillihaku:** Eelis pyysi korjaamaan, ettei "tilli" osu lakritsipastilliin. Vika oli jo korjattu commitissa `15f17a5` (kokonaisen sanan täsmäys). Tarkistettu portissa 4747: "1 kg tilliä" → 13 tuotetta, kaikki tilliä; "5 l kookosmaitoa" → 12 kookosmaitotuotetta. Avoin: "2 kg mustikkaa" tarjoaa yhä myös mustikkajogurttia ja muita mustikanmakuisia tuotteita (54 osumaa), koska sana on niiden nimessä kokonaisena.
+
+**Jatko samana päivänä (Eeliksen pyynnöstä):**
+
+- **Esikatselu aluksi kiinni:** valmiin tilauksen kuvakortti ei näy heti. "Katso valmis tilauksesi" -rivin nuoli (`.ask-peek`) avaa ja sulkee sen; muu osa kortista vie suoraan ostoskoriin (`/kitchen.html`).
+- **Oikotiet kutistuvat kirjoittaessa:** kun hakukentässä on tekstiä, vasen sarake kapenee 68 px:n kuvakesarakkeeksi (resepti, tilaus) ja tulokset saavat tilan. Tilauskuvake vie ostoskoriin, reseptikuvake avaa reseptihaun, jolloin sarake levenee takaisin. Toteutus on pelkkää CSS:ää (`:has(.ask-idle)`), ei uutta tilaa JavaScriptissä.
+- **Raaka-aine voittaa maun** (`server/aimo/resolve.mjs`, `RAW_INGREDIENT`): kun kategoriaton hakusana löytyy kokonaisena tuore- (174xx), pakaste- (41731, 41733, 41740) tai kuivamaustekategorian (22630) tuotteesta, ehdokkaiksi jäävät vain ne. "2 kg mustikkaa": 54 → 5 tuotetta (ei jogurttia, saippuaa eikä lautasliinoja); vadelma 6, omena 11, kaneli 13, valkosipuli 9, sitruuna 3. Jos osumia ei ole näissä kategorioissa, joukko pysyy ennallaan (lohi, suklaa, kookosmaito). "mustikkajogurttia" löytää yhä jogurtit. `npm run aimo:eval` 26/26, `npm test` 26/26. **Portin 4747 palvelinta ei käynnistetty uudelleen** (toisen työvaiheen käynnistämä klo 15.21), joten mustikkakorjaus ei ole siinä vielä voimassa.
+- Selaimessa (noin 960 px): tyhjällä haulla sarakkeet 360 px + tulokset, esikatselu kiinni ja nuoli näkyy; nuoli avaa kortin; kirjoittaessa sarakkeet 68 px + tulokset, tekstit ja esikatselu piilossa. Puhelinleveyttä ei katsottu.
+
+**Tarkistukset:** selaimessa `http://localhost:4747/`, leveys 800 px: kortissa 6 kuvaa ja "+24", 30 tuotetta, 3 277,65 €, ei konsolivirheitä. `node --check public/aimo-ask.js`. Leveää näyttöä ja puhelinleveyttä ei katsottu.
 
 ## 14.11.2026 — hakupaneeli puhelinleveydellä: tulokset kentän alle, alaosa näkyviin (Claude Code)
 

@@ -38,6 +38,7 @@ function orderCard(o, { actions = true, link = true } = {}) {
       <div><div class="who">${esc(o.buyerName)} <span class="tag agent">ostoagentti</span></div>${o.requestedBy ? `<div class="asked">"${esc(o.requestedBy)}"</div>` : ''}</div>
       <span class="tag ${o.status}">${STATUS[o.status]}</span>
     </div>
+    ${tkTrack(o)}
     ${o.pendingAddition ? additionCard(o, actions) : ''}
     ${o.totals ? `<div><div class="total">${money(o.totals.net)}</div><div class="small muted" title="alv 0 %, verollisena ${money(o.totals.gross)}">toimitus ${day(o.deliveryDate)}${o.cutoffLabel && o.status === 'pending_approval' ? `, päätä ennen ${esc(o.cutoffLabel)}` : ''}</div></div>` : ''}
     ${o.lines?.length ? `<ul class="lines">${o.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span>${l.substituteFor ? `<span class="sub">korvaa tuotteen ${esc(l.substituteFor)}</span>` : ''}${l.addedIn ? '<span class="sub">lisätty jälkikäteen</span>' : ''}</li>`).join('')}</ul>` : ''}
@@ -124,6 +125,19 @@ function tkReason(r) {
   return `<li>${icon}<div><p>${esc(reasonText(r))}</p>${extra}</div></li>`;
 }
 const tkLine = (l, tag = '') => `<li><span class="tk-img"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"><b>${qty(l.quantity)}</b></span><span class="tk-name">${esc(l.name)}<small>${money(l.unitPriceNet)} / ${esc(l.salesUnitLabel)}${l.substituteFor ? `, korvaa tuotteen ${esc(l.substituteFor)}` : ''}${tag || (l.addedIn ? ', lisätty jälkikäteen' : '')}</small></span><span class="tk-sum">${money(l.lineNet)}</span></li>`;
+// Tilauksen vaiheet palkkina: sama puhelimen seurantanäkymässä ja konsolin tilauskorteissa.
+function tkTrack(o) {
+  const waiting = o.status === 'pending_approval' || !!o.pendingAddition;
+  const ok = !waiting && o.status === 'confirmed';
+  const failAt = waiting || ok ? -1 : (o.reasons || []).some((r) => r.code === 'HUMAN_REJECTED') ? 2 : 1;
+  const current = waiting ? 2 : ok ? 3 : failAt;
+  const steps = [['Tarjous', TK.doc], ['Tarkistus', TK.shield], [waiting ? 'Sinun vuoro' : 'Päätös', TK.hand], [o.deliveryDate ? day(o.deliveryDate) : 'Toimitus', TK.truck]];
+  const track = steps.map(([label, icon], i) => {
+    const cls = failAt >= 0 ? (i < failAt ? 'is-done' : i === failAt ? 'is-fail' : '') : i < current ? 'is-done' : i === current ? (ok ? 'is-now is-ok' : 'is-now') : '';
+    return `${i ? `<span class="tk-bar ${cls ? 'is-done' : ''}"></span>` : ''}<span class="tk-step ${cls}"><i>${cls === 'is-fail' ? '✕' : cls === 'is-done' ? '✓' : icon}</i><em>${esc(label)}</em></span>`;
+  }).join('');
+  return `<div class="tk-track" role="img" aria-label="Tilauksen vaiheet: ${waiting ? 'odottaa hyväksyntää' : ok ? 'vahvistettu' : 'hylätty'}">${track}</div>`;
+}
 function phoneView(o) {
   const add = o.pendingAddition || null;
   const waiting = o.status === 'pending_approval' || !!add;
@@ -135,11 +149,6 @@ function phoneView(o) {
   const head = waiting ? (add ? 'Hyväksytkö lisäyksen?' : o.cutoffLabel ? `Päätä ${esc(o.cutoffLabel)} mennessä` : 'Hyväksytkö tilauksen?')
     : ok ? `Toimitus ${esc(day(o.deliveryDate))}` : byHuman ? 'Tilaus hylätty' : 'Tilaus ei mennyt läpi';
   const current = waiting ? 2 : ok ? 3 : failAt;
-  const steps = [['Tarjous', TK.doc], ['Tarkistus', TK.shield], [waiting ? 'Sinun vuoro' : 'Päätös', TK.hand], [o.deliveryDate ? day(o.deliveryDate) : 'Toimitus', TK.truck]];
-  const track = steps.map(([label, icon], i) => {
-    const cls = failAt >= 0 ? (i < failAt ? 'done' : i === failAt ? 'fail' : '') : i < current ? 'done' : i === current ? (ok ? 'now ok' : 'now') : '';
-    return `${i ? `<span class="tk-bar ${cls ? 'done' : ''}"></span>` : ''}<span class="tk-step ${cls}"><i>${cls === 'fail' ? '✕' : cls === 'done' ? '✓' : icon}</i><em>${esc(label)}</em></span>`;
-  }).join('');
   const why = (add ? add.reasons : o.reasons || []).filter((r) => (waiting ? r.severity === 'approval' : r.severity === 'block'));
   const lines = add ? add.lines : o.lines || [];
   const ex = o.approval?.explanation;
@@ -149,13 +158,13 @@ function phoneView(o) {
     ${left ? `<span class="tk-left">${TK.clock}aikaa ${left}</span>` : !waiting ? `<span class="tk-left">${ok ? '✓ Vahvistettu' : '✕ Hylätty'}</span>` : ''}
     ${o.requestedBy || add?.requestedBy ? `<p class="tk-asked">"${esc(add?.requestedBy || o.requestedBy)}"</p>` : ''}
   </header>
-  <div class="tk-track" role="img" aria-label="Tilauksen vaiheet">${track}</div>
+  ${tkTrack(o)}
   ${why.length ? `<ul class="tk-why ${waiting ? '' : 'no'}">${why.map(tkReason).join('')}</ul>` : ''}
   ${lines.length ? `<ul class="tk-lines">${lines.map((l) => tkLine(l, add ? ', lisäys' : '')).join('')}</ul>` : ''}
   ${add && o.lines?.length ? `<p class="tk-note">Tilauksessa on jo ${o.lines.length} ${o.lines.length === 1 ? 'rivi' : 'riviä'}, ${money(o.totals.net)}. Se pysyy ennallaan, jos et hyväksy lisäystä.</p>` : ''}
   ${o.suggestions?.length && waiting && !add ? suggestBlock(o) : ''}
   ${ex && waiting && !add ? `<details class="ai-note"><summary><b>${{ approve: 'Tekoäly suosittelee: hyväksy', reject: 'Tekoäly suosittelee: hylkää', review: 'Tekoäly suosittelee: tarkista' }[ex.suggestion] || 'Tekoälyn selitys'}</b></summary><p class="small">${esc(ex.text)} ${esc(ex.suggestionWhy)}</p><p class="small muted">${esc(ex.model)}, päätös on sinun</p></details>` : ''}
-  <footer class="tk-foot">
+  <footer class="tk-foot${o.totals ? '' : ' empty'}">
     <div class="tk-total"><span>${add ? `Lisäys +${money(add.addedNet)}, uusi summa` : 'Yhteensä, alv 0 %'}</span><b>${o.totals ? money(add ? add.orderNetIfApproved : o.totals.net) : '–'}</b></div>
     ${waiting ? `<div class="tk-acts"><button class="tk-yes" data-act="approve" data-order="${o.orderId}">✓ ${add ? 'Hyväksy lisäys' : 'Hyväksy'}</button><button class="tk-no" data-act="reject" data-order="${o.orderId}">Hylkää</button></div>` : ''}
   </footer>`;

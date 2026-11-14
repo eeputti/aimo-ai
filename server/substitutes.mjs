@@ -16,7 +16,11 @@ const sizeOf = (p) => p.kg || p.litres || null;
 const pieceSize = (p) => { const s = sizeOf(p); return s ? s / (p.perSales > 1 ? p.perSales : 1) : null; };
 const pct = (x) => `${x > 0 ? '+' : ''}${Math.round(x)} %`;
 
-function staticCandidates(original, rules) {
+// Yhdyssanat: "jäävuorisalaatti" ja "amerikansalaattisuikale" ovat samaa tuotetta, vaikka yhtään sanaa ei ole yhteistä.
+const sharedPart = (a, b) => { for (let len = Math.min(a.length, b.length); len >= 5; len--) for (let i = 0; i + len <= a.length; i++) if (b.includes(a.slice(i, i + len))) return true; return false; };
+const compoundSim = (a, b) => { let hit = 0; for (const x of a) if ([...b].some((y) => x === y || sharedPart(x, y))) hit += 1; return a.size ? hit / a.size : 0; };
+
+function staticCandidates(original, rules, relaxed = false) {
   const cat = loadCatalog();
   const pool = new Map();
   const add = (p, why) => { if (p && p.id !== original.id && !pool.has(p.id)) pool.set(p.id, { product: p, listed: false, why }); };
@@ -37,19 +41,20 @@ function staticCandidates(original, rules) {
     if (rules.subSameAllergens && newAllergens.length) continue; // ei uusia allergeeneja
     const lostDiet = DIET_LABELS.filter((l) => original.labels?.includes(l) && !p.labels?.includes(l) && l !== 'EU_ORGANIC_FARMING');
     if (lostDiet.length) continue; // laktoositon pysyy laktoosittomana
-    const sim = jaccard(key, nameKey(p));
-    if (!c.listed && sim < 0.2) continue;
+    const sim = Math.max(jaccard(key, nameKey(p)), compoundSim(key, nameKey(p)) * 0.8);
+    // Tiukka haku vaatii saman tuotteen; väljä haku (kun tiukka ei löydä mitään tilattavaa) hyväksyy saman tuoteryhmän.
+    if (!c.listed && (relaxed ? p.category !== original.category : sim < 0.2)) continue;
     const size = pieceSize(p);
     const ratio = origSize && size ? size / origSize : null;
-    if (!c.listed && ratio && (ratio > 4 || ratio < 0.2)) continue;
+    if (!c.listed && ratio && (relaxed ? ratio > 10 || ratio < 0.1 : ratio > 4 || ratio < 0.2)) continue;
     let score = sim * 0.5 + (c.listed ? 0.3 : 0) + (p.category === original.category ? 0.12 : 0);
     if (ratio) score += 0.12 * (1 - Math.min(1, Math.abs(Math.log2(ratio)) / 2));
     score += ((p.reliability ?? 0.93) - 0.9) * 0.6;
     if (rules.preferDomestic && p.country === 'fi') score += 0.05;
     if (p.brand && p.brand === original.brand) score += 0.04;
-    scored.push({ ...c, sim, ratio, newAllergens, score, allergensVerified: !!(original.hasAllergenData && p.hasAllergenData) });
+    scored.push({ ...c, sim, ratio, loose: !c.listed && sim < 0.4, newAllergens, score, allergensVerified: !!(original.hasAllergenData && p.hasAllergenData) });
   }
-  return scored.sort((a, b) => b.score - a.score).slice(0, 14);
+  return scored.sort((a, b) => b.score - a.score).slice(0, relaxed ? 90 : 14);
 }
 
 /**
@@ -58,7 +63,7 @@ function staticCandidates(original, rules) {
  */
 export async function findSubstitutes(original, qty, date, rules, ctx = {}) {
   const t0 = performance.now();
-  const cands = staticCandidates(original, rules);
+  const cands = staticCandidates(original, rules, !!ctx.relaxed);
   const staticMs = performance.now() - t0;
   const t1 = performance.now();
   const quotes = await fetchQuotes([original.id, ...cands.map((c) => c.product.id)], date);
@@ -93,6 +98,7 @@ export async function findSubstitutes(original, qty, date, rules, ctx = {}) {
     const warnings = [];
     if (ctx.recipeRequired) warnings.push('Reseptikäyttö: varmista maku, koostumus ja saanto ennen korvaamista');
     if (c.listed) why.push('Aimon tuotedatassa merkitty korvaajaksi');
+    if (c.loose) warnings.push('Eri tuote samasta tuoteryhmästä');
     if (c.allergensVerified) why.push(original.contains.length ? `Sama allergeeniprofiili (${original.contains.map(allergenName).join(', ')})` : 'Ei allergeeneja, kuten alkuperäisessä');
     else warnings.push('Allergeenitietoa ei voi varmentaa datasta');
     for (const l of DIET_LABELS) if (original.labels?.includes(l) && p.labels?.includes(l)) why.push(`Myös ${DIET_NAME[l]}`);
@@ -114,11 +120,13 @@ export async function findSubstitutes(original, qty, date, rules, ctx = {}) {
       price: { net: price.net, total, deltaPct: deltaPct == null ? null : +deltaPct.toFixed(1), comparison: price.comparison, comparisonUnit: price.comparisonUnit, source: price.source },
       availability: { status: 'ok', amount: avail.amount, model: avail.model, source: avail.source },
       reliability: p.reliability ?? null, co2: p.co2 ?? null, country: p.country, listed: c.listed,
-      withinPolicy: !ctx.recipeRequired && !warnings.some((w) => /yli sallitun|varmentaa/.test(w)),
+      withinPolicy: !ctx.recipeRequired && !warnings.some((w) => /yli sallitun|varmentaa|Eri tuote/.test(w)),
       why, warnings, score: +score.toFixed(3),
     });
   }
   options.sort((a, b) => b.score - a.score);
+  // Tiukka haku ei löytänyt mitään tilattavaa: haetaan lähin tilattavissa oleva samasta tuoteryhmästä. Nämä vaativat aina ihmisen päätöksen.
+  if (!options.length && !ctx.relaxed) return findSubstitutes(original, qty, date, rules, { ...ctx, relaxed: true });
   const top = options.slice(0, ctx.limit ?? 3);
 
   // Osatoimitus: pidetään saatavilla oleva osa alkuperäistä ja täydennetään loput parhaalla korvaajalla.

@@ -89,6 +89,45 @@ async function fromValioSite(p) {
   return { url: `https://www.valio.fi/cdn-cgi/image/width=400,format=jpeg/${raw}`, fallbackUrl: og, source: 'valio.fi', page };
 }
 
+// Lähin vastaava: kun nimi ei osu slugiin sellaisenaan, etsitään sama tuote sanojen päällekkäisyydellä.
+// Merkki (nimen ensimmäinen sana) pitää olla sama, ettei kuvaksi tule kilpailijan tuotetta.
+const words = (s) => String(s).toLowerCase().replace(/[äå]/g, 'a').replace(/ö/g, 'o').normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+const SIZE_WORD = /^\d+$|^(l|dl|cl|ml|g|kg|kpl|x|n|uht|esl)$/;
+const fuzzyIndexes = {};
+async function fuzzySlug(site, name, { min, dropSizes = false }) {
+  const slugs = Object.values(await loadSlugIndex(site));
+  fuzzyIndexes[site] ||= (() => { const inv = new Map(); slugs.forEach((sl, i) => { for (const t of new Set(sl.split('-'))) { if (!inv.has(t)) inv.set(t, []); inv.get(t).push(i); } }); return inv; })();
+  const all = words(name); const brand = all[0];
+  const a = new Set(dropSizes ? all.filter((t) => !SIZE_WORD.test(t)) : all);
+  const hits = new Map();
+  for (const t of a) for (const i of fuzzyIndexes[site].get(t) || []) hits.set(i, (hits.get(i) || 0) + 1);
+  let best = null;
+  for (const [i, c] of hits) {
+    const b = new Set(slugs[i].split('-').filter((t) => !dropSizes || !SIZE_WORD.test(t)));
+    if (!b.has(brand)) continue;
+    const j = c / (a.size + b.size - c);
+    if (!best || j > best.j) best = { j, slug: slugs[i] };
+  }
+  return best && best.j >= min ? best.slug : null;
+}
+async function fromAimoSiteFuzzy(p) {
+  const slug = await fuzzySlug('aimo', p.name, { min: 0.6 });
+  if (!slug) return null;
+  const page = `https://www.valioaimo.fi/toimitustukku/${slug}/`;
+  const src = ogImage(await (await get(page)).text())?.match(/https:\/\/api\.valioaimo\.fi\/medias\/[^"\s]+/)?.[0];
+  return src ? { url: `https://imgfly.scarabresearch.com/w_400/${src}`, fallbackUrl: src, source: 'valioaimo.fi (lähin vastaava)', page } : null;
+}
+async function fromValioSiteFuzzy(p) {
+  if (!/^valio\b/i.test(p.name)) return null;
+  const slug = await fuzzySlug('valio', p.name, { min: 0.5, dropSizes: true });
+  if (!slug) return null;
+  const page = `https://www.valio.fi/tuotteet/${slug}/`;
+  const og = ogImage(await (await get(page)).text());
+  if (!og) return null;
+  const raw = og.replace(/^https:\/\/www\.valio\.fi\/cdn-cgi\/image\/[^/]+\//, '');
+  return { url: `https://www.valio.fi/cdn-cgi/image/width=400,format=jpeg/${raw}`, fallbackUrl: og, source: 'valio.fi (lähin vastaava)', page };
+}
+
 async function fromOpenFoodFacts(p) {
   if (!/^\d{8,14}$/.test(p.gtin || '')) return null;
   const res = await get(`https://world.openfoodfacts.org/api/v2/product/${p.gtin}.json?fields=image_front_url,image_front_small_url`).catch(() => null);
@@ -129,7 +168,7 @@ export function resolveImage(id) {
   const job = limited(async () => {
     const p = loadCatalog().get(id);
     if (!p) return null;
-    for (const source of [fromAimoSite, fromValioSite, fromOpenFoodFacts]) {
+    for (const source of [fromAimoSite, fromValioSite, fromOpenFoodFacts, fromAimoSiteFuzzy, fromValioSiteFuzzy]) {
       const found = await source(p).catch(() => null);
       const img = found && await download(found);
       if (!img) continue;

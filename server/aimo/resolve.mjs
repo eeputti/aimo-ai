@@ -11,6 +11,8 @@ let PRODUCT_TYPES = [];
 try { ({ PRODUCT_TYPES } = await import('../gateway/contract.mjs')); } catch { /* ilman porttia rajataan pelkällä kategorialla */ }
 
 const FAT_RE = { 'fat-free': /rasvaton/i, 'semi-skimmed': /kevyt/i, whole: /täys/i }; // suomenkielisestä nimestä: englanniksi "semi-skimmed" sisältää sanan "skimmed"
+// Raaka-ainekategoriat: tuoreet hedelmät, vihannekset, yrtit ja marjat (174xx), pakastevihannekset, -yrtit ja -marjat, kuivamausteet.
+const RAW_INGREDIENT = /^(174\d\d|41731|41733|41740|22630)$/;
 const PORTION = /annos|portion|\d+\s*x\s*\d+\s*(cl|ml|g)\b/i; // annospakkaukset eivät vastaa litra- tai kilotarvetta
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu', MARINE_STEWARDSHIP_COUNCIL_LABEL: 'MSC', FAIR_TRADE_MARK: 'Reilu kauppa' };
 
@@ -45,7 +47,7 @@ export function resolveItem(item, opts = {}) {
   const cat = loadCatalog();
   const limit = opts.limit ?? 40;
   const { steps, type, terms } = filterSteps(item);
-  let pool;
+  let pool; let narrowedToRaw = false;
   if (type || item.category || item.shelf) pool = cat.products;
   else {
     // Tuntematon ryhmä: nimihaku koko katalogista. Jos sana löytyy nimestä kokonaisena, osasanaosumat jätetään pois:
@@ -53,8 +55,13 @@ export function resolveItem(item, opts = {}) {
     const hits = item.productTerm ? cat.search(item.productTerm, { limit: 200 }) : [];
     const whole = hits.filter((h) => h.exact);
     pool = (whole.length ? whole : hits).map((h) => h.product);
+    // Raaka-aine voittaa maun: "mustikka" on myös jogurtin, saippuan ja lautasliinan nimessä. Jos sana löytyy kokonaisena
+    // tuore-, pakaste- tai maustekategorian tuotteesta, ehdokkaiksi jäävät vain ne. Muuten joukko pysyy ennallaan.
+    const raw = whole.length ? pool.filter((p) => RAW_INGREDIENT.test(p.category || '')) : [];
+    if (raw.length && raw.length < pool.length) { pool = raw; narrowedToRaw = true; }
   }
   const funnel = [];
+  if (narrowedToRaw) funnel.push({ filter: 'rawIngredient', remaining: pool.length });
   let relaxed = null;
   for (const [name, fn] of steps) {
     const next = pool.filter(fn);

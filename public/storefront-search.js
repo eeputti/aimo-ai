@@ -1,13 +1,18 @@
 // FIKSU HAKU etusivulla. Hakukenttään kirjoitettu puhekielinen pyyntö ("laktoositonta kermaa 20 l perjantaiksi")
 // tulkitaan Aimon sääntökerroksella (/api/aimo/interpret, llm: false): yksikään näppäily ei maksa mallikutsua eikä Valion API-kutsua.
 // Näkymä näyttää, mitä ymmärrettiin (määrä, tuote, väittämät, päivä) ja parhaat osumat kuvineen.
-// Hinnat ja tilaus eivät tapahdu täällä: nappi vie pyynnön agenttikonsoliin, jossa portti tekee tarjouksen, mandaattitarkistuksen ja hyväksynnän.
+// Hinta ja saatavuus haetaan näkyville osumille vasta kirjoitustauon jälkeen (/api/storefront/quotes): palvelimen välimuisti ja
+// selaimen oma muisti pitävät Valion API-kutsut vähissä. Tilaus ei tapahdu täällä: nappi vie pyynnön agenttikonsoliin,
+// jossa portti tekee allekirjoitetun tarjouksen, mandaattitarkistuksen ja hyväksynnän.
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const icon = (name) => `<span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/${name}.svg')"></span>`;
 const num = (n) => String(+(+n).toFixed(2)).replace('.', ',');
 const UNIT = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu', MARINE_STEWARDSHIP_COUNCIL_LABEL: 'MSC', FAIR_TRADE_MARK: 'Reilu kauppa' };
 const WD = ['su', 'ma', 'ti', 'ke', 'to', 'pe', 'la'];
+const eur = (n) => `${(+n).toFixed(2).replace('.', ',')} €`;
+const DOT = { ok: '', partial: ' warn', late: ' warn', out: ' unavailable', closed: ' unavailable', unknown: ' unknown' };
+const QUOTE_PAUSE = 450; // ms kirjoitustaukoa ennen hinta- ja saatavuushakua
 const day = (iso) => { const [y, m, d] = iso.split('-').map(Number); return `${WD[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d}.${m}.`; };
 const CHECK = '<svg class="ss-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.500 8.500 3 3 6-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 export const HANDOFF_KEY = 'aimo.ask';
@@ -30,11 +35,39 @@ if (box && input) {
     location.href = '/agent.html';
   };
 
-  const tile = (p) => `<div class="ss-tile" title="${esc(p.name)}">
+  const tile = (p) => `<div class="ss-tile" data-id="${esc(p.id)}" title="${esc(p.name)}">
       <span class="ss-img"><img src="/img/${encodeURIComponent(p.id)}" alt="" loading="lazy" onerror="this.remove()"></span>
       <span class="ss-tname">${esc(p.name)}</span>
       <span class="ss-tmeta">${esc(p.id)}${p.litres ? `, ${num(p.litres)} l` : p.kg ? `, ${num(p.kg)} kg` : ''}</span>
+      <span class="ss-quote" aria-busy="true"><span class="ss-skel"></span></span>
     </div>`;
+
+  // Hinta ja saatavuus tulevat erillisellä haulla; tuntematon saatavuus näytetään tuntemattomana, ei saatavilla olevana.
+  const quoteHtml = (q) => `<b class="ss-price">${q.price ? `${eur(q.price.net)}<small> / ${esc(q.unitLabel)}</small>` : '<small>hinta ei saatavilla</small>'}</b>
+      <span class="ss-stock"><span class="stock-dot${DOT[q.availability.kind] ?? ' unknown'}"></span>${esc(q.availability.text)}</span>`;
+  const quoteCache = new Map(); let quoteTimer;
+  function paintQuotes(date, info) {
+    for (const el of panel.querySelectorAll('.ss-tile')) {
+      const q = quoteCache.get(`${date}:${el.dataset.id}`); const slot = el.querySelector('.ss-quote');
+      if (q) { slot.innerHTML = quoteHtml(q); slot.removeAttribute('aria-busy'); }
+    }
+    const note = panel.querySelector('.ss-qnote');
+    if (note && info) note.innerHTML = `${icon('calendar-blank')}Hinnat (alv 0 %) ja saatavuus toimituspäivälle ${day(info.deliveryDate)}${info.dateAssumed ? ', oletuspäivä' : ''}${info.mode === 'sim' ? '<b class="ss-sim">simuloitu</b>' : ''}`;
+  }
+  async function loadQuotes(r, mine) {
+    const ids = [...new Set((r.cards || []).flatMap((c) => (c.top || []).map((p) => String(p.id))))];
+    if (!ids.length) return;
+    let q;
+    try {
+      const res = await fetch('/api/storefront/quotes', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids, deliveryDate: r.understood.deliveryDate || undefined }) });
+      if (!res.ok) throw new Error(String(res.status));
+      q = await res.json();
+    } catch { q = null; }
+    if (mine !== seq) return;
+    if (!q) { for (const slot of panel.querySelectorAll('.ss-quote[aria-busy]')) { slot.innerHTML = '<span class="ss-stock"><span class="stock-dot unknown"></span>Hintaa ja saatavuutta ei saatu</span>'; slot.removeAttribute('aria-busy'); } return; }
+    for (const it of q.items) quoteCache.set(`${q.deliveryDate}:${it.productId}`, it);
+    paintQuotes(q.deliveryDate, q);
+  }
 
   function need(it, card) {
     const ok = card?.status === 'ok' && card.total > 0;
@@ -64,7 +97,8 @@ if (box && input) {
       ${u.unparsed?.length ? `<p class="ss-warn">En ymmärtänyt: ${esc(u.unparsed.join(', '))}</p>` : ''}
       ${notes.length ? `<ul class="ss-notes">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
       <div class="ss-foot">
-        <span>${orderable ? 'Hinnan, saatavuuden ja hyväksynnän hoitaa agentti portin kautta.' : items.length ? 'Lisää määrä, niin agentti voi pyytää tarjouksen.' : ''}</span>
+        <span class="ss-qnote"></span>
+        <span>${orderable ? 'Tarjouksen ja hyväksynnän hoitaa agentti portin kautta.' : items.length ? 'Lisää määrä, niin agentti voi pyytää tarjouksen.' : ''}</span>
         <button type="button" class="solid-button ss-go"${items.length ? '' : ' disabled'}>${icon('truck')}Pyydä tarjous agentilta</button>
       </div>
     </div>`;
@@ -83,9 +117,11 @@ if (box && input) {
     } catch { r = { error: 'Hakupalveluun ei saatu yhteyttä.' }; }
     if (mine !== seq) return;
     render(r, text); panel.hidden = false;
+    clearTimeout(quoteTimer);
+    if (!r.error) quoteTimer = setTimeout(() => loadQuotes(r, mine), QUOTE_PAUSE);
   }
 
-  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(search, 160); });
+  input.addEventListener('input', () => { clearTimeout(timer); clearTimeout(quoteTimer); timer = setTimeout(search, 160); });
   input.addEventListener('focus', () => { if (input.value.trim().length >= 2) { if (last === input.value.trim()) panel.hidden = false; else search(); } });
   input.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') { close(); input.blur(); }

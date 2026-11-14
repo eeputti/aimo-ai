@@ -26,6 +26,42 @@
         "PORT=4751 GATEWAY_DB=/private/tmp/claude-501/-Users-eeputti--claude-spares-spare-fpDhe7/d3feaf80-2428-4e9b-8508-476a975b15c8/scratchpad/gateway-test.db npm start"
       ],
       "port": 4751
+    },
+    {
+      "name": "aimo-ai-test-4752",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "PORT=4752 GATEWAY_DB=/private/tmp/claude-501/-Users-eeputti-developer-aimo-ai/df41ebdb-4d66-4ae9-94c4-f127490613ea/scratchpad/gateway-test.db AIMO_DB=/private/tmp/claude-501/-Users-eeputti-developer-aimo-ai/df41ebdb-4d66-4ae9-94c4-f127490613ea/scratchpad/aimo-test.db npm start"
+      ],
+      "port": 4752
+    },
+    {
+      "name": "aimo-ai-test-4755",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "PORT=4755 VALIO_API_KEY= ANTHROPIC_API_KEY= GATEWAY_DB=/private/tmp/claude-501/-Users-eeputti--claude-spares-spare-k4Oczr/f50222cb-88f2-4276-a3a7-807b3c363d4d/scratchpad/gateway-test.db AIMO_DB=/private/tmp/claude-501/-Users-eeputti--claude-spares-spare-k4Oczr/f50222cb-88f2-4276-a3a7-807b3c363d4d/scratchpad/aimo-test.db npm start"
+      ],
+      "port": 4755
+    },
+    {
+      "name": "aimo-ai-test-4756",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "PORT=4756 VALIO_API_KEY= ANTHROPIC_API_KEY= GATEWAY_DB=/private/tmp/claude-501/-Users-eeputti--claude-spares-spare-u1N9iW/a3f01168-c45a-491b-8f90-e48f1253b005/scratchpad/gateway-test.db AIMO_DB=/private/tmp/claude-501/-Users-eeputti--claude-spares-spare-u1N9iW/a3f01168-c45a-491b-8f90-e48f1253b005/scratchpad/aimo-test.db npm start"
+      ],
+      "port": 4756
+    },
+    {
+      "name": "aimo-ai-test-4766",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "PORT=4766 GATEWAY_DB=/private/tmp/claude-501/-Users-eeputti--claude-spares-spare-ecMoNI/7686b0d3-0dfd-4108-b773-f4ce67eb1506/scratchpad/gw.db AIMO_DB=/private/tmp/claude-501/-Users-eeputti--claude-spares-spare-ecMoNI/7686b0d3-0dfd-4108-b773-f4ce67eb1506/scratchpad/aimo.db AIMO_LEARNED=/private/tmp/claude-501/-Users-eeputti--claude-spares-spare-ecMoNI/7686b0d3-0dfd-4108-b773-f4ce67eb1506/scratchpad/learned-ui.json npm start"
+      ],
+      "port": 4766
     }
   ]
 }
