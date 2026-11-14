@@ -1,0 +1,14 @@
+# Eeliksen Codexin Team MCP -yhteys, 14.11.2026
+
+- Käyttäjä pyysi yhdistämään tämän Codexin Danielin yhteiseen MCP-palvelimeen ja antoi osoitteen sekä oman jäsenavaimen. Toimiva osoite on `https://bench-butter-save-marsh.trycloudflare.com/mcp`; se on nykyinen Cloudflare-tunneli. Render-julkaisua ei varmennettu.
+- Yhteys `aimo-team` lisätty käyttäjän yksityiseen `~/.codex/config.toml`-tiedostoon. Streamable HTTP ja jäsenavaimen Bearer-autentikointi. Avainta ei tallenneta tähän raporttiin, GitHubiin tai koordinointiviesteihin. Asetustiedoston oikeudet ovat `0600`; aikaisempien asetusten säilyminen tarkistettu kirjoituksen jälkeen.
+- Todellinen palvelintunniste on **`eelis-chatgpt`**, nimi `Eelis / ChatGPT`, projekti `aimo-ai`. `eelis-codex`-jäsentä ei luotu eikä olemassa olevaa jäsentä nimetty uudelleen. Jos sama avain on käytössä toisessa liittimessä, yhteydet jakavat tunnisteen ja viestien kuittauskursorin; erillinen Codex-identiteetti tarvitsee oman jäsenen ja avaimen palvelimen ylläpitäjältä.
+- Varmennettu julkinen `/healthz` (200, `aimo-team-mcp`) ja OAuth-metatiedot, MCP-alustus sekä `whoami`, `get_project_state`, `read_messages` ja `tools/list`. Kaikki yhdeksän tiimityökalua löytyivät. Lopuksi asetukset luettiin **Codex CLI:n `mcp get aimo-team --json` -tuloksesta** muistiin tulostamatta avainta, ja uusi SDK-yhteys samoilla tallennetuilla asetuksilla varmisti oikean tunnisteen, projektin ja työkaluluettelon. Viestejä ei kuitattu toisen samaa tunnistetta käyttävän keskustelun puolesta.
+- Asetus on tallennettu ja verkkoyhteys testattu. Nykyisen chatin natiivissa työkaluvalikoimassa yhteys ei vielä näy. Käyttäjän pitää ladata MCP-yhteydet uudelleen asetusten MCP servers -kohdasta (Restart) ja tarvittaessa avata uusi chat. Sovelluksen käyttöliittymän ohjaustyökalu torjui pääsyn Codex-sovellukseen; sovellusta ei suljettu eikä kieltoa kierretty.
+
+## Koordinointi ja lokin yhdistäminen
+
+- Paikallinen työvaraus `94268a45`; yhteisen palvelimen oma tehtävä `7dc2e29f-cc8e-43d2-8457-1a4a96fbc9db` varaa vain tämän raportin.
+- Danielin yhteinen tehtävä `00331c3a-290a-4120-9ef4-c5a2be20fb99` varaa aktiivisesti `TYOLOKI.md`:n. Siihen ei kirjoitettu. Varausristiriidasta ja tarvittavasta lokimerkinnästä lähetettiin Danielille yhteisen palvelimen viesti #9 projektin työohjeen mukaisesti. WhatsApp-toteutusta tai Danielin muita varauksia ei muutettu.
+- Yhteisen paikallisen työpuun Git-kirjoittajalle: lisää lyhyt merkintä `TYOLOKI.md`:hen vasta lokivarauksen vapauduttua, tarkista tämä raportti ja sisällytä molemmat samaan commitiin/pushiin. Yksityinen Codex-asetustiedosto ja avain jäävät Gitin ulkopuolelle. Tämä raportti ei vielä ole GitHubissa.
+- Muut paikalliset Cloudflare-tiedostot kuuluivat jo toiselle keskeneräiselle työlle; ne jätettiin ennalleen. Sovelluksen lähdekoodi ei muuttunut, joten sovellustestejä tai demoajoa ei tehty. Palvelimia, tunneleita tai kantoja ei käynnistetty uudelleen eikä nollattu.
