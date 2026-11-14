@@ -95,6 +95,35 @@
       }
       save();
     },
+    async syncWhatsApp(snapshot) {
+      await ready;
+      if (!snapshot?.enabled || snapshot.state === 'waiting') return false;
+      if (!['ready', 'empty'].includes(snapshot.state) || typeof snapshot.source !== 'string') throw new Error('Virheellinen WhatsApp-kori.');
+      if (state.whatsappSync?.source && state.whatsappSync.source !== snapshot.source) throw new Error('WhatsApp-asiakas vaihtui. Tarkista asiakas ennen korin synkronointia.');
+      if (snapshot.id && state.whatsappSync?.id === snapshot.id && snapshot.revision < state.whatsappSync.revision) throw new Error('Ostoskorin vanha versio hylättiin.');
+      const signature = JSON.stringify(snapshot);
+      if (state.whatsappSync?.signature === signature) return false;
+      const next = copy(state);
+      for (const rows of Object.values(next.carts)) for (let i = rows.length - 1; i >= 0; i--) if (rows[i].whatsappSource === snapshot.source) rows.splice(i, 1);
+      if (snapshot.state === 'ready') {
+        if (!validDate(snapshot.deliveryDate) || !Array.isArray(snapshot.lines) || !snapshot.lines.length) throw new Error('Toimituspäivä tai tuotteet puuttuvat.');
+        const rows = next.carts[snapshot.deliveryDate] ||= [];
+        for (const line of snapshot.lines) {
+          if (!line.id || !line.name || !Number.isFinite(line.qty) || line.qty <= 0 || line.qty > 999999 || !Number.isFinite(line.price) || line.price < 0) throw new Error('Tarkista WhatsApp-korin tuotteet ja määrät.');
+          const existing = rows.find((p) => p.id === line.id);
+          if (existing && existing.whatsappSource !== snapshot.source) throw new Error('Sama tuote on jo käsin lisätyssä korissa. Tarkista päällekkäiset rivit.');
+          const qty = amount((existing?.qty || 0) + line.qty);
+          if (qty > 999999) throw new Error('Yhdistetty määrä on liian suuri.');
+          if (existing) existing.qty = qty;
+          else rows.push({ ...copy(line), whatsappSource: snapshot.source, qty, taxUnknown: line.taxUnknown || line.vat == null });
+        }
+        next.selectedDate = snapshot.deliveryDate;
+      }
+      next.whatsappSync = { source: snapshot.source, id: snapshot.id, revision: snapshot.revision, signature };
+      // Persist the full replacement once: repeats never add the same products again.
+      try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { throw new Error('Salli ostoskorin tallennus ennen synkronointia.'); }
+      state = next; window.dispatchEvent(new Event('aimo:cart-change')); return true;
+    },
     async add(product, qty = 1, date = state.selectedDate) {
       return this.addMany([{ product, qty }], date);
     },
@@ -170,6 +199,7 @@
     if (ev.key !== KEY || !ev.newValue) return;
     try { const v = JSON.parse(ev.newValue); if (validDate(v.selectedDate) && v.carts) { state = v; window.dispatchEvent(new Event('aimo:cart-change')); } } catch { /* invalid storage does not replace the visible basket */ }
   });
+  import('/whatsapp-cart-sync.js').then(({ startWhatsAppCartSync }) => startWhatsAppCartSync(window.aimoCart)).catch(() => {});
   ready.catch(() => {}); // The cart page reports loading failures; search remains available.
   if (document.querySelector('.header-actions')) import('/storefront-agent.js').catch((error) => console.error('Tilauksen toimintojen lataus epäonnistui:', error));
 })();
