@@ -6,8 +6,12 @@
 (() => {
   if (window.aimoAsk) return;
   const HANDOFF_KEY = 'aimo.ask';
+  const COLLECTION_RETURN_KEY = 'aimo.ask.collection-return';
   const intentReady = import('/aimo-request-intent.js').catch(() => null);
   const quantityReady = import('/aimo-search-quantity.js');
+  let collectionLinksFor = () => [];
+  let collectionBrowseRequest = () => false;
+  const collectionsReady = import('/aimo-collections.js').then((module) => { collectionLinksFor = module.collectionLinksFor; collectionBrowseRequest = module.collectionBrowseRequest; }).catch(() => {});
   const deliveryReady = import('/delivery-date.js');
   let recipeContext = null;
   const storefrontCart = window.aimoCart || null;
@@ -111,7 +115,7 @@
   }).catch(() => null); // Sanelun latausvirhe ei estä tavallista hakua.
   // Valittu resepti. override: hakukentässä näkyy ruoan nimi, mutta tulkintaan ja agentille lähtee raaka-ainelista määrineen.
   let portions = 100; let ideas = []; let picked = null; let override = null; let ideaSeq = 0; let ideaTimer;
-  // Suodattimet (laktoositon, rasvaton...) ovat rakenteisia muutoksia tulkintaan, eivät uutta tekstiä. Ne nollataan, kun käyttäjä kirjoittaa.
+  // Määrän muutos kohdistetaan tulkitulle riville. Se nollataan, kun käyttäjä kirjoittaa.
   let patches = []; let last = null; const expanded = new Set();
   let observedDate = storefrontCart?.get().selectedDate;
   let syncingDate = false;
@@ -136,32 +140,41 @@
       <span class="ask-tname">${esc(p.name)}</span>
       <span class="ask-tmeta">${esc(p.id)}${p.litres ? `, ${num(p.litres)} l` : p.kg ? `, ${num(p.kg)} kg` : ''}</span>
       ${p.quantityExplanation ? `<span class="ask-tmeta">${esc(p.quantityExplanation.text)}</span>` : ''}
-      <span class="ask-live"><b class="ask-price">${money(p.price)}</b><span class="ask-avail ok"><i></i>Saatavilla ${day(p.availability.deliveryDate)}${p.availability.stock == null ? ', saldo ei tiedossa' : ''}</span></span>
+      <span class="ask-live"><b class="ask-price">${money(p.price)}<small> / ${esc(p.unitLabel || p.unit || 'pakkaus')}</small></b>${Number.isFinite(p.comparison) && p.comparisonUnit ? `<span class="ask-comparison">${money(p.comparison)} / ${esc(UNIT[p.comparisonUnit] || p.comparisonUnit.toLowerCase())}</span>` : ''}<span class="ask-avail ok"><i></i>Saatavilla ${day(p.availability.deliveryDate)}${p.availability.stock == null ? ', saldo ei tiedossa' : ''}</span></span>
       ${p.substituteFor ? `<span class="ask-sub">Korvaaja tuotteelle ${esc(p.substituteFor.name)}. Tarkista sopivuus ostoskorissa.</span>` : ''}
       <button type="button" class="ask-add" data-add="${esc(p.id)}" data-qty="${p.qty}">${I.cart}Lisää ${num(p.qty)} koriin</button>
     </div>`;
   let liveTimer;
+  const collectionNavigation = (item) => {
+    const links = collectionLinksFor(item);
+    if (!links.length) return '';
+    return `<nav class="ask-collections" aria-label="Tuoteryhmät: ${esc(item.productTerm || item.label || item.raw)}"><span>Selaa koko tuoteryhmää</span><div>${links.map((link, i) => {
+      const href = `${link.href}&q=${encodeURIComponent(sent())}&from=${encodeURIComponent(location.pathname === '/cart.html' ? '/cart.html' : '/')}`;
+      return `<a href="${esc(href)}"${i ? ' class="ask-collection-parent"' : ''}>${esc(i ? link.allLabel : link.name)}${I.go}</a>`;
+    }).join('')}</div></nav>`;
+  };
   function need(it, card, i, opt) {
     const ok = card?.status === 'ok' && card.total > 0;
     const all = expanded.has(i);
     const list = (card?.list || card?.top || []).slice(0, all ? 80 : opt.max);
-    const fixed = [...(it.claims || []).map((c) => CLAIM[c] || c), it.brand, it.countryOfOrigin === 'fi' ? 'kotimainen' : null].filter(Boolean).filter((c) => !patches.some((p) => p.item === i && p.label?.toLowerCase() === String(c).toLowerCase()));
-    const on = patches.map((p, k) => (p.item === i && p.label ? `<button type="button" class="ask-filter on" data-unfilter="${k}" aria-pressed="true">${I.check}${esc(p.label)}</button>` : '')).join('');
-    const more = (card?.chips || []).filter((c) => !patches.some((p) => p.item === i && p.label === c.label)).map((c) => `<button type="button" class="ask-filter" data-filter="${i}:${esc(c.label)}" aria-pressed="false">${esc(c.label)}${c.matches == null ? '' : `<small>${c.matches}</small>`}</button>`).join('');
+    const fixed = [...(it.claims || []).map((c) => CLAIM[c] || c), it.brand, it.countryOfOrigin === 'fi' ? 'kotimainen' : null,
+      { 'fat-free': 'rasvaton', 'semi-skimmed': 'kevyt', whole: 'täysrasvainen' }[it.attributes?.fat],
+      it.attributes?.state === 'frozen' ? 'pakaste' : null, it.attributes?.treatment === 'uht' ? 'UHT' : null].filter(Boolean);
     const term = it.productTerm || it.label || it.raw;
     return `<article class="ask-need" data-need="${i}">
       <div class="ask-nhead">
         <div class="ask-line"><b>${esc(term)}</b>${opt.edit ? `<button type="button" class="ask-plus${it.quantity ? ' ask-quantity' : ''}" data-ask="qty" data-item="${i}" aria-label="${it.quantity ? 'Muuta' : 'Lisää'} tuotteen ${esc(term)} määrä">${it.quantity ? `${num(it.quantity.value)} ${it.quantity.unit === 'PCS' ? it.quantity.basis === 'items' ? 'kpl' : 'pakkausta' : UNIT[it.quantity.unit]}<small>Muuta</small>` : `${I.plus}Lisää määrä`}</button>` : it.quantity ? `<span class="ask-qty">${num(it.quantity.value)} ${UNIT[it.quantity.unit] || ''}</span>` : ''}</div>
-        ${ok && (card.list || card.top || []).length > opt.max ? `<button type="button" class="ask-all" data-all="${i}">${all ? 'Näytä vähemmän' : `Katso hakutulokset${I.go}`}</button>` : ''}
+        ${ok && (card.list || card.top || []).length > opt.max ? `<button type="button" class="ask-all" data-all="${i}" aria-expanded="${all}">${all ? 'Näytä vähemmän' : `Näytä kaikki ${card.total} hakutulosta${I.go}`}</button>` : ''}
       </div>
-      ${!ok ? `<p class="ask-no-products">Kokeile toista hakusanaa tai toimituspäivää.</p>` : ''}
-      ${fixed.length || on || more ? `<div class="ask-chips">${fixed.map((c) => `<span class="ask-chip">${I.check}${esc(c)}</span>`).join('')}${on}${more}</div>` : ''}
+      ${fixed.length ? `<p class="ask-requirements">${fixed.map(esc).join(' · ')}</p>` : ''}
+      ${collectionNavigation(it)}
+      ${!ok ? `<p class="ask-no-products">${esc(card?.reason?.fi || 'Kokeile toista hakusanaa tai toimituspäivää.')}</p>` : ''}
       ${list.length ? `<div class="ask-rail${all ? ' all' : ''}">
         <button type="button" class="ask-arrow prev" data-rail="-1" aria-label="Edelliset tuotteet">${I.left}</button>
         <div class="ask-tiles">${list.map((p) => tile(p, it)).join('')}</div>
         <button type="button" class="ask-arrow next" data-rail="1" aria-label="Seuraavat tuotteet">${I.right}</button>
       </div>` : ''}
-      ${all && card.total > list.length ? `<p class="ask-allnote">Näytetään ${list.length} parasta osumaa ${card.total} tuotteesta. Rajaa suodattimilla.</p>` : ''}
+      ${all && card.total > list.length ? `<p class="ask-allnote">Näytetään ${list.length} parasta osumaa ${card.total} tuotteesta. Tarkenna hakusanaa tai selaa tuoteryhmää.</p>` : ''}
     </article>`;
   }
   // Seuraavat kuusi toimituspäivää (ei sunnuntaita): valinta lisää hakuun sanan, jonka sääntökerros jo ymmärtää ("maanantaiksi").
@@ -172,7 +185,8 @@
     orderable = items.length > 0 && !r.handoff && !u.unparsed?.length && items.every((it, i) => it.quantity && r.cards?.[i]?.status === 'ok' && r.cards[i].list.length > 0);
     last = r;
     if (!items.length) {
-      main.innerHTML = '<div class="ask-empty"><p>Kokeile tuotteen nimeä, esimerkiksi maito.</p></div>';
+      const navigation = collectionNavigation({ productTerm: sent() });
+      main.innerHTML = navigation || '<div class="ask-empty"><p>Kokeile tuotteen nimeä, esimerkiksi maito.</p></div>';
       return;
     }
     const edit = !override && !r.recipe;
@@ -215,8 +229,14 @@
     orderable = false; last = null;
     if (text.length < 2) { idle(); return; }
     const intent = await intentReady;
+    await collectionsReady;
     await storefrontCart?.ready;
     if (mine !== seq || root.hidden) return;
+    if (collectionBrowseRequest(text)) {
+      clearTimeout(deepTimer);
+      render({ understood: { items: [] }, cards: [] });
+      return true;
+    }
     const requestedDate = storefrontCart?.get().selectedDate;
     if (!override && recipeContext?.label !== q.value) {
       const routed = intent?.routeRequest(text);
@@ -546,12 +566,12 @@
     if (ev.target.closest('[data-close]')) { close(); return; }
     if (ev.target.closest('.ask-go')) { toAgent(); return; }
     const hit = (sel) => ev.target.closest(sel);
+    if (hit('.ask-collections a')) {
+      try { sessionStorage.setItem(COLLECTION_RETURN_KEY, JSON.stringify({ text: sent(), patches })); } catch { /* Alkuperäinen hakuteksti kulkee myös linkissä. */ }
+      return;
+    }
     const add = hit('[data-add]');
     if (add) { addToCart(add); return; }
-    const filter = hit('[data-filter]');
-    if (filter) { const [item, label] = [+filter.dataset.filter.split(':')[0], filter.dataset.filter.slice(filter.dataset.filter.indexOf(':') + 1)]; const chip = last?.cards?.[item]?.chips?.find((c) => c.label === label); if (chip) { patches.push({ item, patch: chip.patch, label: chip.label }); search(); } return; }
-    const unfilter = hit('[data-unfilter]');
-    if (unfilter) { patches.splice(+unfilter.dataset.unfilter, 1); search(); return; }
     const all = hit('[data-all]');
     if (all && last) { const i = +all.dataset.all; if (expanded.has(i)) expanded.delete(i); else expanded.add(i); render(last); return; }
     const rail = hit('[data-rail]');
@@ -608,4 +628,18 @@
   // Etusivun otsake (index.html, gateway.html) kytketään suoraan; yhteinen kehys (aimo-shell.js) kutsuu attach-funktiota itse.
   const sf = document.querySelector('.store-header .search');
   if (sf) attach({ box: sf, input: sf.querySelector('input'), icon: sf.querySelector('.icon') });
+  const returnUrl = new URL(location.href);
+  const returnSearch = returnUrl.searchParams.get('ask');
+  if (returnSearch && returnSearch.length <= 1000) {
+    returnUrl.searchParams.delete('ask');
+    history.replaceState(history.state, '', returnUrl.pathname + returnUrl.search + returnUrl.hash);
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(COLLECTION_RETURN_KEY));
+      if (saved?.text === returnSearch && Array.isArray(saved.patches)) {
+        patches = saved.patches.slice(0, 20).filter((p) => Number.isInteger(p.item) && p.patch?.quantity);
+        sessionStorage.removeItem(COLLECTION_RETURN_KEY);
+      }
+    } catch { /* Ilman tallennusta palataan alkuperäiseen hakutekstiin. */ }
+    open(returnSearch);
+  }
 })();

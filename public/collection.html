@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tuoteryhmä | Valio Aimo® toimitustukku</title>
+  <meta name="description" content="Selaa Aimon demon tuoteryhmää.">
+  <link rel="icon" href="/aimo-logo.png">
+  <link rel="preload" href="/storefront-assets/Matter-Regular.otf" as="font" type="font/otf" crossorigin>
+  <link rel="preload" href="/storefront-assets/Matter-Bold.otf" as="font" type="font/otf" crossorigin>
+  <link rel="preload" href="/storefront-assets/National2Compressed-Bold.otf" as="font" type="font/otf" crossorigin>
+  <link rel="stylesheet" href="/storefront.css">
+  <link rel="stylesheet" href="/collection.css">
+</head>
+<body>
+  <a class="skip" href="#main">Siirry sisältöön</a>
+  <header class="store-header">
+    <div class="service-bar"><div class="container">
+      <nav class="services" aria-label="Valio Aimon palvelut">
+        <button type="button" class="service"><span class="service-logo" aria-hidden="true"></span>Valioaimo.fi</button>
+        <button type="button" class="service"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/storefront.svg')"></span>Pikatukku</button>
+        <a class="service selected" href="/" aria-current="page"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/truck.svg')"></span>Toimitustukku</a>
+        <button type="button" class="service"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/package.svg')"></span>VALO Tilauspalvelu</button>
+        <button type="button" class="service"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/chart-bar.svg')"></span>Minun Aimo</button>
+      </nav>
+      <div class="account"><span class="customer">554485 VALIO OY / ALKOHOLI</span><button type="button" aria-label="Oma tili"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/user.svg')"></span><span class="user-name">Junction TestUser</span><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/caret-down.svg')"></span></button><button type="button" class="language" aria-label="Kieli: suomi">FI<span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/caret-down.svg')"></span></button></div>
+    </div></div>
+    <div class="container main-header">
+      <a class="brand" href="/" aria-label="Valio Aimo etusivu"><img src="/storefront-assets/logo.svg" alt="Valio Aimo" width="96" height="32"></a>
+      <nav class="main-nav" aria-label="Päävalikko"><button type="button">Tuotteet</button><button type="button">Tilaukset</button><button type="button">Ajankohtaista</button></nav>
+      <div class="search" role="search"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/magnifying-glass.svg')"></span><input type="search" aria-label="Hae tuotteita" placeholder="Hae tuotteita" autocomplete="off"></div>
+      <div class="header-actions">
+        <button type="button" class="header-action" aria-label="Toimituspäivä 16.11.2026"><span class="header-icon"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/calendar-blank.svg')"></span><span class="badge">2</span></span><span>Toimituspäivä<b>16.11.2026</b></span></button>
+        <button type="button" class="header-action" aria-label="Ostoskori: 3 tuotetta, 79,39 euroa"><span class="header-icon"><span class="icon" aria-hidden="true" style="--icon:url('/storefront-assets/icons/shopping-cart.svg')"></span><span class="badge">3</span></span><span>Ostoskori<b>79,39 €</b></span></button>
+      </div>
+    </div>
+  </header>
+  <main id="main" class="container collection-main">
+    <a id="collection-back" class="collection-back" href="/">← Takaisin hakuun</a>
+    <nav id="collection-breadcrumb" class="collection-breadcrumb" aria-label="Murupolku"></nav>
+    <div class="collection-heading"><div><p class="collection-eyebrow">Tuoteryhmä</p><h1 id="collection-title">Ladataan tuoteryhmää…</h1></div><button type="button" id="collection-search" class="solid-button" hidden>Hae tuotteita tästä ryhmästä</button></div>
+    <nav id="collection-related" class="collection-related" aria-label="Muut tuoteryhmät"></nav>
+    <p class="collection-note">Selaa valikoimaa. Haussa voit tarkistaa tuotteiden hinnan ja saatavuuden toimituspäivällesi.</p>
+    <label class="collection-find">Etsi tästä tuoteryhmästä<input id="collection-find" type="search" placeholder="Tuotteen nimi tai tuotenumero" autocomplete="off"></label>
+    <p id="collection-count" role="status"></p>
+    <ul id="collection-products" class="collection-products" aria-label="Tuoteryhmän tuotteet"></ul>
+    <button id="collection-more" type="button" class="collection-more" hidden>Näytä lisää tuotteita</button>
+    <p id="collection-error" role="alert" hidden></p>
+  </main>
+  <script src="/storefront-cart-store.js"></script>
+  <script src="/aimo-ask.js"></script>
+  <script type="module" src="/collection.js"></script>
+</body>
+</html>
