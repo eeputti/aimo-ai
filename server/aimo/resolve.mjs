@@ -16,11 +16,13 @@ const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoos
 
 function filterSteps(item) {
   const type = PRODUCT_TYPES.find((t) => t.id === item.productType);
-  const terms = (item.productTerm || '').split(' ').filter(Boolean);
+  // Hyllyhaku ("kana" → raaka broileri): nimen pitää sisältää jokin hyllyn nimiosista, itse hakusanaa ei vaadita nimeen.
+  const terms = item.shelf ? [] : (item.productTerm || '').split(' ').filter(Boolean);
   const steps = [];
   if (type) steps.push(['productType', (p) => type.categories.includes(p.category) && !(type.exclude && type.exclude.test(p.name))]);
   else if (item.categories?.length) steps.push(['category', (p) => item.categories.includes(p.category)]);
   else if (item.category) steps.push(['category', (p) => p.category === item.category]);
+  if (item.shelf) steps.push(['shelf', (p) => { const n = p.name.toLowerCase(); return item.shelf.names.some((x) => n.includes(x)); }]);
   for (const c of item.claims) steps.push([`claim:${c}`, (p) => p.labels?.includes(c)]);
   for (const a of item.excludeAllergens) steps.push([`excludeAllergen:${a}`, (p) => p.hasAllergenData && !p.contains.includes(a) && !(p.mayContain || []).includes(a)]);
   if (item.countryOfOrigin) steps.push(['countryOfOrigin', (p) => p.country === item.countryOfOrigin]);
@@ -44,7 +46,7 @@ export function resolveItem(item, opts = {}) {
   const limit = opts.limit ?? 40;
   const { steps, type, terms } = filterSteps(item);
   let pool;
-  if (type || item.category) pool = cat.products;
+  if (type || item.category || item.shelf) pool = cat.products;
   else {
     // Tuntematon ryhmä: nimihaku koko katalogista. Jos sana löytyy nimestä kokonaisena, osasanaosumat jätetään pois:
     // muuten halvin ehdokas voi olla "pas|tilli", kun haettiin tilliä.
@@ -74,7 +76,8 @@ export function resolveItem(item, opts = {}) {
     if (narrowed.length) { pool = narrowed; funnel.push({ filter: 'nameTerms', remaining: pool.length }); }
   }
   // järjestys: tuote, jolla on toimitusvarmuusdataa (= oikeasti tilattu) ja lyhyt nimi (= perustuote) ensin
-  const ranked = [...pool].sort((a, b) => (b.reliability != null) - (a.reliability != null) || a.name.length - b.name.length);
+  const shelfRank = (p) => (item.shelf ? item.categories.indexOf(p.category) : 0); // hyllyhaussa tuore raaka-aine ennen pakastetta ja säilykettä
+  const ranked = [...pool].sort((a, b) => shelfRank(a) - shelfRank(b) || (b.reliability != null) - (a.reliability != null) || a.name.length - b.name.length);
   const status = relaxed || !ranked.length ? 'no_match' : 'ok';
   return {
     status,

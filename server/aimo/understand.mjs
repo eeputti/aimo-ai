@@ -7,7 +7,8 @@
 //  - jokainen kenttä on tyypitetty ja validoitu (määrä, yksikkö, päivä), kelpaamaton arvo hylätään eikä arvata
 //  - oletukset kirjataan näkyviin, ihmiseltä ei kysytä avoimia kysymyksiä
 import { normalize } from '../catalog.mjs';
-import { conceptOf, brandAt, variants, loadLexicon } from './lexicon.mjs';
+import { conceptOf, brandAt, variants, loadLexicon, recognize } from './lexicon.mjs';
+import { synonymOf, learnedOf, SHELVES } from './synonyms.mjs';
 
 // ---------- Portin kuratoidut tuotetyypit ja kello (jos portti on käytössä), muuten omat varakopiot ----------
 let PRODUCT_TYPES = [
@@ -51,8 +52,8 @@ const ATTRIBUTES = [
   ['fat', 'semi-skimmed', /\b(kevytmai\w+|kevyt\w*|semi[- ]?skimmed|low[- ]fat|light)\b/, /kevyt|semi/i],
   ['fat', 'whole', /\b(täysmai\w+|täys\w*|whole|full[- ]fat|punai\w+)\b/, /täys|whole/i],
   ['treatment', 'uht', /\b(uht|iskukuumennet\w+|long[- ]life)\b/, /uht/i],
-  ['state', 'frozen', /\b(pakaste\w*|pakastet\w+|frozen)\b/, null],
-  ['state', 'fresh', /\b(tuore\w*|fresh)\b/, /tuore|fresh/i],
+  ['state', 'frozen', /\b(pakaste|pakasteet|pakasteita|pakastetta|pakasteena|pakastet\w+|frozen)\b/, null],
+  ['state', 'fresh', /\b(tuore|tuoreet|tuoretta|tuoreita|tuoreena|fresh)\b/, /tuore|fresh/i],
 ];
 
 const WEEKDAYS = [ // 0 = sunnuntai
@@ -143,6 +144,36 @@ function productTypeFor(word) {
   return null;
 }
 
+const STATE_PREFIX = { pakaste: 'frozen', tuore: 'fresh' };
+/**
+ * Kirjoitettu sana → sanaston sana. Järjestys: puhekielen synonyymi, sanasto sellaisenaan, opittu sana,
+ * puhekielen muoto ja astevaihtelu, yhdyssanan osat, kirjoitusvirhe. Palauttaa myös tiedon siitä, miten sana löytyi.
+ */
+function canonical(word, lang) {
+  const syn = synonymOf(word);
+  if (syn) return { w: syn.word, via: 'synonym' };
+  if (conceptOf(word) || variants(word).some(productTypeFor)) return { w: word, via: 'exact' };
+  const mem = learnedOf(word);
+  if (mem && (conceptOf(mem.word) || SHELVES[mem.word])) return { w: mem.word, via: 'learned' };
+  if (word.length < 4) return { w: word, via: null };
+  // "pakastemustikka", "tuoremehu": tila on attribuutti, loppuosa on tuote
+  const pre = word.match(/^(pakaste|tuore)([a-zåäö]{4,})$/);
+  if (pre) { const rest = recognize(pre[2]); if (rest && rest.via !== 'fuzzy') return { w: rest.word, via: 'exact', state: STATE_PREFIX[pre[1]] }; }
+  const r = recognize(word);
+  if (r) return { w: r.word, via: r.via }; // myös kirjoitusvirhe koko sanassa voittaa pilkkomisen: mustikkajugurtti → mustikkajogurtti
+  // Tuntematon yhdyssana: pisin loppuosa, jonka sanasto tuntee, on pääsana ("jäävuorisalaatti" → salaatti, alkuosa rajaa nimeä).
+  if (lang === 'fi' && word.length >= 8) {
+    for (let k = 3; k <= word.length - 5; k++) {
+      const tail = recognize(word.slice(k));
+      if (!tail || tail.via === 'fuzzy' || tail.concept.total < 3) continue;
+      const head = recognize(word.slice(0, k));
+      const known = head && head.via !== 'fuzzy';
+      return { w: tail.word, via: 'split', head: known ? head.word : null, dropped: known ? null : word.slice(0, k) };
+    }
+  }
+  return { w: word, via: null };
+}
+
 function parseItem(raw, lang) {
   let text = ` ${raw} `;
   const item = { raw: raw.trim(), productTerm: null, productType: null, category: null, categories: undefined, categoryLabel: null, claims: [], excludeAllergens: [], brand: null, countryOfOrigin: null, attributes: {}, quantity: null };
@@ -189,9 +220,22 @@ function parseItem(raw, lang) {
   const words = tokens.filter((t) => !FILLER.has(t) && !/^\d+(\.\d+)?$/.test(t) && t !== 'x');
 
   // tuotesana: viimeinen sana, jonka Aimon sanasto tuntee, on pääsana ("laktoositonta kevytmaitoa", "whipping cream")
-  const known = words.map((w) => {
+  const canon = [];
+  for (const orig of words) {
+    const c = canonical(orig, lang);
+    if (c.state && !item.attributes.state) item.attributes.state = c.state;
+    if (c.head) canon.push(c.head);
+    canon.push(c.w);
+    // Näkyvä korjaus: käyttäjä näkee, millä sanalla haettiin, kun se ei ole se mitä hän kirjoitti.
+    if (['synonym', 'learned', 'fuzzy', 'split'].includes(c.via) && !variants(orig).includes(c.w)) {
+      notes.push({ code: 'WORD_CORRECTED', via: c.via, from: orig, to: c.w, fi: c.dropped ? `"${orig}": haetaan sanalla "${c.w}", osaa "${c.dropped}" ei tunnistettu` : `"${orig}": haetaan sanalla "${c.head ? `${c.head} ${c.w}` : c.w}"`, en: `"${orig}": searching with "${c.w}"` });
+    }
+  }
+  const known = canon.map((w) => {
     const concept = conceptOf(w);
     let type = variants(w).map(productTypeFor).find(Boolean) || null;
+    // "kahvimaito" päättyy sanaan "maito", mutta tuotetyyppi sulkee sen itse pois: haetaan sanalla, ei tyypillä.
+    if (type && type.exclude?.test(w) && !variants(w).some((v) => type.keywords.includes(v))) type = null;
     // "kookosmaito" päättyy sanaan "maito", mutta on sanaston mukaan toisella hyllyllä: se ei ole juomamaitoa.
     if (type && concept && !variants(w).some((v) => type.keywords.includes(v)) && !type.categories.includes(concept.top[0].category)) type = null;
     return { w, concept, type };
@@ -205,7 +249,10 @@ function parseItem(raw, lang) {
     else if (head.concept.top[0].share >= 0.3) item.category = head.concept.top[0].category;
     if (!head.type && head.concept.top[0].share < 0.5) item.categories = head.concept.top.filter((t) => t.share >= 0.12).map((t) => t.category); // sana elää usealla hyllyllä: haetaan kaikista
     item.categoryLabel = item.category ? loadLexicon().categories.get(item.category)?.label || null : null;
-    if (!head.type && head.concept.top[0].share < 0.5 && head.concept.top[1]) notes.push({ code: 'CATEGORY_AMBIGUOUS', fi: `"${head.concept.word}" esiintyy useassa tuoteryhmässä (${head.concept.top.slice(0, 3).map((t) => t.label).join(' / ')}): haetaan kaikista`, en: `"${head.concept.word}" appears in several product groups: searching all of them` });
+    // Raaka-aineen oma hylly: "kana" yksin tarkoittaa raakaa broileria, ei kanatäytteistä eväsleipää.
+    const shelf = heads.length === 1 && !head.type ? SHELVES[head.concept?.word] || SHELVES[head.w] : null;
+    if (shelf) { item.shelf = { names: shelf.names }; item.category = null; item.categories = shelf.categories; item.categoryLabel = shelf.label; }
+    if (!shelf && !head.type && head.concept.top[0].share < 0.5 && head.concept.top[1]) notes.push({ code: 'CATEGORY_AMBIGUOUS', fi: `"${head.concept.word}" esiintyy useassa tuoteryhmässä (${head.concept.top.slice(0, 3).map((t) => t.label).join(' / ')}): haetaan kaikista`, en: `"${head.concept.word}" appears in several product groups: searching all of them` });
   }
   if (!item.quantity) notes.push({ code: 'QUANTITY_MISSING', fi: 'Määrää ei annettu', en: 'No quantity given' });
   return { item, notes, unparsed };
@@ -263,6 +310,7 @@ export function understand(text, opts = {}) {
     if (items.some((it) => !it.category && !it.categories?.length && !it.productType)) confidence -= 0.3;
     if (intent === 'order' && items.some((it) => !it.quantity)) confidence -= 0.15;
     if (assumptions.some((a) => a.code === 'CATEGORY_AMBIGUOUS')) confidence -= 0.1;
+    confidence -= 0.1 * assumptions.filter((a) => a.code === 'WORD_CORRECTED' && (a.via === 'fuzzy' || a.via === 'split')).length; // arvattu sana: näytetään, mutta ei täydellä varmuudella
   }
   return {
     text: original, language, intent, items, deliveryDate: d.date, deliveryPhrase: d.phrase?.trim() || null,

@@ -16,8 +16,9 @@ export const REQUEST_SCHEMA = {
     items: {
       type: 'array',
       items: {
-        type: 'object', additionalProperties: false, required: ['productTerm', 'claims', 'quantity'],
+        type: 'object', additionalProperties: false, required: ['productTerm', 'heard', 'claims', 'quantity'],
         properties: {
+          heard: { type: 'string', description: 'Sana täsmälleen sellaisena kuin ostaja sen kirjoitti, esim. "pottuu", "maetoo", "jätskii"' },
           productTerm: { type: 'string', description: 'Tuotteen pääsana suomeksi perusmuodossa, esim. "maito", "kuohukerma", "broilerin rintafilee"' },
           claims: { type: 'array', items: { type: 'string', enum: CLAIM_CODES } },
           excludeAllergens: { type: 'array', items: { type: 'string' } },
@@ -55,6 +56,7 @@ Yleisimmät merkit: ${topBrands}
 - Määrä ostajan omassa yksikössä: L (litrat), KG (kilot) tai PCS (kappaleet, laatikot, tölkit, pussit). Muunna dl, cl, ml ja g. Älä muunna litroja laatikoiksi: sen tekee rajapinta tuotedatasta.
 - Jos määrää ei sanota, quantity on null. Älä arvaa määrää.
 - Päivä: laske suhteelliset päivät ("maanantaiksi", "tomorrow") käyttäjän viestin mukana annetusta nykyhetkestä. Jos päivää ei sanota, deliveryDate on null.
+- Ostajat kirjoittavat puhekieltä, murretta ja kirjoitusvirheitä ("pottuu", "maetoo", "jätskii", "limsaa"). Päättele tarkoitettu tuote ja anna productTerm valikoiman sanalla ("peruna", "maito", "jäätelö", "virvoitusjuoma"). Kenttään heard tulee ostajan oma sana muuttamattomana.
 - Älä lisää rivejä, joita viestissä ei pyydetä. Älä keksi merkkiä.
 
 # Kulku
@@ -100,6 +102,7 @@ export async function interpretWithModel(text, now) {
     const quantity = it.quantity && it.quantity.value > 0 ? it.quantity : null;
     const brand = it.brand && lex.brands.get(it.brand.toLowerCase()) ? lex.brands.get(it.brand.toLowerCase()).name : null; // merkki vain jos se on katalogissa
     items.push({
+      heard: String(it.heard || '').toLowerCase().trim(),
       raw: it.productTerm, productTerm: concepts.map((c) => c.word).join(' '), productType: null,
       category: head.top[0].share >= 0.3 ? head.top[0].category : null,
       categories: head.top[0].share < 0.5 ? head.top.filter((t) => t.share >= 0.12).map((t) => t.category) : undefined,

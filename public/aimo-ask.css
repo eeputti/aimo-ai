@@ -149,3 +149,8 @@ html.ask-open { overflow: hidden; }
   .ask-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ask-tiles .ask-tile:nth-child(3) { display: none; }
 }
+
+/* Kielimalli selvittää tuntematonta sanaa (kirjoitustauon jälkeen) */
+.ask-thinking { margin: 0 0 10px; color: #5b6770; font-size: 14px; animation: ask-pulse 1.1s ease-in-out infinite; }
+@keyframes ask-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .ask-thinking { animation: none; } }

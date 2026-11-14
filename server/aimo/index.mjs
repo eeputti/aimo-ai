@@ -8,9 +8,20 @@ import { toGateway } from './resolve.mjs';
 import { interpretWithModel, warm, modelStats, domainCard } from './model.mjs';
 import { loadLexicon } from './lexicon.mjs';
 import { detectRecipe, expandRecipe } from './recipes.mjs';
+import { learn } from './synonyms.mjs';
 import { loadCatalog } from '../catalog.mjs';
 
 export const LLM_THRESHOLD = 0.6;
+// Sama teksti ei maksa toista mallikutsua: tulos (myös tyhjä) muistetaan prosessin ajan.
+const modelMemo = new Map();
+async function askModelOnce(text, now) {
+  const key = text.trim().toLowerCase();
+  if (modelMemo.has(key)) return modelMemo.get(key);
+  const m = await interpretWithModel(text, now);
+  if (modelMemo.size > 500) modelMemo.delete(modelMemo.keys().next().value);
+  modelMemo.set(key, m);
+  return m;
+}
 const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu', MARINE_STEWARDSHIP_COUNCIL_LABEL: 'MSC', FAIR_TRADE_MARK: 'Reilu kauppa' };
 
@@ -66,7 +77,10 @@ export async function interpret(text, opts = {}) {
   }
   if (!recipe && req.confidence < LLM_THRESHOLD && opts.llm !== false) {
     try {
-      const m = await interpretWithModel(text, opts.now || new Date());
+      const m = await askModelOnce(text, opts.now || new Date());
+      // Oppiva muisti: sana, jota säännöt eivät tunteneet ja jonka malli tulkitsi yhdeksi sanaston sanaksi, tallennetaan.
+      // Seuraavalla kerralla sama sana tunnistuu säännöillä ilman mallikutsua.
+      if (m) for (const it of m.items) if (it.heard && req.unparsed.includes(it.heard) && !it.productTerm.includes(' ')) learn(it.heard, it.productTerm);
       if (m && m.items.length) req = { ...req, intent: m.intent === 'other' ? req.intent : m.intent, items: m.items, deliveryDate: m.deliveryDate || req.deliveryDate, unparsed: m.unparsed, assumptions: req.assumptions.filter((a) => a.item == null && a.code !== 'UNKNOWN_WORD'), confidence: m.unparsed.length ? 0.7 : 0.9, via: m.via, modelMs: m.modelMs };
     } catch (err) { modelError = String(err.message || err).slice(0, 160); }
   }

@@ -177,6 +177,7 @@
         <button type="button" class="ask-go"${items.length ? '' : ' disabled'}>${I.truck}Tilaa agentin kautta</button>
       </div>`;
   }
+  let deepTimer;
   async function search(speech = false) {
     if (override && q.value.trim() !== override.label) { override = null; picked = null; paintIdeas(); }
     const text = sent(); const mine = ++seq;
@@ -190,6 +191,16 @@
     if (mine !== seq || root.hidden) return;
     render(r);
     if (!r.error) loadLive(r.understood?.deliveryDate || today(), mine);
+    // Säännöt eivät tunnistaneet sanaa: kirjoitustauon jälkeen kysytään kielimallilta. Vastaus tallentuu palvelimen
+    // muistiin, joten sama sana tunnistuu seuraavalla kerralla heti.
+    clearTimeout(deepTimer);
+    if (!speech && !r.error && (r.trace?.confidence ?? 1) < 0.6 && r.understood?.unparsed?.some((w) => w.length > 2)) {
+      deepTimer = setTimeout(() => {
+        if (mine !== seq || root.hidden || sent() !== text) return;
+        main.insertAdjacentHTML('afterbegin', '<p class="ask-thinking">Selvitän, mitä tarkoitit</p>');
+        search(true);
+      }, 600);
+    }
     return !r.error;
   }
   const setText = (text) => { q.value = text; q.focus({ preventScroll: true }); clearTimeout(timer); search(); };

@@ -6,6 +6,7 @@ data/packs.json
 data/img/
 data/image-index*.json
 data/*.db
+data/aimo-learned.json
 data/*.db-*
 .DS_Store
 .env.*

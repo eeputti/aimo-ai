@@ -15,6 +15,7 @@
     "demo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/demo-buyer.mjs",
     "aimo": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/aimo.mjs",
     "aimo:eval": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/aimo-eval.mjs",
+    "aimo:eval:spoken": "node --disable-warning=ExperimentalWarning scripts/aimo-spoken-eval.mjs",
     "eval": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/eval.mjs"
   },
   "engines": {

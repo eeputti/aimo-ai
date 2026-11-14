@@ -99,9 +99,11 @@ export function loadLexicon() {
     categories.set(c, { id: c, size, label: words.slice(0, 2).map((x) => x.w).join(', ') || `kategoria ${c}`, words: words.map((x) => x.w) });
   }
 
-  built = { concepts, categories, brands, brandMaxWords, stats: { products: products.length, concepts: concepts.size, categories: categories.size, brands: brands.size, ms: Math.round(performance.now() - t0) } };
+  built = { concepts, whole, categories, brands, brandMaxWords, stats: { products: products.length, concepts: concepts.size, categories: categories.size, brands: brands.size, ms: Math.round(performance.now() - t0) } };
   return built;
 }
+
+const shape = (word, e, categories) => ({ word, total: e.total, top: [...e.cats].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([category, n]) => ({ category, label: categories.get(category)?.label, n, share: +(n / e.total).toFixed(2) })) });
 
 /**
  * Sana (missä tahansa suomen taivutusmuodossa tai englanniksi) → Aimon kategoriat, todennäköisin ensin.
@@ -114,9 +116,103 @@ export function conceptOf(token) {
     const e = concepts.get(v);
     if (e && (!hit || e.total > hit.e.total)) hit = { word: v, e };
   }
-  if (!hit) return null;
-  const top = [...hit.e.cats].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([category, n]) => ({ category, label: categories.get(category)?.label, n, share: +(n / hit.e.total).toFixed(2) }));
-  return { word: hit.word, total: hit.e.total, top };
+  return hit ? shape(hit.word, hit.e, categories) : null;
+}
+
+// ---------- Puhekieli, astevaihtelu ja kirjoitusvirheet ----------
+// Jokainen ehdokas hyväksytään vain, jos se löytyy Aimon sanastosta. Säännöt saavat siis tuottaa myös vääriä muotoja:
+// sanasto karsii ne. Mitään tuotetta tai sanaa ei synny tyhjästä.
+const WEAK_TO_STRONG = { ng: 'nk', mm: 'mp', nn: 'nt', ll: 'lt', rr: 'rt', d: 't', v: 'p', k: 'kk', p: 'pp', t: 'tt' };
+/** Heikko aste takaisin vahvaksi: maido → maito, jogurti → jogurtti, leivä → leipä, mustika → mustikka. */
+function strengthen(stem) {
+  const m = stem.match(/^(.*?)(ng|mm|nn|ll|rr|d|v|k|p|t)([aeiouyäö]+)$/);
+  if (!m || (m[2].length === 1 && m[1].endsWith(m[2]))) return [];
+  return [m[1] + WEAK_TO_STRONG[m[2]] + m[3]];
+}
+/** Puhekielen ja taivutuksen muodot, joita kevyt stemmaus ei kata: maitoo, lohee, kananmunii, perunoit, maidon, jogurtit. */
+export function spoken(token) {
+  const out = new Set();
+  const add = (v) => { if (v.length >= 3 && v !== token) out.add(v); };
+  const bases = new Set([token, ...stems(token)]);
+  for (const b of bases) {
+    const m = b.match(/^(.+?)([aeiouyäö])\2$/); // pitkä loppuvokaali: maitoo → maito
+    if (m) {
+      add(m[1] + m[2]);
+      if (m[2] === 'e') add(`${m[1]}i`); // lohee → lohi
+      if (m[2] === 'i') { add(`${m[1]}a`); add(`${m[1]}ä`); } // kananmunii → kananmuna
+    }
+    if (/[oö]it$/.test(b)) { add(b.replace(/oit$/, 'a')); add(b.replace(/öit$/, 'ä')); } // perunoit → peruna
+    if (/ei$/.test(b)) add(b.replace(/ei$/, 'i')); // tomaattei → tomaatti
+  }
+  for (const b of [...bases, ...out]) for (const v of strengthen(b)) add(v);
+  return [...out];
+}
+
+/** Damerau–Levenshtein (vierekkäisten kirjainten vaihto on yksi virhe). Palauttaa max + 1, jos raja ylittyy. */
+function editDistance(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev2 = null; let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]; let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (prev2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+      cur.push(v); if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > max) return max + 1;
+    prev2 = prev; prev = cur;
+  }
+  return prev[b.length];
+}
+
+const recognized = new Map();
+/**
+ * Tunnistaa sanan, jota sanasto ei löydä sellaisenaan. Tasot järjestyksessä, ensimmäinen osuma voittaa:
+ *  exact  = tavallinen taivutus (conceptOf)
+ *  spoken = puhekielen muoto tai astevaihtelu (maitoo, maidon)
+ *  tail   = sana elää vain yhdyssanojen loppuosana (jauho: vehnäjauho, ruisjauho)
+ *  fuzzy  = kirjoitusvirhe, enintään 1 merkin ero (2, kun sana on vähintään 8 merkkiä): maetoo, jugurtti
+ * @returns {{word: string, concept: object, via: 'exact'|'spoken'|'tail'|'fuzzy', distance?: number} | null}
+ */
+export function recognize(token) {
+  if (recognized.has(token)) return recognized.get(token);
+  const lex = loadLexicon();
+  const { concepts, categories, whole } = lex;
+  const done = (r) => { recognized.set(token, r); return r; };
+  const exact = conceptOf(token);
+  if (exact) return done({ word: exact.word, concept: exact, via: 'exact' });
+  if (token.length < 4 || /\d/.test(token)) return done(null);
+
+  const forms = spoken(token);
+  let best = null;
+  for (const v of forms) { const e = concepts.get(v); if (e && (!best || e.total > best.e.total)) best = { v, e }; }
+  if (best) return done({ word: best.v, concept: shape(best.v, best.e, categories), via: 'spoken' });
+
+  // Yhdyssanan loppuosa: "jauho" ja "muro" eivät ole yksinään minkään tuotteen nimessä tarpeeksi usein.
+  for (const base of [token, ...forms, ...stems(token)].filter((v) => v.length >= 4)) {
+    const e = { total: 0, cats: new Map() };
+    for (const [w, x] of whole) if (w.length > base.length && (w.endsWith(base) || w.endsWith(`${base}t`))) { e.total += x.total; for (const [c, n] of x.cats) e.cats.set(c, (e.cats.get(c) || 0) + n); }
+    if (e.total >= 3) { concepts.set(base, e); return done({ word: base, concept: shape(base, e, categories), via: 'tail' }); }
+  }
+
+  // Kirjoitusvirhe: lähin sanaston sana. Ensimmäisen kirjaimen pitää täsmätä, ja ehdokkaan pitää olla oikea tuotesana
+  // (vähintään 3 tuotetta), jotta harvinainen sana ei kaappaa virhettä.
+  lex.fuzzyKeys ||= [...concepts].filter(([w, e]) => w.length >= 4 && e.total >= 3 && !/\d/.test(w)).map(([w, e]) => [w, e.total]);
+  const tries = [...new Set([token, ...forms, ...stems(token)])].filter((v) => v.length >= 4);
+  let hit = null;
+  for (const form of tries) {
+    const max = form.length >= 8 ? 2 : 1;
+    for (const [w, total] of lex.fuzzyKeys) {
+      if (w[0] !== form[0]) continue;
+      const d = editDistance(form, w, max);
+      if (d > max) continue;
+      const better = !hit || d < hit.d || (d === hit.d && (form === token) > hit.own) || (d === hit.d && (form === token) === hit.own && total > hit.total);
+      if (better) hit = { w, d, total, own: form === token };
+    }
+  }
+  if (hit) return done({ word: hit.w, concept: shape(hit.w, concepts.get(hit.w), categories), via: 'fuzzy', distance: hit.d });
+  return done(null);
 }
 
 /** Pisin merkkiosuma sanajonon alusta. @returns {{name: string, key: string, words: number} | null} */

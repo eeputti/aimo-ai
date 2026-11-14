@@ -2,6 +2,28 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — haku ymmärtää puhekielen, kirjoitusvirheet ja slangin (Claude Code)
+
+**Käyttäjän pyyntö ja päätökset:** Eelis kysyi, onko haku oikeasti fiksu ("maitoo", "maetoo", "jugurtti"). Mittaus: noin 125 yhden sanan hausta noin 30 palautti tyhjää ja noin 10 meni väärälle hyllylle. Päätökset: omaa hakumallia ei kouluteta (ei hakulokeja, deadline). Haku ei kulje MCP-palvelimen läpi, koska siinä ei ole kieliymmärrystä. Kielimalli on varalla vain, kun säännöt eivät tunnista sanaa. Laajaa testisettiä ei tehty, vain pikalista.
+
+- **Tunnistustasot** (`server/aimo/lexicon.mjs`, `recognize`): tavallinen taivutus, puhekielen muoto ja astevaihtelu (maitoo, lohee, kananmunii, perunoit, maidon, jogurtit, leivän), yhdyssanan loppuosa (jauho, muro) ja kirjoitusvirhe (Damerau–Levenshtein, 1 merkki, 2 kun sana on vähintään 8 merkkiä, ensimmäisen kirjaimen pitää täsmätä). Jokainen ehdokas hyväksytään vain, jos se on sanastossa.
+- **Synonyymit ja hyllyt** (uusi `server/aimo/synonyms.mjs`): käsin ylläpidetty taulu (pottu, bansku, jätski, limu, limsa, kalja, kauramaito, jugurtti ym.) ja `SHELVES`: kana, broileri, lohi, nauta, porsas, kurkku, banaani ja peruna haetaan raaka-aineen omista tuoteryhmistä, kun sana on pyynnön ainoa tuotesana. Tuore hylly on ennen pakastetta ja säilykettä (`server/aimo/resolve.mjs`).
+- **Oppiva muisti:** kun kielimalli tulkitsee sanan, jota säännöt eivät tunteneet, pari tallennetaan tiedostoon `data/aimo-learned.json` (ei gitissä, polun voi vaihtaa muuttujalla `AIMO_LEARNED`). Sama sana tunnistuu sen jälkeen säännöillä. Mallin skeemassa on uusi kenttä `heard` (ostajan oma sana), ja sama teksti ei maksa toista mallikutsua saman prosessin aikana (`server/aimo/model.mjs`, `server/aimo/index.mjs`).
+- **Paneeli** (`public/aimo-ask.js`): jos säännöt jättävät sanan tunnistamatta, paneeli kysyy mallilta 600 ms kirjoitustauon jälkeen ja näyttää tekstin "Selvitän, mitä tarkoitit". Korjattu sana näkyy huomiona: "maetoo": haetaan sanalla "maito".
+- **Muut korjaukset** (`server/aimo/understand.mjs`): "kahvimaito" ei ole enää juomamaitoa (tuotetyypin oma poissulku), "pakastemustikka" ja "tuoremehu" pilkotaan tilaksi ja tuotteeksi, eikä attribuutti "tuore" tai "pakaste" enää niele koko yhdyssanaa. Tuntematon yhdyssana haetaan pisimmällä tunnetulla loppuosalla.
+- Uusi pikalista `npm run aimo:eval:spoken` (54 hakua, ei mallikutsuja, oppiva muisti pois päältä).
+
+**Tarkistukset:** `npm run aimo:eval:spoken` 54/54, `npm run aimo:eval` 26/26, `npm test` 34/34, `node --check`. Sääntöjen vasteaika: tuttu sana alle 1 ms, kylmä kirjoitusvirhe 4–16 ms. Oikea malli (`claude-haiku-5-5`), väliaikainen muistitiedosto: "suklaajätskii 10 l" 3,8 s mallilta ja toisella kerralla 4 ms muistista, "nötköttiä 5 kg" 2,4 s. Selaimessa eristetyllä palvelimella portissa 4766 (omat kannat, live-mock-API): "10 l maetoo", "pottuu 5 kg", "kanaa 10 kg" ja "10 l maetoo ja jugurttii 5 kg" näyttävät oikeat tuotteet hintoineen ja korjaushuomiot, "nötköttiä 5 kg" täydentyy mallilta tauon jälkeen, ei konsolivirheitä.
+
+**Keskeneräistä ja huomiot:**
+
+- Portin 4747 demopalvelinta ei käynnistetty uudelleen: palvelinpuolen muutokset tulevat voimaan vasta uudelleenkäynnistyksessä.
+- Toisen työvaiheen commitoimaton rajaus (`RAW_INGREDIENT`, `resolve.mjs`) näyttää sanalla "mustikka" vain marjat. Eelis sanoi tässä keskustelussa, että mustikkajogurttiakin saa tarjota. Rajaukseen ei koskettu; päätettävä, näytetäänkö makutuotteet marjojen jälkeen.
+- Malli vastaa 2–4 sekunnissa, joten tuntematon slangisana näkyy ensimmäisellä kerralla viiveellä. Demon haut kannattaa ajaa kerran etukäteen, jolloin ne ovat muistissa.
+- Mallin tulkinta voi kadottaa määritteen ("suklaajätskii" → jäätelö) tai valita kapean sanan ("nötkötti" → naudanliha, 4 tuotetta). Opittu pari jää muistiin, kunnes rivi poistetaan tiedostosta.
+- "luomupottu" jää tunnistamatta (väittämä "luomu" nielee koko sanan). Lohen kärjessä on kirjolohi ennen lohta. Paneelin tekstiä "Selvitän, mitä tarkoitit" ei nähty ruudulla, koska selainpaneeli oli piilossa; DOM-sisältö tarkistettiin.
+- Commitissa on tiedostoista `resolve.mjs`, `server/aimo/index.mjs`, `aimo-ask.js`, `aimo-ask.css` ja tästä lokista vain tämän työvaiheen kohdat. Muiden työvaiheiden commitoimattomat muutokset jäivät työpuuhun.
+
 ## 14.11.2026 — ostoslistan sanelu hakukenttään (Codex)
 
 **Käyttäjän päätös:** hakukentän oikeaan reunaan mikrofoni, josta nykyinen hakupaneeli avautuu kuunteluun. Pieni sininen/petrolinvärinen pallo reagoi ääneen, puhe näkyy tekstinä ja Valmis näyttää tavallisen tuotetulkinnan. Tuotteet, määrät ja toimituspäivä tarkistetaan ennen nykyisiä koritoimintoja.
