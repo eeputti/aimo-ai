@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsApp-tilauskytkennän sovittu yksi restart valmis (Codex)
+
+**Valmis käyttöönotto-osuus:** Clauden `e52b00b` ja `4a0b358` löytyivät päivittyneestä Gitistä ja raportti luettiin. Kytkennän eristetyt testit 6/6 läpi. `.env.whatsapp.ordering-pending` aktivoitiin `.env.whatsapp`:ksi portilla 4749 (0600), alkuperäiset eristetyt kantapolut ja allekirjoitusavain säilyttäen. Snapshot-worker pysäytettiin ja projektin commitoitu `npm run whatsapp` käynnistettiin kerran. Uusittu Meta-token latautuu `.env`:stä ilman overlay-ohitusta.
+
+**Varmennus:** paikallinen ja julkinen `/healthz` 200 / `ordering-demo`; GET-haaste molempien kautta täsmää. Sama WhatsApp-kanta, jäsen ja aiemmat jonorivit säilyivät, tunneli pysyi samana. WhatsAppin erillinen gateway-kanta oli vielä puuttuva: alustettiin 3 vakiodemo-ostajaa olemassa olevalla seed-funktiolla ilman forcea/nollausta; tilauksia 0. Katalogi on olemassa, luonnos-/tarjousruntime alustuu ensimmäisellä tilausvuorolla. Verkkokaupan palvelimet/kannat säilyivät koskemattomina.
+
+**Yhä avoin:** Meta 131005 estää lähettämisen myös suorissa vertailukutsuissa; restart ei korjaa tilin käyttöoikeutta. Aitoa puhelinvastausta tai tilausta ei ole varmennettu, PNG-profiilivaihto on kesken. Edellisen lokimerkinnän commit-ilmoituksen odotus on tällä päivityksellä päättynyt. Tarkka jatkotila `docs/parallel/1.md`.
+
 ## 14.11.2026 — WhatsApp-lähetyseston lisärajaus, tilauslogiikka erillään (Codex)
 
 **Uusi näyttö:** 131005 toistuu myös Hello World -pohjalla sekä API-version, appsecret_proofin, vastaanottajamuodon ja eksplisiittisen testitilin valinnan vertailuissa. Meta ei hyväksynyt yhtäkään vertailulähetystä. Tokenin omistajan sovellusrooli on ylläpitäjä, vastaanottaja vastaa vahvistettua numeroa, ja molemmat WhatsApp-oikeudet näkyvät Metassa Ready for testing. Numeron tila CONNECTED/VERIFIED/LIVE, PIN pois päältä. Varsinaista Metan resursoikeus-/tilieston juurisyytä ei vielä väitetä ratkaistuksi. Ei maksutapa- tai rekisteröintimuutoksia.
