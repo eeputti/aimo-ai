@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — WhatsApp-webhook ja messages-tilaus varmennettu (Codex)
+
+**Vaiheet 3–4 valmiit:** oma testivastaanottaja löytyi Metan listalta jo aiemmin vahvistettuna; sitä ei lisätty toista kertaa. Käyttäjä hyväksyi verify tokenin välityksen Cloudflare-testitunnelissa. Julkinen HTTPS-GET palautti oikean haasteen 200:lla. Callback rekisteröitiin Graph API:lla ja luettiin takaisin: oikea osoite, aktiivinen tilaus, `messages` mukana (Metan kenttäversio v27.0). Sovellus tilattiin myös WABA:lle ja takaisinluku vahvisti oman App ID:n. Metan aiempi testisovellustilaus säilytettiin.
+
+**Vaihe 5 odottaa käyttäjää:** ylläpitäjän `npm run whatsapp:member -- invite` ajettu samalla WhatsApp-kannalla, kertakoodi toimitettu käyttäjälle. Käyttäjää pyydetty lähettämään yhdistämisviesti ja `tuki`. Puhelimeen saapuvaa vastausta ei ole vielä varmennettu. Tuotehaun MCP-asetusten puute säilyy; tähän kuljetustestiin ei tarvita mallia tai tuotteiden API-kutsuja.
+
+**Git ja rajat:** palvelimen/tunnelin lokikommitti `a8afd54` yhdistettiin etähaaran riippumattomaan HTML-committiin `7d39b22` tavallisella mergellä `bc404ad`, push ja etäcommit varmennettu. Clauden keskeneräisiä tiedostoja ei muokattu tai sisällytetty omiin committeihin. Vaihe 6 (pyydetty PNG-profiili) ja myöhempi tilauskytkennän restart ovat vielä tekemättä. Dokumenttidiff tarkistetaan ennen committia.
+
 ## 14.11.2026 — WhatsApp-palvelin ja HTTPS-tunneli käynnissä (Codex)
 
 **Varmennettu:** `npm run whatsapp` portissa 4749, commitin `fcd3c71` vain lukeva snapshot, pysyvä projektin `data/whatsapp.db`. Clauden samanaikaisesti muokkaamia moduuleja ei otettu kesken käyttöön. `.env`:n portti, absoluuttinen WhatsApp-kantapolku ja tilausdemon pois päältä pitävä asetus päivitettiin paikallisesti; muut arvot säilyivät. Molemmat verkkokauppapalvelimet ja niiden kannat säilyvät.
