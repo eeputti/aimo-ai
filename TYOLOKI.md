@@ -16,6 +16,8 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 
 **Tarkistukset:** eristetty simuloitu palvelin portissa 4756 (omat testikannat, ei API-avaimia), kuusi testitilausta `/console/demo`-reitillä. `/console/state` palauttaa kentät; selaimessa 1280 px leveydellä merkit näkyvät tuotekorteissa ja tilausriveillä, kortit pysyvät samankorkuisina, ei vaakaylivuotoa. `npm test` 26/26, `node --check` ja `git diff --check` läpi. Keltaista alle 95 %:n merkkiä ei nähty oikealla rivillä (testituotteilla arvo oli 100 % tai puuttui). Hyväksyntänäkymää ja kapeaa näyttöä ei katsottu erikseen.
 
+**Korjaus commitiin `c991ca2`:** `public/gateway.js` lisättiin commitiin kokonaisena, ja siinä oli samaan aikaan toisen työvaiheen keskeneräinen puhelimen seurantanäkymä (`phoneView`, `tk`-alkuiset funktiot). Se osa ei ole tämän työvaiheen työtä eikä sitä ole tarkistettu tässä. Näkymän tyylit ja `approve.html`-muutos ovat yhä commitoimatta, joten GitHubin `main` on hyväksyntänäkymän osalta välitilassa, kunnes se työvaihe tallennetaan. Paikallisesta työpuusta ei kadonnut mitään. Uusi seurantanäkymä piirtää hyväksyntäsivun rivit itse, joten merkit näkyvät vain konsolissa, eivät hyväksyntänäkymässä.
+
 **Huomiot:** palvelinmuutos vaatii käynnissä olevan palvelimen uudelleenkäynnistyksen; ennen sitä tehdyillä tilauksilla ei ole kenttiä tallennettuna. Testissä "ruokakermaa 10 l" valitsi 2,5 dl:n maustetun ruokakerman: sama yleisen haun vika kuin aiemmin kirjattu, ei korjattu. `.claude/launch.json`-tiedostoon lisättiin paikallisesti asetus `aimo-ai-test-4756`, ei tässä commitissa.
 
 ## 14.11.2026 — graafiset ehdotukset tiiviistä ja luotettavasta ostoskorista (Codex)
