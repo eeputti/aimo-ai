@@ -102,6 +102,10 @@ curl -s localhost:4747/v1/products/search -H 'authorization: Bearer demo-nordic-
   -H 'content-type: application/json' -d '{"query":"lactose-free milk"}'
 ```
 
+## Tiimin yhteinen MCP
+
+Claude-, ChatGPT- ja muiden MCP-avustajien projektiviestit, tehtävävaraukset ja yhteinen tilannekuva toimivat erillisessä [Team MCP -palvelussa](services/team-mcp/README.md). Palvelulla on oma OAuth-kirjautuminen, avustajakohtaiset tunnukset, pysyvä SQLite-kanta ja Dockerfile. Se ei tarvitse verkkokaupan tuotekatalogia tai malliavaimia eikä käynnistä muiden avustajien keskusteluja automaattisesti. Käyttöönotto vaatii yhden yhteisen HTTPS-hostingin; sitä ei ole vielä valittu tai julkaistu.
+
 ## WhatsApp-testikanava
 
 Nykyinen Tilausapuri toimii myös WhatsApp Cloud API -kanavan kautta: numeron yhdistäminen kertakäyttökoodilla, tuotehaku ja keskustelumuisti. Tämä testiversio vain hakee tietoja; se ei tee tilauksia tai muuta selaimen koria. Käynnistä erikseen `npm run whatsapp` tai liitä sivuston palvelimeen asetuksella `WHATSAPP_ENABLED=true`. Meta-asetukset, julkinen HTTPS-webhook, henkilön yhdistäminen ja testaus: [WhatsAppin käyttöönotto](docs/whatsapp.md).
