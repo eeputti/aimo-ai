@@ -101,7 +101,7 @@ export async function interpret(text, opts = {}) {
     understood: req,
     recipe: recipe || undefined,
     summary: recipe ? `${recipe.name} × ${recipe.portions} annosta: ${req.items.length} raaka-ainetta${gw.blocked.length ? `, ${gw.blocked.length} ei löydy valikoimasta` : ''}${req.deliveryDate ? `, toimitus ${req.deliveryDate}` : ''}` : summarize(req, gw),
-    cards: gw.resolved.map((r, i) => ({ item: i, status: r.status, reason: r.reason, total: r.total, top: r.candidates.slice(0, 3), list: r.candidates.slice(0, 40), chips: r.chips, funnel: r.funnel })),
+    cards: gw.resolved.map((r, i) => ({ item: i, status: r.status, reason: r.reason, total: r.total, top: r.candidates.slice(0, 3), list: r.candidates.slice(0, Math.min(80, opts.limit || 40)), chips: r.chips, funnel: r.funnel })),
     gateway: { search: gw.resolved.map((r) => r.search), requestQuote: gw.requestQuote, blocked: gw.blocked },
     handoff: needsHuman ? { code: 'NEEDS_HUMAN', fi: 'Pyyntöä ei ymmärretty riittävän varmasti: ohjataan ihmiselle eikä arvata', en: 'Not understood with enough confidence: handed to a human instead of guessing' } : null,
     trace: { via: req.via, confidence: req.confidence, llmCalls: req.via === 'aimo-rules' ? 0 : 1, modelError, ms: +(performance.now() - t0).toFixed(2) },

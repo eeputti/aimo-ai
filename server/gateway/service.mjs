@@ -1,3 +1,4 @@
+import { unitSizeFor } from './quantity.mjs';
 // PORTIN YDIN. Neljä operaatiota samalla logiikalla riippumatta siitä, tuleeko pyyntö REST:nä vai MCP:nä:
 //   search_products → request_quote (allekirjoitettu tarjous) → place_order (confirmed | pending_approval | rejected) → audit trail.
 // Periaatteet: hinta ja saatavuus vain rajatulle joukolle, tuntematon ei ole koskaan "saatavilla", tilausaikaraja valvotaan
@@ -108,19 +109,6 @@ export function searchProducts(buyer, input = {}) {
 export const productTypes = () => PRODUCT_TYPES.map((t) => ({ id: t.id, fi: t.fi, en: t.en, keywords: t.keywords, categories: t.categories, excludes: t.excludes, assumption: 'Kuratoitu käsin tälle demolle: challenge-datassa kategorioilla ei ole nimiä.' }));
 
 // ---------- request_quote ----------
-function unitSizeFor(p, price, unit) {
-  if (unit === 'PCS') return { value: 1, source: 'sales-unit' };
-  const fromPrice = price?.comparison > 0 && price.comparisonUnit === unit ? +(price.net / price.comparison).toFixed(2) : null;
-  const fromData = unit === 'L' ? p.litres : p.kg;
-  // Tuotedata ensin; hinnasta laskettu koko (netto ÷ vertailuhinta) on varmistus ja varakeino.
-  // Jos ne eroavat yli 10 %, luotetaan hintaan: se on sitova live-tieto. Esim. 464076 "voi 4x5 kg": datassa 20 kg / kpl,
-  // mutta 37,33 € ÷ 7,47 €/kg = 5 kg. Datan paino on laatikon (4 kpl), myyntiyksikkö on yksi 5 kg:n pakkaus.
-  if (fromData && fromPrice && Math.abs(fromData - fromPrice) / fromPrice > 0.1) return { value: fromPrice, source: 'comparison-price', check: fromData, mismatch: true };
-  if (fromData) return { value: fromData, source: p.sizeApprox ? 'product-name' : 'product-data', check: fromPrice };
-  if (fromPrice) return { value: fromPrice, source: 'comparison-price' };
-  return null;
-}
-
 function assess(p, quote, need, buyer, deliveryDate) {
   const out = (code, detail = {}) => ({ ok: false, productId: p?.id, name: p?.name, ...reason(code, 'excluded', detail) });
   if (!p) return { ok: false, productId: null, ...reason('UNKNOWN_PRODUCT', 'excluded') };
@@ -132,7 +120,7 @@ function assess(p, quote, need, buyer, deliveryDate) {
   if (avail.status === 'blocked') return out('SALES_BLOCK');
   if (avail.status === 'out') return out('NOT_DELIVERABLE');
   if (cutoffPassed(avail.closingTime)) return out('CUTOFF_PASSED', { closingTime: avail.closingTime, closingLabel: helsinkiLabel(avail.closingTime), logisticModel: avail.model });
-  const size = unitSizeFor(p, price, need.quantity.unit);
+  const size = unitSizeFor(p, price, need.quantity.unit, need.quantity.basis || 'sales');
   if (!size) return out('UNIT_NOT_CONVERTIBLE', { requestedUnit: need.quantity.unit, comparisonUnit: price.comparisonUnit });
   const qty = Math.max(stepOf(p), roundToStep(need.quantity.value / size.value, p, 'up'));
   return {
@@ -226,7 +214,7 @@ async function quoteNeed(buyer, need, ctx, liveQuotes) {
     const first = excluded.find((e) => ['NOT_DELIVERABLE', 'CUTOFF_PASSED', 'SALES_BLOCK'].includes(e.code));
     const original = a ? a.p : first ? cat.get(first.productId) : null;
     if (original) {
-      const size = a ? a.size : unitSizeFor(original, liveQuotes.get(original.id)?.price, need.quantity.unit);
+      const size = a ? a.size : unitSizeFor(original, liveQuotes.get(original.id)?.price, need.quantity.unit, need.quantity.basis || 'sales');
       const wantUnits = a ? a.qty : Math.max(stepOf(original), roundToStep(need.quantity.value / (size?.value || 1), original, 'up'));
       const subs = await findSubstitutes(original, wantUnits, ctx.deliveryDate, rules, { limit: maxOptions + 2 });
       const keep = a ? roundToStep(a.stock, original, 'down') : 0;
@@ -237,7 +225,7 @@ async function quoteNeed(buyer, need, ctx, liveQuotes) {
         if (type && (!type.categories.includes(sp.category) || (type.exclude && type.exclude.test(sp.name)))) continue; // maitojuomaa ei korvata piimällä
         // Ostajan pyytämä väittämä säilyy aina: luomua ei korvata ei-luomulla eikä laktoositonta tavallisella.
         if (['FREE_FROM_LACTOSE', 'FREE_FROM_GLUTEN', 'VEGAN', 'EU_ORGANIC_FARMING'].some((c) => original.labels?.includes(c) && !sp.labels?.includes(c))) continue;
-        const subNeed = { ...need, quantity: { value: Math.max(0.01, need.quantity.value - (a ? keep * a.size.value : 0)), unit: need.quantity.unit } };
+        const subNeed = { ...need, quantity: { ...need.quantity, value: Math.max(0.01, need.quantity.value - (a ? keep * a.size.value : 0)) } };
         const sa = assess(sp, subQuotes.get(o.productId), subNeed, buyer, ctx.deliveryDate);
         if (!sa.ok || (sa.stock != null && sa.stock < sa.qty)) continue;
         const deltaPct = a ? +(((sa.perUnit - a.perUnit) / a.perUnit) * 100).toFixed(1) : o.price.deltaPct;
