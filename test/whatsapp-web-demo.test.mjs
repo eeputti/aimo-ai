@@ -39,6 +39,11 @@ test('browser demo runs the same ordering chat for its own test customer, one tu
   assert.equal(seen.length, 2);
   assert.ok(seen.every((s) => s.phone === WEB_DEMO_PHONE && s.binding === store.member(WEB_DEMO_PHONE).binding && /^web-/.test(s.messageId)));
   assert.notEqual(seen[0].messageId, seen[1].messageId);
+  const logo = await fetch(`${base}/demo/logo.png`);
+  assert.equal(logo.status, 200);
+  assert.equal(logo.headers.get('content-type'), 'image/png');
+  assert.deepEqual([...new Uint8Array(await logo.arrayBuffer()).slice(0, 4)], [0x89, 0x50, 0x4e, 0x47]);
+  assert.equal((await fetch(`${base}/demo/logo.png`, { headers: { 'x-forwarded-for': '203.0.113.9' } })).status, 403);
   assert.equal((await post('')).status, 400);
   assert.equal((await post('x'.repeat(4001))).status, 400);
 });

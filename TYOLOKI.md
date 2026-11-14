@@ -2,6 +2,11 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — Clauden varademopäivitys ja palveluinventaario yhdistetty (Codex, Git-kokoaja)
+
+- Inventaarion rajattu commit `5a472a2` valmistui samalla kun GitHubiin tulivat aleksi-clauden `630b32c` ja lokin muotoilukorjaus `ecf9b54`. Muutokset yhdistettiin merge-commitilla. Molemmat uudet työlokimerkinnät, inventaarioraportti ja Clauden kaikki neljä lähde-/testi-/raporttitiedostoa säilytettiin; vain yleislokin rinnakkaiset lisäykset vaativat yhdistämisen. Paikallinen `docs/parallel/1.md` ja julkisen WhatsApp-linkin raportit jätettiin koskemattomiksi.
+- Yhdistetyn nykykoodin **koko `npm test` 191/191 läpi, 0 virhettä/ohitusta**. Ensimmäinen sandbox-ajo pysähtyi HTTP-testien EPERM-porttirajoihin; uusinta eristetyt paikalliset testipalvelimet sallivalla ajolla onnistui. Mukana ovat varademon logoreitin localhost-/tunnelirajat, koko tilausketju ja natiivin typing-ilmaisimen testit. Syntaksin/diffin tarkistus läpi. Ei oikeita malli-, Meta- tai Valio-kutsuja, käynnissä olevien palvelinten restarttia tai käyttäjäkantojen muutoksia. Tämä Git-yhdistäminen ei ole nykyisen 4749-snapshotin käyttöönotto.
+
 ## 14.11.2026 — palveluinventaario ja siirtokokeen ehdot koottu alustavalintaa varten (Codex, Cloudflare-julkaisuchatin raportti)
 
 - `Arvioi Cloudflare Workers -vaihtoehto` -chat luovutti valmiin `docs/parallel/cloudflare-backend-plan.md`:n (paikallinen tehtävä `8cd50a1b`). Raportti erottaa katselusivun ja sen koneella ajettavan julkaisijan, WhatsAppin/upotetun kaupan, erillisen storefrontin, tilausytimen, yhteisen Team MCP:n, koordinaattorin sekä mahdollisen ulkoisen ostosapurin. Toteutuksen olemassaolo ja kunkin palvelun todellinen käynti-/varmennustila on erotettu.
@@ -9,6 +14,15 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 - Käyttäjän kysymys erillisen katselusivun tarpeesta kirjattiin selvennyksenä: sivu on valinnainen demo, lopullinen hyväksytty tilaus kuuluu varsinaiseen verkkokauppaan. Kysymys ei ollut poistopyyntö, julkaisijan pysäytyspyyntö tai alustavalinta. Nykyistä sivua, sen dataa tai julkaisijaa ei muutettu tässä raporttivaiheessa.
 - Raportin seuraava testi kattaa valitun alustan eristetyn asennuksen, autentikoinnin, saman tilaus-/audit-ketjun, samanaikaiset uusinnat, katkot kriittisissä kohdissa ja pysyvyyden restartissa. MCP:n siirtokoe ja loppuvaihto säilyttävät yhden yhteisen taulun; nykyinen tunneli pysyy valmistelun ajan. Varsinaista siirtokoetta, pilvikoodia tai migraatiota ei tehty.
 - Kokoaja luki tekijän inventaarion, kuittaukset ja tarkistusten rajat, vertasi sen työnjakoa juuri tallennettuihin raportteihin sekä tarkisti seitsemän paikallista tiedosto-/globiviitettä, whitespace- ja avainmuodot. Pelkälle dokumenttimuutokselle ei toistettu sovellustestejä tai tekijän health-/tilannekuvakutsuja. Vain raportti ja tämä lokimerkintä kuuluvat commitiin; muiden keskeneräiset Meta- ja WhatsApp-linkin tiedostot säilyvät erillään.
+
+## 14.11.2026 — varademon tervetuloviesti, hiirellä vieritettävät pikavalinnat ja logo (Claude Code, aleksi-claude)
+
+**Käyttäjän pyyntö:** Aleksi rajasi työnjaon tehtävän B (/demo-varademo) kolmeen visuaaliseen korjaukseen. Työ varattiin yhteiseltä taululta (`f4ceb8a9`). Tarkka raportti `docs/parallel/varademo-qa.md`.
+
+- `public/whatsapp-demo.html`: tyhjässä näkymässä Tänään-merkki ja apurin tervetuloviesti (selaimessa, ei palvelinkutsua). Alusta-painike lähettää saman `peru`-viestin mutta palauttaa näkymän tervetuloviestiin. Pikavalintarivi vierittyy hiiren rullalla sivuttain ja raahaamalla; raahaus ei lähetä pikavastausta, hiirilaitteilla ohut vierityspalkki ja reunojen häivytys. Avatarissa ja faviconina `aimo-logo.png`.
+- `server/whatsapp/web-demo.mjs`: `GET /demo/logo.png` samalla localhost-rajauksella kuin sivu, koska WhatsApp-palvelin ei tarjoa public-kansiota.
+- **Tarkistukset:** varademon testit 2/2 (uusi logoreitin ja tunnelin 403 -tarkistus). Koko `npm test` 155/192 läpi, 30 virhettä: sama tulos ilman tämän työn muutoksia, syynä koneelta puuttuva `data/catalog.json`. Edge headless, eristetty palvelin portissa 4791 simuloidulla chatilla: 1280 ja 375 px, tervetuloviesti, logo, rulla 200 px sivuttain, raahaus ilman lähetystä, kirjoittaa-ilmaisin, Alusta, vaakaylivuoto 0 px, ei konsolivirheitä. Ei malli-, Meta- tai Valio-kutsuja, 4749-palvelimeen ei koskettu.
+- **Avoinna:** moniosaiset vastaukset erillisinä kuplina ja oikean mallin ketju jäivät rajauksen ulkopuolelle; moniosaisuus vaatisi tiedon ordering-sillalta (Danielin tiedostot). Käynnissä oleva 4749-palvelin saa muutokset vasta seuraavassa käyttöönoton omistajan restartissa.
 
 ## 14.11.2026 — valmis julkinen tilauskatselu ja vain lukeva julkaisija GitHubiin (Codex, Cloudflare-julkaisuchatin toteutus)
 
