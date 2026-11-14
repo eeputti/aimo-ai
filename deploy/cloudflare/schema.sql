@@ -4,3 +4,16 @@ CREATE TABLE IF NOT EXISTS demo_snapshot (
   received_at INTEGER NOT NULL,
   json TEXT NOT NULL
 );
+
+-- One row per confirmed order pushed by the gateway machine. The order id is the idempotency key.
+-- email_to is private: no public route reads this table.
+CREATE TABLE IF NOT EXISTS order_events (
+  order_id TEXT PRIMARY KEY,
+  received_at INTEGER NOT NULL,
+  json TEXT NOT NULL,
+  email_to TEXT,
+  email_status TEXT NOT NULL,
+  email_attempts INTEGER NOT NULL DEFAULT 0,
+  email_updated_at INTEGER NOT NULL,
+  email_message_id TEXT
+);

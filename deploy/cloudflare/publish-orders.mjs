@@ -58,9 +58,35 @@ export async function publishOnce({ url, token, snapshot, fetcher = fetch, allow
   return result;
 }
 
+// Push each newly confirmed order once. The Worker deduplicates by order id, so a restart or a
+// lost response only repeats a harmless POST; `known` just avoids re-sending every 5 seconds.
+export async function pushOrderEvents({ url, token, snapshot, known, email = {}, fetcher = fetch, allowLocal = false }) {
+  const endpoint = new URL('/api/order-events', url);
+  if (endpoint.protocol !== 'https:' && !(allowLocal && endpoint.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(endpoint.hostname))) throw new Error('Julkaisu vaatii HTTPS-osoitteen.');
+  if (!token || token.length < 32) throw new Error('Julkaisuavain puuttuu.');
+  const results = [];
+  for (const order of snapshot.orders) {
+    if (order.status !== 'confirmed' || known.has(order.orderId)) continue;
+    const response = await fetcher(endpoint, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
+      headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ version: 1, observedAt: snapshot.observedAt, ledgerHead: snapshot.ledgerHead, order,
+        email: { to: email.to || null, customerName: email.customerName || null } }) });
+    if (!response.ok) throw new Error(`Tilauksen välitys epäonnistui (HTTP ${response.status}).`);
+    const result = await response.json();
+    if (result.ok !== true) throw new Error('Tilauksen välitystä ei vahvistettu.');
+    // Keep retrying only while the Worker can still send the e-mail later.
+    if (!['sender_missing', 'retry', 'sending'].includes(result.email)) known.add(order.orderId);
+    results.push({ orderId: order.orderId, duplicate: result.duplicate, email: result.email });
+  }
+  return results;
+}
+
 async function main() {
   const env = process.env, watch = process.argv.includes('--watch');
   let stop = false, wake;
+  const orderEvents = process.argv.includes('--order-events'), backfill = process.argv.includes('--order-events-backfill');
+  // Without backfill, orders already confirmed when the publisher starts are not e-mailed again.
+  let known = null;
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { stop = true; wake?.(); });
   do {
     try {
@@ -68,9 +94,15 @@ async function main() {
         includeBrowserDemo: process.argv.includes('--include-browser-demo') });
       await publishOnce({ url: env.CLOUDFLARE_DEMO_URL, token: env.CLOUDFLARE_DEMO_SYNC_TOKEN, snapshot });
       console.log(JSON.stringify({ event: 'demo_published', orders: snapshot.orders.length, at: new Date().toISOString() }));
+      if (orderEvents) {
+        if (!known) known = new Set(backfill ? [] : snapshot.orders.filter(o => o.status === 'confirmed').map(o => o.orderId));
+        for (const r of await pushOrderEvents({ url: env.CLOUDFLARE_DEMO_URL, token: env.CLOUDFLARE_DEMO_SYNC_TOKEN, snapshot, known,
+          email: { to: env.ORDER_EMAIL_TO, customerName: env.ORDER_EMAIL_CUSTOMER_NAME } }))
+          console.log(JSON.stringify({ event: 'order_event_pushed', ...r }));
+      }
     } catch (error) {
       // Do not log upstream responses, tokens, database paths, or customer records.
-      console.error(JSON.stringify({ event: 'demo_publish_failed', error: error.message?.startsWith('Julkaisu') || error.message?.startsWith('Tilauskannan') ? error.message : 'Tarkista julkaisun asetukset ja kannat.' }));
+      console.error(JSON.stringify({ event: 'demo_publish_failed', error: error.message?.startsWith('Julkaisu') || error.message?.startsWith('Tilauskannan') || error.message?.startsWith('Tilauksen') ? error.message : 'Tarkista julkaisun asetukset ja kannat.' }));
       if (!watch) { process.exitCode = 1; return; }
     }
     if (watch && !stop) await new Promise(resolve => { const timer = setTimeout(resolve, 5000); wake = () => { clearTimeout(timer); resolve(); }; });
