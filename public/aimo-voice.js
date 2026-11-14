@@ -146,30 +146,34 @@ export function attachVoice({ root, input, onBegin, onCancel, onCommit }) {
   button.setAttribute('aria-controls', 'ask-voice'); button.setAttribute('aria-expanded', 'false');
   bar.insertBefore(button, root.querySelector('.ask-x'));
   const panel = document.createElement('div'); panel.className = 'ask-voice'; panel.id = 'ask-voice'; panel.hidden = true;
-  panel.innerHTML = `<div class="ask-voice-visual" aria-hidden="true"><i class="ask-voice-ring"></i><i class="ask-voice-ring second"></i><span class="ask-voice-orb">${mic}</span></div>
-    <div class="ask-voice-copy"><b class="ask-voice-title" role="status" aria-live="polite"></b><p class="ask-voice-hint"></p><p class="ask-voice-transcript" aria-label="Saneltu teksti"></p><small>Sanelu käyttää selaimen puheentunnistusta.</small></div>
-    <div class="ask-voice-actions"><button type="button" class="ask-voice-done">Valmis</button><button type="button" class="ask-voice-cancel">Peruuta</button></div>`;
+  panel.innerHTML = `<div class="ask-voice-visual"><i class="ask-voice-ring" aria-hidden="true"></i><i class="ask-voice-ring second" aria-hidden="true"></i><button type="button" class="ask-voice-orb" aria-label="Lopeta sanelu" aria-describedby="ask-voice-hint">${mic}<span class="ask-voice-thinking" aria-hidden="true"><i></i><i></i><i></i></span></button></div>
+    <div class="ask-voice-copy"><b class="ask-voice-title" role="status" aria-live="polite"></b><p class="ask-voice-hint" id="ask-voice-hint"></p></div>
+    <div class="ask-voice-actions"><button type="button" class="ask-voice-done">Yritä uudelleen</button><button type="button" class="ask-voice-cancel">Peruuta</button></div>`;
   bar.after(panel);
   const title = panel.querySelector('.ask-voice-title'); const hint = panel.querySelector('.ask-voice-hint');
-  const transcript = panel.querySelector('.ask-voice-transcript'); const done = panel.querySelector('.ask-voice-done'); const cancel = panel.querySelector('.ask-voice-cancel');
-  let original = ''; let originalLabel = input.getAttribute('aria-label');
+  const orb = panel.querySelector('.ask-voice-orb'); const done = panel.querySelector('.ask-voice-done'); const cancel = panel.querySelector('.ask-voice-cancel');
+  let original = ''; let draft = ''; const originalLabel = input.getAttribute('aria-label');
   const busy = () => ['starting', 'listening', 'stopping', 'processing'].includes(session.state);
   const session = createVoiceSession({
     onState(state, message) {
       const active = ['starting', 'listening', 'stopping', 'processing'].includes(state);
       panel.hidden = state === 'idle'; panel.dataset.state = state;
       root.classList.toggle('ask-voice-active', active);
-      input.readOnly = active; input.setAttribute('aria-label', active ? 'Saneltu ostoslista' : originalLabel);
+      input.readOnly = active; input.setAttribute('aria-label', originalLabel);
       button.setAttribute('aria-expanded', String(!panel.hidden)); button.setAttribute('aria-pressed', String(active));
       button.setAttribute('aria-label', active ? 'Lopeta sanelu' : 'Sanele ostoslista');
       button.title = active ? 'Lopeta sanelu' : 'Sanele ostoslista';
-      title.textContent = { starting: 'Avataan mikrofonia…', listening: 'Kuuntelen', stopping: 'Viimeistellään sanelua…', processing: 'Etsitään sopivat tuotteet…', done: 'Ostoslista kuultu', error: 'Sanelu ei onnistunut' }[state] || '';
-      hint.textContent = message || (state === 'listening' ? 'Kerro tuotteet, määrät ja toimituspäivä. Paina lopuksi Valmis.' : 'Voit puhua rauhassa, pieni tauko ei haittaa.');
-      done.hidden = !['starting', 'listening', 'error'].includes(state); done.textContent = state === 'error' ? 'Yritä uudelleen' : 'Valmis';
+      const processing = state === 'stopping' || state === 'processing';
+      orb.disabled = processing; orb.setAttribute('aria-label', processing ? 'Sanelua käsitellään' : 'Lopeta sanelu');
+      title.textContent = { starting: 'Avataan mikrofonia…', listening: 'Kuuntelen…', stopping: 'Hetki, käsittelen sanelua…', processing: 'Kokoan ostoslistaa…', done: 'Ostoslista kuultu', error: 'Sanelu ei onnistunut' }[state] || '';
+      hint.textContent = message || (processing ? 'Etsin sopivat tuotteet ja toimituspäivän.' : 'Lopeta sanelu painamalla mikrofonia.');
+      done.hidden = state !== 'error';
       cancel.textContent = active ? 'Peruuta' : 'Jatka kirjoittamalla';
-      if (state === 'error' && !input.value) input.value = original;
+      if (state === 'error') { input.value = draft || original; done.focus({ preventScroll: true }); }
+      if (state === 'done') cancel.focus({ preventScroll: true });
     },
-    onText(text) { input.value = text; transcript.textContent = text; input.scrollLeft = input.scrollWidth; },
+    // Puhe pysyy muistissa kuuntelun ajan. Teksti näytetään vasta lopetuksen jälkeen.
+    onText(text) { draft = text; },
     onLevel(level) {
       const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
       panel.style.setProperty('--voice-level', reduced ? 0 : level.toFixed(3));
@@ -178,14 +182,16 @@ export function attachVoice({ root, input, onBegin, onCancel, onCommit }) {
   });
   function start() {
     if (busy()) { session.stop(); return; }
-    original = input.value; transcript.textContent = ''; onBegin(); input.blur(); session.start();
+    original = input.value; draft = ''; onBegin(); input.blur(); session.start();
+    if (busy()) orb.focus({ preventScroll: true });
   }
   function dismiss(restore) {
     const active = busy(); session.cancel();
     if (active) { onCancel(); if (restore) input.value = original; }
   }
   button.addEventListener('click', start);
-  done.addEventListener('click', () => session.state === 'error' ? start() : session.stop());
+  orb.addEventListener('click', () => session.stop());
+  done.addEventListener('click', start);
   cancel.addEventListener('click', () => { dismiss(true); input.focus({ preventScroll: true }); });
   // Enter päättää kuuntelun ennen hakulomakkeen omaa tilaussiirtymää.
   bar.addEventListener('submit', (event) => { if (busy()) { event.preventDefault(); event.stopImmediatePropagation(); session.stop(); } }, true);

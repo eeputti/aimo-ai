@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — sanelu keskelle isoksi lopetuspainikkeeksi (Codex)
+
+**Käyttäjän päätös:** kuunnellessa näkyy keskellä iso litteä mikrofonipainike, kevyt pomppiva liike, teksti "Kuuntelen…" ja ohje "Lopeta sanelu painamalla mikrofonia." Puhetta ei kirjoiteta näkyviin kuuntelun aikana. Lopetuksen jälkeen näytetään käsittelytila ja sitten ostoslistan tulkinta.
+
+- `public/aimo-voice.js`: keskimmäinen mikrofoni on oikea painike, joka päättää sanelun hiirellä, kosketuksella ja näppäimistöllä. Erillinen Valmis-painike poistettu. Välitulokset pysyvät muistissa; hakuteksti täytetään vasta lopetuksen yhteydessä. Käsittelyn ajan mikrofoni on estetty ja sen tilalla näkyvät kolme pistettä. Peruuta ja sulkeminen säilyvät, virheestä voi yrittää uudelleen tai jatkaa kirjoittamalla.
+- `public/aimo-voice.css`: kuuntelun ajaksi hakukenttä ja oikotiet väistyvät. Keskitetty 104 px:n sininen painike (puhelimella 92 px), ääneen reagoivat kehät ja pieni pystysuuntainen liike. Vähennetyn liikkeen asetus estää animaation. Tulosten valmistuttua tavallinen hakupaneeli palaa näkyviin.
+
+**Tarkistukset:** sanelun elinkaaritestit 8/8, `node --check`, `git diff --check`. Selaimessa erillisessä testidemossa simuloidulla puheella: välitulos ei näy hakukentässä (arvo pysyi tyhjänä), iso painike näyttää ensin "Kokoan ostoslistaa…" ja sitten 20 l kermaa + 5 kg voita pe 20.11.; lopetus Enterillä pysyy hakupaneelissa; peruutus palauttaa aiemman tekstin, lupaesto ja sulkeminen toimivat. 375/320 px:n leveydet ilman vaakaylivuotoa. Testiproxyn vastausta viivästettiin vain testissä käsittelytilan näkemiseksi; toteutukseen ei lisätty odotusta. Oikeaa mikrofonia ei tässä testattu. Tässä työvaiheessa muutettiin vain sanelun kahta tiedostoa ja tätä lokimerkintää.
+
 ## 14.11.2026 — koko työpuun tilannetallennus GitHubiin (Claude Code)
 
 **Käyttäjän pyyntö:** Eelis kysyi, onko kaikki GitHubissa, jotta muut voivat jatkaa, koska hänen käyttörajansa lähestyy. Ei ollut: työpuussa oli 16 muutettua ja 10 uutta tiedostoa commitoimatta. Ne tallennettiin yhtenä tilannetallennuksena. **Suurin osa on muiden työvaiheiden keskeneräistä työtä, jota tämä istunto ei ole tehnyt eikä tarkistanut selaimessa.**
