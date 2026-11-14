@@ -1,0 +1,20 @@
+{
+  "name": "aimo-team-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Project-scoped coordination MCP for the Aimo team",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/main.mjs",
+    "admin": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/admin.mjs",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "express": "^5.3.0",
+    "zod": "^3.25.76"
+  }
+}
