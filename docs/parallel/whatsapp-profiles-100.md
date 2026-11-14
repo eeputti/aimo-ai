@@ -29,3 +29,26 @@ Rajaus: `--ids P001,P003` tai `--limit 20`. Vertailu: `--source-ref <commit>`. E
 - Samat neljä profiilia toisen chatin keskeneräiset korjaukset sisältävällä muuttumattomalla kopiolla: **3/4 läpi**, 4 linkkiä, 3 tarkistusta ja **3 demotilausta ilman duplikaattia**. Kananmunat, desilitrat ja maitomäärän korjaus etenivät loppuun. Puuttuvan tuotteen tapaus nosti uuden löydöksen: kuvitteelliselle kuukivijogurtille tarjottiin tavallisia jogurtteja. Alkuperäinen tarkistin löysi 4/4 oikeat tarverivit; valitun tuotteen tarkennettu tarkistus antaa **3/4 oikeaa koria**, koska viimeisen korin valittu tuote oli korvike. Tässä pilotissa myös simuloitu ostaja ajautui valitsemaan korvikkeen vastoin tavoitetta; evaluoijaa tarkennettiin ennen laajaa ajoa. Pilotti ei ole vielä todiste tuotehaun oikeellisuudesta.
 - **Sadan profiilin ensimmäinen ajo käynnissä**. Neljä prosessia; lähdecommit `3c4f1c4` sekä kopion jokaisen palvelintiedoston hash tallennettu raporttiin. Koska kopio sisältää muiden chatien keskeneräisiä muutoksia, pelkkä commit ei yksilöi testattua toteutusta. Täydet tulokset ja korjausten jälkeinen varmennus lisätään vasta valmistuttua. Paikalliset raportit `/private/tmp/aimo-profiles-baseline.json`, `/private/tmp/aimo-profiles-pilot.json` ja `/private/tmp/aimo-profiles-100-round1.json`.
 - Paikallinen koordinointivaraus `484c55ac`. Yhteinen etä-MCP ei vastannut aloituskutsuihin. Claude Codelle ja toiselle Codex-chatille ilmoitettu tästä sadan profiilin kokeesta, jotta samaa maksullista sarjaa ei ajeta kahdesti.
+
+## Ulkoiset tapaustiedostot
+
+`--cases eval/cases/demo.json` lukee JSON-taulukon oletusprofiilien sijasta.
+`--ids D01,D02` rajaa tämän tiedoston tapauksia. Ilman `--cases`-valintaa
+käytetään edelleen alkuperäisiä sataa profiilia. Esimerkiksi:
+
+```sh
+node --env-file=.env scripts/whatsapp-profiles-eval.mjs --cases eval/cases/demo.json --ids D01,D02 --workers 2 --out /tmp/aimo-demo.json
+```
+
+Tapauksella on `id`, `persona` (`business`, `person`, `style`), `first`,
+`moves` (viestitaulukko), `date` (YYYY-MM-DD), `lines` ja `outcome` (`order`
+tai `stop`). Rivillä on `term`, positiivinen `value`, `unit` (L/KG/PCS) ja
+valinnainen `need`: laktoositon, gluteeniton, maidoton, vegaaninen tai ei pähkinää.
+`answers` ja `good` välitetään simuloidun ostajan tavoitteeseen; `trap` ja
+`dead_end` voivat kuvata testin tarkoitusta. `absent` on poistettujen tuotteiden
+termitaulukko. Tuntematon `need` hylätään, jotta rajoite ei katoa hiljaa.
+
+Tapaukset kopioidaan lähdesnapshotiin ja sama kopio välitetään workereille.
+Raportin `provenance.casesSha256` yksilöi käytetyn normalisoidun tapaustaulukon.
+Myös `--source-ref`-vertailu käyttää samoja tapauksia ja nykyisiä tarkistuksia;
+valittu lähdeviite vaihtaa vain testattavan palvelimen ja käyttöliittymän.
