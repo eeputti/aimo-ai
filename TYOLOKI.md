@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — WhatsAppin korilinkki avautuu käyttäjän puhelimessa (Codex, token-korjauschatti)
+
+- Käyttäjä vahvisti **”Kyllä, linkki ja kori aukeavat”** WhatsAppin avaa kori -viestin tarkistukseen. Aiemman palvelin-/selainvarmennuksen lisäksi myös linkin saaminen WhatsAppissa ja avaaminen on nyt käyttäjän varmentama. Uuden korin vahvistusta, maksua tai sähköpostia ei tämän perusteella väitetä tehdyksi.
+- Käyttäjä kysyi trycloudflare-osoitteesta ja projektin localhost/GitHub-kaupasta. Nykyinen linkki vie tunnelin kautta saman palvelinkoneen rajattuun `/whatsapp/cart`-sivuun ja samaan luonnokseen. Koko testikauppa on yhä localhost-rajattu. Puhelimen localhost ei tarkoita palvelinkonetta, ja GitHub-repositorion URL näyttää lähdekoodin. Ei hosting-/domainpäätöstä eikä kaupan julkistamista tässä vaiheessa.
+- Lähde-/asetustarkistus ja dokumenttimuutos; ei uusia tilauksia, mallikutsuja, restarttia tai sovellustestien toistoa. Yhteinen etä-MCP ei vastannut, joten varaus paikallisella CLI-taululla. Muiden kolme keskeneräistä Worker-tiedostoa säilytetään koskemattomina. Tarkempi kuittaus `docs/parallel/whatsapp-order-completion.md`.
+
 ## 15.11.2026 — tuotekohtaiset tarkennukset ja keskusteluharjoittelun tavoite (Codex, selvityschatti)
 
 - **Käyttäjän tavoite:** WhatsApp-apuri kysyy vain tuotteen valinnan kannalta olennaisia asioita. Tavallisista kananmunista ei kysytä laktoosittomuutta tai gluteenittomuutta. Käyttäjä kysyi myös, voisiko apuri harjoitella keskustelemalla itsensä kanssa ja parantaa toimintaansa.
