@@ -21,6 +21,7 @@ const HELP = 'Kirjoita tuotteet ja määrät, esim. "20 l laktoositonta maitoa j
 const DATE_QUESTION = 'Mille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.';
 // Vaihtoehtolistan vastaukset tunnistetaan koodissa, jotta numero viittaa aina viimeksi näytettyyn listaan.
 const PICK = /^(?:nro\s*|numero\s*)?(\d{1,2})[.)]?(?:\s*kiitos)?[.!\s]*$/iu;
+const SHOW = /^(?:näytä(?:\s+(?:lista|ostoslista|tilaus|yhteenveto))?|lista)[.!?\s]*$/iu;
 const MORE = /^(?:(?:näytä|anna|hae|katso)\s+)?(?:lisää|muita|muut|enemmän)(?:\s+(?:vaihtoehtoja|vaihtoehdot|tuotteita|tuotteet))?(?:\s+kiitos)?[.!?\s]*$|^onko\s+(?:muita|muuta|lisää)(?:\s+(?:vaihtoehtoja|tuotteita))?[?.!\s]*$/iu;
 const CHEAPEST = /^(?:(?:otetaan|ota|laita|valitse|se|joo)\s+)*(?:halvin|halvinta|halvimman|halvempi|edullisin|edullisinta)(?:\s+(?:vaihtoehto|kiitos))?[.!\s]*$/iu;
 // Myyntierän sana lukumäärän kanssa: "5 rasiaa", "1 rasia". Tuntematon tunnus näytetään sellaisenaan.
@@ -313,7 +314,8 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         const wantsMore = Boolean(choosing && ((picked && picked === choosing.more) || nextNumber || MORE.test(t)));
         const cheapest = choosing && shownOptions.length && CHEAPEST.test(t)
           ? shownOptions.reduce((best, o, i) => (o.lineNet < shownOptions[best].lineNet ? i : best), 0) + 1 : null;
-        const choice = wantsMore ? { intent: 'order', ops: [] }
+        const choice = SHOW.test(t) ? { intent: 'show', ops: [] }
+          : wantsMore ? { intent: 'order', ops: [] }
           : picked ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: picked }] }
             : cheapest ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: cheapest }] } : null;
         const turn = choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes

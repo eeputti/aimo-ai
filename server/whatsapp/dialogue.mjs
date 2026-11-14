@@ -40,6 +40,8 @@ Route order: kaikki ostoslistan lisäykset, korjaukset, määrät, päivät, tuo
 Pelkkä "voitko etsiä/laittaa" on pyyntö, ei selitystä vaativa lisäkysymys. Älä kirjoita odotustekstiä kuten "Näet vaihtoehdot kohta", koska tulokset tulevat samaan vastaukseen. Vastaa sisällöllisiin kysymyksiin, kuten miksi, mitä eroa tai mihin käyttöön.
 Route cart: asiakas pyytää avaamaan nykyisen korin tai lähettämään linkin, myös vapaasti kuten "ok näyttää hyvältä, laita linkki tulemaan" tai "voisinko kattoa ostoskorin". openCart=true. Jos samalla valitaan tuotteita tai korjataan määrää, route=order ja openCart=true: muutos tehdään ensin. Linkki luodaan palvelimella, älä kirjoita tai keksi URL:ia itse.
 capabilities.cartLink kertoo voiko tämän kanavan palvelin avata korin. Kun se on true, ostoskorilinkki ON olemassa: älä väitä ettet voi lähettää sitä äläkä pyydä vahvistamaan tilausta TILAA-viestillä. WhatsAppissa asiakas tarkistaa ja vahvistaa tilauksen linkistä selaimessa. Tavallinen "ok" yhteenvedon jälkeen avaa korin, ei tee tilausta. Jos kori on kesken, suora koripyyntö saa silti avata sen tarkennettavaksi.
+Kun capabilities.browserCart=true, asiakas on JO selainkorissa. cartLink=false tarkoittaa silloin, ettei uutta linkkiä tarvita. Älä väitä korilinkin puuttuvan tai ettei tätä koria voi avata. Ohjaa tarkistamaan tilaus tässä näkymässä. Tuotevalinta tai korjaus tehdään silti order-reitillä; vastaa myös asiakkaan varsinaiseen kysymykseen.
+"Tavallinen käy" tai "ei tarvitse olla laktoositonta" tarkoittaa, ettei asiakas vaadi laktoosittomuutta. Se ei ole laktoosittoman tuotteen kielto: myös muuten sopiva laktoositon tuote voi käydä. Älä väitä asiakkaan valitsemaa laktoositonta tuotetta vääräksi pelkästään siksi, että tavallinenkin kävi. Kunnioita silti kaikkia shoppingListiin kirjattuja vaatimuksia ja asiakkaan nimenomaisia kieltoja.
 Ymmärrä puhekieli ja keskustelun tarkoitus: "no vaiks 50 kananmunaa ja sit 5 dl kermaa", "eiku sitä vähemmän", "pitäskö pistää kananmunii ja sit kermaa?" ja "tarvii 50 kpl kananmunia huomiseks, onnistuuks?" ovat tilauskorin täydennyksiä tai muutoksia. Kysymysmerkki tai "onnistuuks" ei tee määrästä ja tuotteesta yleistä käyttökysymystä. Toteutus ja mahdollinen saatavuuseste tarkistetaan tilausmoottorissa, älä lupaa onnistumista etukäteen.
 shoppingList on palvelimen ajantasainen rakenteinen ostoskori ja lastOrderReply kertoo viimeksi kysytyn tarkennuksen tai näytetyt vaihtoehdot. Historia auttaa ymmärtämään viittauksen, mutta ei saa ohittaa nykyisiä rivejä tai niiden määriä. Lyhyt vastaus jatkaa viimeistä kysymystä, ei aloita keskustelua alusta.
 Jos muutos on aidosti epäselvä, kysy yksi lyhyt, kohdennettu tarkennus route chat -vastauksena ja jätä lookupQuery sekä suggestionTerm tyhjiksi. Esimerkiksi jos aiemmin toiselle päivälle koottuun moniriviseen koriin pyydetään vain kananmunia huomiseksi, kysy siirretäänkö koko kori vai tarkoitetaanko kananmunille erillistä tilausta. Älä arvaa muiden rivien muutosta. Älä kuitenkaan kysy uudelleen viestissä selvästi annettua tuotetta tai määrää.
@@ -74,7 +76,7 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], now =
     return result;
   };
   return {
-    async respond({ binding, messageId, text, runOrder, getShoppingList = () => null, canOpenCart = false, allowed = () => true }) {
+    async respond({ binding, messageId, text, runOrder, getShoppingList = () => null, canOpenCart = false, inCart = false, allowed = () => true }) {
       const cached = db.prepare('SELECT json FROM wa_dialogue_results WHERE message_id=? AND binding=?').get(messageId, binding);
       if (cached) return JSON.parse(cached.json);
       const row = db.prepare('SELECT json FROM wa_dialogue WHERE binding=?').get(binding);
@@ -110,8 +112,19 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], now =
               : { today: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Helsinki' }).format(new Date(now())),
                 history: state.history || [], shoppingList: getShoppingList({ epoch: state.epoch || '' }) || null,
                 lastOrderReply: canOpenCart && state.lastOrder ? withCartHandoffHint(state.lastOrder).text : state.lastOrder?.text || '',
-                capabilities: { cartLink: canOpenCart }, pendingSuggestion: state.pendingSuggestion || null, message: text }) })).json;
+                capabilities: { cartLink: canOpenCart, browserCart: inCart }, pendingSuggestion: state.pendingSuggestion || null, message: text }) })).json;
         } catch { /* The established ordering engine remains available if conversation planning fails. */ }
+      }
+      if (inCart && plan) {
+        // A model's capability claim cannot contradict the authenticated HTTP surface. Keep any
+        // actual answer (e.g. why products need choosing), while removing a false link denial.
+        const sentences = String(plan.text || '').split(/(?<=[.!?])\s+|\n+/u).filter(Boolean);
+        const isWrongLinkClaim = (sentence) => /korilinkki[^\n.!?]{0,90}(?:ei[^\n.!?]*(?:saa|pysty|onnistu)|en[^\n.!?]*pysty)/iu.test(sentence);
+        const remaining = sentences.filter((sentence) => !isWrongLinkClaim(sentence));
+        if (plan.openCart || remaining.length !== sentences.length) {
+          const alreadyExplained = remaining.some((sentence) => /olet jo[^.!?\n]*(?:korissa|korinäkymässä)/iu.test(sentence));
+          plan = { ...plan, text: [...remaining, ...(!alreadyExplained ? ['Olet jo ostoskorissa. Voit tarkistaa tilauksen tässä näkymässä.'] : [])].join(' ') };
+        }
       }
       if (!result && GREETING.test(text) && plan?.route !== 'chat') plan = { route: 'chat', text: 'Hei! Mitä tarvitset keittiöön? Voin auttaa ostoslistan kanssa.' };
       if (!result && plan?.route === 'reset' && !blocksReset(text)) await freshStart();

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PROFILES, inspectBasket, inspectResult, redact, withQuantityEvidence } from '../eval/whatsapp-profiles-100.mjs';
+import { PROFILES, normalizeCases, inspectBasket, inspectResult, redact, withQuantityEvidence, diagnoseDeadEnds } from '../eval/whatsapp-profiles-100.mjs';
 import { summarize } from '../scripts/whatsapp-profiles-eval.mjs';
 
 const basket = (profile) => ({ deliveryDate: profile.date, diet: { claims: [], excludeAllergens: [] }, lines: profile.lines.map((l) => ({
@@ -58,4 +58,33 @@ test('only exact catalog-proven physical equivalence can replace a requested vol
   list.lines[0].selectedProductId = 'synthetic-1l';
   assert.deepEqual(inspectBasket(profile, withQuantityEvidence(list, () => ({ litres: 1 }))), []);
   assert.ok(inspectBasket(profile, withQuantityEvidence(list, () => ({ litres: 5 }))).includes('quantity:maito'));
+});
+
+test('completion does not hide repeated answered questions or contradictory link advice', () => {
+  const profile = PROFILES.find((p) => p.preferenceAlreadyGiven);
+  const r = { finalBasket: basket(profile), turns: [{ assistant: 'Maito: haluatko laktoositonta vai käykö tavallinen?' },
+    { assistant: 'Korilinkkiä ei valitettavasti saa tässä kanavassa auki.' }], linkOpened: true, reviewed: true, confirmed: true, orderCount: 1 };
+  assert.deepEqual(inspectResult(profile, r), ['preference_asked_again', 'cart_link_capability_denied']);
+});
+
+test('dead ends retain the exact turn and redacted evidence without flagging completed orders', () => {
+  const r = { hitTurnLimit: true, turns: Array.from({ length: 3 }, () => ({ assistant: 'En ymmärtänyt. Avaa https://profiles.invalid/#secret', list: null })) };
+  const reasons = new Set(diagnoseDeadEnds(r).map((item) => item.reason));
+  assert.deepEqual([...reasons].sort(), ['fallback', 'no_progress', 'repeated_reply', 'turn_limit']);
+  assert.ok(diagnoseDeadEnds(r).every((item) => !item.reply.includes('secret')));
+  r.confirmed = true; assert.deepEqual(diagnoseDeadEnds(r), []);
+});
+
+test('external human-authored cases validate goals and map every declared restriction', () => {
+  const input = { id: 'D01', persona: { business: 'Synteettinen keittiö', person: 'Ostaja', style: 'lyhyt' }, first: 'Kaurajuomaa', moves: [],
+    date: '2026-11-20', lines: [{ term: 'kaurajuoma', value: 2, unit: 'L', need: 'maidoton ja gluteeniton, ei pähkinää' }], outcome: 'order', answers: '2 l', trap: 'Älä unohda maitoallergiaa.' };
+  const [profile] = normalizeCases([input], { productExists: () => true });
+  assert.deepEqual(profile.lines[0].claims, ['FREE_FROM_GLUTEN']);
+  assert.deepEqual(profile.lines[0].allergens, ['AM', 'AN']);
+  assert.match(profile.goal, /maitoallergiaa/);
+  assert.throws(() => normalizeCases([input], { productExists: () => false }), /catalog does not verify/);
+  assert.throws(() => normalizeCases([input, input]), /duplicate/);
+  assert.throws(() => normalizeCases([{ ...input, date: '2026-02-31' }]), /Invalid date/);
+  assert.throws(() => normalizeCases([{ ...input, lines: [{ term: 'maito', value: 2, unit: 'L', need: 'tuntematon-rajoite' }] }]), /Unrecognized dietary/);
+  assert.throws(() => normalizeCases([{ ...input, lines: [{ term: 'maito', value: 2, unit: 'L', need: 'maidoton ja tuntematon-rajoite' }] }]), /Unrecognized dietary/);
 });
