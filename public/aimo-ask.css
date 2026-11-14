@@ -193,7 +193,6 @@ html.ask-open { overflow: hidden; }
 .ask-quantity small { font-size: 12px; font-weight: 500; }
 .ask-dayadd .ask-pills { gap: 6px; }
 .ask-qed { display: grid; gap: 8px; flex-basis: 100%; min-width: 0; padding: 12px; border-radius: 8px; background: var(--ask-blue-bg); }
-.ask-quantity-hint { margin: 0; color: var(--ask-muted); font-size: 13px; font-weight: 400; }
 .ask-quantity-fields { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .ask .ask-qed input, .ask .ask-qed select { width: 100px; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--ask-line); border-radius: 6px; background: #fff; color: var(--ask-petrol); font: inherit; font-size: 16px; }
 .ask .ask-qed select { width: auto; max-width: 100%; }

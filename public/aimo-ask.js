@@ -569,13 +569,13 @@
       if (!it) return;
       const { quantityChoices, quantityLabel } = await quantityReady;
       if (last !== result || !ask.isConnected) return;
-      const { hint, options } = quantityChoices(it, result.cards?.[item]?.list || []);
+      const { options } = quantityChoices(it, result.cards?.[item]?.list || []);
       const key = (q) => `${q.unit}${q.basis ? `:${q.basis}` : q.unit === 'PCS' ? ':sales' : ''}`;
       const current = it.quantity;
       if (current && !options.some((o) => key(o) === key(current))) options.push({ ...current, label: quantityLabel(current) });
       const selected = current ? key(current) : key(options[0]);
       const box = document.createElement('div'); box.className = 'ask-qed'; box.dataset.item = item;
-      box.innerHTML = `<p class="ask-quantity-hint" id="ask-quantity-hint-${item}">${esc(hint)}</p><div class="ask-quantity-fields"><input type="text" inputmode="decimal" maxlength="12" value="${current ? num(current.value) : ''}" placeholder="Määrä" aria-label="Määrä tuotteelle ${esc(it.productTerm)}" aria-describedby="ask-quantity-hint-${item}"><select aria-label="Määrän yksikkö tuotteelle ${esc(it.productTerm)}">${options.map((o) => `<option value="${key(o)}"${key(o) === selected ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select><button type="button" data-save-quantity>Tallenna</button><button type="button" class="ask-quantity-cancel" data-cancel-quantity>Peruuta</button></div>`;
+      box.innerHTML = `<div class="ask-quantity-fields"><input type="text" inputmode="decimal" maxlength="12" value="${current ? num(current.value) : ''}" placeholder="Määrä" aria-label="Määrä tuotteelle ${esc(it.productTerm)}"><select aria-label="Määrän yksikkö tuotteelle ${esc(it.productTerm)}">${options.map((o) => `<option value="${key(o)}"${key(o) === selected ? ' selected' : ''}>${esc(o.label)}</option>`).join('')}</select><button type="button" data-save-quantity>Tallenna</button><button type="button" class="ask-quantity-cancel" data-cancel-quantity>Peruuta</button></div>`;
       ask.replaceWith(box); const input = box.querySelector('input'); input.focus(); input.select(); return;
     }
 

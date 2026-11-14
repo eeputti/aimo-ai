@@ -3,7 +3,7 @@ export function quantityChoices(item, products = []) {
   const term = item.productTerm || '';
   const packs = { unit: 'PCS', basis: 'sales', label: 'pakkausta' };
   if (item.productType === 'eggs' || /kananmun|\beggs?\b/i.test(term)) {
-    return { hint: 'Kananmunien määrä annetaan kappaleina. Lasken tarvittavat pakkaukset puolestasi.', options: [{ unit: 'PCS', basis: 'items', label: 'kpl' }, packs] };
+    return { options: [{ unit: 'PCS', basis: 'items', label: 'kpl' }, packs] };
   }
   const litres = products.filter((p) => p.litres > 0).length;
   const kilos = products.filter((p) => p.kg > 0).length;
@@ -11,10 +11,9 @@ export function quantityChoices(item, products = []) {
     : ['milk', 'cream'].includes(item.productType) || litres > 0 && litres >= kilos ? 'L'
       : kilos > 0 ? 'KG' : null;
   if (unit) return {
-    hint: unit === 'L' ? 'Tämän tuotteen määrä ilmoitetaan yleensä litroina.' : 'Tämän tuotteen määrä ilmoitetaan yleensä kiloina.',
     options: [{ unit, label: unit === 'L' ? 'l' : 'kg' }, packs],
   };
-  return { hint: 'Anna määrä pakkauksina tai valitse tarvitsemasi yksikkö.', options: [packs, { unit: 'KG', label: 'kg' }, { unit: 'L', label: 'l' }] };
+  return { options: [packs, { unit: 'KG', label: 'kg' }, { unit: 'L', label: 'l' }] };
 }
 
 export function quantityLabel(quantity) {

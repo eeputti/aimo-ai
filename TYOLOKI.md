@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — määrävalinnan selittävä teksti pois (Codex)
+
+**Käyttäjän pyyntö:** yksikön selitystä (esimerkiksi Tämän tuotteen määrä ilmoitetaan yleensä litroina) ei tarvita. Poistettu määrävalinnan ohjekappale ja vastaavat kilo-, muna- ja pakkausohjeet sekä niiden CSS ja `aria-describedby`-viite. Tuotekohtainen oletusyksikkö ja määrän muokkaus säilyvät.
+
+**Varmennus:** määrän neljä olemassa olevaa regressiotestiä **4/4**, JavaScript-syntaksit ja diff-tarkistus läpi. Poistettuja ohjetekstejä tai niiden viitteitä ei enää ole hakutoteutuksessa. Pelkän tekstin poiston vuoksi koko testisarjaa tai selainvarmennusta ei ajettu uudelleen. Muutos näkyy sivun päivityksellä; palvelinta tai käyttäjän koria ei muutettu.
+
 ## 14.11.2026 — reseptisivun yläteksti pois (Codex)
 
 **Käyttäjän pyyntö:** poistetaan myös ”OMA KEITTIÖ. OMAT RESEPTIT.” -teksti reseptisivulta. Poistettu kyseinen kappale `public/recipes.html`:stä ilman korvaavaa tekstiä.
