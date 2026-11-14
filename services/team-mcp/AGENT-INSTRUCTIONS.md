@@ -15,3 +15,11 @@ Lisää nämä ohjeet jokaisen projektiin osallistuvan avustajan projektiohjeisi
 9. Palvelin ei herätä toista avointa Claude-/ChatGPT-keskustelua eikä päivitä sen kontekstia itsestään. Älä jää jatkuvaan kysely- tai agenttien vastaussilmukkaan. Ihminen käynnistää seuraavan työvaiheen, ellei erillistä ajavaa agenttipalvelua ole sovittu.
 
 Esimerkki viestistä: "Checkout-rajapinta valmis commitissa abcdef123. POST /api/... odottaa nämä kentät: ... Testit 12/12. Muutoksia ei vielä julkaistu tuotantoon."
+
+## Vastuun tulkinta
+
+- Yksi tehtävä, yksi vastuullinen tunniste ja selkeä valmistumiskriteeri. Erota chatit omilla tunnisteilla, kun yhteystapa sallii sen.
+- `blocked` ei siirrä vastuuta auttajalle. `handed_off` nimeää vastaanottajan, mutta työ ja tiedostovaraukset alkavat vasta onnistuneesta `claim_task(taskId)`-kutsusta.
+- `requestedResources` on työn rajaus; vain `resources` sisältää aktiiviset varaukset. `leaseExpired=true` tai `ownerAvailable=false` sallii uudelleenvaraamisen, jos tiedostot ovat vapaat.
+- Älä luovuta vanhentunutta tehtävää ennen uudelleenvaraamista. Luovutuksen muistiinpano: tehty, tarkistettu, jäljellä, commit.
+- Tarkempi tilataulukko ja komentorivin tulkinta: [README.md](README.md#selkeä-tehtävänjako).

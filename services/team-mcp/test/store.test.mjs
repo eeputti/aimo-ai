@@ -118,3 +118,32 @@ test('blockers reach inboxes once; handoff moves ownership, frees files and hold
   advance(120 * 60_000 + 1);
   assert.equal(store.claim('carol', { project, taskId: orphan.id }).owner, 'carol');
 });
+
+test('old open tasks stay visible after more than 100 completed tasks', (t) => {
+  const { store, advance } = fixture(t);
+  const active = store.claim('alice-gpt', { project, title: 'Still reserved', resources: ['shared'] });
+  for (let i = 0; i < 105; i++) {
+    advance(1);
+    const task = store.claim('bob-claude', { project, title: `Finished ${i}` });
+    store.progress('bob-claude', { project, taskId: task.id, expectedRevision: task.revision, status: 'done', note: 'Complete' });
+  }
+  const tasks = store.state('bob-claude', { project }).tasks;
+  assert.equal(tasks.length, 101);
+  assert.equal(tasks.find((task) => task.id === active.id).resources[0].path, 'shared');
+  assert.equal(tasks.filter((task) => task.status === 'done').length, 100);
+});
+
+test('expired handoffs and unavailable owners are visible; expired owners cannot hand work off', (t) => {
+  const { store, advance } = fixture(t);
+  const task = store.claim('alice-gpt', { project, title: 'Handoff', leaseMinutes: 1 });
+  advance(60_000);
+  assert.throws(() => store.handoff('alice-gpt', { project, taskId: task.id, expectedRevision: task.revision, to: 'bob-claude', note: 'Late' }), /again/);
+  assert.equal(store.state('alice-gpt', { project }).tasks[0].owner, 'alice-gpt');
+  const renewed = store.claim('alice-gpt', { project, taskId: task.id });
+  const handed = store.handoff('alice-gpt', { project, taskId: task.id, expectedRevision: renewed.revision, to: 'bob-claude', note: 'Ready' });
+  assert.equal(handed.ownerAvailable, true);
+  advance(120 * 60_000);
+  assert.equal(store.state('alice-gpt', { project }).tasks[0].leaseExpired, true);
+  store.revokeMember('bob-claude');
+  assert.equal(store.state('alice-gpt', { project }).tasks[0].ownerAvailable, false);
+});

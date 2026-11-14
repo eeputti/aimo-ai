@@ -2,6 +2,19 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — Team MCP:n tehtävänjaon selkeytys (Codex / erillinen pilvichat)
+
+**Rajaus:** käyttäjä pyysi selkeyttämään MCP-palvelimen tehtävänjakoa ja kielsi sovelluksen sekä ostosapuriagentin tiedostojen muuttamisen. Muutokset vain `services/team-mcp/` ja tämä lokimerkintä. Ei palvelinten käynnistyksiä, tuotantokantojen muutoksia tai sovelluksen riippuvuuspäivityksiä.
+
+- Komentorivin tilannekuva näyttää omistajan, tilan, varauksen määräajan, aktiiviset tiedostovaraukset, alkuperäisen tiedostorajauksen ja seuraavan toimenpiteen. Vanhentuneet tai käytöstä poistetun omistajan tehtävät erotetaan aktiivisista tehtävistä. Luovutuksessa vastaanottaja ja vastaanottokomento näkyvät erikseen.
+- Kaikki avoimet tehtävät säilyvät tilannekuvassa; 100 tehtävän raja koskee nyt vain suljettua historiaa. Vanha aktiivinen varaus ei katoa uusien valmistuneiden töiden alle.
+- `leaseExpired` kattaa myös vanhentuneet luovutukset; `ownerAvailable` kertoo onko omistajan tunniste käytettävissä. Vanhentuneen tehtävän luovutus torjutaan ennen uudelleenvaraamista, kuten etenemisraportointikin.
+- Palvelun README:ssä vastuu- ja tilataulukko. Yksi tehtävä = yksi tulos, vastuullinen tunniste ja valmistumiskriteeri. Esteen auttaja ei peri vastuuta; luovutuksen vastaanottaja varaa tiedostot ennen jatkamista. Avustajaohjeet ja MCP-työkalukuvaus vastaavat tätä.
+
+**Tarkistukset:** palvelun `npm test` 21/21 läpi (kolme uutta regressiotestiä: vanha avoin tehtävä yli 100 suljetun jälkeen, vanhentunut luovutus / poistettu omistaja / myöhäisen luovutuksen torjunta, komentorivin vastaanotto-ohje ja tiedostovarausten erottelu). Integroinnissa säilytettiin rinnakkain tullut tunnelikokeilucommit `214f5bd`; yhdistetyn version testit 25/25 läpi. `git diff --check` läpi. Riippuvuudet asennettiin vain palvelun omaan node_modules-hakemistoon; lockfile ei muuttunut.
+
+**Käyttöönotto / koordinointiraja:** työ tehtiin erillisessä pilvikloonissa; sen paikallinen tehtävävaraus ei näy käyttäjän koneen kannassa. Muiden chattien pitää hakea commit ja lukea tämä loki. Yhteistä HTTPS-palvelua tai oikeita asiakasliittimiä ei julkaistu tai testattu tässä työssä. Paikallinen CLI käyttää muutoksia päivityksen jälkeen; käynnissä oleva MCP-palvelin tarvitsee hallitun uudelleenkäynnistyksen omistajaltaan.
+
 ## 14.11.2026 — Team MCP:n yhden komennon Cloudflare-tunnelikokeilu (Codex)
 
 **Käyttäjän päätös:** Renderin sijasta ensin nopea Cloudflare-tunnelikokeilu; pysyvää hostingia ei vielä valita. Tämä työ tehtiin erillisessä pilvikloonissa. Toisen koneen verkkokauppa-, WhatsApp- tai koordinointiprosesseja ja kantoja ei muutettu. Muiden uudet commitit edb9b91 ja 1e58b43 haettiin ja säilytettiin.
@@ -13,6 +26,7 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 **Tarkistukset:** Team MCP:n **22/22 testiä läpi**, mukaan lukien neljä uutta: simuloidun cloudflared-prosessin osoite → oikean HTTP-sovelluksen julkiset OAuth-metatiedot ja autentikoimattoman MCP:n 401; varatun portin suojaus; puuttuva binääri / ennenaikainen loppuminen / aikakatkaisu; käynnissä olevan tunnelin loppuminen ja HTTP-portin vapautus. Virhelokin api.trycloudflare.com-osoitetta ei tulkita onnistuneeksi tunneliksi. Syntaksi ja `git diff --check` tarkistettu. Oikea cloudflared 2026.11.0 ladattiin virallisesta GitHub-julkaisusta työskentelyhakemistoon ja uusi CLI ajettiin sillä; virhepolku sulki palvelimen hallitusti.
 
 **Käyttöönotto estyi tässä ympäristössä:** cloudflaredin suora yhteys api.trycloudflare.com:443:een palauttaa connection refused; saman API:n POST normaalin HTTPS-proxyn kautta palauttaa 403 / Your request was blocked. Julkista tunneliosoitetta ei saatu, eikä oikeita ChatGPT-/Claude-liittimiä kytketty. Verkon rajoituksia ei kierretty. Käyttäjä saa ajaa yllä olevat komennot omalla koneellaan; oikea tunnelin yli kulkeva pilviyhteys on vielä varmennettava. Tässä pilvikloonissa ei jäänyt palvelinta tai tunnelia käyntiin. Käynnistystestin verkkotarkistus ei ole automaattisen hyväksyntätarkistuksen hylkäys.
+
 
 ## 14.11.2026 — WhatsApp-lähetyseston lisärajaus, tilauslogiikka erillään (Codex)
 

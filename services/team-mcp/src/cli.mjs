@@ -79,11 +79,19 @@ function statusReport(state, me) {
   const out = [];
   if (state.board.summary) out.push(`Yhteenveto (rev ${state.board.revision}, ${state.board.actor}):\n${state.board.summary}\n`);
   const open = state.tasks.filter((t) => !['done', 'released'].includes(t.status));
-  const row = (t) => `  ${short(t.id)} ${t.owner}: ${t.title}${t.resources.length ? ` [${t.resources.map((r) => r.path).join(', ')}]` : ''}${t.leaseExpired ? ' (VARAUS VANHENTUNUT, saa ottaa: accept)' : t.status === 'handed_off' ? '' : `, varaus ${time(t.lease_until)} asti`}${t.commit_sha ? `, commit ${t.commit_sha.slice(0, 9)}` : ''}${t.note ? `\n           ${t.note.split('\n')[0]}` : ''}`;
+  const available = (t) => t.leaseExpired || !t.ownerAvailable;
+  const row = (t) => {
+    const next = available(t) ? `kuka tahansa: accept --task ${short(t.id)} (tarkista tiedostokonfliktit)`
+      : t.status === 'handed_off' ? `${t.owner}: accept --task ${short(t.id)}`
+      : t.owner === me ? `renew / block / handoff / done --task ${short(t.id)}` : `odota tai sovi muutos jäsenen ${t.owner} kanssa`;
+    const files = t.resources.map((r) => r.path);
+    return `  ${short(t.id)} ${t.owner}: ${t.title}\n           Tila: ${t.status}; ${available(t) ? 'VARAUS VANHENTUNUT tai omistaja ei käytettävissä' : t.status === 'handed_off' ? `vastaanottajalle varattu ${time(t.lease_until)} asti` : `varaus ${time(t.lease_until)} asti`}\n           Aktiiviset tiedostovaraukset: ${files.join(', ') || 'ei varauksia'}${t.requestedResources.length ? `\n           Tehtävän tiedostot: ${t.requestedResources.join(', ')}` : ''}\n           Seuraava: ${next}${t.commit_sha ? `\n           Commit: ${t.commit_sha}` : ''}${t.note ? `\n           ${t.note.split('\n')[0]}` : ''}`;
+  };
   const group = (title, list) => { if (list.length) out.push(title, ...list.map(row)); };
-  group('ESTEET:', open.filter((t) => t.status === 'blocked'));
-  group(`LUOVUTETTU, odottaa vastaanottoa (accept):`, open.filter((t) => t.status === 'handed_off'));
-  group('Työn alla:', open.filter((t) => t.status === 'in_progress'));
+  group('ESTEET:', open.filter((t) => t.status === 'blocked' && !available(t)));
+  group('LUOVUTETTU, odottaa vastaanottoa (accept):', open.filter((t) => t.status === 'handed_off' && !available(t)));
+  group('Työn alla:', open.filter((t) => t.status === 'in_progress' && !available(t)));
+  group('VAPAA UUDELLEEN VARATTAVAKSI (accept):', open.filter(available));
   if (!open.length) out.push('Ei avoimia tehtäviä tai varauksia.');
   const closed = state.tasks.filter((t) => t.status === 'done').slice(0, 5);
   if (closed.length) out.push('Viimeksi valmistuneet:', ...closed.map((t) => `  ${short(t.id)} ${t.owner}: ${t.title}${t.commit_sha ? `, commit ${t.commit_sha.slice(0, 9)}` : ', ei commitia'}`));

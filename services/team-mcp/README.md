@@ -4,6 +4,36 @@ Yhteinen projektipostilaatikko, tehtävä- ja tiedostovaraukset sekä projektin 
 
 Palvelu toimii erillään verkkokaupasta. Sen omat riippuvuudet ja lockfile ovat tässä hakemistossa; sivuston package.json tai tilauskannat eivät muutu.
 
+## Selkeä tehtävänjako
+
+Yksi tehtävä tarkoittaa yhtä rajattua tulosta ja sillä on yksi vastuullinen avustajatunniste.
+Käytä eri chatille omaa tunnistetta, jos asiakas sallii erilliset yhteydet. Paikallisesti
+voit luoda esimerkiksi `codex-mcp` ja `claude-tests` komennolla `join`.
+Kirjoita otsikkoon tavoite ja kuvaukseen valmistumiskriteeri sekä työn ulkopuolelle jäävät asiat.
+Varaa vain muokkaamasi tiedostot; koko projektikansion varaus estää rinnakkaistyön.
+
+| Tila | Kuka jatkaa? | Tiedostot ja seuraava toimi |
+|---|---|---|
+| `in_progress` | `owner` | Omistaja tekee työn ja uusii varauksen ennen määräaikaa. |
+| `blocked` | `owner`; nimetty auttaja ratkaisee esteen | Varaus säilyy. Auttajalle ilmoittaminen ei siirrä omistusta. |
+| `handed_off` | `owner` on vastaanottaja, joka ei ole vielä aloittanut | Tiedostovaraukset ovat vapaat. Vastaanottaja käyttää `accept` / `claim_task(taskId)` ennen muokkausta; tiedostot varataan uudelleen konfliktitarkistuksella. |
+| Varaus vanhentunut tai omistaja poistettu käytöstä | Kuka tahansa projektin jäsen voi yrittää ottaa työn | Lue muistiinpanot ja commit, sitten `accept` / `claim_task(taskId)`. Älä aloita ennen onnistunutta varausta. |
+| `done` | Ei jatkajaa | Tulos on valmis; varaukset vapautuvat. Uusi työ saa uuden tehtävän. |
+| `released` | Ei aktiivista vastuuhenkilöä | Työ jätettiin kesken; varaukset vapautuvat. Jatko luodaan uutena tehtävänä viitaten vanhaan. |
+
+`status` näyttää omistajan, tilan, aktiiviset tiedostovaraukset, tehtävään kuuluvat
+alkuperäiset tiedostot ja seuraavan toimenpiteen. `requestedResources` kertoo työn rajauksen;
+`resources` kertoo juuri nyt voimassa olevat varaukset. Vanhentunutta omistajuutta ei pidä
+lukea aktiiviseksi työksi. Kaikki avoimet tehtävät näkyvät, lisäksi viimeiset 100 suljettua.
+
+Luovutuksen muistiinpanoon: **tehty, tarkistettu, jäljellä, commit**. Luovutuksen vastaanottaja
+on vastuussa seuraavasta vaiheesta vasta otettuaan työn vastaan. Vanha omistaja ei jatka
+muokkausta luovutuksen jälkeen. Vanhenneen varauksen omistajan on varattava tehtävä uudelleen
+ennen luovutusta. Varaus on aina neuvoa antava, ei tiedostojärjestelmän lukko.
+
+Eri koneiden paikalliset kannat eivät jaa tehtävätilannetta. Yhteinen tehtävänjako vaatii
+saman HTTPS-palvelimen; GitHub välittää koodin ja työlokin, ei paikallisia varauksia.
+
 ## Paikallinen käyttö ilman palvelinta
 
 Samalla koneella ja samassa projektikansiossa työskentelevät avustajat (esimerkiksi Codex ja Claude Code) voivat käyttää taulua suoraan komentoriviltä. Palvelinta, liitintä tai `npm ci`:tä ei tarvita: komento käyttää samaa kantaa ja samaa logiikkaa kuin MCP-palvelin.
@@ -115,7 +145,7 @@ OAuth käyttää joko julkista PKCE-asiakasta (`none`) tai SDK:n confidential cl
 | Työkalu | Tulos |
 |---|---|
 | `whoami` | Todellinen avustajatunniste ja sallitut projektit. Lähettäjää ei voi valita argumenteissa. |
-| `get_project_state` | Projektin yhteenveto, jäsenet, viimeiset 100 tehtävää varauksineen ja viimeiset 30 tehtävä-/yhteenvetotapahtumaa. Ei yksityisviestejä. |
+| `get_project_state` | Projektin yhteenveto, jäsenet, kaikki avoimet ja viimeiset 100 suljettua tehtävää varauksineen ja viimeiset 30 tehtävä-/yhteenvetotapahtumaa. Ei yksityisviestejä. |
 | `send_message` | Projektille tai jäsenelle viesti. Vaadittu `requestKey` estää saman viestin uusinnan; saman avaimen eri sisältö hylätään. |
 | `read_messages` | Omat vastaanotetut, projektin yhteiset ja itse lähetetyt viestit. Enintään 50/sivu; jatka `nextCursor`-arvosta. |
 | `ack_messages` | Kuittaa käsitelty `through`-kursori omalle tunnisteelle. Ei poista viestejä. |
