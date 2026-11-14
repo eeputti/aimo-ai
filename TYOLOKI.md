@@ -2,6 +2,22 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — toimitusvarmuus ja hiilijalanjälki näkyviin tilausriveille, Danielin liittimen arvio (Claude Code)
+
+**Tausta:** Eelis sai Danielilta MCP-liittimen (Danielin `server.py` väliaikaisen `trycloudflare.com`-tunnelin takana, token osoitteessa). Liitin kytkettiin Claude Code -istuntoon ja kokeiltiin kolmella lukukutsulla: `ping` 200, `data_status` 17 546 tuotetta, 4 425 toimitusvarmuusriviä ja 11 033 hiilijalanjälkiriviä, `search_products` toimii. Hinta- ja saatavuuskutsuja ei tehty API-kiintiön vuoksi.
+
+**Päätös:** liitintä ei kytketä palvelimeen eikä demoon. Sen data on samoista lähdetiedostoista kuin meidän `data/catalog.json` (samat rivimäärät), osoite katoaa tunnelin sulkeutuessa, eikä siinä ole tilaus-, mandaatti- tai hyväksyntäpuolta. Käyttö: vertailukohta pitchissä (pelkkä haku vastaan portti) ja tarkistus kehityksessä. Tokenia ei kirjata repoon.
+
+**Löytynyt aukko ja korjaus:** gateway palautti toimitusvarmuuden ja hiilijalanjäljen tarjousriveillä, mutta tilausriveiltä ne putosivat pois eikä käyttöliittymä näyttänyt niitä.
+
+- `server/gateway/service.mjs`: tilausrivi saa katalogista kentät `deliveryReliability` ja `co2PerKg` samoilla nimillä kuin tarjousrivi. Ne ovat näyttötietoa: allekirjoitettu tarjous ja mandaattitarkistus eivät muutu.
+- `public/gateway-products.js` ja `public/gateway.js`: pienet merkit tuotekortissa sekä tilaus- ja lisäyskorttien riveillä (konsoli ja hyväksyntänäkymä käyttävät samaa tiedostoa). Rekkakuvake ja prosentti on vihreä, kun toimitusvarmuus on vähintään 95 %, muuten keltainen. Lehtikuvake ja kg CO₂e/kg on neutraali. Puuttuva tieto ei näy lainkaan.
+- Tyylit: merkit `public/gateway.css`, tuotekortin rivi `public/aimo-shell.css`.
+
+**Tarkistukset:** eristetty simuloitu palvelin portissa 4756 (omat testikannat, ei API-avaimia), kuusi testitilausta `/console/demo`-reitillä. `/console/state` palauttaa kentät; selaimessa 1280 px leveydellä merkit näkyvät tuotekorteissa ja tilausriveillä, kortit pysyvät samankorkuisina, ei vaakaylivuotoa. `npm test` 26/26, `node --check` ja `git diff --check` läpi. Keltaista alle 95 %:n merkkiä ei nähty oikealla rivillä (testituotteilla arvo oli 100 % tai puuttui). Hyväksyntänäkymää ja kapeaa näyttöä ei katsottu erikseen.
+
+**Huomiot:** palvelinmuutos vaatii käynnissä olevan palvelimen uudelleenkäynnistyksen; ennen sitä tehdyillä tilauksilla ei ole kenttiä tallennettuna. Testissä "ruokakermaa 10 l" valitsi 2,5 dl:n maustetun ruokakerman: sama yleisen haun vika kuin aiemmin kirjattu, ei korjattu. `.claude/launch.json`-tiedostoon lisättiin paikallisesti asetus `aimo-ai-test-4756`, ei tässä commitissa.
+
 ## 14.11.2026 — graafiset ehdotukset tiiviistä ja luotettavasta ostoskorista (Codex)
 
 **Käyttäjän täsmennys:** ostoportaali helpottaa tarkistusta huomaamalla poikkeavan määrän ja perustelemalla sen. Käyttöliittymän pitää painottaa visuaalisuutta: tuotekuvat, pienet rivit, keltainen huomio juuri tuotteen kohdalla sekä erityisen selkeä muutoksen hyväksyntä. Ei erillistä näkyvää tekoälyelementtiä, suuria päätöskortteja tai ”sinun päätöksesi” -otsikkoa. Vihreä kertoo tarkistetusta asiasta, punainen varataan todelliselle esteelle. Huomioitu myös lokiin kirjattu keskipiste-erottimien kielto.

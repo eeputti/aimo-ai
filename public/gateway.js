@@ -13,6 +13,22 @@ const STATUS = { confirmed: 'Vahvistettu', pending_approval: 'Odottaa hyväksynt
 const api = async (path, body) => { const r = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error?.message || r.status); return j; };
 
 // Syyn selitys ihmiselle: koodi + luvut auki kirjoitettuna.
+// Toimitusvarmuus ja hiilijalanjälki pieninä merkkeinä tuoterivillä. Puuttuva tieto ei näy lainkaan: tyhjä ei saa näyttää tarkistetulta.
+const ECO_ICON = {
+  truck: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h11v10H2zM13 10h4l4 3v3h-8z"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>',
+  leaf: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-9 5-14 15-14 0 10-5 15-14 14zM5 19l7-7"/></svg>',
+};
+const ecoNum = (n, d) => n.toLocaleString('fi-FI', { minimumFractionDigits: d, maximumFractionDigits: d });
+function ecoBadges(l) {
+  const out = [];
+  if (l.deliveryReliability != null) {
+    const pct = l.deliveryReliability * 100;
+    out.push(`<span class="eco-b ${pct >= 95 ? 'ok' : 'warn'}" title="Toimitusvarmuus ${ecoNum(pct, 1)} % Valion toimitusvarmuusdatan mukaan">${ECO_ICON.truck}${ecoNum(pct, 0)} %</span>`);
+  }
+  if (l.co2PerKg != null) out.push(`<span class="eco-b" title="Hiilijalanjälki ${ecoNum(l.co2PerKg, 2)} kg CO₂-ekv tuotekiloa kohti">${ECO_ICON.leaf}${ecoNum(l.co2PerKg, 1)} kg CO₂e/kg</span>`);
+  return out.length ? `<span class="eco">${out.join('')}</span>` : '';
+}
+
 function reasonText(r) {
   const d = r.detail || {};
   switch (r.code) {
@@ -39,7 +55,7 @@ function orderCard(o, { actions = true, link = true } = {}) {
     </div>
     ${o.pendingAddition ? additionCard(o, actions) : ''}
     ${o.totals ? `<div><div class="total">${money(o.totals.net)}</div><div class="small muted" title="alv 0 %, verollisena ${money(o.totals.gross)}">toimitus ${day(o.deliveryDate)}${o.cutoffLabel && o.status === 'pending_approval' ? `, päätä ennen ${esc(o.cutoffLabel)}` : ''}</div></div>` : ''}
-    ${o.lines?.length ? `<ul class="lines">${o.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span>${l.substituteFor ? `<span class="sub">korvaa tuotteen ${esc(l.substituteFor)}</span>` : ''}${l.addedIn ? '<span class="sub">lisätty jälkikäteen</span>' : ''}</li>`).join('')}</ul>` : ''}
+    ${o.lines?.length ? `<ul class="lines">${o.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span>${ecoBadges(l)}</span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span>${l.substituteFor ? `<span class="sub">korvaa tuotteen ${esc(l.substituteFor)}</span>` : ''}${l.addedIn ? '<span class="sub">lisätty jälkikäteen</span>' : ''}</li>`).join('')}</ul>` : ''}
     ${o.suggestions?.length ? suggestBlock(o) : ''}
     ${o.approval?.explanation && o.status === 'pending_approval' ? `<details class="ai-note"><summary><b>${{ approve: 'Tekoäly suosittelee: hyväksy', reject: 'Tekoäly suosittelee: hylkää', review: 'Tekoäly suosittelee: tarkista' }[o.approval.explanation.suggestion] || 'Tekoälyn selitys'}</b></summary><p class="small">${esc(o.approval.explanation.text)} ${esc(o.approval.explanation.suggestionWhy)}</p><p class="small muted">${esc(o.approval.explanation.model)}, päätös on sinun</p></details>` : ''}
     ${o.substitutions?.some((s) => s.modelNote) ? `<div class="ai-note"><p class="small">${o.substitutions.filter((s) => s.modelNote).map((s) => esc(s.modelNote)).join(' ')} <span class="muted">Korvaajan valitsi tekoäly portin tarkistamista vaihtoehdoista (${esc(o.substitutions.find((s) => s.modelNote).chosenBy)}).</span></p></div>` : ''}
@@ -64,7 +80,7 @@ function additionCard(o, actions) {
   const a = o.pendingAddition;
   return `<div class="addition">
     <div class="who">Lisäys odottaa hyväksyntääsi</div>${a.requestedBy ? `<div class="asked">"${esc(a.requestedBy)}"</div>` : ''}
-    <ul class="lines">${a.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span></span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span></li>`).join('')}</ul>
+    <ul class="lines">${a.lines.map((l) => `<li><span class="limg"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"></span><span>${esc(l.name)} <span class="muted mono">${esc(l.productId)}</span>${ecoBadges(l)}</span><span class="num"><b>${qty(l.quantity)} ${esc(l.salesUnitLabel)}</b>, ${money(l.lineNet)}</span></li>`).join('')}</ul>
     <div class="small muted">+${money(a.addedNet)}, uusi summa olisi ${money(a.orderNetIfApproved)}${a.approval?.expiresAt ? ', tilaus pysyy ennallaan, jos et hyväksy' : ''}</div>
     <ul class="why">${a.reasons.filter((r) => r.severity === 'approval').map((r) => `<li class="${r.severity}">${esc(reasonText(r))}<code>${esc(r.code)}</code></li>`).join('')}</ul>
     ${actions ? `<div class="actions"><button class="btn approve big" data-act="approve" data-order="${o.orderId}"><span aria-hidden="true">✓</span> Hyväksy lisäys</button><button class="btn danger big" data-act="reject" data-order="${o.orderId}">Hylkää lisäys</button></div>` : ''}
@@ -90,6 +106,76 @@ function eventDetail(e) {
 }
 const timeline = (entries) => `<ul class="timeline">${entries.map((e) => `<li class="${e.actor.split(':')[0]}"><span class="t">${time(e.ts)}</span><span class="dot"></span><div><b>${esc(EVENT_FI[e.type] || e.type)}</b> <span class="muted small">${esc(e.actor)}</span><div class="detail">${esc(eventDetail(e))}</div><div class="hash">#${e.seq} ${esc(e.hash.slice(0, 16))}… ← ${esc(e.prevHash.slice(0, 8))}…</div></div></li>`).join('')}</ul>`;
 
+// Seurantanäkymä puhelimelle (malli ruokalähettisovelluksista): yksi iso lupaus ylhäällä, vaiheet palkkina,
+// syy kuvana, tuoterivit kuvilla ja päätösnapit kiinni alareunassa. Hyväksynnän jälkeen sama näkymä jatkaa tilauksen seurantana.
+const tkIcon = (d) => '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+const TK = {
+  doc: tkIcon('<path d="M7 3h7l4 4v14H7zM14 3v4h4M10 13h5M10 17h5"/>'),
+  shield: tkIcon('<path d="M12 3 5 6v6c0 4 3 7 7 9 4-2 7-5 7-9V6zM9 12l2 2 4-4"/>'),
+  hand: tkIcon('<path d="M8 13V5.500a1.500 1.500 0 0 1 3 0V12M11 5.500v-2a1.500 1.500 0 0 1 3 0V12M14 5.500a1.500 1.500 0 0 1 3 0V12M17 7.500a1.500 1.500 0 0 1 3 0V16a6 6 0 0 1-6 6h-2c-2.500 0-4-1-5.500-3L3.700 14.500a1.500 1.500 0 0 1 2.300-1.800L8 15"/>'),
+  truck: tkIcon('<path d="M2 6h11v10H2zM13 9h4l4 4v3h-8z"/><circle cx="6.500" cy="17.500" r="1.800"/><circle cx="17" cy="17.500" r="1.800"/>'),
+  clock: tkIcon('<circle cx="12" cy="12" r="8.500"/><path d="M12 7.500V12l3 2"/>'),
+  bars: tkIcon('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  euro: tkIcon('<path d="M17 6.500A6.500 6.500 0 1 0 17 17.500M4 10h9M4 14h9"/>'),
+  cal: tkIcon('<rect x="3.500" y="5.500" width="17" height="15" rx="1.500"/><path d="M3.500 10h17M8 3v4M16 3v4"/>'),
+  swap: tkIcon('<path d="M4 8h14l-3-3M20 16H6l3 3"/>'),
+};
+const tkDate = (iso) => new Date(String(iso).replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+function tkLeft(o, until) {
+  const ms = tkDate(until) - new Date(o.clock?.now || Date.now());
+  if (!(ms > 0)) return null;
+  const h = Math.floor(ms / 36e5); const m = Math.floor((ms % 36e5) / 6e4);
+  return h >= 48 ? `${Math.floor(h / 24)} pv ${h % 24} h` : h ? `${h} h ${m} min` : `${m} min`;
+}
+const tkCompare = (aLabel, a, bLabel, b, fmt) => { const top = Math.max(a, b, 1); return `<div class="tk-cmp"><span>${esc(aLabel)}</span><i style="width:${Math.max(2, Math.round((a / top) * 100))}%"></i><b>${fmt(a)}</b><span>${esc(bLabel)}</span><i class="now" style="width:${Math.max(2, Math.round((b / top) * 100))}%"></i><b>${fmt(b)}</b></div>`; };
+function tkReason(r) {
+  const d = r.detail || {};
+  let icon = TK.hand; let extra = '';
+  if (r.code === 'UNUSUAL_QUANTITY') { icon = TK.bars; extra = d.basis === 'product' ? tkCompare('Yleensä', d.typical, 'Nyt', d.quantity, (v) => `${qty(v)} ${esc(d.unit || '')}`) : tkCompare('Yleensä', d.typicalNet, 'Nyt', d.orderNet, money); }
+  else if (r.code === 'SPEND_CAP_ORDER') { icon = TK.euro; extra = tkCompare('Valtuus', d.cap, 'Tilaus', d.orderNet, money); }
+  else if (r.code === 'SPEND_CAP_DAY' || r.code === 'ORDER_SPLIT_UNDER_CAP') icon = TK.euro;
+  else if (r.code === 'DELIVERY_DATE_SHIFT') icon = TK.cal;
+  else if (r.code.startsWith('SUBSTITUTION')) icon = TK.swap;
+  return `<li>${icon}<div><p>${esc(reasonText(r))}</p>${extra}</div></li>`;
+}
+const tkLine = (l, tag = '') => `<li><span class="tk-img"><img src="/img/${esc(l.productId)}" alt="" loading="lazy" onerror="this.remove()"><b>${qty(l.quantity)}</b></span><span class="tk-name">${esc(l.name)}<small>${money(l.unitPriceNet)} / ${esc(l.salesUnitLabel)}${l.substituteFor ? `, korvaa tuotteen ${esc(l.substituteFor)}` : ''}${tag || (l.addedIn ? ', lisätty jälkikäteen' : '')}</small></span><span class="tk-sum">${money(l.lineNet)}</span></li>`;
+function phoneView(o) {
+  const add = o.pendingAddition || null;
+  const waiting = o.status === 'pending_approval' || !!add;
+  const ok = !waiting && o.status === 'confirmed';
+  const byHuman = (o.reasons || []).some((r) => r.code === 'HUMAN_REJECTED');
+  const failAt = waiting || ok ? -1 : byHuman ? 2 : 1;
+  const until = add?.approval?.expiresAt || o.cutoff;
+  const left = waiting && until ? tkLeft(o, until) : null;
+  const head = waiting ? (add ? 'Hyväksytkö lisäyksen?' : o.cutoffLabel ? `Päätä ${esc(o.cutoffLabel)} mennessä` : 'Hyväksytkö tilauksen?')
+    : ok ? `Toimitus ${esc(day(o.deliveryDate))}` : byHuman ? 'Tilaus hylätty' : 'Tilaus ei mennyt läpi';
+  const current = waiting ? 2 : ok ? 3 : failAt;
+  const steps = [['Tarjous', TK.doc], ['Tarkistus', TK.shield], [waiting ? 'Sinun vuoro' : 'Päätös', TK.hand], [o.deliveryDate ? day(o.deliveryDate) : 'Toimitus', TK.truck]];
+  const track = steps.map(([label, icon], i) => {
+    const cls = failAt >= 0 ? (i < failAt ? 'done' : i === failAt ? 'fail' : '') : i < current ? 'done' : i === current ? (ok ? 'now ok' : 'now') : '';
+    return `${i ? `<span class="tk-bar ${cls ? 'done' : ''}"></span>` : ''}<span class="tk-step ${cls}"><i>${cls === 'fail' ? '✕' : cls === 'done' ? '✓' : icon}</i><em>${esc(label)}</em></span>`;
+  }).join('');
+  const why = (add ? add.reasons : o.reasons || []).filter((r) => (waiting ? r.severity === 'approval' : r.severity === 'block'));
+  const lines = add ? add.lines : o.lines || [];
+  const ex = o.approval?.explanation;
+  return `<header class="tk-head ${waiting ? 'wait' : ok ? 'ok' : 'no'}">
+    <div class="tk-who">${esc(o.buyerName)}, ${esc(o.orderId)}</div>
+    <h2>${head}</h2>
+    ${left ? `<span class="tk-left">${TK.clock}aikaa ${left}</span>` : !waiting ? `<span class="tk-left">${ok ? '✓ Vahvistettu' : '✕ Hylätty'}</span>` : ''}
+    ${o.requestedBy || add?.requestedBy ? `<p class="tk-asked">"${esc(add?.requestedBy || o.requestedBy)}"</p>` : ''}
+  </header>
+  <div class="tk-track" role="img" aria-label="Tilauksen vaiheet">${track}</div>
+  ${why.length ? `<ul class="tk-why ${waiting ? '' : 'no'}">${why.map(tkReason).join('')}</ul>` : ''}
+  ${lines.length ? `<ul class="tk-lines">${lines.map((l) => tkLine(l, add ? ', lisäys' : '')).join('')}</ul>` : ''}
+  ${add && o.lines?.length ? `<p class="tk-note">Tilauksessa on jo ${o.lines.length} ${o.lines.length === 1 ? 'rivi' : 'riviä'}, ${money(o.totals.net)}. Se pysyy ennallaan, jos et hyväksy lisäystä.</p>` : ''}
+  ${o.suggestions?.length && waiting && !add ? suggestBlock(o) : ''}
+  ${ex && waiting && !add ? `<details class="ai-note"><summary><b>${{ approve: 'Tekoäly suosittelee: hyväksy', reject: 'Tekoäly suosittelee: hylkää', review: 'Tekoäly suosittelee: tarkista' }[ex.suggestion] || 'Tekoälyn selitys'}</b></summary><p class="small">${esc(ex.text)} ${esc(ex.suggestionWhy)}</p><p class="small muted">${esc(ex.model)}, päätös on sinun</p></details>` : ''}
+  <footer class="tk-foot">
+    <div class="tk-total"><span>${add ? `Lisäys +${money(add.addedNet)}, uusi summa` : 'Yhteensä, alv 0 %'}</span><b>${o.totals ? money(add ? add.orderNetIfApproved : o.totals.net) : '–'}</b></div>
+    ${waiting ? `<div class="tk-acts"><button class="tk-yes" data-act="approve" data-order="${o.orderId}">✓ ${add ? 'Hyväksy lisäys' : 'Hyväksy'}</button><button class="tk-no" data-act="reject" data-order="${o.orderId}">Hylkää</button></div>` : ''}
+  </footer>`;
+}
+
 // ====================== PUHELIN: yksi tilaus, yksi nappi ======================
 async function phone(orderId) {
   const root = $('#phone');
@@ -98,9 +184,7 @@ async function phone(orderId) {
   };
   const render = (o) => {
     if (o.clock?.simulated) document.body.insertAdjacentHTML('afterbegin', '<div class="demo-clock">Demokello: aika on simuloitu</div>');
-    if (o.status === 'pending_approval') root.innerHTML = `<h2>Hyväksytkö tilauksen?</h2>${orderCard(o, { link: false })}`;
-    else if (o.pendingAddition) root.innerHTML = `<h2>Hyväksytkö lisäyksen?</h2>${orderCard(o, { link: false })}`;
-    else root.innerHTML = `<div class="done"><div class="tick ${o.status === 'confirmed' ? '' : 'no'}">${o.status === 'confirmed' ? '✓' : '✕'}</div><h2>${o.addition ? (o.addition.status === 'applied' ? 'Lisäys hyväksytty' : 'Lisäys hylätty, tilaus ennallaan') : o.status === 'confirmed' ? 'Tilaus vahvistettu' : 'Tilaus hylätty'}</h2><p>${esc(o.orderId)}${o.totals ? `, ${money(o.totals.net)}, toimitus ${day(o.deliveryDate)}` : ''}</p></div>${orderCard(o, { actions: false, link: false })}`;
+    root.innerHTML = phoneView(o);
   };
   root.addEventListener('click', async (ev) => {
     const b = ev.target.closest('[data-act]'); if (!b) return;

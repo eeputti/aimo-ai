@@ -16,6 +16,22 @@ const ICON = {
 const STATUS = { confirmed: ['ok', 'Vahvistettu'], pending_approval: ['wait', 'Odottaa hyväksyntää'], rejected: ['no', 'Hylätty'] };
 const when = (iso) => new Date(iso).toLocaleString('fi-FI', { timeZone: 'Europe/Helsinki', weekday: 'short', day: 'numeric', month: 'numeric', hour: '2-digit', minute: '2-digit' });
 
+// Toimitusvarmuus ja hiilijalanjälki pieninä merkkeinä tuoterivillä. Puuttuva tieto ei näy lainkaan: tyhjä ei saa näyttää tarkistetulta.
+const ECO_ICON = {
+  truck: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h11v10H2zM13 10h4l4 3v3h-8z"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>',
+  leaf: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-9 5-14 15-14 0 10-5 15-14 14zM5 19l7-7"/></svg>',
+};
+const ecoNum = (n, d) => n.toLocaleString('fi-FI', { minimumFractionDigits: d, maximumFractionDigits: d });
+function ecoBadges(l) {
+  const out = [];
+  if (l.deliveryReliability != null) {
+    const pct = l.deliveryReliability * 100;
+    out.push(`<span class="eco-b ${pct >= 95 ? 'ok' : 'warn'}" title="Toimitusvarmuus ${ecoNum(pct, 1)} % Valion toimitusvarmuusdatan mukaan">${ECO_ICON.truck}${ecoNum(pct, 0)} %</span>`);
+  }
+  if (l.co2PerKg != null) out.push(`<span class="eco-b" title="Hiilijalanjälki ${ecoNum(l.co2PerKg, 2)} kg CO₂-ekv tuotekiloa kohti">${ECO_ICON.leaf}${ecoNum(l.co2PerKg, 1)} kg CO₂e/kg</span>`);
+  return out.length ? `<span class="eco">${out.join('')}</span>` : '';
+}
+
 function card(o, l) {
   const [cls, label] = STATUS[o.status] || ['no', o.status];
   const gross = l.unitPriceNet * (1 + (l.vatRate ?? 13.5) / 100);
@@ -27,6 +43,7 @@ function card(o, l) {
     <div class="pc-img"><img src="/img/${encodeURIComponent(l.productId)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'pc-noimg',textContent:'Ei kuvaa'}))"></div>
     <h3 class="pc-name">${esc(l.name)}</h3>
     <div class="pc-id">${esc(l.productId)}</div>
+    <div class="pc-eco">${ecoBadges(l)}</div>
     <div class="pc-price">${eur(l.unitPriceNet)} <small>/ ${esc(l.salesUnitLabel)}</small></div>
     <div class="pc-buy">
       <div class="pc-sub">${num(l.quantity)} ${esc(l.salesUnitLabel)} = ${eur(l.lineNet)}${l.orders > 1 ? `, ${l.orders} tilausta` : ''}<br>${eur(gross)} / ${esc(l.salesUnitLabel)} (alv ${num(l.vatRate ?? 13.5)} %)</div>
