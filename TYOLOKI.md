@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — demopolku: etusivulta WhatsAppiin, kori localhostissa (Claude Code)
+
+- **Käyttäjän päätös:** demo kulkee etusivu → WhatsApp-keskustelu → TILAA → päivittynyt kori/tilaus paikallisessa kaupassa (`http://localhost:4749/?shop=orders`) demokoneella. Kauppaa ei siirretä Workersiin ennen demoa: WhatsApp tarvitsee läppärin joka tapauksessa, ja vain localhostissa haku, kori ja tilaus toimivat oikeasti. Julkinen `aimo-order-demo…workers.dev` jää jaettavaksi linkiksi samasta tilauksesta.
+- **Etusivun WhatsApp-painike** (`public/storefront.js`, `storefront.css`): sisällön alkuun vihreä kortti "Tilaa keskustelemalla WhatsAppissa" ja "Avaa WhatsApp". Linkki luetaan Gitin ohittamasta `public/demo-config.json`:sta (malli `public/demo-config.example.json`), koska se sisältää apurin numeron, jota ei kirjata repoon. Ilman tiedostoa tai muulla kuin `https://wa.me`/`api.whatsapp.com`-osoitteella korttia ei näytetä.
+- **Tarkistukset:** erillinen staattinen esikatselu 4791 (ei palvelinta, ei kantoja), väliaikainen valenumeroasetus poistettu testin jälkeen. 1280 px ja 375 px: kortti ensimmäisenä, ei vaakaylivuotoa, ei konsolivirheitä. Vieras osoite ja puuttuva asetus piilottavat kortin, tuotekarusellit (5) ennallaan. `node --check` läpi.
+- **Käyttöönotto:** 4749 ajaa commitoitua snapshotia, joten kortti näkyy siellä vasta seuraavassa sovitussa uudelleenkäynnistyksessä. Lisäksi demokoneelle `public/demo-config.json` oikealla linkillä (Eeliksellä). Puhelinvastausten toimivuus on käyttöönottochatin vastuulla.
+
 ## 14.11.2026 — numeroliitoksen ja WhatsApp-siirron hyväksymistesti (Danielin alkuperäinen toteutuschatti)
 
 - Käyttäjä pyysi testaamaan numeron/testiasiakkaan sidoksen ja allokoimaan WhatsAppista verkkokauppaan siirron testauksen Eeliksen Codexin kanssa. Nykykoodi haettu pohjaan `fc29a0b`; vain testin ja raporttien muutoksia.

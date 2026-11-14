@@ -94,5 +94,25 @@ document.addEventListener('click', async (event) => {
   if (event.target.closest('.chat-launch')) { const intro = document.querySelector('.chat-intro'); intro.hidden = !intro.hidden; }
 });
 
+// Demo entry: landing page -> WhatsApp ordering. The chat link holds the assistant's phone number,
+// so it lives only in the git-ignored /demo-config.json (see demo-config.example.json). No file, no button.
+export function whatsappEntry(link) {
+  let url;
+  try { url = new URL(link); } catch { return ''; }
+  if (url.protocol !== 'https:' || !['wa.me', 'api.whatsapp.com'].includes(url.hostname)) return '';
+  return `<section class="whatsapp-entry"><div class="container"><a class="whatsapp-card" href="${esc(url.href)}" target="_blank" rel="noopener">
+    <span class="whatsapp-badge" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30"><path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.9 11.9 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.2c0-.1-.2-.2-.4-.3Z"/></svg></span>
+    <span class="whatsapp-copy"><strong>Tilaa keskustelemalla WhatsAppissa</strong><span>Kerro mitä tarvitset. Apuri kokoaa tilauksen, ja hyväksytty tilaus näkyy täällä verkkokaupassa.</span></span>
+    <span class="whatsapp-go">Avaa WhatsApp</span></a></div></section>`;
+}
+async function showWhatsappEntry() {
+  try {
+    const response = await fetch('/demo-config.json', { cache: 'no-store' });
+    if (!response.ok) return;
+    const html = whatsappEntry((await response.json()).whatsappLink);
+    if (html) document.querySelector('#storefront-content')?.insertAdjacentHTML('afterbegin', html);
+  } catch { /* optional demo setting */ }
+}
+
 export { product, rail };
-if (document.querySelector('#storefront-content')) render().catch((error) => { document.querySelector('#storefront-content').innerHTML = `<div class="container"><p>${esc(error.message)}</p></div>`; });
+if (document.querySelector('#storefront-content')) render().then(showWhatsappEntry).catch((error) => { document.querySelector('#storefront-content').innerHTML = `<div class="container"><p>${esc(error.message)}</p></div>`; });

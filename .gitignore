@@ -20,3 +20,6 @@ data/eval-oracle-cache.json
 # Python (Danielin MCP-palvelin)
 __pycache__/
 *.pyc
+
+# Demon WhatsApp-linkki sisältää apurin numeron: vain paikallisesti (malli: public/demo-config.example.json)
+public/demo-config.json
