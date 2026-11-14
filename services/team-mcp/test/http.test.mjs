@@ -57,7 +57,7 @@ test('reported SDK activity triggers a bounded OpenAI job and replies through th
 });
 test('two real SDK clients discover tools and coordinate via authenticated Streamable HTTP', async (t) => {
   const f = await fixture(t); const a = await f.connect(f.alice); const b = await f.connect(f.bob);
-  assert.equal((await a.listTools()).tools.length, 10);
+  assert.equal((await a.listTools()).tools.length, 13);
   assert.equal(data(await a.callTool({ name: 'whoami', arguments: {} })).id, 'alice-gpt');
   data(await a.callTool({ name: 'send_message', arguments: { project: 'aimo-ai', recipient: 'bob-claude', subject: 'Checkout API', body: 'Please read commit abcdef123', requestKey: 'http-message-1', sender: 'pretend' } }));
   const inbox = data(await b.callTool({ name: 'read_messages', arguments: { project: 'aimo-ai' } }));

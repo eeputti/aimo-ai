@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { dispatchAssignments } from './dispatch.mjs';
 
 const error = (code) => Object.assign(new Error(code), { code });
 export function createCoordinationStore(store) {
@@ -68,10 +69,12 @@ export function createCoordinationStore(store) {
           const requester = store.member(message.sender);
           if (!requester?.projects.includes(project)) continue;
           const pending = db.prepare("SELECT COUNT(*) AS n FROM coord_jobs WHERE project=? AND actor=? AND status IN ('queued','running')").get(project, actor).n;
+          const ownPending = db.prepare("SELECT COUNT(*) AS n FROM coord_jobs WHERE project=? AND actor=? AND requester=? AND status IN ('queued','running')").get(project, actor, message.sender).n;
+          const queueError = ownPending >= 5 ? 'REQUESTER_QUEUE_FULL' : pending >= 100 ? 'QUEUE_FULL' : null;
           const id = crypto.randomUUID();
           const created = db.prepare('INSERT OR IGNORE INTO coord_jobs(id,project,actor,requester,source_seq,input,status,due,created,updated,error_code) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-            .run(id, project, actor, message.sender, message.seq, JSON.stringify({ subject: message.subject, body: message.body }), pending < 100 ? 'queued' : 'failed', now(), now(), now(), pending < 100 ? null : 'QUEUE_FULL');
-          if (created.changes && pending >= 100) failedReply({ id, project, actor, requester: message.sender }, 'QUEUE_FULL');
+            .run(id, project, actor, message.sender, message.seq, JSON.stringify({ subject: message.subject, body: message.body }), queueError ? 'failed' : 'queued', now(), now(), now(), queueError);
+          if (created.changes && queueError) failedReply({ id, project, actor, requester: message.sender }, queueError);
         }
         db.prepare('INSERT INTO coord_offsets VALUES(?,?,?) ON CONFLICT(project,actor) DO UPDATE SET cursor=excluded.cursor').run(project, actor, events.at(-1)?.seq || cursor);
         return events;
@@ -97,11 +100,13 @@ export function createCoordinationStore(store) {
         return { ...db.prepare('SELECT * FROM coord_jobs WHERE id=?').get(job.id), input: JSON.parse(job.input) };
       });
     },
-    complete(job, worker, result) {
+    complete(job, worker, result, policy) {
       return tx(() => {
         const current = owns(job, worker);
         store.access(current.actor, current.project); store.access(current.requester, current.project);
-        replyToJob(current, `OpenAI-koordinaattorin vastaus\n\n${result.reply}`);
+        const tasks = dispatchAssignments(store, { ...current, input: JSON.parse(current.input) }, result, policy);
+        const dispatchNote = tasks.length ? '\n\nLuovutetut tehtävät:\n' + tasks.map((t) => `${t.id} -> ${t.owner}: ${t.title}`).join('\n') : '';
+        replyToJob(current, `OpenAI-koordinaattorin vastaus\n\n${result.reply}${dispatchNote}`);
         db.prepare("UPDATE coord_jobs SET status='succeeded',summary=?,reply=?,error_code=NULL,lease_owner=NULL,lease_until=0,updated=? WHERE id=?")
           .run(result.summary, result.reply, now(), job.id);
       });
@@ -109,6 +114,7 @@ export function createCoordinationStore(store) {
     fail(job, worker, code, retryable, retryAfterMs = 0) {
       return tx(() => {
         const current = owns(job, worker);
+        if (retryAfterMs > 900000) { retryable = false; code = 'OPENAI_RETRY_TOO_LONG'; retryAfterMs = 0; }
         const retry = retryable && job.attempts < 3;
         db.prepare('UPDATE coord_jobs SET status=?,error_code=?,lease_owner=NULL,lease_until=0,due=?,updated=? WHERE id=?')
           .run(retry ? 'queued' : 'failed', code, now() + Math.max(retryAfterMs, Math.min(60000, 5000 * 2 ** (job.attempts - 1))), now(), job.id);

@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createCoordinationStore } from './coordination-store.mjs';
+import { createRunnerStore } from './runner-store.mjs';
 export const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
 export const secret = () => crypto.randomBytes(32).toString('base64url');
 export class TeamError extends Error { constructor(code, message) { super(message); this.code = code; } }
@@ -29,7 +30,15 @@ export function openStore(filename, now = Date.now) {
     CREATE TABLE IF NOT EXISTS boards(project TEXT PRIMARY KEY,summary TEXT NOT NULL,revision INTEGER NOT NULL,actor TEXT NOT NULL,updated INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY,project TEXT NOT NULL,actor TEXT NOT NULL,type TEXT NOT NULL,data TEXT NOT NULL,created INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS auth_records(kind TEXT NOT NULL,key_hash TEXT NOT NULL,data TEXT NOT NULL,expires INTEGER NOT NULL,PRIMARY KEY(kind,key_hash));`);
-  const tx = (fn) => { db.exec('BEGIN IMMEDIATE'); try { const result = fn(); db.exec('COMMIT'); return result; } catch (err) { db.exec('ROLLBACK'); throw err; } };
+  let depth = 0;
+  const tx = (fn) => {
+    const level = depth++; const savepoint = `team_tx_${level}`;
+    try {
+      db.exec(level ? `SAVEPOINT ${savepoint}` : 'BEGIN IMMEDIATE');
+      try { const result = fn(); db.exec(level ? `RELEASE ${savepoint}` : 'COMMIT'); return result; }
+      catch (err) { db.exec(level ? `ROLLBACK TO ${savepoint}; RELEASE ${savepoint}` : 'ROLLBACK'); throw err; }
+    } finally { depth--; }
+  };
   const member = (id) => { const m = db.prepare('SELECT * FROM members WHERE id=? AND disabled=0 AND key_expires>?').get(id, now()); return m ? { id: m.id, name: m.name, projects: JSON.parse(m.projects), keyExpires: m.key_expires } : null; };
   const access = (actor, project) => { const m = member(actor); if (!m || !m.projects.includes(project)) deny('FORBIDDEN', 'Project not available to this identity'); return m; };
   const event = (project, actor, type, data) => db.prepare('INSERT INTO events(project,actor,type,data,created) VALUES(?,?,?,?,?)').run(project, actor, type, JSON.stringify(data), now());
@@ -92,6 +101,7 @@ export function openStore(filename, now = Date.now) {
       access(actor, project); const paths = [...new Set(resources.map(resourcePath))];
       return tx(() => {
         const old = taskId ? db.prepare('SELECT * FROM tasks WHERE id=? AND project=?').get(taskId, project) : null;
+        if (old) store.runner.guard(taskId);
         if (taskId && !old) deny('NOT_FOUND', 'Task not found in this project');
         if (old && ['done', 'released'].includes(old.status)) deny('CLOSED_TASK', 'Create a new task for closed work');
         if (old && old.owner !== actor && member(old.owner) && old.lease_until > now()) deny('TASK_BUSY', 'Another member owns this task until its lease expires');
@@ -114,6 +124,7 @@ export function openStore(filename, now = Date.now) {
       if (blockedOn) access(blockedOn, project);
       return tx(() => {
         const task = db.prepare('SELECT * FROM tasks WHERE id=? AND project=?').get(taskId, project);
+        store.runner.guard(taskId);
         if (!task || task.owner !== actor) deny('FORBIDDEN', 'Only the task owner can update it');
         if (task.revision !== expectedRevision) deny('REVISION_CONFLICT', 'Read the latest task revision before updating');
         if (task.status === 'done' || task.status === 'released') deny('CLOSED_TASK', 'Task is already closed');
@@ -137,6 +148,7 @@ export function openStore(filename, now = Date.now) {
       if (to === actor) deny('INVALID_RECIPIENT', 'Hand off to another member');
       return tx(() => {
         const task = db.prepare('SELECT * FROM tasks WHERE id=? AND project=?').get(taskId, project);
+        store.runner.guard(taskId);
         if (!task || task.owner !== actor) deny('FORBIDDEN', 'Only the task owner can hand it off');
         if (task.revision !== expectedRevision) deny('REVISION_CONFLICT', 'Read the latest task revision before updating');
         if (['done', 'released', 'handed_off'].includes(task.status)) deny('CLOSED_TASK', 'Task is closed or already handed off');
@@ -174,5 +186,6 @@ export function openStore(filename, now = Date.now) {
     },
   };
   store.coordination = createCoordinationStore(store);
+  store.runner = createRunnerStore(store, { deny, digest, secret, resourcePath, overlaps });
   return store;
 }

@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — heräteajurin ensimmäinen toteutus riippumattomaan tarkistukseen (Codex)
+
+- `work/local-runner`-haaraan toteutettu tokenilla sidotut kolme runner-työkalua, paikallinen HTTP-MCP/CLI-ajuri, instanssilukko ja päiväkirja, erilliset Git-työpuut, katkon sovittaminen ilman toista ajoa sekä rajattu automaattinen työnjako. Asetuspohja `.env.runner.example` ilman salaisuuksia. Ei uusia npm-riippuvuuksia. Tarkka toteutus/rajat `docs/parallel/runner-daniel.md`.
+- Ensimmäinen pohja: **54 tavallista testiä läpi, 0 virhettä, 2 vanhaa TODO-regressiota myös läpi**. Todelliset lapsiprosessit, SQLite-yhteydet ja Git-työpuu; CLI:t simuloitu eikä maksullisia malliajoja tehty. HTTP-ketjun laajempi varmennus ja riippumaton tarkistus vielä kesken. Myös vanhan koordinaattorikatselmoinnin L1/L2-korjaukset mukana; Windows-tarkistusten viimeistely jatkuu.
+- Aleksin Codex vastaanotti testiosuuden ec59bf51 ja Aleksin Claude käyttöohjeen 46f5495d. Claude julkaisi sopimukseen perustuvan rungon omalle haaralleen 84ddfad ja tarkisti natiivin Claude CLI:n; molemmat odottavat tämän koodipohjan SHA:ta. Toimitetaan se heti pushin varmennuksen jälkeen. Kenenkään käyttäjän palvelinta, tunnuksia tai kantoja ei muutettu. Tämä on tarkistettava pohja, ei käyttöönoton loppukuittaus.
+
 ## 14.11.2026 — paikallisen CLI-heräteajurin toteutussopimus ja työnjaon aloitus (Codex)
 
 - Käyttäjä pyysi toteuttamaan automaattisen heräteajurin sekä välittämään työtehtävän koordinaattorille ja jakamaan työtä Aleksin agenttien kesken. Suora työpyyntö toimitettu MCP:n `team-coordinator`-jäsenelle (viesti #79); jäsen löytyy, mutta vastausta ei vielä ole eikä API-tilaa voi vahvistaa vanhan liittimen työkaluilla. Nykyinen koordinaattori voi vain ehdottaa jakoa, ei väittää suorittaneensa delegointia.
