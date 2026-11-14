@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — landing page riisuttu lomakkeeksi (Claude Code, landing-chat)
+
+- **Käyttäjän pyyntö:** sivulle vain logo, WhatsApp-ikoni ja lomake, otsikkona "WhatsAppin tilausapuri". Yritys-kenttää ei tarvita. Logon ja WhatsApp-ikonin väliin sininen sydän, ja tilavaiheet Valion sinisellä. Metan koodikenttä sai jäädä ennalleen.
+- **Muutos (commit 45ca2bd, Worker-versio 3c4a8c81):** `deploy/cloudflare/index.html`, `public/landing.css`, `public/landing.js`. Esittely, puhelinkuva, vaiheet ja yrityskenttä poistettu, ja Worker käyttää yrityksenä oletusta Demokeittiö. Rajapinta ja D1 ennallaan. Julkaistu 477131e:n päältä, joten demomaksusivun paluu `/tilaukset.html`-sivulle säilyi.
+- **Tarkistukset:** Workerin testit 20/20, typecheck ja `cf deploy --dry-run` läpi. Paikallinen selainketju 375 px:n leveydellä tuotannon CSP:llä (lomake → liitos väliaikaiseen kantaan → koodi → hyväksyntä → Avaa WhatsApp). Ei vaakaylivuotoa, 1280 px tarkistettu. Julkinen osoite: uusi otsikko ja sydän, ei yrityskenttää, autentikoimaton lista 401, healthz ok.
+- **Päätös sivuston paikasta:** sivu pidetään samassa Workerissa. Lomake tarvitsee Workerin rajapinnan ja D1:n, joten GitHub Pages ei yksin riittäisi, ja erillinen Worker toisi vain toisen julkaisun ylläpidettäväksi.
+
 ## 15.11.2026 — hakujärjestys: pyydetty tuotetyyppi ennen halvempaa väärää (Claude Code, hakujärjestys-chat)
 
 - **Tehtävä:** selfplay-100:n hakulöydökset (koordinointitaulun viesti #152): kanafilee → Stroganoff, valkosipuli → hapankaali, herne → kikhernepihvi, salaatti → perunasalaatti, tomaatti → tomaattimurska, spagetti → spagettilihavuoka, kinkku → kinkkumakkara, lohi → kirjolohifilee, peruna 18 kg → kypsä suikaleperuna, tuorehiiva → kuivahiiva, sipuli 2 kg → nippu ilman kiloja.
