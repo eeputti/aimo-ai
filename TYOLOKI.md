@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — tyhjän demokorin lopputarkistus (Codex)
+
+Tämän korityövaiheen tyhjä alkukori, erillinen `referenceCart` ja käyttäjän muokkausten säilyttäminen ehtivät rinnakkaisen, käyttäjän pyytämän tilannetallennuksen commitiin `d20e017`. Samaa koodia ei commitoitu uudelleen.
+
+**Varmennus:** korin storetestit 9/9, JavaScriptin syntaksi ja diff-tarkistus läpi. Selaimessa päivitetty `http://localhost:4747/cart.html`: tyhjä kori, otsakkeen summa 0,00 euroa, Lisää tuotteita avaa saman sinisen AI-haun ja mikrofonin, `aria-expanded` päivittyy ja vaakaylivuoto on 0 px. Kori jätettiin näkyviin esikatseluun. Päädemon uudet search/review-reitit ja vanhojen tilausrivien säilyminen varmistettiin sanelutyövaiheen käyttöönotossa (ks. `e9a7c69`-merkintä). Maksupalvelu on edelleen liittämättä; maksuvaihe on esikatselu.
+
 ## 14.11.2026 — työpuun tilannetallennus: ostoskori alkaa tyhjänä (Claude Code)
 
 **Käyttäjän pyyntö:** Eelis pyysi pushaamaan uusimman version GitHubiin ennen käyttörajan täyttymistä. Työpuussa oli neljä commitoimatonta tiedostoa toisesta työvaiheesta; tämä istunto ei tehnyt niitä, vain tarkisti ja tallensi ne.
