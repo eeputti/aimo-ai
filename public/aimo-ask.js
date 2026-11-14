@@ -85,6 +85,15 @@
   const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   let origin = null; let seq = 0; let timer; let orderable = false;
+  let voice = null;
+  const voiceReady = import('/aimo-voice.js').then(({ attachVoice }) => {
+    voice = attachVoice({ root, input: q,
+      onBegin: () => { clearTimeout(timer); clearTimeout(liveTimer); seq++; },
+      onCancel: () => { clearTimeout(timer); clearTimeout(liveTimer); seq++; },
+      onCommit: (text) => { override = null; q.value = text; q.dispatchEvent(new Event('input')); clearTimeout(timer); return search(true); },
+    });
+    return voice;
+  }).catch(() => null); // Sanelun latausvirhe ei estä tavallista hakua.
   // Valittu resepti. override: hakukentässä näkyy ruoan nimi, mutta tulkintaan ja agentille lähtee raaka-ainelista määrineen.
   let portions = 100; let ideas = []; let picked = null; let override = null; let ideaSeq = 0; let ideaTimer;
   const sent = () => (override && q.value.trim() === override.label ? override.text : q.value.trim());
@@ -168,22 +177,24 @@
         <button type="button" class="ask-go"${items.length ? '' : ' disabled'}>${I.truck}Tilaa agentin kautta</button>
       </div>`;
   }
-  async function search() {
+  async function search(speech = false) {
     if (override && q.value.trim() !== override.label) { override = null; picked = null; paintIdeas(); }
     const text = sent(); const mine = ++seq;
     if (text.length < 2) { idle(); return; }
     let r;
     try {
-      const res = await fetch('/api/aimo/interpret', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, llm: false }) });
+      const res = await fetch('/api/aimo/interpret', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, llm: speech === true }) });
       r = await res.json();
       if (!res.ok) r = { error: r.error?.message || r.error || 'Haku epäonnistui' };
     } catch { r = { error: 'Hakupalveluun ei saatu yhteyttä.' }; }
     if (mine !== seq || root.hidden) return;
     render(r);
     if (!r.error) loadLive(r.understood?.deliveryDate || today(), mine);
+    return !r.error;
   }
   const setText = (text) => { q.value = text; q.focus({ preventScroll: true }); clearTimeout(timer); search(); };
   const toAgent = () => {
+    voice?.cancel();
     const text = sent(); if (!text) return;
     try { sessionStorage.setItem(HANDOFF_KEY, text); } catch { /* ilman tallennusta konsoli avautuu tyhjänä */ }
     location.href = '/agent.html';
@@ -231,6 +242,7 @@
   }
   async function close() {
     if (root.hidden) return;
+    voice?.cancel();
     seq++;
     if (!still()) {
       dim.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 180, fill: 'forwards' });
@@ -299,6 +311,7 @@
     box.classList.add('ask-trigger');
     input.placeholder = PLACEHOLDER; input.setAttribute('aria-label', PLACEHOLDER); input.readOnly = true; input.setAttribute('aria-haspopup', 'dialog');
     const go = (text) => { origin = box; open(text); };
+    voiceReady.then((v) => v?.addTrigger(box, () => go('')));
     box.addEventListener('click', () => go(''));
     input.addEventListener('keydown', (ev) => {
       if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'ArrowDown') { ev.preventDefault(); ev.stopImmediatePropagation(); go(''); }

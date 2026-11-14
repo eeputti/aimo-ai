@@ -2,6 +2,20 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — ostoslistan sanelu hakukenttään (Codex)
+
+**Käyttäjän päätös:** hakukentän oikeaan reunaan mikrofoni, josta nykyinen hakupaneeli avautuu kuunteluun. Pieni sininen/petrolinvärinen pallo reagoi ääneen, puhe näkyy tekstinä ja Valmis näyttää tavallisen tuotetulkinnan. Tuotteet, määrät ja toimituspäivä tarkistetaan ennen nykyisiä koritoimintoja.
+
+- Uudet `public/aimo-voice.js` ja `aimo-voice.css`: selaimen suomenkielinen SpeechRecognition/webkitSpeechRecognition, välitulokset, mikrofonin äänitasoon reagoiva pallo Web Audion avulla, Valmis, Peruuta, virhetilat ja kirjoittamiseen palaaminen. Värit ja painikkeet vastaavat hakupaneelia. 320/375 px:n asettelu ja vähennetty liike huomioitu.
+- `public/aimo-ask.js`: pieni valinnaisesti ladattava kytkentä otsakkeen kenttään ja paneeliin. Vain valmis sanelu menee olemassa olevaan `/api/aimo/interpret`-hakuun (mallivaratien saa käyttää); näppäily säilyy sääntöhakuna. Sanelu ei lisää tuotteita eikä lähetä tilausta. Enter päättää kuuntelun ennen lomakkeen omaa siirtymää.
+- Tauon vuoksi päättynyt selaimen tunnistusjakso jatkuu ilman lopullisten osien kahdentamista. Valmis, peruutus, Esc/sulkeminen, sivun piilottuminen ja siirtyminen vapauttavat äänimittarin mikrofoniraidat. Keskeneräinen lupapyyntö ei jätä myöhemmin saatua raitaa päälle. Kuuntelun enimmäiskesto 2 min; yli 600 merkin sanelua ei lähetetä palvelimen katkaistavaksi.
+- Sanelu vaatii selaintuen sekä HTTPS:n tai localhostin. Puheentunnistuksen palvelu on selaimen tarjoama (voi tarvita verkkoyhteyden); projektiin ei lisätty uutta puhepalvelua, API-avainta tai äänitallennusta. Tuettuja selaimia ja oikean laitteen suomen tunnistustarkkuutta ei tässä varmennettu.
+- `test/voice.test.mjs`: 8 testiä välituloksille, jaksojen jatkumiselle, myöhäisille tapahtumille, mikrofonin vapautukselle, lupa-/verkkovirheille, puuttuvalle selaintuelle, peruutukselle käsittelyn aikana ja liian pitkälle tekstille.
+
+**Tarkistukset:** `npm test` 34/34, `npm run aimo:eval` 26/26 (0 mallikutsua), JS-syntaksi ja `git diff --check`. HTTP-testin portin avaamiseen tarvittiin hiekkalaatikon oikeuslaajennus. Selaimessa erillinen simuloitu palvelin 4762/4763 omilla väliaikaisilla kannoilla, ilman API-avaimia ja simuloidulla puheella: kuuntelu, väliteksti, Valmis ja Enter (ei tilaussiirtymää), 20 l laktoositonta kermaa + 5 kg voita pe 20.11., peruutuksen tekstinpalautus, estetty lupa, sulkeminen sekä 1280/375/320 px ilman vaakaylivuotoa. Käyttäjän demopalvelinta tai tilauskantaa ei muutettu eikä käynnistetty uudelleen.
+
+**Rajaus ja jatko:** oikeaa puhetta, selaimen palvelun toimintaa, mikrofonilupaa ja tunnistustarkkuutta ei voitu todentaa simuloidulla äänilähteellä. Kokeile omalla mikrofonilla selaimessa. Commit sisältää vain sanelun sekä tämän kirjauksen; työpuun muiden työvaiheiden muutokset, myös `aimo-ask.js`:n muu työ ja vanhempi lokiluonnos, jätettiin paikalleen commitoimatta. Staattiset tiedostot tulevat käyttöön sivun päivityksellä.
+
 ## 14.11.2026 — hakupaneeli puhelinleveydellä: tulokset kentän alle, alaosa näkyviin (Claude Code)
 
 **Käyttäjän kysymys:** Eelis kysyi, toimiiko hakupaneeli puhelimessa. Paneeli aukesi ja haku toimi, mutta asettelussa oli kaksi vikaa, jotka korjattiin.
