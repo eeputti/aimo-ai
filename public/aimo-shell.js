@@ -15,6 +15,11 @@
     search: svg('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.500 4.500"/>', 22),
     calendar: svg('<rect x="3.500" y="5.500" width="17" height="15" rx="1.500"/><path d="M3.500 10h17M8 3v4M16 3v4"/>', 34),
     cart: svg('<path d="M2.500 4h3l2.600 11h10.400l2-8H7"/><circle cx="9.500" cy="19" r="1.400"/><circle cx="17" cy="19" r="1.400"/>', 34),
+    bars: svg('<path d="M5 20v-6M12 20V8M19 20V4"/>', 18),
+    bell: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.500 2h-15zM10 20a2 2 0 0 0 4 0"/>', 18),
+    go: svg('<path d="m9 6 6 6-6 6"/>', 16),
+    back: svg('<path d="M19 12H5m6-6-6 6 6 6"/>', 22),
+    fwd: svg('<path d="M5 12h14m-6-6 6 6-6 6"/>', 22),
   };
   const SEARCH = 'Hae tuotteita';
   const compact = page === 'approve';
@@ -74,6 +79,8 @@
   const api = async (path) => (await fetch(path, { headers: { authorization: `Bearer ${key()}` } })).json();
   const row = (href, main, sub, right = '', dot = '') => `<a class="as-row" href="${href}"${href.startsWith('/approve') ? ' target="_blank" rel="noopener"' : ''}>${dot ? `<i class="as-dot ${dot}"></i>` : ''}<span class="as-row-main"><b>${main}</b><small>${sub}</small></span>${right ? `<span class="as-row-right">${right}</span>` : ''}</a>`;
   const empty = (t) => `<p class="as-empty">${t}</p>`;
+  const link = (href, label, count = '') => `<a class="as-link" href="${href}"${href.startsWith('/console') ? ' target="_blank" rel="noopener"' : ''}><span>${label}</span>${count !== '' ? `<small>${count}</small>` : ''}</a>`;
+  const cal = { month: null, sel: null };
   const waitingOf = (s) => s.orders.filter((o) => o.status === 'pending_approval' || o.pendingAddition);
   const waitNet = (o) => (o.status === 'pending_approval' ? o.totals?.net || 0 : o.pendingAddition?.addedNet || 0);
 
@@ -86,17 +93,25 @@
         ${row('/.well-known/agent-gateway.json', 'Portin kuvaus', 'Kyvykkyydet, avaimet ja valvonnan säännöt')}`;
     },
     async products() {
-      await load();
-      try { types ||= (await api('/v1/product-types')).items; } catch { types = []; }
-      return `<h4>Tuoteryhmät</h4>
-        ${(types || []).map((t) => `<button type="button" class="as-row" data-type="${esc(t.fi)}"><span class="as-row-main"><b>${esc(t.fi)}</b><small>${esc((t.keywords || []).slice(0, 4).join(', '))}</small></span></button>`).join('') || empty('Tuoteryhmiä ei saatu ladattua.')}
-        <a class="as-more" href="/gateway.html#products">Agenttien tilaamat tuotteet</a>`;
+      const s = await load();
+      if (!types) {
+        try {
+          types = (await api('/v1/product-types')).items;
+          await Promise.all(types.map(async (t) => { try { t.total = (await api(`/v1/products/search?limit=1&productType=${encodeURIComponent(t.id)}`)).total; } catch { /* määrä jää pois */ } }));
+        } catch { types = null; }
+      }
+      const lines = (s?.orders || []).flatMap((o) => o.lines || []);
+      return `${link('/gateway.html#products', `${I.bars}Usein tilatut`, new Set(lines.map((l) => l.productId)).size || '')}
+        ${link('/gateway.html#inbox', `${I.bell}Odottaa hyväksyntää`, s ? waitingOf(s).length : '')}
+        <hr>
+        ${(types || []).map((t) => `<button type="button" class="as-link" data-type="${esc(t.fi)}"><span>${esc(t.fi)}</span><small>${t.total ?? ''}</small>${I.go}</button>`).join('') || empty('Tuoteryhmiä ei saatu ladattua.')}
+        <a class="as-more" href="/gateway.html#products">Katso agenttien tilaamat tuotteet</a>`;
     },
     async orders() {
-      const s = await load(); if (!s) return empty('Tilauksia ei saatu ladattua.');
-      return `<h4>Viimeisimmät tilaukset</h4>
-        ${s.orders.slice(0, 6).map((o) => { const [cls, label] = STATUS[o.status] || ['no', o.status]; return row(`/approve.html?order=${encodeURIComponent(o.orderId)}`, esc(o.orderId), `${esc(o.buyerName)} · toimitus ${o.deliveryDate ? fiDate(o.deliveryDate) : 'avoin'}`, `<b>${money(o.totals?.net || 0)}</b><small>${label}</small>`, cls); }).join('') || empty('Yhtään tilausta ei ole vielä tehty.')}
-        <a class="as-more" href="/gateway.html#inbox">Hyväksyntää odottavat</a>`;
+      return `${link('/gateway.html#inbox', 'Tilausten hallinta')}
+        ${link('/gateway.html#mandate', 'Mandaatit')}
+        ${link('/gateway.html#trail', 'Päätösketju')}
+        ${link('/console/watch', 'Raportit: taustavahti')}`;
     },
     async news() {
       const s = await load(); if (!s) return empty('Tapahtumia ei saatu ladattua.');
@@ -107,10 +122,33 @@
     },
     async date() {
       const s = await load(); if (!s) return empty('Toimituksia ei saatu ladattua.');
-      const today = String(s.clock.now).slice(0, 10); const days = new Map();
-      for (const o of s.orders) if (o.deliveryDate >= today && o.status !== 'rejected') days.set(o.deliveryDate, [...(days.get(o.deliveryDate) || []), o]);
-      return `<h4>Tulevat toimitukset</h4>
-        ${[...days].sort().slice(0, 5).map(([d, os]) => row('/gateway.html#inbox', fiDate(d), `${os.length} tilausta${os[0].cutoffLabel ? ` · tilaa viimeistään ${esc(os[0].cutoffLabel)}` : ''}`, `<b>${money(os.reduce((t, o) => t + (o.totals?.net || 0), 0))}</b>`)).join('') || empty('Ei tulevia toimituksia.')}`;
+      const today = String(s.clock.now).slice(0, 10);
+      const live = s.orders.filter((o) => o.deliveryDate && o.status !== 'rejected');
+      const next = live.map((o) => o.deliveryDate).filter((d) => d >= today).sort()[0];
+      cal.sel ||= next || today; cal.month ||= cal.sel.slice(0, 7);
+      const [y, m] = cal.month.split('-').map(Number);
+      const iso = (d) => d.toISOString().slice(0, 10);
+      const start = new Date(Date.UTC(y, m - 1, 1)); start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
+      const week = (d) => { const t = new Date(d); t.setUTCDate(t.getUTCDate() + 3); const j = new Date(Date.UTC(t.getUTCFullYear(), 0, 4)); return 1 + Math.round(((t - j) / 864e5 - 3 + ((j.getUTCDay() + 6) % 7)) / 7); };
+      let rows = '';
+      for (let w = 0; w < 6; w++) {
+        const first = new Date(start); first.setUTCDate(start.getUTCDate() + w * 7);
+        rows += `<tr><th>${week(first)}</th>${[0, 1, 2, 3, 4, 5, 6].map((i) => {
+          const d = new Date(first); d.setUTCDate(first.getUTCDate() + i); const k = iso(d);
+          const os = live.filter((o) => o.deliveryDate === k);
+          const cls = [k.slice(0, 7) !== cal.month ? 'out' : '', k === today ? 'today' : '', os.some((o) => o.status === 'pending_approval' || o.pendingAddition) ? 'open' : os.length ? 'done' : '', k === cal.sel ? 'sel' : ''].join(' ');
+          return `<td><button type="button" class="${cls}" data-day="${k}">${d.getUTCDate()}</button></td>`;
+        }).join('')}</tr>`;
+      }
+      const picked = live.filter((o) => o.deliveryDate === cal.sel);
+      const title = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('fi-FI', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+      return `<div class="as-cal">
+        <div class="as-cal-head"><button type="button" data-cal="-1" aria-label="Edellinen kuukausi">${I.back}</button><b>${title.charAt(0).toUpperCase()}${title.slice(1)}</b><button type="button" data-cal="1" aria-label="Seuraava kuukausi">${I.fwd}</button></div>
+        <table><thead><tr><th>VK</th><th>MA</th><th>TI</th><th>KE</th><th>TO</th><th>PE</th><th>LA</th><th>SU</th></tr></thead><tbody>${rows}</tbody></table>
+        <div class="as-cal-legend"><span><b>${+today.slice(8)}</b>Kuluva päivä</span><span><i class="done"></i>Vahvistettu tilaus</span><span><i class="sel"></i>Valittu päivä</span><span><i class="open"></i>Odottaa hyväksyntää</span></div>
+      </div>
+      <h4>Toimitus ${fiDate(cal.sel)}</h4>
+      ${picked.map((o) => { const [cls, label] = STATUS[o.status] || ['no', o.status]; return row(`/approve.html?order=${encodeURIComponent(o.orderId)}`, esc(o.orderId), `${esc(o.buyerName)} · ${label}`, `<b>${money(o.totals?.net || 0)}</b>`, cls); }).join('') || empty('Ei tilauksia tälle päivälle.')}`;
     },
     async cart() {
       const s = await load(); if (!s) return empty('Koria ei saatu ladattua.');
@@ -127,6 +165,12 @@
   el.addEventListener('click', async (ev) => {
     const typeBtn = ev.target.closest('[data-type]');
     if (typeBtn) { closeAll(); const q = el.querySelector('#as-q'); q.value = typeBtn.dataset.type; q.focus(); suggest(); return; }
+    const calBtn = ev.target.closest('[data-cal], [data-day]');
+    if (calBtn) {
+      if (calBtn.dataset.day) { cal.sel = calBtn.dataset.day; cal.month = cal.sel.slice(0, 7); }
+      else { const [y, m] = cal.month.split('-').map(Number); cal.month = new Date(Date.UTC(y, m - 1 + +calBtn.dataset.cal, 1)).toISOString().slice(0, 7); }
+      const pop = calBtn.closest('.as-pop'); pop.innerHTML = await MENU.date(); return;
+    }
     if (ev.target.closest('.as-pop')) { if (ev.target.closest('a')) closeAll(); return; }
     const box = ev.target.closest('.as-dd'); if (!box) return;
     const pop = box.querySelector('.as-pop'); const open = pop.hidden;
@@ -149,28 +193,36 @@
     form.scrollIntoView({ behavior: 'smooth', block: 'center' });
     if (submit) form.requestSubmit(); else input.focus({ preventScroll: true });
   };
-  let seq = 0; let debounce;
+  let seq = 0; let debounce; let limit = 6;
+  const mark = (name, text) => { const words = text.toLowerCase().split(/\s+/).filter((w) => w.length > 1); return esc(name).split(/(\s+)/).map((w) => (words.some((x) => w.toLowerCase().includes(x)) ? `<b>${w}</b>` : w)).join(''); };
   async function suggest() {
     const text = q.value.trim(); const mine = ++seq;
     if (text.length < 2) { sugg.hidden = true; return; }
     if (!state) await load();
     let r = null;
-    try { r = await api(`/v1/products/search?limit=6&q=${encodeURIComponent(text)}`); } catch { /* näytetään vain agenttirivi */ }
+    try { r = await api(`/v1/products/search?limit=${limit}&q=${encodeURIComponent(text)}`); } catch { /* näytetään vain agenttipainike */ }
     if (mine !== seq) return;
     const items = r?.items || [];
     closeAll(sugg); sugg.hidden = false;
-    sugg.innerHTML = `<button type="button" class="as-row agent" data-agent="1"><span class="as-row-main"><b>Anna ostopyyntönä agentille</b><small>”${esc(text)}”</small></span><span class="as-row-right"><small>Enter ↵</small></span></button>
-      ${items.length ? `<h4>Tuotteet${r.total > items.length ? ` · ${items.length} / ${r.total}` : ''}</h4>` : empty('Ei osumia tuotteista.')}
-      ${items.map((p) => `<button type="button" class="as-row prod" data-name="${esc(p.name.fi)}"><img src="/img/${encodeURIComponent(p.productId)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span class="as-row-main"><b>${esc(p.name.fi)}</b><small>${esc(p.productId)} · ${esc(p.brand || p.vendor || '')}</small></span><span class="as-row-right"><small>/ ${esc(p.salesUnit?.label || 'kpl')}</small></span></button>`).join('')}`;
+    sugg.innerHTML = `${items.length ? `<table class="as-hits"><thead><tr><th>Tuote</th><th>Tuotemerkki</th><th>Myyntiyksikkö</th><th>Määrä</th></tr></thead><tbody>
+      ${items.map((p) => `<tr><td><span class="as-hit"><img src="/img/${encodeURIComponent(p.productId)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'"><span><span class="as-hit-name">${mark(p.name.fi, text)}</span><small>${esc(p.productId)}</small></span></span></td><td>${esc(p.brand || p.vendor || '')}</td><td>${esc(p.salesUnit?.label || 'kpl')}</td>
+        <td><span class="as-qty" data-name="${esc(p.name.fi)}" data-unit="${esc(p.salesUnit?.label || 'kpl')}"><button type="button" data-step="-1" aria-label="Vähennä">−</button><input type="text" inputmode="numeric" value="" placeholder="${esc(p.salesUnit?.label || 'kpl')}" aria-label="Määrä: ${esc(p.name.fi)}"><button type="button" data-step="1" aria-label="Lisää">+</button></span></td></tr>`).join('')}
+      </tbody></table>` : empty('Ei osumia tuotteista.')}
+      ${r?.interpretedAs?.assumptions?.length ? `<p class="as-note">${esc(r.interpretedAs.assumptions.join(' '))}</p>` : ''}
+      <div class="as-foot"><span>Löytyi ${r?.total ?? 0} tuotetta</span><span class="as-foot-btns">${r && r.total > items.length && limit < 24 ? '<button type="button" class="as-btn ghost" data-all="1">Kaikki hakutulokset</button>' : ''}<button type="button" class="as-btn" data-agent="1">Pyydä tarjous agentilta</button></span></div>`;
   }
-  q.addEventListener('input', () => { clearTimeout(debounce); debounce = setTimeout(suggest, 180); });
-  q.addEventListener('focus', () => { if (q.value.trim().length >= 2) suggest(); });
+  // Valitut määrät muuttuvat ostopyynnöksi, jonka agentti hoitaa portin kautta: tarjous, mandaatti ja tarvittaessa ihmisen hyväksyntä.
+  const request = () => { const picked = [...sugg.querySelectorAll('.as-qty')].map((b) => ({ n: parseInt(b.querySelector('input').value, 10), name: b.dataset.name, unit: b.dataset.unit })).filter((x) => x.n > 0); return picked.length ? picked.map((x) => `${x.n} ${x.unit} ${x.name}`).join(' ja ') : q.value.trim(); };
+  q.addEventListener('input', () => { limit = 6; clearTimeout(debounce); debounce = setTimeout(suggest, 180); });
+  q.addEventListener('focus', () => { if (q.value.trim().length >= 2 && sugg.hidden) suggest(); });
   sugg.addEventListener('click', (ev) => {
-    const b = ev.target.closest('.as-row'); if (!b) return;
     ev.stopPropagation();
-    if (b.dataset.agent) toAgent(q.value.trim(), true); else toAgent(b.dataset.name, false);
+    const step = ev.target.closest('[data-step]');
+    if (step) { const input = step.parentElement.querySelector('input'); input.value = Math.max(0, (parseInt(input.value, 10) || 0) + +step.dataset.step) || ''; return; }
+    if (ev.target.closest('[data-all]')) { limit = 24; suggest(); return; }
+    if (ev.target.closest('[data-agent]')) toAgent(request(), true);
   });
-  el.querySelector('#as-search').addEventListener('submit', (ev) => { ev.preventDefault(); seq++; toAgent(q.value.trim(), true); });
+  el.querySelector('#as-search').addEventListener('submit', (ev) => { ev.preventDefault(); seq++; toAgent(sugg.hidden ? q.value.trim() : request(), true); });
 
   // Konsolissa oikea reuna: toimituspäivä ja kori (keittiödemossa app.js täyttää saman paikan omalla tilauksellaan).
   if (page !== 'gateway') return;
