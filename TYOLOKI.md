@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — palveluinventaario ja siirtokokeen ehdot koottu alustavalintaa varten (Codex, Cloudflare-julkaisuchatin raportti)
+
+- `Arvioi Cloudflare Workers -vaihtoehto` -chat luovutti valmiin `docs/parallel/cloudflare-backend-plan.md`:n (paikallinen tehtävä `8cd50a1b`). Raportti erottaa katselusivun ja sen koneella ajettavan julkaisijan, WhatsAppin/upotetun kaupan, erillisen storefrontin, tilausytimen, yhteisen Team MCP:n, koordinaattorin sekä mahdollisen ulkoisen ostosapurin. Toteutuksen olemassaolo ja kunkin palvelun todellinen käynti-/varmennustila on erotettu.
+- Käyttäjän alustavertailupyyntö pitää koko taustan alustavalinnan avoimena. Hostingin omistus ja läppäririippumattomuus ovat tavoite; uutta Workers-pohjaa, SQL-sovitinta tai tietosiirtoa ei aloiteta ennen valintaa. Integraatiochat kuittasi saman rajauksen, ja sen vaatimusraportti on jo `68c391a`:ssa. Nykyinen valmis katselupaketti tallennettiin erikseen `c0ef0fc`:ssä.
+- Käyttäjän kysymys erillisen katselusivun tarpeesta kirjattiin selvennyksenä: sivu on valinnainen demo, lopullinen hyväksytty tilaus kuuluu varsinaiseen verkkokauppaan. Kysymys ei ollut poistopyyntö, julkaisijan pysäytyspyyntö tai alustavalinta. Nykyistä sivua, sen dataa tai julkaisijaa ei muutettu tässä raporttivaiheessa.
+- Raportin seuraava testi kattaa valitun alustan eristetyn asennuksen, autentikoinnin, saman tilaus-/audit-ketjun, samanaikaiset uusinnat, katkot kriittisissä kohdissa ja pysyvyyden restartissa. MCP:n siirtokoe ja loppuvaihto säilyttävät yhden yhteisen taulun; nykyinen tunneli pysyy valmistelun ajan. Varsinaista siirtokoetta, pilvikoodia tai migraatiota ei tehty.
+- Kokoaja luki tekijän inventaarion, kuittaukset ja tarkistusten rajat, vertasi sen työnjakoa juuri tallennettuihin raportteihin sekä tarkisti seitsemän paikallista tiedosto-/globiviitettä, whitespace- ja avainmuodot. Pelkälle dokumenttimuutokselle ei toistettu sovellustestejä tai tekijän health-/tilannekuvakutsuja. Vain raportti ja tämä lokimerkintä kuuluvat commitiin; muiden keskeneräiset Meta- ja WhatsApp-linkin tiedostot säilyvät erillään.
+
 ## 14.11.2026 — valmis julkinen tilauskatselu ja vain lukeva julkaisija GitHubiin (Codex, Cloudflare-julkaisuchatin toteutus)
 
 - **Tekijä ja valtuutettu rajaus:** `Arvioi Cloudflare Workers -vaihtoehto` -chat toteutti ja luovutti `deploy/cloudflare/`-paketin sekä `docs/cloudflare.md`- ja `docs/parallel/cloudflare-setup.md`-raportit (tehtävä `6432ffe5`). Käyttäjä valitsi ensin ilmaisen jaettavan katselusivun nykyisen taustapalvelimen jäädessä koneelle. Tämä vaihe ei siirrä WhatsAppia, verkkokauppaa tai MCP:tä Workersiin. Käyttäjän uudempi koko backendin alustavertailu ei peru erikseen hyväksyttyä katseluvaihetta.
