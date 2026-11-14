@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — reseptisivun yläteksti pois (Codex)
+
+**Käyttäjän pyyntö:** poistetaan myös ”OMA KEITTIÖ. OMAT RESEPTIT.” -teksti reseptisivulta. Poistettu kyseinen kappale `public/recipes.html`:stä ilman korvaavaa tekstiä.
+
+**Varmennus:** päädemon `/recipes.html` palauttaa HTTP 200, poistettua tekstiä ei ole ja pääotsikko säilyy. Diff-tarkistus läpi. Pelkän tekstin poiston vuoksi testisarjaa ei ajettu. Staattinen muutos näkyy sivun päivityksellä; palvelinta tai koria ei muutettu.
+
 ## 14.11.2026 — rauhallinen tuotehaku ja tuotteen mukaan muokattava määrä (Codex)
 
 **Käyttäjän päätös:** keskeneräinen tai tunnistamaton haku ei valita. Pitkät ohjetekstit pois, pieni vihreä tuotelukumäärä tulosten ylle, toimituspäivä oikeaan yläkulmaan ja tuoterivillä nimi ennen määrävalintaa. Määrän yksikön pitää sopia tuotteeseen ja valinta pitää voida avata uudelleen. Toisessa hakuchatissa annettu uudempi otsikon poistopyyntö säilyy (`5c5775f`): yleistä Näin ymmärsin -otsikkoa ei palauteta.
