@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — numeroliitoksen ja WhatsApp-siirron hyväksymistesti (Danielin alkuperäinen toteutuschatti)
+
+- Käyttäjä pyysi testaamaan numeron/testiasiakkaan sidoksen ja allokoimaan WhatsAppista verkkokauppaan siirron testauksen Eeliksen Codexin kanssa. Nykykoodi haettu pohjaan `fc29a0b`; vain testin ja raporttien muutoksia.
+- Uusintasarja **35 läpi, 0 virhettä, 1 ohitettu** (36 yhteensä). Kattaa kutsukoodin numerorajauksen, autoliitoksen, restartin, asiakaserottelun, listan molempisuuntaiset muutokset, vahvistuksen/idempotenssin ja revokoinnin. Uusi regressio: sama numero yhdistetään uudelle testiyritykselle; vanha buyer/lista/selainvahvistus ei enää avaudu eikä vanha päivä, ruokavalio tai webhook-uusinta siirry uudelle asiakkaalle. Ei sovelluslähteen muutosta tarvittu.
+- Oma katalogiriippuvainen oikean gatewayn HTTP-testi ohitettiin puuttuvan `data/catalog.json`:n vuoksi. Eeliksen Codex on jo ajanut sen 1/1 ja oman koko sarjansa 191/191, commit `c63435d`; tätä ei lasketa tässä uudelleen suoritetuksi.
+- MCP-viestit #95/#98: oma osuus eristetyt automaattitestit ja testimatriisi; Eeliksen oikean koneen nykyinen tokenikorjaus-/tilauschat (tehtävä `11dc75ca`) pyydetty tarkistamaan todellinen numeroliitos, koodiversio, sama asiakas/lista ja oikean vahvistetun demotilauksen näkyminen kaupassa. Vastaanotto ja uusi puhelinketjun tulos ovat vielä avoimia. Tuore tieto tokenikorjauksen onnistumisesta huomioitu; ei rinnakkaista token- tai restart-työtä.
+- Raportti ja vaiheittaiset hyväksymiskriteerit: `docs/parallel/whatsapp-transfer-acceptance.md`. Nykyinen käyttäjän lista säilytetään; ei uusia oikeita Meta-/malli-/Valio-kutsuja, yhteisten kantojen muutoksia tai palvelinten restarteja tässä chatissa. Eeliksen oman puhelimen/kannan ajantasainen tarkistus ei ole tästä erillisestä pilvikloonista mahdollinen.
+
 ## 14.11.2026 — WhatsApp vastaa taas: token ladattu ja uusi viestiketju varmennettu (Codex, tokenikorjauschat)
 
 - Meta-oikeuden korjannut alkuperäinen käyttöönottotyö ilmoitti toimivasta 60 päivän tokenista (`587ae63` / `6db19a3`). Sen jälkeen tehtiin sovittu **yksi credential-reload klo 23.00**: PID 47387 pysäytettiin hallitusti, portin vapautuminen todettiin ja sama testattu **27ee93b**-snapshot käynnistettiin samalla `deploy/whatsapp/start.mjs`:llä. Uusi PID **59831**, hallintaistunto **11869**, sama tunneli ja kaikki viisi eristettyä pysyvää kantaa. Nykyinen messaging-only-token latautui `.env`:stä; uutta tokenia, management-scopea, Meta-ohjausta, Danielin uutta API:a tai erillistä workeria ei lisätty.
