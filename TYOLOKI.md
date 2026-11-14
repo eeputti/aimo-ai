@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — selaimen varademo samasta tilauskeskustelusta (Claude Code)
+
+**Miksi:** Metan 131005 estää vastaukset puhelimeen, eikä esto välttämättä aukea ennen demoa. Varademo näyttää saman tilauskeskustelun selaimessa ilman Metaa.
+
+- `server/whatsapp/web-demo.mjs` ja `public/whatsapp-demo.html`: WhatsApp-palvelimen osoite `/demo` (puhelimen näköinen keskustelunäkymä, pikavastaukset, vastausaika) ja `POST /demo/chat`. Viesti kulkee saman sillan, luonnoskannan, tuotetyökalujen ja gatewayn läpi kuin WhatsApp-viesti; vain Metan webhook ja lähetys jäävät väliin. Selaindemolla on oma testiasiakas (varattu numero, jota ei voi lisätä Metaan) ja oma luonnos.
+- Käytössä vain tilaustilassa (`WHATSAPP_ORDERING_ENABLED=true`) ja vain palvelinkoneen omasta selaimesta: tunnelin kautta tuleva pyyntö (välityspalvelimen otsakkeet tai muu isäntänimi), toisen sivuston pyyntö ja lomakelähetys saavat 403. Syy: sivu tekee malli- ja hintakutsuja ilman kirjautumista. Viestit käsitellään yksi kerrallaan.
+- `server/whatsapp/runtime.mjs`: reitti liitetty kanavan käsittelijän perään. `server/index.mjs`:ään tai verkkokaupan kantoihin ei koskettu.
+
+**Tarkistukset:** `npm test` 153/153. Kolme uutta testiä: sama ketju HTTP:n yli oikeilla moduuleilla ja simuloidulla rajapinnalla tuottaa yhden demotilauksen, vuorot eivät mene päällekkäin, ja tunneli-, vierassivusto- ja lomakepyynnöt torjutaan ilman mallikutsua. **Sivua ei ole katsottu selaimessa:** esikatselupalvelimen käynnistys estettiin, ja palvelimen käynnistykset kuuluvat Codexille. Sivun skripti on vain jäsennetty.
+
+**Käyttöönotto:** käynnissä oleva 4749-palvelin ajaa commitin `c94a1a3` koodia. Se ei sisällä tätä varademoa eikä edellisen merkinnän neljää korjausta (mm. gluteeniton + tilli → maustesuola). Tarvitaan yksi restart samoilla asetuksilla; sen jälkeen varademo on osoitteessa `http://localhost:4749/demo`.
+
 ## 14.11.2026 — verkkokaupan korvaajan hyväksyntä säilyttää korin virheessä (Codex)
 
 **Rajaus ja koordinointi:** käyttäjä pyysi seuraamaan muiden sessioiden työtä ja edistämään vapaata osuutta ilman ristiriitoja. Claudelle jäivät oikean mallin ja Valio-mock-API:n keskustelutestit, niistä löytyvät korjaukset, pitkien vastausten pilkkominen ja WhatsAppin selainvarademo. Muiden Codex-chattien Meta-/käyttöönottotyö ja käynnistyspaketti tarkistettiin chat-työkaluilla ja koordinointitaululta. Oma korityö varattiin ennen muutoksia. Yhteisen Gitin kesken ollutta yhdistämistä ei muokattu; oma tallennus odotti sen valmistumista.

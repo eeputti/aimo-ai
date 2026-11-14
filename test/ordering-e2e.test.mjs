@@ -108,3 +108,34 @@ test('WhatsApp-viestistä demotilaukseen: tarkistuslista, valinta, muutos, vahvi
   assert.equal(saved[0].lines.length, 2);
   assert.match(done, new RegExp(saved[0].id));
 });
+
+test('selaindemo: sama ketju HTTP:n yli oikeilla moduuleilla tuottaa yhden demotilauksen omalle testiasiakkaalle', { skip, timeout: 60_000 }, async (t) => {
+  const { openWhatsAppStore } = await import('../server/whatsapp/store.mjs');
+  const { createDemoOrderingChat } = await import('../server/whatsapp/ordering.mjs');
+  const { createWebDemo, WEB_DEMO_PHONE } = await import('../server/whatsapp/web-demo.mjs');
+  const { orders } = await import('../server/gateway/store.mjs');
+
+  const store = openWhatsAppStore(path.join(dir, 'whatsapp-web.db'));
+  const bridge = createDemoOrderingChat({ store, phoneId: settings.phoneId, draftDb: path.join(dir, 'web-drafts.db'), quoteDb: path.join(dir, 'web-quotes.db') });
+  const demo = createWebDemo({ store, chat: bridge.chat });
+  const server = http.createServer(async (req, res) => { if (!(await demo.handle(req, res, new URL(req.url, 'http://localhost')))) { res.writeHead(404); res.end(); } });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  t.after(async () => { await new Promise((r) => server.close(r)); await bridge.close(); store.close(); });
+  const say = async (text) => {
+    const res = await fetch(`http://127.0.0.1:${server.address().port}/demo/chat`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+    assert.equal(res.status, 200, text);
+    return res.json();
+  };
+
+  assert.match((await say('20 l maitoa ja 5 l kermaa maanantaiksi')).text, /Onko allergioita/);
+  const options = await say('laktoositon');
+  assert.equal(options.status, 'choosing');
+  assert.match(options.text, /\*Maito 20 l\*\n1\. [^\n]+€/);
+  assert.equal((await say('1 1')).status, 'ready');
+  const done = await say('TILAA');
+  assert.match(done.text, /Tilaus AGW-\S+ (on tallennettu|odottaa yrityksesi hyväksyjän kuittausta)/);
+  assert.match((await say('tilaa')).text, /on jo tallennettu\. Uutta tilausta ei tehty/);
+  const saved = orders.list(`whatsapp-demo-${store.member(WEB_DEMO_PHONE).binding}`);
+  assert.equal(saved.length, 1);
+  assert.match(done.text, new RegExp(saved[0].id));
+});

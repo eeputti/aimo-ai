@@ -3,6 +3,7 @@ import { openWhatsAppStore } from './store.mjs';
 import { createMetaSender, createWhatsAppChannel } from './channel.mjs';
 import { replyToAssistant } from '../assistant.mjs';
 import { bootstrapDemoMember, createDemoOrderingChat, validateOrderingEnvironment } from './ordering.mjs';
+import { createWebDemo } from './web-demo.mjs';
 
 export const whatsappDbPath = () => process.env.WHATSAPP_DB || fileURLToPath(new URL('../../data/whatsapp.db', import.meta.url));
 export function whatsappSettings(env = process.env) {
@@ -30,8 +31,12 @@ export function createConfiguredWhatsApp() {
   }
   const channel = createWhatsAppChannel({ settings, store, chat: ordering?.chat || replyToAssistant,
     onPrune: () => ordering?.prune(), send: createMetaSender(settings) });
-  return { ...channel, async close() {
-    try { await channel.stop(); await ordering?.close(); }
-    finally { store.close(); }
-  } };
+  // Selaindemo on olemassa vain tilaustilassa, jolloin kannat ovat eristetyt.
+  const webDemo = ordering ? createWebDemo({ store, chat: ordering.chat }) : null;
+  return { ...channel,
+    async handle(req, res, url = new URL(req.url, 'http://localhost')) { return (await channel.handle(req, res, url)) || (webDemo ? webDemo.handle(req, res, url) : false); },
+    async close() {
+      try { await channel.stop(); await ordering?.close(); }
+      finally { store.close(); }
+    } };
 }

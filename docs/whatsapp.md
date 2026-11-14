@@ -66,6 +66,8 @@ WHATSAPP_DEMO_PERSON=<valinnainen: testaajan nimi>
 - Asetukset voi pitää erillisessä `.env.whatsapp`-tiedostossa: `npm run whatsapp` ja `npm run whatsapp:member` lukevat sen `.env`:n jälkeen, ja sen arvot ohittavat `.env`:n arvot. Tiedosto on Gitin ohittama.
 - `/healthz` palauttaa tilaksi `ordering-demo`, kun tilausdemo on päällä, muuten `read-only-test`.
 
+**Selaimen varademo:** tilaustilassa palvelin tarjoaa osoitteessa `http://localhost:<portti>/demo` saman tilauskeskustelun selaimessa, omalla testiasiakkaalla ja ilman Metaa. Se toimii vain palvelinkoneen omasta selaimesta; tunnelin kautta pyyntö torjutaan, koska sivu tekee malli- ja hintakutsuja ilman kirjautumista.
+
 Jos viestin käsittely epäonnistuu, sama viesti yritetään uudelleen samalla Metan viestitunnisteella (enintään kolme kertaa, 30 ja 60 sekunnin välein). Tilauskeskustelu palauttaa uusinnalle saman tuloksen, joten uusinta ei tee toista tilausta.
 
 ## 3. Webhook
