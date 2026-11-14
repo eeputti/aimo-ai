@@ -79,6 +79,19 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
         return ordering.getShoppingList?.({ conversationId: conversationId(customer), customer }) || null;
       });
     },
+    async getStorefrontCart(member, expectedDraftId) {
+      return serial(member?.binding, async () => {
+        const current = member?.phone && store.member(member.phone);
+        if (!current || current.binding !== member.binding) throw Object.assign(new Error('Testiyhteys ei ole voimassa.'), { status: 403 });
+        const ordering = await getRuntime(); const customer = context(current);
+        if (!livePermissions(customer).readProducts) throw Object.assign(new Error('Ei käyttöoikeutta.'), { status: 403 });
+        const list = ordering.getShoppingList({ conversationId: conversationId(customer), customer });
+        if (list && list.id !== expectedDraftId) throw Object.assign(new Error('Korilinkki ei koske nykyistä koria.'), { status: 410 });
+        const result = await ordering.getStorefrontCart({ conversationId: conversationId(customer), customer });
+        if (!livePermissions(customer).readProducts) throw Object.assign(new Error('Ei käyttöoikeutta.'), { status: 403 });
+        return result;
+      });
+    },
     chat(args) { return serial(args.member?.binding, () => bridge.chatTurn(args)); },
     async chatTurn({ member, messageId, receivedAt, messages, expectedList }) {
       const current = member?.phone && store.member(member.phone);

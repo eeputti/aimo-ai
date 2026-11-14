@@ -25,6 +25,7 @@ import { searchStorefront, reviewStorefront, validDeliveryDate } from './storefr
 import { analyzeRecipeSource, recipeProducts } from './recipe-import.mjs';
 import { prepareCheckout, confirmCheckout } from './storefront-checkout.mjs';
 import { handleAssistantChat, assistantStatus } from './assistant.mjs'; // Tilausapuri: Danielin MCP-agentti sivulla /assistant.html
+import { createStorefrontWhatsAppSync } from './storefront-whatsapp-sync.mjs';
 import { createLocalShop } from './local-shop.mjs';
 
 import { createConfiguredWhatsApp, whatsappDbPath } from './whatsapp/runtime.mjs';
@@ -320,9 +321,11 @@ const routes = {
   },
 };
 
+const whatsappCartSync = createStorefrontWhatsAppSync({ sourceUrl: process.env.WHATSAPP_CART_SOURCE_URL || '' });
 export async function handleStorefrontRequest(req, res) {
   const t0 = performance.now();
   const url = new URL(req.url, 'http://localhost');
+  if (await whatsappCartSync.handle(req, res, url)) return;
   if (localShop?.handle(req, res, url)) return;
   if (['/agent', '/agent/', '/agent.html'].includes(url.pathname)) {
     url.searchParams.set('shop', 'agent');
