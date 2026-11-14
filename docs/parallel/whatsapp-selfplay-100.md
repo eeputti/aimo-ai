@@ -11,7 +11,7 @@ Tehtävä 26880afb, 15.11.2026. Eelis pyysi agentin, joka keskustelee apurin kan
 
 - `eval/whatsapp-personas.mjs`: 100 personaa (`PERSONAS`, S001–S100) generoidaan deterministisesti, 20 polkua x 5 muunnelmaa. Lisäksi 6 regressiota (`REGRESSIONS`, R01–R06) baseline-ajon löydöksistä. Omat tarkistukset `inspectPersona` erillään Codexin `inspectConversation`-funktiosta.
 - `scripts/whatsapp-selfplay-batch.mjs`: ajaa personat lapsiprosesseissa (oletus 1 persona per prosessi, `--chunk`, `--concurrency`, `--max-calls`, `--limit`, `--offset`, `--ids`, `--set regressions|all`). Kopioi lähdekoodin ajon alussa väliaikaishakemistoon, jotta rinnakkain muokattu työpuu ei vaihdu kesken ajon. Lapsiprosessi estää muut kuin paikalliset ja mallirajapinnan pyynnöt ja laskee tokenit tarkoituksittain. `--reinspect results.json` laskee tarkistukset uudelleen tallennetuista vuoroista ilman mallikutsuja. `--dry-run` listaa personat.
-- `test/whatsapp-personas.test.mjs`: 10 testiä ilman mallikutsuja. Rakenne, tuotetermien löytyminen simuloidusta hausta, jokaisen virheluokan tunnistus ja yhteenveto.
+- `test/whatsapp-personas.test.mjs`: 13 testiä ilman mallikutsuja. Rakenne, tuotetermien löytyminen simuloidusta hausta, jokaisen virheluokan tunnistus ja yhteenveto.
 - `npm run whatsapp:selfplay100 -- --limit 10` (lataa `.env`:n). Raportit tallentuvat Gitin ohittamaan polkuun `data/selfplay/<ajo>/` (`results.json`, `summary.md`, lapsiprosessien lokit).
 
 Tuotetermit tarkistettiin simuloidulla haulla päiville 16.–20.11. Jokaisella tavoitetuotteella on tilattava vaihtoehto, ja kaviaari, ananas ja appelsiinituoremehu palauttavat oikein nolla osumaa.
@@ -54,8 +54,44 @@ Hinnat claude-api-taidon taulukosta (Opus 5.5: 4 / 20 USD per miljoona, välimui
 
 Regressiosarja R01–R06 kattaa löydökset 1–4. Uudemmalla koodilla (5e0a61f) perusvaatimukset 5/6 (R03 sipuli puuttuu ja nippu ei kata tarvetta) ja uusi vaatimus 4/6. R01 ja R02 läpäisivät koodin tarkistukset vain siksi, että ostaja jaksoi pyytää uudelleen (arvio 2/5).
 
+## Laajennettu joukko X001–X100 (käyttäjän lisäpyyntö klo 1.25)
+
+`eval/whatsapp-personas-extended.mjs` (`--set extended`) lisää 100 personaa kuuteen luokkaan:
+
+| luokka | n | sisältö |
+|---|---|---|
+| errors | 20 | 5 l vaikka tarkoitti 5 dl, väärä tuote vaihdetaan, korjaus korjauksen päälle, "maanantaiks eli 18.11.", vastaus väärään kysymykseen, peruminen kesken, peruminen ja uusi aloitus |
+| dialect | 20 | savo, turku, stadin slangi, pohjalainen, tampere, karjala, Lappi, englanninsekainen, ruotsinsekainen ja maahanmuuttajan arkisuomi, kukin kahdesti |
+| weird | 15 | pelkät emojit tai numerot, pitkä rönsyilevä viesti, lyhyet palat, sivuasiat, vitsailu, kiukkuinen, töksähtelevä |
+| rush | 12 | tänään, heti, huomenna ennen klo 7 ja tilausajan umpeuduttua |
+| question | 25 | toimitusmaksu, aukioloajat, maksutavat, lasku, alkuperä, allergeenit, säilyvyys, reseptineuvo, valitus, "ootko botti", "haluan ihmisen", valikoima (pelkkä kysymys tai kysymys ja tilaus) |
+| greeting | 8 | pelkkä tervehdys neljänä kellonaikana |
+
+Jokaisella personalla on oma demokello: yö su klo 2.30, aamu 7.30, päivä 14.00 tai ilta 19.30. Ajuri lataa `gateway/clock.mjs`:n personan ajalla ennen runSelfplayta. Kello luetaan moduulin latauksessa, joten Codexin ajuriin ei tarvittu muutosta. Saman kellon personat ajetaan samassa lapsiprosessissa. Simuloidussa haussa maanantain tilausaika umpeutuu su klo 12.00, ja sen jälkeen aikaisin toimitus on ti 17.11. Kiirepolkujen odotettu päivä lasketaan kellosta, ja muut personat pyytävät ti–pe.
+
+Uudet tarkistukset:
+- Perumisen jälkeen kori on tyhjä (`cancel_not_applied`), eikä pelkkä kysymys lisää tuotetta (`question_added_item`).
+- Päivien ristiriita kysytään (`date_conflict_not_asked`), eikä väärän vastauksen jälkeen keksitä päivää (`date_invented`).
+- Kiireessä kerrotaan tilausaika (`rush_no_deadline`) ja aikaisin päivä (`rush_no_earliest_day`), eikä toimituskellonaikaa luvata (`delivery_time_promised`).
+- Toimitusmaksua, aukioloja, maksutapoja, laskua tai hyvitystä ei keksitä (`fact_invented:*`), vaan ohjataan tukeen tai kerrotaan tiedon puuttuvan (`not_referred:*`).
+- Botti tunnustaa olevansa botti (`bot_not_disclosed`, `claims_human`).
+- Tervehdys vastaa kellonaikaa (`greeting_wrong_time`, ja tervehdyspersonoilla `greeting_not_time_aware`, joka kuuluu uuteen vaatimukseen).
+- Kieltolauseet ("en voi luvata …") eivät laske keksityksi faktaksi.
+
+Ajurin tapausvalinta on yleinen: `--cases polku[:export]` (useita pilkulla). Moduulin oma `inspect(case, turns, list)` korvaa inspectPersonan, joten abuse-tests-session `eval/whatsapp-abuse-cases.mjs` toimii suoraan. `--source-ref origin/main` ajaa apurin koodin GitHubin versiosta, eikä tämän kansion jäljessä olevasta työpuusta.
+
+**Pilotti GitHubin koodilla (a6b53a9, 252b337:n hakukorjaus mukana):** 17 eri personaa 20 ajossa, 179 kutsua, noin 1,6 USD. Kolme kysymyspersonaa kaatui ensin uuden runSelfplayn päivävaatimukseen ja ajettiin uudelleen päivän kanssa. Perusvaatimukset 14/17, uusi vaatimus 15/17.
+- Toimii: yksikkövirhe, päivien ristiriita (apuri kysyi), väärä vastaus, murteet ymmärrettiin (savo, englanninsekainen, arkisuomi), emojit. Kysymyksissä ei keksitty toimitusmaksua, aukioloja tai hyvitystä, apuri tunnusti olevansa botti ja ohjasi yhteyshenkilölle tai asiakaspalveluun. Huomenna ennen klo 7: kellonaikaa ei luvattu. Tänään (aamulla) ja maanantaiksi (iltapäivällä): apuri kertoi heti aikaisimman päivän.
+- **Peruminen ei tyhjennä koria (X016):** "unohda koko homma" sai vastauksen "Luonnos on tyhjä", mutta maito jäi listalle. Omistaja Codex 97c238ef.
+- **Apuri ei kerro tilausaikaa, vaikka tietää sen (X056, X064):** kysyttäessä "mihin mennessä pitää tilata" apuri vastasi, ettei näe takarajaa. Sama järjestelmä tulostaa yhteenvetoon "Tilattava viimeistään su 15.11. klo 12.00" (X061, jossa vastaus oli siksi ristiriitainen). Dialogi ei saa tarjouksen tilausaikaa. Omistaja Codex 97c238ef.
+- **Tukiyhteystieto ei näy dialogille:** apuri sanoo, ettei sillä ole yhteystietoja, vaikka kanavaan on määritetty tukiyhteystieto (`tuki`-komento).
+- **Kellonaikatervehdys puuttuu vielä:** 0/17 ensimmäisestä vastauksesta tervehti kellonajan mukaan, mutta vääriä tervehdyksiä ei ollut. Omistaja date-first-options.
+
+**Kustannusarvio koko laajennetulle joukolle:** noin 0,11 USD tilaavaa personaa kohden ja 0,05 USD pelkkää kysymystä kohden. 100 personaa maksaa noin 9–12 USD ja vie noin 20 min neljällä rinnakkaisella prosessilla. Sitä ei ajettu ennen hyväksyntää.
+
 ## Seuraavat askeleet
 
-- Uusi 100 personan ajo nykyisellä koodilla mittaa 1a517f5:n ja 5e0a61f:n vaikutuksen samaan baselineen (noin 9–10 USD, 17 min). Sitä ei ajettu ilman erillistä hyväksyntää.
+- Uusi 100 personan ajo nykyisellä koodilla mittaa 1a517f5:n, 5e0a61f:n ja 252b337:n vaikutuksen samaan baselineen (noin 9–10 USD, 17 min, `--source-ref origin/main`). Sitä ei ajettu ilman erillistä hyväksyntää.
+- Koko laajennettu joukko X001–X100 (noin 9–12 USD) odottaa hyväksyntää.
 - Jatkuvaa tai ajastettua ajoa ei luotu. Se on helppo toteuttaa samalla ajurilla, jos käyttäjä hyväksyy kustannuksen ja tahdin.
 - Codexin 100 profiilin loppukoe ja tämä sarja voidaan raportoida yhdessä, kun molempien tulokset ovat samasta lähdeversiosta.

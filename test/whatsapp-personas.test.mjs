@@ -8,7 +8,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { PERSONAS, REGRESSIONS, inspectPersona, parseOptions } from '../eval/whatsapp-personas.mjs';
 import { inspectConversation } from '../eval/whatsapp-selfplay-cases.mjs';
-import { costUsd, modelOf, restoreTurns, summarize } from '../scripts/whatsapp-selfplay-batch.mjs';
+import { costUsd, modelOf, restoreTurns, summarize, loadCases, CASE_SETS } from '../scripts/whatsapp-selfplay-batch.mjs';
+import { EXTENDED, SLOTS, earliestDate } from '../eval/whatsapp-personas-extended.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CATALOG = path.join(ROOT, 'data/catalog.json');
@@ -58,7 +59,8 @@ test('jokaiselle tavoitetuotteelle löytyy tilattava vaihtoehto ja olemattomille
   const suggest = async (term, quantity, date) => (await tools.suggest({ customer, draft: { id: 'd', deliveryDate: date, diet: { known: true, claims: [], excludeAllergens: [] },
     lines: [{ ref: 'L1', productTerm: term, quantity, claims: [], excludeAllergens: [] }] } })).lines[0]?.options || [];
   const seen = new Set();
-  for (const p of PERSONAS) for (const [key, q] of Object.entries(p.expected)) {
+  // Laajennetun joukon odotetut päivät ovat ti–pe tai kiirepoluilla aikaisin päivä, jotka ovat tilattavissa myös klo 9.00 kellolla.
+  for (const p of [...PERSONAS, ...REGRESSIONS, ...EXTENDED]) for (const [key, q] of Object.entries(p.expected)) {
     const term = q.label; const id = `${term}|${p.date}`; if (seen.has(id)) continue; seen.add(id);
     assert.ok((await suggest(term, { value: q.value, unit: q.unit }, p.date)).length > 0, `${p.id}: ${term} ${p.date}`);
   }
@@ -81,8 +83,10 @@ test('hyvä keskustelu: päivä ensin, numeroidut vaihtoehdot määrin ja hinnoi
   ];
   const r = inspectPersona(persona, turns, turns.at(-1).list);
   assert.deepEqual(r.failures, []);
-  // OPTIONS_B ei tarjoa enää 4:ää: vaatimus koskee jokaista vaihtoehtolistaa.
-  assert.deepEqual(r.newRequirement, ['options_no_more_hint']);
+  // OPTIONS_B:ssä on vain kaksi vaihtoehtoa: vajaasta listasta ei ole enempää näytettävää, joten 4:ää ei vaadita.
+  assert.deepEqual(r.newRequirement, []);
+  const full = OPTIONS_B.replace('\n\nVastaa numerolla.', '\n3. Atria rintafilee 2 kg: 5 pkt (10 kg), 99,50 €\n\nVastaa numerolla.');
+  assert.ok(inspectPersona(persona, [turns[0], { ...turns[1], assistant: full }], turns[1].list).newRequirement.includes('options_no_more_hint'), 'täysi kolmen lista ilman 4:ää');
   assert.equal(r.metrics.moreRequests, 1); assert.equal(r.metrics.optionReplies, 2); assert.equal(r.metrics.linkTurn, 4); assert.equal(r.metrics.allSelected, true);
   assert.deepEqual(parseOptions(OPTIONS_A)[0].map((o) => [o.number, o.hasPrice, o.hasQuantity]), [[1, true, true], [2, true, true], [3, true, true]]);
   assert.equal(parseOptions(OPTIONS_A)[0].heading, 'Broilerin rintafilee 10 kg');
@@ -152,4 +156,81 @@ test('kustannusarvio käyttää mallikohtaisia hintoja ja yhteenveto listaa virh
   const md = summarize(results, { calls: 10, failed: 0, input: 100, output: 50, cacheRead: 0, orders: 0, ms: 60000, personaMs: 60000, assistantMs: 30000, byPurpose: { whatsapp_order_turn: { calls: 10, input: 100, output: 50, cacheRead: 0 } } },
     { created: 'x', commit: 'abc', dirty: [], snapshotHash: '0'.repeat(64), deepModel: 'claude-opus-5-5', fastModel: 'claude-haiku-5-5' });
   assert.match(md, /missing: 1/u); assert.match(md, /options_no_more_hint: 1/u); assert.doesNotMatch(md, /https:/u); assert.doesNotMatch(md, /\u00b7/u);
+});
+
+test('laajennettu joukko X001–X100: luokat, kellonajat ja kellon mukaan laskettu aikaisin päivä', () => {
+  assert.equal(EXTENDED.length, 100); assert.equal(new Set(EXTENDED.map((p) => p.id)).size, 100);
+  assert.equal(new Set([...PERSONAS, ...REGRESSIONS, ...EXTENDED].map((p) => p.id)).size, 206);
+  const cats = {}; for (const p of EXTENDED) cats[p.category] = (cats[p.category] || 0) + 1;
+  assert.deepEqual(cats, { errors: 20, dialect: 20, weird: 15, rush: 12, question: 25, greeting: 8 });
+  for (const slot of Object.keys(SLOTS)) assert.ok(EXTENDED.filter((p) => p.slot === slot).length >= 20, slot);
+  assert.equal(new Set(EXTENDED.filter((p) => p.category === 'dialect').map((p) => p.route)).size, 10);
+  assert.equal(earliestDate('morning'), '2026-11-16'); assert.equal(earliestDate('evening'), '2026-11-17');
+  for (const p of EXTENDED) {
+    assert.ok(p.now && p.greetingWrong && p.brief.includes('Kello on nyt'), p.id);
+    if (p.rush) assert.equal(p.date, earliestDate(p.slot), p.id);
+    else if (!p.expectEmpty) assert.ok(['2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20'].includes(p.date), `${p.id} ${p.date}`);
+    if (p.expectEmpty) assert.deepEqual(p.expected, {}, p.id);
+    for (const [, q] of Object.entries(p.expected)) assert.ok(Number.isFinite(q.value) && q.value > 0, p.id);
+  }
+  assert.equal(EXTENDED.find((p) => p.route === 'rush-before7' && p.slot === 'evening').expected.peruna.value, 25, 'kellonaika 7 ei ole määrä');
+});
+
+test('laajennetut tarkistukset: keksityt faktat, ohjaus tukeen, botti, kiire, tervehdys, peruminen, päivien ristiriita', () => {
+  const X = (route) => EXTENDED.find((p) => p.route === route);
+  const fee = X('question-fee');
+  const one = (persona, assistant, lines = [], date = null, user = persona.first) => inspectPersona(persona, [{ user, assistant, list: list(date, lines) }], list(date, lines));
+  assert.ok(one(fee, 'Moi! Toimitusmaksu on 9,90 € alle 100 euron tilauksissa.').failures.includes('fact_invented:fee'));
+  assert.ok(one(fee, 'Toimitus on ilmainen yli 200 euron tilauksissa.').failures.includes('fact_invented:fee'));
+  assert.deepEqual(one(fee, 'En näe toimitusmaksua täältä, joten en voi luvata summaa. Kysy asiakaspalvelusta.').failures, []);
+  assert.ok(one(fee, 'Kiva kun kysyit! Tilataanko jotain?').failures.includes('not_referred:fee'));
+  assert.ok(one(fee, 'Moi!', [line('maito', 20, 'L')]).failures.includes('question_added_item'));
+  assert.ok(one(X('question-hours'), 'Olemme auki arkisin klo 8–16.').failures.includes('fact_invented:hours'));
+  assert.ok(one(X('question-payment'), 'Voit maksaa kortilla tai MobilePaylla.').failures.includes('fact_invented:payment'));
+  assert.ok(one(X('question-complaint'), 'Pahoittelut, hyvitämme rikkinäiset munat seuraavassa laskussa.').failures.includes('fact_invented:complaint'));
+  const bot = X('question-bot');
+  assert.deepEqual(one(bot, 'Olen tekoälyllä toimiva tilausapuri, en ihminen. Asiakaspalvelu auttaa muissa asioissa.').failures, []);
+  assert.ok(one(bot, 'Joo, olen ihminen täällä!').failures.includes('bot_not_disclosed'));
+  assert.ok(one(X('question-human'), 'Kerro vaan mitä tarvitset.').failures.includes('not_referred:human'));
+
+  const rush = X('rush-cutoff');
+  const r1 = one(rush, 'Ei tilattavaa tuotetta päivälle ma 16.11.: maito.', [line('maito', 20, 'L')], '2026-11-17');
+  assert.ok(r1.failures.includes('rush_no_deadline') && r1.failures.includes('rush_no_earliest_day'), 'pelkkä "ei tilattavaa" ei kerro tilausaikaa eikä aikaisinta päivää');
+  const r2 = one(rush, 'Maanantain tilausaika umpeutui su klo 12.00. Aikaisin mahdollinen toimitus on ti 17.11.', [line('maito', 20, 'L')], '2026-11-17');
+  assert.ok(!r2.failures.includes('rush_no_deadline') && !r2.failures.includes('rush_no_earliest_day'));
+  const b7 = EXTENDED.find((p) => p.rush === 'before7');
+  assert.ok(one(b7, 'Joo, toimitus saapuu huomenna ennen klo 7!').failures.includes('delivery_time_promised'));
+  assert.ok(!one(b7, 'En voi luvata, että toimitus saapuu ennen klo 7.').failures.includes('delivery_time_promised'));
+
+  const evening = EXTENDED.find((p) => p.route === 'greeting-time' && p.slot === 'evening');
+  assert.ok(one(evening, 'Hyvää huomenta! Mitä tilataan?').newRequirement.includes('greeting_wrong_time'));
+  assert.ok(!one(evening, 'Hyvää iltaa! Mitä tilataan?').newRequirement.includes('greeting_wrong_time'));
+  assert.ok(one(evening, 'Moi! Mitä tilataan?').newRequirement.includes('greeting_not_time_aware'));
+  assert.ok(!one(evening, 'Hyvää iltaa! Mitä tilataan?').newRequirement.includes('greeting_not_time_aware'));
+  assert.ok(!one(EXTENDED.find((p) => p.route === 'greeting-time' && p.slot === 'morning'), 'Huomenta! Mitä tilataan?').newRequirement.includes('greeting_wrong_time'));
+
+  const cancel = X('cancel');
+  assert.ok(one(cancel, 'Selvä, peruttu.', [line('maito', 20, 'L')]).failures.includes('cancel_not_applied'));
+  assert.deepEqual(one(cancel, 'Selvä, lista tyhjennetty, mitään ei tilattu.').failures, []);
+  const mixed = X('mixed-dates');
+  assert.ok(inspectPersona(mixed, [{ user: mixed.first, assistant: 'Selvä! [ostoskorilinkki]', list: list('2026-11-18', [line('maito', 20, 'L', { selectedProductId: 'x' })]) }], list('2026-11-18', [line('maito', 20, 'L')])).failures.includes('date_conflict_not_asked'));
+  const wrong = X('wrong-answer');
+  const turns = [{ user: wrong.first, assistant: 'Mille päivälle toimitus?', list: list(null, [line('voi', 5, 'KG')]) }, { user: 'joo 5 kg', assistant: 'Laitoin perjantaille.', list: list('2026-11-20', [line('voi', 5, 'KG')]) }];
+  assert.ok(inspectPersona(wrong, turns, turns[1].list).failures.includes('date_invented'));
+});
+
+test('loadCases: yleinen tapausvalinta, oma tarkistin ja polkurajaus', async () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const all = await loadCases(root, CASE_SETS.all);
+  assert.equal(all.cases.length, 206);
+  const codex = await loadCases(root, 'eval/whatsapp-selfplay-cases.mjs:SELFPLAY_CASES');
+  assert.ok(codex.cases.length >= 5 && codex.inspectors.get(codex.cases[0].id) === inspectPersona);
+  await assert.rejects(() => loadCases(root, '../etc/x.mjs'), /projektin sisällä/u);
+  await assert.rejects(() => loadCases(root, 'eval/whatsapp-personas.mjs:PERSONAS,eval/whatsapp-personas.mjs:PERSONAS'), /toistuva/u);
+  const dir = fs.mkdtempSync(path.join(root, 'eval', '.tmp-cases-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'c.mjs'), "export const CASES = [{ id: 'T1', first: 'moi', brief: 'b', expected: {}, maxTurns: 2 }];\nexport const inspect = () => ['custom'];\n");
+    const custom = await loadCases(root, `eval/${path.basename(dir)}/c.mjs`);
+    assert.deepEqual(custom.inspectors.get('T1')(), ['custom']);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });

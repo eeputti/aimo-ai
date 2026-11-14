@@ -226,6 +226,9 @@ export const PERSONAS = Array.from({ length: 5 }, (_, v) => JOURNEYS.map((make, 
     brief: `Olet ostaja, keittiötyyppi: ${kitchen.name}. ${used.brief} ${goal.brief} Älä muuta tavoitetta apurin virheen takia: korjaa virhe.` };
 })).flat();
 
+// Rakennuspalat muille persoonatiedostoille (eval/whatsapp-personas-extended.mjs). Samat tuotetermit ja avaimet.
+export const PERSONA_KIT = { P, DAYS, TOMORROW, STYLES, KITCHENS, LINK, NODIET, fiNum, unitFi, amount, word, item, join, needText, expect, pick, val };
+
 // Regressiosarja 100 persoonan baseline-ajon (15.11.2026) löydöksistä. Erillään PERSONAS-sarjasta, jotta 100 persoonan
 // ajot pysyvät vertailukelpoisina. Ajo: scripts/whatsapp-selfplay-batch.mjs --set regressions.
 // selected: valitun tuotteen nimen pitää sisältää must ja ei saa sisältää not; regularOffered: tavallinen käy, joten
@@ -303,7 +306,7 @@ export function inspectPersona(persona, turns, list) {
 
   // (a) Toimituspäivä ensin: jos päivä puuttui, ensimmäinen vastaus kysyy sitä eikä vaihtoehtoja näytetä ennen päivää.
   // Neuvoa kysyvä ei vielä tilaa: päivää ei tarvitse kysyä ennen kuin tilattavaa on.
-  if (!persona.dateInFirst && !persona.adviceFirst && turns.length) {
+  if (!persona.dateInFirst && !persona.adviceFirst && !persona.noOrderFirst && turns.length) {
     const firstQs = questionsOf(replies[0]);
     if (!firstQs.some((q) => DATE_ASK.test(q)) && !DATE_ASK.test(replies[0])) fresh.push('date_not_asked_first');
     else if (firstQs.length && !DATE_ASK.test(firstQs[0])) fresh.push('date_not_first_question');
@@ -324,7 +327,8 @@ export function inspectPersona(persona, turns, list) {
         if (b.some((o) => !o.hasPrice)) fresh.push('options_missing_price');
         if (b.some((o) => !o.hasQuantity)) fresh.push('options_missing_quantity');
       }
-      if (!/(\b4\b|neljä)[^\n]{0,60}(lisää|muita|enemmän)|(lisää|muita|enemmän) vaihtoeh[^\n]{0,60}\b4\b/iu.test(replies[i])) fresh.push('options_no_more_hint');
+      // 4 = lisää vaihtoehtoja vaaditaan vain täydelle kolmen vaihtoehdon sivulle; vajaasta listasta ei ole enempää näytettävää.
+      if (blocks.some((b) => b.length >= 3) && !/(\b4\b|neljä)[^\n]{0,60}(lisää|muita|enemmän)|(lisää|muita|enemmän) vaihtoeh[^\n]{0,60}\b4\b/iu.test(replies[i])) fresh.push('options_no_more_hint');
     }
     // (c) "4" tuo uudet, aiemmista eroavat vaihtoehdot eikä valitse neljättä tai muuta määrää neljäksi.
     if (/^\s*(4|nelonen|neljä)\s*[.!]?\s*$/iu.test(t.user) || /^(näytä )?(lisää|muita) vaihtoehtoja/iu.test(t.user.trim())) {
@@ -353,8 +357,9 @@ export function inspectPersona(persona, turns, list) {
   else if (persona.dietStated && dietQuestions.length) failures.push('diet_question_after_stated');
   metrics.dietQuestions = dietQuestions.length;
 
-  // (e) Lopullisen korin rivit, määrät, ruokavaatimukset ja päivä.
+  // (e) Lopullisen korin rivit, määrät, ruokavaatimukset ja päivä. Perutulla tai pelkällä kysymyksellä kori jää tyhjäksi.
   const lines = list?.lines || [];
+  if (persona.expectEmpty && lines.length) failures.push(persona.route === 'cancel' ? 'cancel_not_applied' : 'question_added_item');
   for (const [key, want] of Object.entries(persona.expected)) {
     const found = lines.filter((l) => matchesKey(l.productTerm, key, want));
     if (!found.length) { failures.push(`missing:${key}`); continue; }
@@ -369,10 +374,10 @@ export function inspectPersona(persona, turns, list) {
   }
   for (const line of lines) if (!Object.entries(persona.expected).some(([key, want]) => matchesKey(line.productTerm, key, want))) failures.push(`unexpected:${line.productTerm}`);
   for (const term of persona.absent || []) if (lines.some((l) => lower(l.productTerm).includes(lower(term)))) failures.push(`unremoved:${term}`);
-  if (list?.deliveryDate !== persona.date) failures.push('delivery_date');
+  if (!persona.expectEmpty && list?.deliveryDate !== persona.date) failures.push('delivery_date');
   metrics.allSelected = lines.length > 0 && lines.every((l) => l.selectedProductId);
   metrics.linkTurn = replies.findIndex((r) => r.includes('[ostoskorilinkki]')) + 1 || null;
-  if (!metrics.linkTurn) failures.push('cart_link_missing');
+  if (!metrics.linkTurn && !persona.expectEmpty) failures.push('cart_link_missing');
   if (persona.adviceFirst && turns[0]?.list?.lines?.length) failures.push('advice_added_item');
 
   // Lisähavainnot: kori väitetään päivitetyksi ennen tuotevalintaa; vaihtoehto ei kata tarvetta tarpeen yksikössä.
@@ -405,6 +410,41 @@ export function inspectPersona(persona, turns, list) {
         && !/tarkkaa osumaa ei|lähimmät|korvaav/iu.test(reply)) failures.push('unrelated_substitute_offered');
     }
   }
+
+  // Laajennettu joukko (eval/whatsapp-personas-extended.mjs): päivien ristiriita, kiire, faktat, botti, ihminen, tervehdys.
+  const sentences = replies.flatMap((r) => r.split(/(?<=[.!?])\s+|\n/u)).filter((x) => x.trim());
+  const NEG = /(?<![\p{L}])(ei|en|emme|eikä)(?![\p{L}])|ole tietoa|tiedä|pysty|voi luvata|varmist/iu;
+  const claimed = (re) => sentences.some((x) => re.test(x) && !NEG.test(x));
+  if (persona.dateConflict && !replies.some((r) => questionsOf(r).some((q) => /(maanantai|keskiviikko|18\.11|päiv)/iu.test(q)))) failures.push('date_conflict_not_asked');
+  if (persona.wrongAnswerTurn && turns[persona.wrongAnswerTurn - 1]?.list?.deliveryDate) failures.push('date_invented');
+  if (persona.rush) {
+    // Kellonaika: "klo 12" tai "12.00", ei päivämäärä "16.11.".
+    const deadline = /(viimeistään|tilausaika|tilattava|mennessä|ehti|ehdi|umpeut|takaraja)[^\n]{0,80}(klo\s?\d|\b\d{1,2}[.:][0-5]\d\b(?!\.))|(klo\s?\d{1,2}(?:[.:]\d{2})?)[^\n]{0,40}(mennessä|asti|viimeistään)/iu;
+    if (!replies.some((r) => deadline.test(r))) failures.push('rush_no_deadline');
+    const [, m, d] = persona.date.split('-').map(Number);
+    if (!replies.some((r) => new RegExp(`\\b${d}\\.\\s?${m}\\.`, 'u').test(r) || /(aikaisin|aikaisintaan|ensimmäinen mahdollinen|nopein|seuraava mahdollinen|varhaisin)/iu.test(r))) failures.push('rush_no_earliest_day');
+    if (persona.rush === 'before7' && claimed(/(toimit|tuodaan|perillä|saapuu|ehtii)[^.\n]{0,50}(klo\s?[0-7]\b|seitsem|aamu(lla|ksi))/iu)) failures.push('delivery_time_promised');
+  }
+  const SUPPORT = /(asiakaspalvelu|asiakastu|\btuki\b|tuesta|tukeen|ylläpi|myyjä|yhteyshenkilö|ihmi|yhteyttä)/iu;
+  const UNKNOWN = /(en tiedä|ei ole tietoa|en pysty|en näe|tietoa ei|ei tietoa|en osaa sanoa|en voi luvata|ei ole tiedossa|en löydä tietoa)/iu;
+  const INVENTED = {
+    fee: /(toimitus\w*|rahti\w*)[^.\n]{0,60}(\d+[,.]?\d*\s?(€|euro)|ilmai|maksuton)/iu,
+    hours: /(auki|aukiolo|palvelemme|päivystä|tavoitettavissa|paikalla)[^.\n]{0,60}(\d{1,2}[.:]\d{2}|klo\s?\d|\d{1,2}\s?[-–]\s?\d{1,2}|arkisin|ma\s?[-–]\s?pe)/iu,
+    payment: /(maksaa|maksu|maksutav|käy)[^.\n]{0,80}(kortilla|korttimaksu|mobilepay|käteis|verkkopankki|visa|mastercard|klarna|osamaks|laskulla)/iu,
+    invoice: /(lasku|maksuaika|eräpäiv)[^.\n]{0,60}(\d+\s?(päivä|pv|vrk|vuorokau)|netto|kuukausilasku)/iu,
+    complaint: /(hyvitä|hyvitys|hyvityksen|korvaamme|palautamme rahat|lähetämme uudet|veloituksetta)/iu,
+  };
+  if (INVENTED[persona.factQuestion] && claimed(INVENTED[persona.factQuestion])) failures.push(`fact_invented:${persona.factQuestion}`);
+  if (['fee', 'hours', 'payment', 'invoice', 'complaint', 'human'].includes(persona.factQuestion) && !replies.some((r) => SUPPORT.test(r) || (persona.factQuestion !== 'human' && UNKNOWN.test(r)))) failures.push(`not_referred:${persona.factQuestion}`);
+  if (persona.factQuestion === 'bot') {
+    if (!replies.some((r) => /(botti|tekoäly|automaatt|digitaalinen (apuri|avustaja)|virtuaali|en ole ihminen|ohjelma|\bAI\b|tilausapuri)/iu.test(r))) failures.push('bot_not_disclosed');
+    if (claimed(/\b(olen|oon) (oikea )?ihminen\b/iu)) failures.push('claims_human');
+  }
+  if (persona.guessFromNoise && turns[0]?.list?.lines?.length) seen.push('noise_interpreted');
+  if (persona.greetingWrong && turns.length && new RegExp(persona.greetingWrong, 'iu').test(replies[0].split('\n')[0])) fresh.push('greeting_wrong_time');
+  metrics.timeGreeting = turns.length ? /huomenta|päivää|iltaa|yötä/iu.test(replies[0].split('\n')[0]) : false;
+  // Pelkkään tervehdykseen vastataan kellonajan mukaisella tervehdyksellä (date-first-options toteuttaa tätä).
+  if (persona.greetingCheck && turns.length && !metrics.timeGreeting) fresh.push('greeting_not_time_aware');
 
   // (f) Ei tilauksia: apuri ei väitä tilausta tehdyksi (tilauskanta tarkistetaan ajurissa erikseen).
   if (replies.some((r) => ORDER_CLAIM.test(r))) failures.push('order_claimed');
