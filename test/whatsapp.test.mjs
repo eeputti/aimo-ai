@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openWhatsAppStore, codeHash } from '../server/whatsapp/store.mjs';
-import { createWhatsAppChannel, createMetaSender, validSignature, extractMessages, formatReply } from '../server/whatsapp/channel.mjs';
+import { createWhatsAppChannel, createMetaSender, createMetaTypingIndicator, validSignature, extractMessages, formatReply, replyChunks } from '../server/whatsapp/channel.mjs';
 import { whatsappSettings } from '../server/whatsapp/runtime.mjs';
 
 const PHONE = '358401234567'; const OTHER = '358409876543';
@@ -197,6 +197,133 @@ test('Meta sender uses configured endpoint, bearer and reply context; upstream e
   assert.equal(await send(PHONE, 'Hei', 'inbound'), 'sent');
   const bad = createMetaSender(settings, async () => ({ ok: false, status: 401 }));
   await assert.rejects(bad(PHONE, 'Hei', 'inbound'), /META_HTTP_401/);
+});
+
+test('Meta typing uses the inbound message id and read status without sending a chat message', async () => {
+  const typing = createMetaTypingIndicator(settings, async (url, options) => {
+    assert.equal(url, 'https://graph.facebook.com/v23.0/12345/messages');
+    assert.equal(options.headers.authorization, 'Bearer test-access');
+    assert.equal(options.method, 'POST');
+    assert.deepEqual(JSON.parse(options.body), { messaging_product: 'whatsapp', status: 'read', message_id: 'inbound', typing_indicator: { type: 'text' } });
+    return { ok: true };
+  });
+  await typing('inbound');
+  const denied = createMetaTypingIndicator(settings, async () => ({ ok: false, status: 403 }));
+  await assert.rejects(denied('inbound'), /^Error: META_TYPING_HTTP_403$/);
+});
+
+test('typing starts before the model and its failure cannot fail or retry the reply', async (t) => {
+  const events = [];
+  const f = fixture(t, {
+    typing: async (id) => { events.push(['typing', id]); throw new Error('private-upstream-error'); },
+    chat: async () => { events.push(['model']); return { text: 'Vastaus' }; },
+    send: async () => { events.push(['reply']); return 'out'; },
+  });
+  await f.pair(); events.length = 0;
+  f.enqueue('Maitoa'); await f.channel.processNext();
+  assert.deepEqual(events.map(([kind]) => kind), ['typing', 'model', 'reply']);
+  assert.equal(events[0][1], 'message-2');
+  const job = f.store.db.prepare("SELECT state,attempts,error FROM inbox WHERE id='message-2'").get();
+  assert.equal(job.state, 'done'); assert.equal(job.attempts, 1); assert.equal(job.error, null);
+});
+
+test('a slow typing request runs alongside the model and settles before sending the answer', async (t) => {
+  let finishTyping; let modelStarted = false; let replied = false;
+  const f = fixture(t); await f.pair();
+  const channel = createWhatsAppChannel({ settings, store: f.store, now: f.now,
+    typing: () => new Promise((resolve) => { finishTyping = resolve; }),
+    chat: async () => { modelStarted = true; return { text: 'Vastaus' }; },
+    send: async () => { replied = true; return 'out'; },
+  });
+  f.enqueue('Maitoa'); const work = channel.processNext();
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(modelStarted, true); assert.equal(replied, false);
+  finishTyping(); await work; assert.equal(replied, true);
+});
+
+test('typing refreshes during slow work and stops after the answer', async (t) => {
+  let release; const calls = [];
+  const f = fixture(t); await f.pair();
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const channel = createWhatsAppChannel({ settings, store: f.store, now: f.now,
+    typing: async (id) => { calls.push(id); },
+    chat: () => new Promise((resolve) => { release = () => resolve({ text: 'Vastaus' }); }),
+    send: async () => 'out',
+  });
+  f.enqueue('Maitoa'); const work = channel.processNext();
+  assert.equal(calls.length, 1);
+  f.advance(20_000); t.mock.timers.tick(20_000); assert.equal(calls.length, 2);
+  release(); await work;
+  t.mock.timers.tick(40_000); assert.equal(calls.length, 2);
+});
+
+test('a verified new message shows typing immediately while another model turn is busy, but duplicate and invalid webhooks do not', async (t) => {
+  const typed = []; let release;
+  const f = fixture(t, { typing: async (id) => { typed.push(id); }, chat: () => new Promise((resolve) => { release = () => resolve({ text: 'Vastaus' }); }) });
+  await f.pair(); typed.length = 0;
+  f.enqueue('Maitoa'); const work = f.channel.processNext();
+  const body = JSON.stringify(payload(f.now(), [{ id: 'new-during-work', from: OTHER, text: { body: 'Moi' } }]));
+  assert.equal((await request(f.channel, 'POST', '/webhooks/whatsapp', body)).status, 200);
+  assert.deepEqual(typed, ['message-2', 'new-during-work']);
+  await request(f.channel, 'POST', '/webhooks/whatsapp', body);
+  await request(f.channel, 'POST', '/webhooks/whatsapp', body, 'invalid');
+  assert.equal(typed.length, 2);
+  release(); await work; await f.channel.stop();
+});
+
+test('expired or revoked jobs never show typing', async (t) => {
+  const calls = [];
+  const f = fixture(t, { typing: async (id) => { calls.push(id); } }); await f.pair(); calls.length = 0;
+  f.enqueue('Maitoa'); f.advance(23 * 3600_000); await f.channel.processNext();
+  f.enqueue('Kermaa'); f.store.revoke(PHONE); await f.channel.processNext();
+  assert.deepEqual(calls, []);
+});
+
+test('a partial multi-message delivery retries only the unacknowledged part without rerunning the model', async (t) => {
+  let fail = true; const delivered = []; const pauses = [];
+  const f = fixture(t); await f.pair();
+  let models = 0;
+  const channel = createWhatsAppChannel({ settings, store: f.store, now: f.now, pause: async (ms) => pauses.push(ms),
+    chat: async () => { models++; return { text: 'Lista\n\nKysymys', messages: ['Lista', 'Kysymys'] }; },
+    send: async (phone, text) => { if (text === 'Kysymys' && fail) throw new Error('META_HTTP_503'); delivered.push(text); return `out-${text}`; },
+  });
+  f.enqueue('Maitoa'); await channel.processNext();
+  assert.deepEqual(delivered, ['Lista']);
+  f.advance(31_000); fail = false;
+  await channel.processNext();
+  assert.deepEqual(delivered, ['Lista', 'Kysymys']); assert.equal(models, 1);
+  assert.equal(f.store.db.prepare("SELECT state FROM inbox WHERE id='message-2'").get().state, 'done');
+  assert.deepEqual(pauses, [400, 400]);
+});
+
+test('long replies split without losing product facts or breaking an emoji', () => {
+  const text = 'x'.repeat(3799) + '🥛' + '\nTuotteen hinta 12,34 € ja toimituspäivä 16.11.2026.';
+  const chunks = replyChunks([text]);
+  assert.equal(chunks.join(''), text);
+  assert.ok(chunks.every((part) => part.length <= 3800));
+});
+
+test('restart preserves the acknowledged parts of a multi-message reply', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-wa-parts-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const filename = path.join(dir, 'whatsapp.db'); let time = Date.now();
+  const first = openWhatsAppStore(filename, () => time);
+  const invite = first.invite(PHONE, 'Keittiö', 'Testaaja'); first.pair(PHONE, codeHash(invite.code));
+  first.enqueue({ id: 'multi', phone: PHONE, text: 'Maitoa', sentAt: time });
+  const channel = createWhatsAppChannel({ settings, store: first, now: () => time, pause: async () => {},
+    chat: async () => ({ messages: ['Lista', 'Kysymys'], text: 'Lista\n\nKysymys' }),
+    send: async (phone, text) => { if (text === 'Kysymys') throw new Error('META_HTTP_503'); return 'first-accepted'; },
+  });
+  await channel.processNext(); first.close(); time += 31_000;
+  const second = openWhatsAppStore(filename, () => time); t.after(() => second.close());
+  const sent = [];
+  const restarted = createWhatsAppChannel({ settings, store: second, now: () => time, pause: async () => {},
+    chat: async () => { throw new Error('must not run model again'); },
+    send: async (phone, text) => { sent.push(text); return 'second-accepted'; },
+  });
+  await restarted.processNext();
+  assert.deepEqual(sent, ['Kysymys']);
+  assert.equal(second.db.prepare("SELECT state FROM inbox WHERE id='multi'").get().state, 'done');
 });
 
 test('enabling channel requires explicit configuration', () => {

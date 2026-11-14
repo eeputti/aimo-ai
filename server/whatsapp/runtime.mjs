@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { openWhatsAppStore } from './store.mjs';
-import { createMetaSender, createWhatsAppChannel } from './channel.mjs';
+import { createMetaSender, createMetaTypingIndicator, createWhatsAppChannel } from './channel.mjs';
 import { replyToAssistant } from '../assistant.mjs';
 import { bootstrapDemoMember, createDemoOrderingChat, validateOrderingEnvironment } from './ordering.mjs';
 import { createWebDemo } from './web-demo.mjs';
@@ -30,7 +30,7 @@ export function createConfiguredWhatsApp() {
     });
   }
   const channel = createWhatsAppChannel({ settings, store, chat: ordering?.chat || replyToAssistant,
-    onPrune: () => ordering?.prune(), send: createMetaSender(settings) });
+    onPrune: () => ordering?.prune(), send: createMetaSender(settings), typing: createMetaTypingIndicator(settings) });
   // Selaindemo on olemassa vain tilaustilassa, jolloin kannat ovat eristetyt.
   const webDemo = ordering ? createWebDemo({ store, chat: ordering.chat }) : null;
   return { ...channel,

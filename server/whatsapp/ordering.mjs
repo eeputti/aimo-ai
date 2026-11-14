@@ -39,11 +39,11 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
     return { readProducts: allowed, placeOrders: allowed };
   };
   const load = loadOrdering || (async (permissions) => {
-    const [{ createConfiguredOrdering }, { buyers }, { DEFAULT_MANDATE }] = await Promise.all([
-      import('../order-conversation/runtime.mjs'), import('../gateway/store.mjs'), import('../gateway/mandate.mjs'),
+    const [{ createConfiguredOrdering }, { buyers }, { DEFAULT_MANDATE }, { createConfiguredDialogue }] = await Promise.all([
+      import('../order-conversation/runtime.mjs'), import('../gateway/store.mjs'), import('../gateway/mandate.mjs'), import('./dialogue.mjs'),
     ]);
     const ordering = await createConfiguredOrdering({ draftDb, quoteDb, permissions });
-    return { ...ordering, ensureBuyer(customer) {
+    return { ...ordering, dialogue: await createConfiguredDialogue(store), ensureBuyer(customer) {
       if (!buyers.byId(customer.buyerId)) buyers.save({
         id: customer.buyerId, name: customer.companyName, kind: 'WhatsApp-testiasiakas',
         apiKey: crypto.randomBytes(32).toString('hex'), approver: 'Testaaja',
@@ -67,12 +67,15 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       const ordering = await getRuntime();
       if (!livePermissions(customer).readProducts) return { text: 'Testiyhteys ei ole enää voimassa.' };
       ordering.ensureBuyer?.(customer);
-      return ordering.handleTurn({ messageId, receivedAt, customer,
+      const runOrder = (text) => ordering.handleTurn({ messageId, receivedAt, customer,
         conversationId: `${phoneId}:${customer.customerId}:${current.binding}`,
-        text: messages.at(-1)?.content || '',
+        text,
       });
+      const text = messages.at(-1)?.content || '';
+      return ordering.dialogue ? ordering.dialogue.respond({ binding: current.binding, messageId, text, runOrder,
+        allowed: () => livePermissions(customer).readProducts }) : runOrder(text);
     },
-    prune() { runtime?.prune(); },
+    prune() { runtime?.prune(); runtime?.dialogue?.prune(); },
     async close() { if (pending) (await pending).close(); },
   };
 }

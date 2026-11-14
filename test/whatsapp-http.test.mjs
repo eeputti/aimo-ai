@@ -13,8 +13,10 @@ test('HTTP webhook acknowledges before slow agent and worker returns the respons
   const settings = { phoneId: '123', verifyToken: 'verify', appSecret: 'secret', supportContact: 'https://example.com/support' };
   let release; let modelStarted; const started = new Promise((r) => { modelStarted = r; });
   let delivered; const delivery = new Promise((r) => { delivered = r; });
+  const typing = [];
   const channel = createWhatsAppChannel({ settings, store,
-    chat: async () => { modelStarted(); return new Promise((r) => { release = () => r({ text: '60 munaa: toimitus maanantaina.' }); }); },
+    typing: async (id) => { typing.push(id); },
+    chat: async () => { assert.equal(typing.at(-1), 'ask'); modelStarted(); return new Promise((r) => { release = () => r({ text: '60 munaa: toimitus maanantaina.' }); }); },
     send: async (to, text) => { if (text.startsWith('60 munaa')) delivered({ to, text }); return 'out'; },
   });
   const server = http.createServer((req, res) => channel.handle(req, res));

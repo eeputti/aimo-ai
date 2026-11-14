@@ -45,6 +45,21 @@ export const formatReply = (text) => {
   return clean.length > 3800 ? clean.slice(0, 3700) + '\n\nVastaus lyhennetty. Pyydä lisätiedot yhdestä tuotteesta kerrallaan.' : clean;
 };
 
+export function replyChunks(messages) {
+  const chunks = [];
+  for (const value of messages) {
+    let text = String(value || '').replace(/\*\*([^*]+)\*\*/g, '*$1*').trim();
+    while (text.length > 3800) {
+      const newline = text.lastIndexOf('\n', 3800);
+      let end = newline > 1900 ? newline : 3800;
+      if (/^[\uDC00-\uDFFF]$/.test(text[end])) end--; // preserve an emoji split across UTF-16 units
+      chunks.push(text.slice(0, end)); text = text.slice(end).trimStart();
+    }
+    if (text) chunks.push(text);
+  }
+  return chunks;
+}
+
 export function createMetaSender(settings, fetchImpl = fetch) {
   return async (to, text, messageId) => {
     const res = await fetchImpl(`https://graph.facebook.com/${settings.apiVersion}/${settings.phoneId}/messages`, {
@@ -61,14 +76,38 @@ export function createMetaSender(settings, fetchImpl = fetch) {
   };
 }
 
-export function createWhatsAppChannel({ settings, store, chat, send, now = Date.now, onPrune = () => {} }) {
+// A typing update also marks this inbound message as read. It is not an outgoing chat message.
+export function createMetaTypingIndicator(settings, fetchImpl = fetch) {
+  return async (messageId) => {
+    const res = await fetchImpl(`https://graph.facebook.com/${settings.apiVersion}/${settings.phoneId}/messages`, {
+      method: 'POST', signal: AbortSignal.timeout(3000),
+      headers: { authorization: `Bearer ${settings.accessToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: messageId, typing_indicator: { type: 'text' } }),
+    });
+    if (!res.ok) throw new Error(`META_TYPING_HTTP_${res.status}`);
+  };
+}
+
+export function createWhatsAppChannel({ settings, store, chat, send, typing, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now, onPrune = () => {} }) {
   let busy = false; let stopped = false; let timer; let active = Promise.resolve();
+  const typingUpdates = new Map();
+  const updateTyping = (id, force = false) => {
+    if (!typing || stopped) return Promise.resolve();
+    const prior = typingUpdates.get(id);
+    if (!force && prior && now() - prior.at < 20_000) return prior.work;
+    let work;
+    try { work = Promise.resolve(typing(id)).catch(() => {}); } catch { work = Promise.resolve(); }
+    typingUpdates.set(id, { at: now(), work });
+    // Cancelled queued work may never be selected by the worker; keep receipt bookkeeping bounded.
+    if (typingUpdates.size > 1000) typingUpdates.delete(typingUpdates.keys().next().value);
+    return work;
+  };
   let lastPrune = now();
   const support = `Asiakaspalvelu: ${settings.supportContact}`;
   async function processNext() {
     if (busy || stopped) return false;
     busy = true;
-    let job;
+    let job; let typingTimer; let typingUpdate = Promise.resolve();
     try {
       job = store.next();
       if (!job) return false;
@@ -77,8 +116,18 @@ export function createWhatsAppChannel({ settings, store, chat, send, now = Date.
       const member = store.member(job.phone);
       // Revocation/re-pairing also invalidates queued conversations and saved replies.
       if (job.binding && member?.binding !== job.binding) { store.finish(job.id, 'cancelled'); return true; }
+      if (typing) {
+        const indicate = () => {
+          if (stopped || now() - job.sent_at >= 23 * 3600_000 || (job.binding && store.member(job.phone)?.binding !== job.binding)) return;
+          // Start before model work, without delaying it. Cosmetic failures never retry an order turn.
+          typingUpdate = updateTyping(job.id);
+        };
+        indicate();
+        // Meta clears typing on reply or after 25 seconds. Refresh only while this job is active.
+        typingTimer = setInterval(indicate, 20_000); typingTimer.unref?.();
+      }
       if (!reply) {
-        let historyBinding;
+        let historyBinding; let parts;
         if (job.kind === 'pair') {
           const paired = store.pair(job.phone, job.text, job.id);
           if (paired) job.binding = paired.binding;
@@ -94,7 +143,8 @@ export function createWhatsAppChannel({ settings, store, chat, send, now = Date.
           try {
             const result = await chat({ messages: [...store.history(member.binding), { role: 'user', content: job.text }], channel: 'whatsapp',
               member, messageId: job.id, receivedAt: job.sent_at });
-            reply = formatReply(result.text);
+            parts = replyChunks(Array.isArray(result.messages) && result.messages.length ? result.messages : [result.text]);
+            reply = parts.join('\n\n');
             if (!reply) throw new Error('EMPTY_REPLY');
             historyBinding = member.binding;
           } catch (err) {
@@ -108,15 +158,28 @@ export function createWhatsAppChannel({ settings, store, chat, send, now = Date.
         }
         // Recheck after a slow model call: a revoked identity must not receive its result.
         if (job.binding && store.member(job.phone)?.binding !== job.binding) { store.finish(job.id, 'cancelled'); return true; }
-        store.saveReply(job, reply, historyBinding);
+        store.saveReply(job, reply, historyBinding, parts || replyChunks([reply]));
       }
-      const replyId = await send(job.phone, reply, job.id);
+      // Finish the last status request before replying, so a slow typing update cannot arrive after the answer.
+      clearInterval(typingTimer); await typingUpdate;
+      if (job.binding && store.member(job.phone)?.binding !== job.binding) { store.finish(job.id, 'cancelled'); return true; }
+      let replyId;
+      for (const part of store.replyParts(job.id, reply)) {
+        if (part.reply_id) { replyId = part.reply_id; continue; }
+        if (part.part > 0) {
+          await updateTyping(job.id, true);
+          await pause(400);
+        }
+        if (job.binding && store.member(job.phone)?.binding !== job.binding) { store.finish(job.id, 'cancelled'); return true; }
+        replyId = await send(job.phone, part.text, job.id);
+        store.saveReplyPart(job.id, part.part, replyId);
+      }
       store.finish(job.id, 'done', replyId);
       return true;
     } catch (err) {
       if (job) store.retry(job, /^META_HTTP_\d+$/.test(err.message) ? err.message : 'PROCESSING_OR_DELIVERY_ERROR');
       return false;
-    } finally { busy = false; }
+    } finally { clearInterval(typingTimer); if (job) typingUpdates.delete(job.id); busy = false; }
   }
   return {
     processNext,
@@ -131,7 +194,7 @@ export function createWhatsAppChannel({ settings, store, chat, send, now = Date.
       }, 500);
       timer.unref();
     },
-    async stop() { stopped = true; clearInterval(timer); await active; },
+    async stop() { stopped = true; clearInterval(timer); await active; await Promise.all([...typingUpdates.values()].map((v) => v.work)); typingUpdates.clear(); },
     async handle(req, res, url = new URL(req.url, 'http://localhost')) {
       if (url.pathname !== '/webhooks/whatsapp') return false;
       try {
@@ -146,9 +209,15 @@ export function createWhatsAppChannel({ settings, store, chat, send, now = Date.
         if (!validSignature(raw, req.headers['x-hub-signature-256'], settings.appSecret)) { json(res, 403, { error: 'Invalid signature' }); return true; }
         let payload;
         try { payload = JSON.parse(raw.toString('utf8')); } catch { json(res, 400, { error: 'Invalid JSON' }); return true; }
-        for (const message of extractMessages(payload, settings.phoneId, now())) store.enqueue(message);
+        const accepted = [];
+        for (const message of extractMessages(payload, settings.phoneId, now())) if (store.enqueue(message)) accepted.push(message.id);
         // Durable receipt only. Model work and sending happen outside the webhook request.
-        json(res, 200, { received: true }); return true;
+        json(res, 200, { received: true });
+        // Even if another conversation is being processed, acknowledge the new sender immediately.
+        for (const id of accepted) updateTyping(id);
+        // Wake a running worker immediately instead of waiting for its next 500 ms polling tick.
+        if (accepted.length && timer) setImmediate(() => { if (!busy && !stopped) active = processNext(); });
+        return true;
       } catch (err) { json(res, err.status || 500, { error: 'Webhook processing failed' }); return true; }
     },
   };

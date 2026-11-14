@@ -23,6 +23,8 @@ export function openWhatsAppStore(filename, now = Date.now) {
       attempts INTEGER NOT NULL DEFAULT 0, next_at INTEGER NOT NULL DEFAULT 0, reply TEXT, reply_id TEXT, error TEXT);
     CREATE INDEX IF NOT EXISTS inbox_queue ON inbox(state, next_at, received);
     CREATE INDEX IF NOT EXISTS inbox_phone ON inbox(phone, received);
+    CREATE TABLE IF NOT EXISTS reply_parts (message_id TEXT NOT NULL, part INTEGER NOT NULL, text TEXT NOT NULL, reply_id TEXT,
+      PRIMARY KEY(message_id,part));
     CREATE TABLE IF NOT EXISTS turns (seq INTEGER PRIMARY KEY, binding TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS turns_binding ON turns(binding, seq);`);
   // A process may have died during a read-only model call or delivery. Saved replies are reused.
@@ -44,6 +46,11 @@ export function openWhatsAppStore(filename, now = Date.now) {
       db.prepare('DELETE FROM members WHERE phone=?').run(phone);
       db.prepare('DELETE FROM invites WHERE phone=?').run(phone);
       if (old) db.prepare('DELETE FROM turns WHERE binding=?').run(old.binding);
+      if (old && db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wa_dialogue'").get()) {
+        db.prepare('DELETE FROM wa_dialogue WHERE binding=?').run(old.binding);
+        db.prepare('DELETE FROM wa_dialogue_results WHERE binding=?').run(old.binding);
+      }
+      db.prepare("DELETE FROM reply_parts WHERE message_id IN (SELECT id FROM inbox WHERE phone=? AND state IN ('pending','processing'))").run(phone);
       db.prepare("UPDATE inbox SET state='cancelled', reply=NULL, text='' WHERE phone=? AND state IN ('pending','processing')").run(phone);
     },
     pair(phone, hash, jobId) {
@@ -81,10 +88,12 @@ export function openWhatsAppStore(filename, now = Date.now) {
     history(binding) {
       return db.prepare('SELECT role,content FROM (SELECT seq,role,content FROM turns WHERE binding=? ORDER BY seq DESC LIMIT 18) ORDER BY seq').all(binding).map((r) => ({ ...r }));
     },
-    saveReply(job, reply, binding) {
+    saveReply(job, reply, binding, parts = [reply]) {
       db.exec('BEGIN IMMEDIATE');
       try {
         db.prepare('UPDATE inbox SET reply=? WHERE id=?').run(reply, job.id);
+        const insertPart = db.prepare('INSERT OR IGNORE INTO reply_parts(message_id,part,text) VALUES(?,?,?)');
+        parts.forEach((text, part) => insertPart.run(job.id, part, text));
         if (binding) {
           const insert = db.prepare('INSERT INTO turns(binding,role,content,created) VALUES(?,?,?,?)');
           insert.run(binding, 'user', job.text, now()); insert.run(binding, 'assistant', reply, now());
@@ -93,6 +102,15 @@ export function openWhatsAppStore(filename, now = Date.now) {
         db.exec('COMMIT');
       } catch (err) { db.exec('ROLLBACK'); throw err; }
     },
+    replyParts(id, fallback) {
+      let parts = db.prepare('SELECT * FROM reply_parts WHERE message_id=? ORDER BY part').all(id);
+      if (!parts.length) {
+        db.prepare('INSERT INTO reply_parts(message_id,part,text) VALUES(?,0,?)').run(id, fallback);
+        parts = db.prepare('SELECT * FROM reply_parts WHERE message_id=? ORDER BY part').all(id);
+      }
+      return parts;
+    },
+    saveReplyPart(id, part, replyId) { db.prepare('UPDATE reply_parts SET reply_id=? WHERE message_id=? AND part=?').run(replyId, id, part); },
     finish(id, state, replyId = null) { db.prepare('UPDATE inbox SET state=?,reply_id=? WHERE id=?').run(state, replyId, id); },
     retry(job, error) {
       db.prepare('UPDATE inbox SET state=?,next_at=?,error=? WHERE id=?').run(job.attempts >= 3 ? 'failed' : 'pending', now() + job.attempts * 30_000, error, job.id);
@@ -101,6 +119,7 @@ export function openWhatsAppStore(filename, now = Date.now) {
       db.prepare('DELETE FROM invites WHERE expires<=?').run(now());
       db.prepare('DELETE FROM turns WHERE created<?').run(now() - 7 * 86400_000);
       db.prepare('DELETE FROM inbox WHERE received<?').run(now() - 7 * 86400_000);
+      db.exec('DELETE FROM reply_parts WHERE message_id NOT IN (SELECT id FROM inbox)');
     },
   };
 }
