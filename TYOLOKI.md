@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — sanelupallo litteäksi (Codex)
+
+**Käyttäjän päätös:** kuuntelupallon ei tarvitse näyttää kolmiulotteiselta. `public/aimo-voice.css`: pallon säteittäinen liukuväri sekä sisä- ja ulkovarjot poistettu; tilalla hakupaneelin tasainen sininen (`--ask-blue`). Ääneen reagoiva liike ja kehät säilyvät.
+
+**Tarkistukset:** selaimessa erillisessä simuloidussa testidemossa (4762/4763) pallo näkyy litteänä; lasketut tyylit: sininen `rgb(22, 104, 227)`, `backgroundImage: none`, `boxShadow: none`. Kuuntelupaneeli avautui ja sulkeutui. `git diff --check` läpi. Pelkkään ulkoasumuutokseen ei ajettu toimintatestejä uudelleen. Käyttäjän demoa tai muiden keskeneräisiä muutoksia ei muokattu.
+
 ## 14.11.2026 — haku ymmärtää puhekielen, kirjoitusvirheet ja slangin (Claude Code)
 
 **Käyttäjän pyyntö ja päätökset:** Eelis kysyi, onko haku oikeasti fiksu ("maitoo", "maetoo", "jugurtti"). Mittaus: noin 125 yhden sanan hausta noin 30 palautti tyhjää ja noin 10 meni väärälle hyllylle. Päätökset: omaa hakumallia ei kouluteta (ei hakulokeja, deadline). Haku ei kulje MCP-palvelimen läpi, koska siinä ei ole kieliymmärrystä. Kielimalli on varalla vain, kun säännöt eivät tunnista sanaa. Laajaa testisettiä ei tehty, vain pikalista.
