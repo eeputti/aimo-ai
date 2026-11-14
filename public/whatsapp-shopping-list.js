@@ -10,7 +10,7 @@ export function describeShoppingList(list) {
     return `- ${line.productTerm}: ${quantity}${diet(line) ? ` (${diet(line)})` : ''}${line.selectedName ? ` — ${line.selectedName}` : ''}`;
   });
   return [`WhatsApp-ostoslista — ${list.companyName}`, `Toimitus: ${list.deliveryDate || 'päivä puuttuu'}`,
-    `Ruokavaliot: ${list.diet.known ? diet(list.diet) || 'ei yleisiä erityisvaatimuksia' : 'tarkennettava'}`, ...lines,
+    `Ruokavaliot: ${diet(list.diet) || 'ei ilmoitettuja yhteisiä vaatimuksia'}`, ...lines,
     '', 'Voit täydentää listaa tässä tai WhatsAppissa. Tilaus vaatii erillisen yhteenvedon ja TILAA-vahvistuksen.'].join('\n');
 }
 async function request(url, options) {

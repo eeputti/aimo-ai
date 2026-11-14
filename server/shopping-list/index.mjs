@@ -6,7 +6,7 @@ export function shoppingListView(draft, customer) {
   const missing = [];
   if (!draft.deliveryDate) missing.push('deliveryDate');
   if (!draft.deliverySiteId) missing.push('deliverySiteId');
-  if (!draft.diet?.known) missing.push('diet');
+  if (draft.pending?.kind === 'preference') for (const ref of draft.pending.refs) missing.push(`preference:${ref}`);
   for (const line of draft.lines) if (!line.quantity) missing.push(`quantity:${line.ref}`);
   return {
     schemaVersion: 1, source: 'whatsapp', id: draft.id, revision: draft.revision,

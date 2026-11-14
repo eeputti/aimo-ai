@@ -62,7 +62,7 @@ test('local storefront shows the exact conversation order once and approvals use
   assert.equal((await get('/console/state')).orders.length, 0);
 
   const say = async (text) => (await post('/demo/chat', { text })).text;
-  assert.match(await say('20 l maitoa ja 5 l kermaa maanantaiksi'), /allergioita/);
+  assert.match(await say('20 l maitoa ja 5 l kermaa maanantaiksi'), /laktoositonta vai käykö tavallinen/);
   const options = await say('laktoositon'); assert.match(options, /Maito 20 l/);
   const context = await get('/api/local-shop');
   assert.equal(context.accounts.length, 1);

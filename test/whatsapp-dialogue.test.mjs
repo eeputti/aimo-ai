@@ -207,7 +207,7 @@ test('a natural follow-up fills quantities in the same cart, and show does not p
   assert.deepEqual(after.lines.map((line) => [line.productTerm, line.quantity.value, line.quantity.unit]),
     [['maito', 50, 'L'], ['kananmuna', 100, 'PCS'], ['kerma', 0.5, 'L']]);
   assert.match(result.text, /- kerma 0,5 l/); assert.doesNotMatch(result.text, /Kuinka paljon|Paljonko/);
-  assert.match(result.text, /Mille päivälle toimitus/); assert.match(result.text, /allergioita/);
+  assert.match(result.text, /Mille päivälle toimitus/); assert.doesNotMatch(result.text, /allergioita/);
   const shown = await f.turn('näytä');
   assert.equal(shown.messages[0].startsWith('Ostoskorissasi nyt:'), true);
   assert.doesNotMatch(shown.text, /laitetaan!|päivitin/); assert.equal((await f.list()).revision, after.revision);
@@ -280,4 +280,22 @@ test('a short answer with decilitres accepts the last suggested ingredient rathe
   assert.equal(f.ordered.length, 0);
   await f.turn('joo 5 dl');
   assert.equal(f.ordered.at(-1), 'Lisää ostoslistalle kuohukerma 0,5 l');
+});
+
+test('one message can update the cart and receive an answer to its question', async (t) => {
+  const answer = 'Vaihtoehdot eroavat pakkaukseltaan ja hinnaltaan. Voit myös pyytää valitsemaan halvimman.';
+  const f = fixture(t, async () => plan('order', { text: answer, openCart: false }));
+  const reply = await f.turn('kermaa 5 desii, miksi pitää valita vaihtoehto?');
+  assert.equal(f.ordered[0], 'kermaa 0,5 l, miksi pitää valita vaihtoehto?');
+  assert.equal(reply.messages[0], answer); assert.equal(reply.messages[1], ready.text);
+});
+
+test('advice names its recommended ingredient and a later bare amount adds that ingredient only', async (t) => {
+  const f = fixture(t, async ({ purpose }) => purpose === 'whatsapp_dialogue'
+    ? plan('chat', { lookupQuery: 'kerma' })
+    : { json: { text: 'Lohikeittoon sopii maustamaton ruokakerma.', suggestionTerm: 'maustamaton ruokakerma', addQuestion: 'Lisätäänkö maustamatonta ruokakermaa ostoslistalle? Kerro määrä.' } });
+  const reply = await f.turn('Mikä kerma sopisi lohikeittoon?');
+  assert.equal(f.ordered.length, 0); assert.match(reply.messages[1], /maustamatonta ruokakermaa/);
+  await f.turn('joo 2 l');
+  assert.equal(f.ordered[0], 'Lisää ostoslistalle maustamaton ruokakerma 2 l');
 });

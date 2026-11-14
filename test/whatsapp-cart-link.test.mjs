@@ -29,7 +29,7 @@ const { understand } = await import('../server/aimo/understand.mjs');
 const NOW = Date.parse('2026-11-14T10:00:00Z');
 const PHONE = '358401234567';
 const OTHER = '358409876543';
-async function fixture(t) {
+async function fixture(t, { ask = null } = {}) {
   let clock = NOW;
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'shopping-handoff-'));
   const wa = openWhatsAppStore(path.join(directory, 'wa.db'), () => NOW);
@@ -54,7 +54,7 @@ async function fixture(t) {
   let handleTurn = handle();
   const bridge = createDemoOrderingChat({ store: wa, phoneId: '12345', loadOrdering: async () => ({
     handleTurn: (args) => handleTurn(args),
-    dialogue: createOrderingDialogue({ db: wa.db, ask: null, now: () => NOW }),
+    dialogue: createOrderingDialogue({ db: wa.db, ask, now: () => NOW }),
     getShoppingList: ({ conversationId, customer }) => shoppingListView(drafts.active(conversationId), customer),
     hasTurnResult: ({ messageId, customer }) => {
       const result = drafts.result(messageId); const draft = result?.draftId && drafts.get(result.draftId);
@@ -109,6 +109,21 @@ test('WhatsApp link opens the same saved basket without copying, quoting or orde
   assert.equal((await f.bridge.getShoppingList(f.wa.member(PHONE))).lines[0].quantity.value, 30);
   assert.match(await f.whatsapp('näytä'), /30 l/);
   assert.equal(f.stats().submits, 0);
+});
+
+test('a natural link request reaches the real cart capability through the model without submitting or changing the cart', async (t) => {
+  const ask = async ({ purpose, user }) => {
+    assert.equal(purpose, 'whatsapp_dialogue');
+    const input = JSON.parse(user); assert.equal(input.capabilities.cartLink, true);
+    return { json: { route: input.message.includes('näyttää hyvältä') ? 'cart' : 'order', text: '', lookupQuery: '', suggestionTerm: '', openCart: input.message.includes('näyttää hyvältä') } };
+  };
+  const f = await fixture(t, { ask });
+  await f.whatsapp('20 l laktoositonta maitoa maanantaiksi');
+  const before = await f.bridge.getShoppingList(f.wa.member(PHONE));
+  const text = await f.whatsapp('ok näyttää hyvältä, laita linkki tulemaan');
+  const token = linkToken(text); assert.match(text, /Tässä linkki ostoskoriisi/); assert.doesNotMatch(text, /TILAA|en pysty/);
+  const current = (await (await f.read(token)).json()).shoppingList;
+  assert.deepEqual(current, before); assert.equal(f.stats().submits, 0);
 });
 
 test('browser reviews and explicitly confirms exactly once; a stale version cannot approve unseen WhatsApp changes', async (t) => {

@@ -70,7 +70,16 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
       const handoff = await replyWithCartLink({ text: args.messages.at(-1)?.content || '', shoppingList: list,
         lastOrder: dialogue.lastOrder, pendingSuggestion: dialogue.pendingSuggestion, cartHandoff: () => issue(args.member, list) });
       if (handoff) return handoff; // Acknowledgement opens the cart, never submits an order.
-      return withCartHandoffHint(await ordering.chat(args));
+      const result = await ordering.chat({ ...args, cartLinkAvailable: true });
+      if (result.cartRequested) {
+        const current = await ordering.getShoppingList(args.member);
+        if (current) {
+          const handoff = await replyWithCartLink({ text: 'avaa kori', shoppingList: current, cartHandoff: () => issue(args.member, current) });
+          if (result.conversationAnswer) return { ...handoff, messages: [result.conversationAnswer, ...handoff.messages], text: `${result.conversationAnswer}\n\n${handoff.text}` };
+          return handoff;
+        }
+      }
+      return withCartHandoffHint(result);
     },
     async handle(req, res, url) {
       if (!assets.has(url.pathname) && url.pathname !== API && url.pathname !== `${API}/chat`) return false;

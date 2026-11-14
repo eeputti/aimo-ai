@@ -63,11 +63,11 @@ const SCHEMA = {
     ops: { type: 'array', items: {
       type: 'object', additionalProperties: false, required: ['op', 'ref', 'productTerm', 'quantityValue', 'quantityUnit', 'quantityBasis', 'addClaims', 'removeClaims', 'excludeAllergens', 'option'],
       properties: {
-        op: { type: 'string', enum: ['add', 'update', 'remove', 'select', 'diet', 'site'] },
+        op: { type: 'string', enum: ['add', 'update', 'remove', 'select', 'diet', 'site', 'no_preference'] },
         ref: { type: 'string', description: 'olemassa olevan rivin ref tai tyhjä' },
         productTerm: { type: 'string', description: 'tuotteen perusmuoto suomeksi, esim. maito; tyhjä jos ei muutu' },
         quantityValue: { type: 'number', description: '0 jos määrää ei annettu' },
-        quantityUnit: { type: 'string', enum: ['L', 'KG', 'PCS', ''] },
+        quantityUnit: { type: 'string', enum: ['L', 'DL', 'CL', 'ML', 'KG', 'G', 'PCS', ''] },
         quantityBasis: { type: 'string', enum: ['items', 'sales', ''], description: 'PCS: items = yksittäiset kappaleet (100 kananmunaa), sales = myyntipakkaukset' },
         addClaims: { type: 'array', items: { type: 'string', enum: CLAIMS } },
         removeClaims: { type: 'array', items: { type: 'string', enum: CLAIMS } },
@@ -82,6 +82,10 @@ Säännöt:
 - Et valitse tuotteita, et keksi määriä, päiviä tai ruokavaatimuksia. Kirjaa vain se, mitä ostaja sanoi.
 - Korjaus ("eikun 30 litraa", "maitoa sittenkin 30") on update oikealle riville. Käytä annettuja ref-arvoja. Uusi tuote on add.
 - Numerovalinta ("1", "eka", "se keskimmäinen") on select: ref ja vaihtoehdon numero tarjotusta listasta. Jos ei ole selvää, mitä vaihtoehtoa ostaja tarkoittaa, älä arvaa.
+- Valinta "halvin" vertaa offered-vaihtoehtojen lineNet-kokonaishintoja. Valinta voi koskea yhtä nimettyä riviä tai kaikkia, jos ostaja sanoo niin. Tavallisten saman tuotteen vaihtoehtojen valinnassa käytä tarjottuja nimiä ja ominaisuuksia.
+- Tunnista puhekieli ja oikea yksikkö: "5 desii" = 5 DL, "pari desiä" = 2 DL, 250 ml = 250 ML, 500 g = 500 G. Palauta alkuperäisen yksikön arvo; palvelin muuntaa DL/CL/ML litroiksi ja G kiloiksi. Älä koskaan vaihda 5 desiä 5 litraksi.
+- context.history kertoo aiemman keskustelun, myös apurin tarkentavan kysymyksen. Ymmärrä siihen annettu vastaus ("sitä", "molemmat", "ihan normina") nykyisten ref-rivien avulla. Ajantasainen luonnos ratkaisee, ei vanha määrä historiassa.
+- pendingQuestion.kind=preference on vain nimettyjen refs-rivien tuoteominaisuuden tarkennus. "ei väliä", "tavallinen käy" tai "ihan normina" on no_preference oikeille riveille. Myöntävä vastaus lisää pendingQuestion.claim-vaatimuksen vain kysyttyihin riveihin. Pelkkä "ei" tähän kysymykseen ei ole kaikkien ruokarajoitusten nollaus.
 - excludeAllergens vain, kun ostaja itse kieltää allergeenin (maidoton, pähkinätön, gluteeniton allergian vuoksi). Tuotteen oma ainesosa ei ole kielto: kananmunalle ei tule AE-kieltoa.
 - Laktoositon on FREE_FROM_LACTOSE. Maidoton ei ole väittämä vaan allergeenikielto AM. Älä sekoita näitä.
 - Koko tilausta koskeva allergia tai ruokavalio (vastaus allergiakysymykseen, "kaikki laktoosittomana", "vieraissa on pähkinäallergikko") on op diet: addClaims ja excludeAllergens, ref tyhjä. Vastaus "ei", "ei allergioita" on diet tyhjillä listoilla. Yhtä tuotetta koskeva vaatimus ("laktoositonta maitoa") kuuluu sen rivin add- tai update-muutokseen.
@@ -99,15 +103,22 @@ export function createModelInterpreter({ ask, fallback }) {
     const state = {
       today, deliveryDate: draft.deliveryDate || null,
       lines: draft.lines.map((l) => ({ ref: l.ref, productTerm: l.productTerm, quantity: l.quantity || null, claims: l.claims, excludeAllergens: l.excludeAllergens, selected: l.selectedName || null })),
-      offered: Object.fromEntries(Object.entries(draft.offered || {}).map(([ref, options]) => [ref, options.map((o, i) => `${i + 1}: ${o.name}`)])),
+      offered: Object.fromEntries(Object.entries(draft.offered || {}).map(([ref, options]) => [ref, options.map((o, i) => ({ option: i + 1, name: o.name,
+        lineNet: o.lineNet, salesUnits: o.salesUnits, salesUnitLabel: o.salesUnitLabel, covers: o.covers, labels: o.labels }))])),
       pendingQuestion: draft.pending || null,
+      context: { history: (input.context?.history || []).slice(-10), lastReply: String(input.context?.lastReply || '').slice(0, 6000) },
     };
     try {
-      const r = await ask({ purpose: 'whatsapp_order_turn', tier: 'fast', system: SYSTEM, schema: SCHEMA, maxTokens: 1200, timeoutMs: 12_000, retries: 0,
+      const r = await ask({ purpose: 'whatsapp_order_turn', tier: 'deep', system: SYSTEM, schema: SCHEMA, maxTokens: 3000, timeoutMs: 60_000, retries: 0,
         user: `Luonnoksen tila:\n${JSON.stringify(state)}\n\nOstajan viesti:\n${text.slice(0, 2000)}` });
+      const amount = (o) => {
+        const scale = { DL: [0.1, 'L'], CL: [0.01, 'L'], ML: [0.001, 'L'], G: [0.001, 'KG'], L: [1, 'L'], KG: [1, 'KG'], PCS: [1, 'PCS'] }[o.quantityUnit];
+        return o.quantityValue > 0 && scale ? { value: Number((o.quantityValue * scale[0]).toPrecision(12)), unit: scale[1],
+          ...(o.quantityUnit === 'PCS' && o.quantityBasis ? { basis: o.quantityBasis } : {}) } : null;
+      };
       const ops = (r.json.ops || []).map((o) => ({
         op: o.op, ref: o.ref || undefined, productTerm: o.productTerm || undefined, option: o.option || undefined,
-        ...(o.quantityValue > 0 && o.quantityUnit ? { quantity: { value: o.quantityValue, unit: o.quantityUnit, ...(o.quantityUnit === 'PCS' && o.quantityBasis ? { basis: o.quantityBasis } : {}) } } : {}),
+        ...(amount(o) ? { quantity: amount(o) } : {}),
         addClaims: o.addClaims || [], removeClaims: o.removeClaims || [], claims: o.addClaims || [], excludeAllergens: o.excludeAllergens || [],
       }));
       return { intent: r.json.intent, deliveryDate: r.json.deliveryDate || null, ops, via: 'model' };

@@ -112,7 +112,7 @@ test('signed WhatsApp → shared list API → explicit approval → exactly one 
 
   const firstId = crypto.randomUUID();
   const firstText = '20 l maitoa ja 5 l kermaa maanantaiksi';
-  assert.match(await deliver(firstId, firstText), /allergioita/);
+  assert.match(await deliver(firstId, firstText), /laktoositonta vai käykö tavallinen/);
   const fromPhone = (await list(buyerId)).shoppingList;
   assert.equal(fromPhone.source, 'whatsapp');
   assert.equal(fromPhone.schemaVersion, 1);
@@ -120,7 +120,7 @@ test('signed WhatsApp → shared list API → explicit approval → exactly one 
   assert.equal(fromPhone.buyerId, buyerId);
   assert.equal(fromPhone.deliveryDate, '2026-11-16');
   assert.equal(fromPhone.lines.length, 2);
-  assert.ok(fromPhone.missing.includes('diet'));
+  assert.ok(!fromPhone.missing.includes('diet'));
   assert.doesNotMatch(JSON.stringify(fromPhone), new RegExp(`${PHONE}|isolated-test-token|apiKey|demoKey|authorization`));
   const milk = (value) => value.lines.find((line) => /maito/i.test(line.productTerm));
   assert.deepEqual(milk(fromPhone).quantity, { value: 20, unit: 'L' });
@@ -133,7 +133,7 @@ test('signed WhatsApp → shared list API → explicit approval → exactly one 
   assert.deepEqual((await list(buyerId)).shoppingList, corrected.shoppingList);
   // A lost response retries the same UUID, without applying another change or revision.
   assert.deepEqual(await turn(buyerId, 'maitoa 30 litraa', fromPhone, correctionId), corrected);
-  assert.match(await deliver(crypto.randomUUID(), 'laktoositon'), /Maito 30 l/);
+  assert.match(await deliver(crypto.randomUUID(), 'kaikki laktoosittomana'), /Maito 30 l/);
   const dietary = (await list(buyerId)).shoppingList;
   assert.equal(dietary.id, fromPhone.id);
   assert.ok(dietary.diet.claims.includes('FREE_FROM_LACTOSE'));

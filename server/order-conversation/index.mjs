@@ -8,7 +8,6 @@ import { CLAIMS } from './interpret.mjs';
 const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
 const ALLERGEN_FI = { AM: 'maidoton', AW: 'ei gluteeniviljoja', AE: 'munaton', AN: 'pähkinätön', AP: 'ei maapähkinää', AF: 'kalaton', AY: 'soijaton', AC: 'ei äyriäisiä', AS: 'ei seesamia', BC: 'ei selleriä', BM: 'ei sinappia' };
-const DIET_QUESTION = 'Onko allergioita tai ruokavalioita huomioitavana (esim. laktoositon, gluteeniton, maidoton, pähkinätön)? Vastaa "ei", jos ei ole.';
 // Gluteeniton-merkintä ja gluteeniviljojen kielto ovat ostajalle sama asia: näytetään kerran.
 const dietLabel = (d) => [...d.claims.map((c) => CLAIM_FI[c]), ...d.excludeAllergens.filter((a) => !(a === 'AW' && d.claims.includes('FREE_FROM_GLUTEN'))).map((a) => ALLERGEN_FI[a] || `ei allergeenia ${a}`)].filter(Boolean).join(', ');
 // Vahvistus tunnistetaan koodissa, ei mallilla. Pelkkä "joo" ei ole tilauslupa.
@@ -30,7 +29,7 @@ const validQuantity = (q) => q && Number.isFinite(q.value) && q.value > 0 && q.v
 const cleanQuantity = (q) => ({ value: q.value, unit: q.unit, ...(q.unit === 'PCS' && ['items', 'sales'].includes(q.basis) ? { basis: q.basis } : {}) });
 const lineLabel = (l) => `${l.productTerm}${l.quantity ? ` ${qty(l.quantity)}` : ''}${[...l.claims.map((c) => CLAIM_FI[c]), ...(l.excludeAllergens.length ? [`ei allergeeneja ${l.excludeAllergens.join(', ')}`] : [])].filter(Boolean).map((x) => ` (${x})`).join('')}`;
 // Sisältö, jonka muutos kasvattaa revisiota ja mitätöi tarjouksen ja hyväksynnän.
-const content = (d) => JSON.stringify([d.deliveryDate, d.deliverySiteId, d.diet.claims, d.diet.excludeAllergens, d.lines.map((l) => [l.ref, l.productTerm, l.quantity, l.claims, l.excludeAllergens, l.selectedProductId || null])]);
+const content = (d) => JSON.stringify([d.deliveryDate, d.deliverySiteId, d.diet.claims, d.diet.excludeAllergens, d.lines.map((l) => [l.ref, l.productTerm, l.quantity, l.claims, l.excludeAllergens, l.selectedProductId || null, l.answeredClaims || []])]);
 
 function newDraft(customer) {
   return { id: `WD-${crypto.randomUUID()}`, state: 'active', revision: 0, customerId: customer.customerId, bindingVersion: customer.bindingVersion,
@@ -68,7 +67,10 @@ function apply(draft, turn, customer, today) {
     } else if (o.op === 'update' && line) {
       const before = JSON.stringify([line.productTerm, line.claims, line.excludeAllergens]);
       if (o.quantity) { if (validQuantity(o.quantity)) line.quantity = cleanQuantity(o.quantity); else notes.push(`Tarkista määrä: ${line.productTerm}.`); }
-      if (typeof o.productTerm === 'string' && o.productTerm.trim()) line.productTerm = o.productTerm.trim().slice(0, 80);
+      if (typeof o.productTerm === 'string' && o.productTerm.trim()) {
+        if (line.productTerm !== o.productTerm.trim()) line.answeredClaims = [];
+        line.productTerm = o.productTerm.trim().slice(0, 80);
+      }
       line.claims = claims([...line.claims, ...(o.addClaims || [])]).filter((c) => !(o.removeClaims || []).includes(c));
       line.excludeAllergens = allergens([...line.excludeAllergens, ...(o.excludeAllergens || [])]);
       // Tuotteen tai ruokavaatimuksen muutos vaatii uuden tuotevalinnan. Määrän muutos säilyttää valinnan ja tarkistetaan tarjouksessa.
@@ -81,7 +83,13 @@ function apply(draft, turn, customer, today) {
       if (!option) { notes.push(`Valitse numero näytetyistä vaihtoehdoista: ${line.productTerm}.`); continue; }
       line.selectedProductId = option.productId; line.selectedName = option.name; line.selectedWarning = option.warning || null;
     } else if (o.op === 'no_preference') {
-      draft.diet.known = true;
+      if (draft.pending?.kind === 'preference') {
+        for (const ref of draft.pending.refs) {
+          if (o.ref && o.ref !== ref) continue;
+          const target = find(ref);
+          if (target) target.answeredClaims = [...new Set([...(target.answeredClaims || []), draft.pending.claim])];
+        }
+      } else draft.diet.known = true;
     } else if (o.op === 'site') {
       const site = customer.deliverySites?.[o.option - 1];
       if (site) draft.deliverySiteId = site.id; else notes.push('Valitse toimituspaikka numerolla.');
@@ -121,12 +129,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
     draft.pending = null;
     if (!draft.lines.length) return { status: 'collecting', text: `Luonnos on tyhjä. ${HELP}` };
     const list = draft.lines.map((l) => `- ${lineLabel(l)}${l.selectedName ? `: ${l.selectedName}` : ''}`).join('\n');
-    // Tarkistuslista ennen tuotteita ja tilausta, aina samassa järjestyksessä: toimituspäivä, allergeenit, määrät.
-    // Kysytään vain puuttuvat, kaikki yhdellä viestillä.
+    // Required logistics and amounts first. Dietary preferences are asked only when actual
+    // orderable candidates differ in a relevant property; declared constraints always apply.
     const noQty = draft.lines.filter((l) => !l.quantity);
     const questions = []; const asks = [];
     if (!draft.deliveryDate) { questions.push('Mille päivälle toimitus?'); asks.push('date'); }
-    if (!draft.diet.known) { questions.push(DIET_QUESTION); asks.push('diet'); }
     if (noQty.length) { questions.push(`Kuinka paljon: ${noQty.map((l) => l.productTerm).join(', ')}?`); asks.push('quantity'); }
     if (asks.length) draft.pending = { kind: 'checklist', asks, refs: noQty.map((l) => l.ref) };
     if (!draft.deliverySiteId && customer.deliverySites?.length > 1 && !questions.length) {
@@ -142,10 +149,25 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       const shown = s.lines.slice(0, 4);
       for (const x of shown) draft.offered[x.ref] = x.options;
       if (!shown.length) return { status: 'collecting', text: `${problems.join('\n')}\nKokeile toista päivää tai tarkenna tuotetta. Tilausta ei ole tehty.` };
+      const preference = !draft.diet.known && shown.flatMap((x) => (x.clarify || []).map((claim) => ({ ref: x.ref, claim })))
+        .find(({ ref, claim }) => !draft.lines.find((l) => l.ref === ref)?.answeredClaims?.includes(claim)
+          && !draft.lines.find((l) => l.ref === ref)?.claims.includes(claim) && !draft.diet.claims.includes(claim));
+      if (preference) {
+        const relevant = shown.filter((x) => x.clarify?.includes(preference.claim)
+          && !draft.lines.find((l) => l.ref === x.ref)?.answeredClaims?.includes(preference.claim));
+        const names = relevant.map((x) => draft.lines.find((l) => l.ref === x.ref).productTerm);
+        const label = names.length > 1 ? `${names.slice(0, -1).join(', ')} ja ${names.at(-1)}` : names[0];
+        draft.pending = { kind: 'preference', refs: relevant.map((x) => x.ref), claim: preference.claim };
+        return { status: 'collecting', text: `Luonnoksessa nyt:\n${list}\n\n${cap(label)}: haluatko laktoositonta vai käykö tavallinen?` };
+      }
       draft.pending = { kind: 'choose', refs: shown.map((x) => x.ref) };
       const blocks = shown.map((x) => {
         const l = open.find((line) => line.ref === x.ref);
-        return `*${cap(lineLabel(l))}*\n${x.options.map((o, i) => `${i + 1}. ${o.name}: ${num(o.salesUnits)} ${o.salesUnitLabel}${o.covers ? ` (${qty(o.covers)})` : ''}, ${eur(o.lineNet)}${o.warning ? ` (${o.warning})` : ''}`).join('\n')}`;
+        const covered = x.options.filter((o) => o.covers?.unit === l.quantity.unit).map((o) => o.covers.value);
+        const smallest = covered.length ? Math.min(...covered) : null;
+        const packNote = smallest > l.quantity.value ? `\nTarve on ${qty(l.quantity)}; pienin näistä myyntieristä kattaa ${qty({ value: smallest, unit: l.quantity.unit })}.` : '';
+        const organicNote = !l.claims.includes('EU_ORGANIC_FARMING') && x.options.every((o) => o.labels?.includes('EU_ORGANIC_FARMING')) ? '\nNäytetyt vaihtoehdot ovat luomua.' : '';
+        return `*${cap(lineLabel(l))}*\n${x.options.map((o, i) => `${i + 1}. ${o.name}: ${num(o.salesUnits)} ${o.salesUnitLabel}${o.covers ? ` (${qty(o.covers)})` : ''}, ${eur(o.lineNet)}${o.warning ? ` (${o.warning})` : ''}`).join('\n')}${packNote}${organicNote}`;
       });
       const how = shown.length > 1 ? `Vastaa numeroilla samassa järjestyksessä, esim. "${shown.map(() => 1).join(' ')}".` : 'Vastaa numerolla.';
       const diet = dietLabel(draft.diet);
@@ -188,7 +210,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
     return { status: 'rejected', text: `Tilausta ei tehty:\n${(r.reasons || []).map((x) => `- ${x.message}`).join('\n') || '- Tilaus hylättiin.'}\nLuonnos säilyy. Kirjoita "näytä", niin tarkistan tilanteen uudelleen.` };
   }
 
-  return async function handleTurn({ messageId, conversationId, customer, text, receivedAt }) {
+  return async function handleTurn({ messageId, conversationId, customer, text, receivedAt, context }) {
     const done = store.result(messageId);
     if (done) return done; // sama viesti uudelleen: sama vastaus, ei uusia muutoksia
     if (!customer?.customerId || customer.permissions?.readProducts !== true) return { status: 'error', text: 'Asiakkuuttasi ei voitu vahvistaa, joten en voi näyttää tuotteita tai tehdä tilausta.' };
@@ -216,7 +238,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         result = { status: 'ready', text: 'Vahvista tilaus vastaamalla *TILAA*. Muuten luonnos jää odottamaan.' };
       } else {
         const before = content(draft);
-        const turn = await interpretTurn({ text: t, draft: structuredClone(draft), today, now: now(), receivedAt });
+        const preferenceYes = draft.pending?.kind === 'preference' && (VAGUE_YES.test(t) || /^laktoosit(?:tomana|tomina|onta|on)[.!\s]*$/iu.test(t));
+        const preferenceNo = draft.pending?.kind === 'preference' && /^(?:ei|ei väliä|ei tarvitse|ei tarvi|tavallinen|tavallista|tavalliset|ihan tavallista|ihan tavalliset|normaali|normaalia|ihan normi|kumpikin käy|kaikki käy)[.!\s]*$/iu.test(t);
+        const turn = preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
+          ? { op: 'update', ref, addClaims: [draft.pending.claim] } : { op: 'no_preference', ref }) }
+          : await interpretTurn({ text: t, draft: structuredClone(draft), today, now: now(), receivedAt, context });
         const notes = apply(draft, turn, customer, today);
         draft.turn += 1;
         if (content(draft) !== before) { draft.revision += 1; draft.quote = null; }

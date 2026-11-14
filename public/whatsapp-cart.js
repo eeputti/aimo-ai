@@ -28,7 +28,7 @@ function render(value) {
   if (!list) { controls(); return; }
   $('company').textContent = list.companyName;
   $('delivery').textContent = list.deliveryDate ? new Intl.DateTimeFormat('fi-FI', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${list.deliveryDate}T12:00:00Z`)) : 'Valitse toimituspäivä';
-  $('diet').textContent = list.diet.known ? `Ruokavaliot: ${diet(list.diet) || 'ei yleisiä erityisvaatimuksia'}` : 'Kerro mahdolliset ruokavaliot ennen tilaamista.';
+  $('diet').textContent = diet(list.diet) ? `Huomioitu: ${diet(list.diet)}` : 'Voit kertoa mahdolliset ruoka- ja allergiavaatimukset apurille.';
   $('lines').replaceChildren(...list.lines.map((line) => {
     const row = document.createElement('li'); const details = document.createElement('div');
     const name = document.createElement('strong'); name.textContent = line.selectedName || line.productTerm; details.append(name);

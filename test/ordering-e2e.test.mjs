@@ -67,28 +67,28 @@ test('WhatsApp-viestistä demotilaukseen: tarkistuslista, valinta, muutos, vahvi
   assert.match(await say('m1', `YHDISTA ${code}`), /yhdistetty: Anna, Testikeittiö \(demo\)/);
   const buyerId = `whatsapp-demo-${store.member(PHONE).binding}`;
 
-  // Päivä ja määrät annettiin jo: kysytään vain allergeenit.
+  // Päivä ja määrät annettiin jo: vain todellisten vaihtoehtojen relevantti tarkennus.
   const checklist = await say('m2', '20 l maitoa ja 5 l kermaa maanantaiksi');
-  assert.match(checklist, /Onko allergioita/);
+  assert.match(checklist, /laktoositonta vai käykö tavallinen/);
   assert.doesNotMatch(checklist, /Mille päivälle|Kuinka paljon/);
   assert.doesNotMatch(checklist, /€/); // ei tuotteita ennen tarkistuslistaa
 
   const options = await say('m3', 'laktoositon');
   assert.match(options, /Toimitus ma 16\.11\./);
-  assert.match(options, /Huomioitu: laktoositon/);
-  assert.match(options, /\*Maito 20 l\*\n1\. [^\n]+€/);
+  assert.match(options, /Maito 20 l \(laktoositon\)/);
+  assert.match(options, /\*Maito 20 l \(laktoositon\)\*\n1\. [^\n]+€/);
   assert.match(options, /\*Kerma 5 l\*\n1\. [^\n]+€/);
   assert.equal(orders.list(buyerId).length, 0);
 
   const summary = await say('m4', '1 1');
   assert.match(summary, /\*Tilausluonnos\*, toimitus ma 16\.11\./);
-  assert.match(summary, /Huomioitu: laktoositon/); // ruokarajoite säilyy yhteenvetoon asti
+  assert.match(summary, /laktoositon/i); // rivikohtainen vaatimus säilyy valitussa tuotteessa
   assert.match(summary, /Vahvista vastaamalla \*TILAA\*/);
 
   // Määrän muutos tuottaa uuden yhteenvedon, eikä pelkkä "joo" ole tilauslupa.
   const changed = await say('m5', 'maitoa 30 litraa');
   assert.match(changed, /\(30 l\)/);
-  assert.match(changed, /Huomioitu: laktoositon/);
+  assert.match(changed, /laktoositon/i);
   assert.match(await say('m6', 'joo'), /Vahvista tilaus vastaamalla \*TILAA\*/);
   assert.equal(orders.list(buyerId).length, 0);
 
@@ -127,10 +127,10 @@ test('selaindemo: sama ketju HTTP:n yli oikeilla moduuleilla tuottaa yhden demot
     return res.json();
   };
 
-  assert.match((await say('20 l maitoa ja 5 l kermaa maanantaiksi')).text, /Onko allergioita/);
+  assert.match((await say('20 l maitoa ja 5 l kermaa maanantaiksi')).text, /laktoositonta vai käykö tavallinen/);
   const options = await say('laktoositon');
   assert.equal(options.status, 'choosing');
-  assert.match(options.text, /\*Maito 20 l\*\n1\. [^\n]+€/);
+  assert.match(options.text, /\*Maito 20 l \(laktoositon\)\*\n1\. [^\n]+€/);
   assert.equal((await say('1 1')).status, 'ready');
   const done = await say('TILAA');
   assert.match(done.text, /Tilaus AGW-\S+ (on tallennettu|odottaa yrityksesi hyväksyjän kuittausta)/);

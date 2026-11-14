@@ -80,7 +80,7 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       });
     },
     chat(args) { return serial(args.member?.binding, () => bridge.chatTurn(args)); },
-    async chatTurn({ member, messageId, receivedAt, messages, expectedList }) {
+    async chatTurn({ member, messageId, receivedAt, messages, expectedList, cartLinkAvailable = false }) {
       const current = member?.phone && store.member(member.phone);
       if (!current || current.binding !== member.binding || !messageId) {
         return { text: 'Testiyhteys ei ole voimassa. Pyydä ylläpitäjältä uusi yhdistäminen.' };
@@ -95,13 +95,14 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
         }
       }
       ordering.ensureBuyer?.(customer);
-      const runOrder = (text, { epoch = '', operation = '' } = {}) => ordering.handleTurn({ messageId: operation ? `${messageId}:${operation}` : messageId, receivedAt, customer,
+      const runOrder = (text, { epoch = '', operation = '', context } = {}) => ordering.handleTurn({ messageId: operation ? `${messageId}:${operation}` : messageId, receivedAt, customer, context,
         conversationId: conversationId(customer, epoch),
         text,
       });
       const text = messages.at(-1)?.content || '';
       const result = await (ordering.dialogue ? ordering.dialogue.respond({ binding: current.binding, messageId, text, runOrder,
         getShoppingList: ({ epoch = '' } = {}) => ordering.getShoppingList?.({ conversationId: conversationId(customer, epoch), customer }) || null,
+        canOpenCart: cartLinkAvailable === true && expectedList === undefined,
         allowed: () => livePermissions(customer).readProducts }) : runOrder(text));
       if (expectedList === undefined) return result;
       if (!livePermissions(customer).readProducts) throw Object.assign(new Error('Testiyhteys ei ole enää voimassa.'), { status: 403 });

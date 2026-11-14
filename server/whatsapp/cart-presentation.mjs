@@ -3,13 +3,14 @@ const PRODUCTS = '{{products}}';
 // Canonical physical units before interpretation: the model must not turn 5 dl into 5 L
 // just because its output schema accepts only L/KG/PCS. This does not infer any missing amount.
 export function normalizeOrderUnits(text) {
-  return text.replace(/(?<![\p{L}\d.,])(\d{1,3}(?:[ \u00a0]\d{3})+|\d+)([.,]\d+)?\s*(dl|cl|ml|g)(?=$|[\s,.;!?])/giu,
+  return text.replace(/(?<![\p{L}\d.,])(\d{1,3}(?:[ \u00a0]\d{3})+|\d+)([.,]\d+)?\s*(dl|cl|ml|g|desi(?:ä|i|a)?|desilitra[a-zåäö]*|senttilitra[a-zåäö]*|millilitra[a-zåäö]*|gramma[a-zåäö]*)(?=$|[\s,.;!?])/giu,
     (_match, integer, fraction = '', unit) => {
       const value = Number((integer.replace(/[ \u00a0]/g, '') + fraction).replace(',', '.'));
-      const factor = { dl: 0.1, cl: 0.01, ml: 0.001, g: 0.001 }[unit.toLowerCase()];
+      const canonical = /^(?:dl|desi)/iu.test(unit) ? 'dl' : /^(?:cl|sentti)/iu.test(unit) ? 'cl' : /^(?:ml|milli)/iu.test(unit) ? 'ml' : 'g';
+      const factor = { dl: 0.1, cl: 0.01, ml: 0.001, g: 0.001 }[canonical];
       const converted = Number((value * factor).toPrecision(12));
       if (!Number.isFinite(converted) || converted <= 0 || converted < 1e-12) return _match;
-      return `${converted.toLocaleString('fi-FI', { useGrouping: false, maximumFractionDigits: 12 })} ${unit.toLowerCase() === 'g' ? 'kg' : 'l'}`;
+      return `${converted.toLocaleString('fi-FI', { useGrouping: false, maximumFractionDigits: 12 })} ${canonical === 'g' ? 'kg' : 'l'}`;
     });
 }
 const PARTITIVE = { maito: 'maitoa', kananmuna: 'kananmunia', kananmunat: 'kananmunia', kerma: 'kermaa',
