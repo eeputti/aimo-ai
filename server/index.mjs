@@ -26,6 +26,8 @@ import { analyzeRecipeSource, recipeProducts } from './recipe-import.mjs';
 import { prepareCheckout, confirmCheckout } from './storefront-checkout.mjs';
 import { handleAssistantChat, assistantStatus } from './assistant.mjs'; // Tilausapuri: Danielin MCP-agentti sivulla /assistant.html
 import { createLocalShop } from './local-shop.mjs';
+import { orderEmailFlow } from './order-email-flow.mjs'; // sähköpostivahvistettu demotilaus: tarkistusviesti → vahvistussivu → tilausvahvistus
+import { handleOrderEmailRequest } from './order-email-http.mjs';
 
 import { createConfiguredWhatsApp, whatsappDbPath } from './whatsapp/runtime.mjs';
 const embeddedStorefront = process.env.AIMO_EMBEDDED_STOREFRONT === 'true';
@@ -171,6 +173,11 @@ const routes = {
   'POST /api/storefront/checkout/confirm': async (req, res) => {
     try { json(res, 200, await confirmCheckout((await readBody(req)).token)); }
     catch (err) { json(res, err.status || 500, { error: err.message }); }
+  },
+  // Lähettää tilausyhteenvedon sähköpostiin. Ei tee tilausta: tilaus syntyy vasta vahvistussivun painikkeesta (POST /order/confirm).
+  'POST /api/storefront/order-email': async (req, res) => {
+    try { json(res, 200, await orderEmailFlow.request(await readBody(req))); }
+    catch (err) { if (!err.status) console.error('[order-email] request failed'); json(res, err.status || 500, { error: err.status ? err.message : 'Sähköpostin lähetys epäonnistui.' }); }
   },
   'GET /api/assistant/status': (req, res) => json(res, 200, assistantStatus()),
   'POST /api/assistant/chat': async (req, res) => handleAssistantChat(req, res, await readBody(req)),
@@ -329,6 +336,7 @@ export async function handleStorefrontRequest(req, res) {
     res.writeHead(302, { location: '/' + url.search, 'cache-control': 'no-store' }); res.end(); return;
   }
   if (whatsapp && await whatsapp.handle(req, res, url)) return;
+  if (await handleOrderEmailRequest(req, res, url)) return;
   if (await handleGateway(req, res, url)) return; // portin reitit ensin; se käsittelee omat virheensä
   const handler = routes[`${req.method} ${url.pathname}`];
   try {

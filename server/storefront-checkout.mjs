@@ -45,6 +45,14 @@ export async function prepareCheckout(input) {
   const vat = Math.round(lines.reduce((s, l) => s + l.lineNet * l.vatRate / 100, 0) * 100) / 100;
   return { token, deliveryDate: input.deliveryDate, lines, totals: { net, vat, gross: Math.round((net + vat) * 100) / 100 }, expiresAt: new Date(expires).toISOString(), simulated: true };
 }
+/** 'placed' once the gateway holds an order for this draft, 'ready' while it can still be confirmed, otherwise 'expired' / 'unknown'. Read-only. */
+export function checkoutStatus(token) {
+  const draft = typeof token === 'string' ? kv.get(`storefront.checkout.${token}`) : null;
+  const b = draft && buyers.byId(draft.buyerId);
+  if (!b) return 'unknown';
+  if (orders.byIdempotency(b.id, token)) return 'placed';
+  return draft.expires > clock.now().getTime() ? 'ready' : 'expired';
+}
 export async function confirmCheckout(token) {
   if (typeof token !== 'string' || !/^[a-f0-9-]{36}$/.test(token)) fail(400, 'Virheellinen tilausvahvistus.');
   if (inflight.has(token)) return inflight.get(token);

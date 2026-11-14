@@ -5,12 +5,12 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const money = (n) => Number(n).toLocaleString('fi-FI', { style: 'currency', currency: 'EUR' });
 const labels = { confirmed: 'Vahvistettu', pending_approval: 'Odottaa hyväksyntää', rejected: 'Hylätty' };
 const flags = { STOCK_UNKNOWN: 'Saldomäärää ei ole vahvistettu', DELIVERY_DATE_SHIFT: 'Toimituspäivä muuttuu', PARTIAL_FILL_SPLIT: 'Osatoimitus ja korvaava tuote', SUBSTITUTION_WITHIN_POLICY: 'Korvaava tuote valtuuden sisällä', SUBSTITUTION_OUTSIDE_POLICY: 'Korvaava tuote vaatii hyväksynnän' };
-let buyers = []; let buyer; let orders = []; let busy = false; let view = 'orders'; let choices = [];
+let buyers = []; let buyer; let orders = []; let busy = false; let view = 'orders'; let choices = []; let reviewEmail = '';
 const localShop = !!document.querySelector('meta[name="aimo-local-shop"]');
 const api = async (url, body, account) => {
   const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', headers: { 'content-type': 'application/json', ...(account ? { authorization: `Bearer ${account.demoKey}` } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const result = await response.json();
-  if (!response.ok) throw new Error(result.error?.message || 'Palvelupyyntö epäonnistui.');
+  if (!response.ok) throw new Error(result.error?.message || (typeof result.error === 'string' ? result.error : '') || 'Palvelupyyntö epäonnistui.');
   return result;
 };
 const flow = createStorefrontOrder({ cart, request: api });
@@ -58,7 +58,7 @@ function showQuote() {
   content.innerHTML = `<p>${esc(quote.priceSource)}. Toivottu toimitus ${esc(quote.deliveryDate)}.</p>${quote.needs.map((n, i) => {
     const o = n.options[choices[i] || 0];
     return `<article><h3>${esc(cart.lines().find((p) => String(p.id) === n.ref)?.name || n.ref)}</h3>${o ? `<label>Vaihtoehto <select data-sf-choice="${i}">${n.options.map((option, j) => `<option value="${j}"${j === (choices[i] || 0) ? ' selected' : ''}>${esc(option.lines.map((l) => l.name).join(' + '))}, ${money(option.totals.net)} (alv 0 %)</option>`).join('')}</select></label>${lineList(o.lines)}<p>Toimitus ${esc(o.deliveryDate)}, tarjous voimassa ${esc(o.expiresAt)} asti.</p>${reasonList((o.flags || []).map((f) => ({ message: flags[f] || f })))}${reasonList(o.mandatePreview?.reasons)}` : `<p class="sf-error">Tuotteelle ei ole saatavilla tarjousta. Poista tai vaihda tuote ostoskorissa.</p>${reasonList(n.excluded)}`}</article>`;
-  }).join('')}${complete ? `<p><b>Tarjouksen summa (alv 0 %): ${money(quote.needs.reduce((sum, n, i) => sum + n.options[choices[i] || 0].totals.net, 0))}</b></p>` : ''}<button type="button" class="sf-primary" data-sf="submit"${complete ? '' : ' disabled'}>Lähetä tilaus</button> <button type="button" data-sf="prepare">Tarkista uudelleen</button>`;
+  }).join('')}${complete ? `<p><b>Tarjouksen summa (alv 0 %): ${money(quote.needs.reduce((sum, n, i) => sum + n.options[choices[i] || 0].totals.net, 0))}</b></p>` : ''}<form data-sf-review-form><label>Sähköpostiosoite <input type="email" name="email" autocomplete="email" required maxlength="254" value="${esc(reviewEmail)}"></label><p class="sf-note">Lähetämme tilausyhteenvedon ja vahvistuslinkin. Tilaus tehdään vasta, kun painat sähköpostin Confirm order -painiketta.</p><button type="submit" class="sf-primary"${complete ? '' : ' disabled'}>Lähetä tilausyhteenveto sähköpostiin</button> <button type="button" data-sf="prepare">Tarkista uudelleen</button></form>`;
 }
 function showOrders() {
   view = 'orders';
@@ -81,6 +81,17 @@ async function act(work) {
 launcher.addEventListener('click', () => open());
 select.addEventListener('change', () => { if (busy) { select.value = buyer?.id || ''; return; } buyer = buyers.find((b) => b.id === select.value); if (!buyer) return; try { localStorage.setItem('aimo.storefront.buyer', buyer.id); } catch { /* preference only */ } say(''); choices = []; view === 'cart' ? showQuote() : view === 'mandate' ? showMandate() : showOrders(); if (localShop) act(load); });
 dialog.addEventListener('change', (event) => { if (event.target.dataset.sfChoice !== undefined) { choices[Number(event.target.dataset.sfChoice)] = Number(event.target.value); showQuote(); } });
+dialog.addEventListener('input', (event) => { if (event.target.closest?.('[data-sf-review-form]') && event.target.name === 'email') reviewEmail = event.target.value; });
+dialog.addEventListener('submit', (event) => {
+  const form = event.target.closest('[data-sf-review-form]'); if (!form) return;
+  event.preventDefault(); if (busy) return;
+  const email = new FormData(form).get('email').trim(); reviewEmail = email;
+  act(async () => {
+    say('Lähetetään tilausyhteenvetoa…');
+    await flow.sendReview(buyer, choices, email);
+    say(`Tilausyhteenveto lähetettiin osoitteeseen ${email}. Tilaus tehdään vasta, kun painat sähköpostin Confirm order -painiketta ja vahvistat tilauksen avautuvalla sivulla.`);
+  });
+});
 dialog.addEventListener('click', (event) => {
   const b = event.target.closest('[data-sf]'); if (!b || busy) return;
   act(async () => {

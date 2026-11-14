@@ -74,3 +74,20 @@ test('a successful order stays submitted even if session storage cleanup fails',
   await assert.rejects(f.flow.submit(f.buyer, []), /muuttui/);
   assert.equal(f.calls.length, 2);
 });
+
+test('order e-mail request sends the cart without offers or buyer credentials; substitutes and date shifts must be accepted in the cart first', async () => {
+  const exact = { offer: 'signed.exact', deliveryDate: '2026-11-16', lines: [{ productId: '464306', quantity: 2 }] };
+  const f = fixture(async (url) => url === '/v1/quotes' ? { needs: [{ options: [exact, { offer: 'signed.sub', deliveryDate: '2026-11-16', lines: [{ productId: '999', quantity: 2 }] }] }] } : { sent: true });
+  Object.assign(f.rows[0], { price: 3.5, vat: 14 });
+  await assert.rejects(f.flow.sendReview(f.buyer, [], 'a@example.test'), /muuttui/); // a quote must be prepared first
+  await f.flow.prepare(f.buyer);
+  await f.flow.sendReview(f.buyer, [], ' ignored@example.test '.trim());
+  const call = f.calls.at(-1);
+  assert.equal(call.url, '/api/storefront/order-email'); assert.equal(call.buyer, undefined);
+  assert.deepEqual(call.body, { email: 'ignored@example.test', deliveryDate: '2026-11-16', reference: 'TEST-42', lines: [{ id: '464306', qty: 2, price: 3.5, vat: 14 }] });
+  assert.equal(f.flow.pending, null); // no order was requested, so nothing to recover
+  await assert.rejects(f.flow.sendReview(f.buyer, [1], 'a@example.test'), /poikkeaa/);
+  exact.deliveryDate = '2026-11-17';
+  await assert.rejects(f.flow.sendReview(f.buyer, [0], 'a@example.test'), /poikkeaa/);
+  assert.equal(f.calls.filter((c) => c.url === '/api/storefront/order-email').length, 1);
+});

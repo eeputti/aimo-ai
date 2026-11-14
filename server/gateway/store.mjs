@@ -89,3 +89,5 @@ export const ledger = {
 };
 
 export function wipeGateway() { db.exec('DELETE FROM quotes; DELETE FROM orders; DELETE FROM ledger; DELETE FROM buyers;'); }
+// Test processes keep this module-level connection open; close it before removing a temporary DB on Windows.
+export function closeGatewayDatabase() { db.close(); }
