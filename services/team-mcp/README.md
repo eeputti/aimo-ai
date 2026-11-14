@@ -1,5 +1,7 @@
 # Tiimin yhteinen MCP-palvelin
 
+**Liittyvälle tiimiläiselle: [yhteinen testiosoite, omat tunnisteet ja kirjautumisohje](../../docs/team-mcp-join.md).** Tämä README sisältää palvelimen ylläpidon ja teknisen käyttöönoton ohjeet.
+
 Yhteinen projektipostilaatikko, tehtävä- ja tiedostovaraukset sekä projektin yhteenveto Claude-, ChatGPT- ja muille remote MCP -asiakkaille. Ei ostoagentin työkalu eikä uusi kielimalli. Palvelu ei käytä malliavaimia, tee ostoksia, suorita komentoja tai muokkaa GitHubia. Viesteistä ei synny automaattista mallikutsua.
 
 Palvelu toimii erillään verkkokaupasta. Sen omat riippuvuudet ja lockfile ovat tässä hakemistossa; sivuston package.json tai tilauskannat eivät muutu.

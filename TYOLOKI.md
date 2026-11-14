@@ -2,6 +2,16 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — tiimiläisten MCP-liittymisohje ja yhteinen osoite GitHubiin (Codex)
+
+**Käyttäjän pyyntö:** tallenna ohjeet ja yhteyslinkki GitHubiin Eelistä, Aleksia ja Peetua varten. Käyttäjä antoi nykyisen Cloudflare-originin; liittymisohjeessa käytetään sen `/mcp`-osoitetta. Avaimia ei pyydetty, luettu tai tallennettu Gitiin. Käyttäjän itse palvelinkoneellaan luomat kuusi Claude-/ChatGPT-jäsentä varmennettiin oikean Tiimialusta-liittimen jäsenlistasta. Tunniste ei itsessään varmista avustajan kirjautumista.
+
+- Uusi `docs/team-mcp-join.md`: nykyinen yhteinen MCP-osoite, kuuden tunnisteen taulukko, yksityisesti toimitettava jäsenavain, ChatGPT:n nykyinen Plugins-polku ja vanhempi Apps-polku, Claude-liitin, OAuth-kirjautuminen, whoami/projekti- ja viestitesti, yhteiset avustajaohjeet sekä ylläpitäjän PowerShell-komennot (`npm.cmd`) avaimen vaihtoon ja tunnelin käynnistykseen. Tilapäisyys, palvelinkoneen päälläolo ja osoitteen vaihdon vaikutus kerrottu. Juuriosoite ei ole erillinen tiimisivu.
+- Root README: helposti löydettävä liittymislinkki ja vanhentuneen "ei vielä julkaistu" -tilan korjaus nykyiseksi tunnelikokeiluksi. Palvelun README linkittää samaan liittymisohjeeseen, jotta nykyinen osoite ylläpidetään yhdessä paikassa.
+- Työ varattiin sekä paikalliselta taululta että oikean liittimen yhteiseltä taululta. Muiden uudet commitit db795e6:een asti haettiin ja säilytettiin. Sovelluskoodiin, käynnissä oleviin palvelimiin, jäsenavaimiin tai kantojen asetuksiin ei tehty muutoksia.
+
+**Varmennus:** oikean liittimen `whoami` palauttaa daniel-chatgpt / aimo-ai ja `get_project_state` kaikki kuusi uutta tunnistetta. Käyttäjän ilmoittaman originin julkinen OAuth resource -metadata palauttaa 200 ja täsmää dokumentoituun `/mcp`-osoitteeseen; autentikoimaton POST `/mcp` palauttaa 401. `/healthz` palautti tästä ympäristöstä 403 / Your request was blocked, joten sen onnistumista ei väitetä. Kaikki 16 tarkistettua paikallista dokumenttilinkkiä osoittavat olemassa olevaan kohteeseen, ohjeen kuusi jäsen-ID:tä ja yhteysosoitteen täsmääminen metadataan tarkistettu, `git diff --check` läpi. Pelkkää dokumenttimuutosta varten sovellustestejä ei ajettu. Muiden kuuden oikeaa Claude-/ChatGPT-kirjautumista tai viestitestiä ei ajettu heidän puolestaan.
+
 ## 14.11.2026 — WhatsAppin ennakkotarkistus ja erillinen käynnistyspaketti (Codex, alkuperäinen testinumerochat)
 
 **Työnjako:** käyttäjä pyysi edistämään muuta sovellusta WhatsApp-kytkennän rinnalla ja tarkensi, että Claude tekee oikean mallin/mock-API:n keskustelutestit, löydettyjen vikojen korjaukset ja selaimen varademon. Tämä osuus rajattiin käynnistys-/julkaisuvalmiuteen. Työ varattiin paikallisella koordinointitaululla (`3a8aa996`), ja rajauksesta ilmoitettiin Claudelle. Varattua `docs/parallel/1.md`:tä ei muokattu; tämän osuuden ohje ja varmennustila ovat `docs/whatsapp-deploy.md`:ssä.
