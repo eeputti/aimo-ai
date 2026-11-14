@@ -2,7 +2,7 @@
 const cart = window.aimoCart;
 const content = document.querySelector('#cart-content');
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const money = (n) => `${Number(n).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+const money = (n) => n == null ? 'Hinta ei tiedossa' : `${Number(n).toLocaleString('fi-FI', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/cart-workflow.css'; document.head.append(css);
 let review = null; let busy = false; let applying = false; let message = '';
 const signature = () => JSON.stringify([cart.get().selectedDate, cart.lines().map((p) => [p.id, p.qty, p.price])]);
@@ -62,7 +62,7 @@ async function applyProduct(old, product, qty, extra = {}) {
     const prior = cart.lines().find((p) => p.id === product.id && p.id !== old.id);
     cart.remove(old.id);
     if (prior) cart.remove(prior.id);
-    await cart.add({ ...old, ...product, unit: product.unitLabel || old.unit, availableFrom: product.availability?.deliveryDate, availabilityNote: null, image: `/img/${encodeURIComponent(product.id)}`, ...extra }, qty + (prior?.qty || 0));
+    await cart.add({ ...old, ...product, unit: product.unitLabel || old.unit, availableFrom: product.availability?.deliveryDate, taxUnknown: product.vat == null, availabilityNote: null, image: `/img/${encodeURIComponent(product.id)}`, ...extra }, qty + (prior?.qty || 0));
     review = null;
   } finally { applying = false; }
   await runReview();
