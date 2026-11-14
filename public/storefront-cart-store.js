@@ -111,4 +111,5 @@
     try { const v = JSON.parse(ev.newValue); if (validDate(v.selectedDate) && v.carts) { state = v; window.dispatchEvent(new Event('aimo:cart-change')); } } catch { /* invalid storage does not replace the visible basket */ }
   });
   ready.catch(() => {}); // The cart page reports loading failures; search remains available.
+  if (document.querySelector('.header-actions')) import('/storefront-agent.js').catch((error) => console.error('Tilauksen toimintojen lataus epäonnistui:', error));
 })();

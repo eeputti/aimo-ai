@@ -47,7 +47,7 @@ function render() {
         ${Object.entries(t.vat).map(([rate, amount]) => `<div><dt>Alv ${rate} %</dt><dd>${money(amount)}</dd></div>`).join('')}
         <div class="cart-reservation"><dt>Lisävaraus <span title="Lisävaraus on 10 % arvonlisäverollisesta summasta">${icon('info')}</span></dt><dd>${t.unpriced || t.taxUnknown ? 'Tarkistetaan' : money(t.reservation)}</dd></div>
         <div class="cart-final"><dt>Yhteensä (sis. alv)</dt><dd>${t.unpriced || t.taxUnknown ? 'Tarkistetaan' : money(t.total)}</dd></div></dl>
-        <button type="button" class="cart-checkout" data-cart-action="checkout" disabled title="Tarkista ensin hinnat ja saatavuus">SIIRRY MAKSAMAAN</button>
+        <button type="button" class="cart-checkout" data-cart-action="checkout"${rows.length ? '' : ' disabled'}>TARKISTA JA TILAA</button>
       </aside>
     </div>`;
 }

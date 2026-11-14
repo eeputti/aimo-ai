@@ -37,13 +37,16 @@ function paint() {
   }
   const button = content.querySelector('.cart-checkout');
   if (button) {
-    button.dataset.wf = review?.ok && !pending() ? 'payment' : 'review';
+    button.dataset.wf = 'order';
     button.disabled = busy || !cart.lines().length;
     button.title = '';
-    button.textContent = busy ? 'TARKISTETAAN…' : button.dataset.wf === 'payment' ? 'SIIRRY MAKSAMAAN' : 'TARKISTA TILAUS';
+    button.textContent = busy ? 'TARKISTETAAN…' : 'TARKISTA JA TILAA';
+    if (!content.querySelector('[data-wf="review"]')) {
+      const check = document.createElement('button'); check.type = 'button'; check.dataset.wf = 'review'; check.textContent = 'Tarkista tuoterivit ja korvaajat'; button.after(check);
+    }
     let note = content.querySelector('.cart-review-note');
     if (!note) { note = document.createElement('p'); note.className = 'cart-review-note'; note.setAttribute('role', 'status'); button.after(note); }
-    note.textContent = message || (review ? review.ok && !pending() ? 'Saatavuus, määrät ja hinnat tarkistettu. Voit siirtyä maksuvaiheeseen.' : 'Hyväksy muutokset tai ratkaise puuttuvat tuotteet ennen vahvistusta.' : 'Tarkistamme hinnat ja saatavuuden sekä etsimme tarvittaessa korvaajat.');
+    note.textContent = message || (review ? review.ok && !pending() ? 'Tuoterivit tarkistettu. Tarkista vielä sitova tarjous ennen tilauksen lähettämistä.' : 'Hyväksy muutokset tai ratkaise puuttuvat tuotteet ennen vahvistusta.' : 'Tarkista ja tilaa näyttää tarjouksen, korvaajat ja toimituspäivät ennen lähettämistä.');
   }
   observer.observe(content, { childList: true, subtree: true });
 }
@@ -71,15 +74,7 @@ content?.addEventListener('click', async (ev) => {
   const b = ev.target.closest('[data-wf]'); if (!b || busy) return;
   const action = b.dataset.wf;
   if (action === 'review') { await runReview(); return; }
-  if (action === 'payment') {
-    await runReview();
-    if (!review?.ok || pending() || checkedSignature !== signature()) return;
-    const totals = cart.totals();
-    let dialog = document.querySelector('#cart-payment-preview');
-    if (!dialog) { dialog = document.createElement('dialog'); dialog.id = 'cart-payment-preview'; dialog.setAttribute('aria-labelledby', 'cart-payment-title'); document.body.append(dialog); }
-    dialog.innerHTML = `<h2 id="cart-payment-title">Maksuvaiheen esikatselu</h2><p>${cart.lines().length} tuotetta, toimituspäivä ${cart.get().selectedDate.split('-').reverse().join('.')}</p><dl><div><dt>Ostokset (alv 0 %)</dt><dd>${money(totals.net)}</dd></div><div><dt>Yhteensä (sis. alv ja lisävaraus)</dt><dd>${money(totals.total)}</dd></div></dl><p>Maksupalvelua ei ole vielä yhdistetty. Tilausta tai maksua ei ole tehty.</p><button type="button" disabled>Maksa</button><form method="dialog"><button>Palaa ostoskoriin</button></form>`;
-    dialog.showModal(); return;
-  }
+  if (action === 'order') { window.dispatchEvent(new Event('aimo:order-checkout')); return; }
   const old = cart.lines().find((p) => p.id === b.dataset.id); if (!old) return;
   if (action === 'move') { cart.move(b.dataset.date, old.id); await runReview(); return; }
   const l = review?.lines.find((l) => l.id === old.id);

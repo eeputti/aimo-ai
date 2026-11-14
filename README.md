@@ -39,7 +39,11 @@ npm start                   # http://localhost:4747
 | `/kitchen.html` | Demo client: a kitchen ordering agent (Ravintola Kulma) |
 | `/assistant.html` | Tilausapuri: chat with Daniel's shopping agent (Python MCP server on Render) through the Claude API MCP connector. Answers with one table: earliest delivery, order deadline, price, substitute. Needs `ANTHROPIC_API_KEY`, `ASSISTANT_MCP_URL`, `ASSISTANT_MCP_TOKEN` |
 
-The homepage uses local images, fonts and a fixed product snapshot. Product carousels and the assistant greeting open and close locally. Asset sources are recorded in `public/storefront-assets/sources.json`.
+Start at `/`: the storefront keeps its existing appearance and search. Its **Tilaukset** menu opens orders, approvals, mandate limits and the audit trail inside the storefront. In the basket, **Tarkista ja tilaa** requests signed gateway offers for the selected buyer and delivery date. Review prices, substitutions and delivery dates, then explicitly send the order. The existing mandate determines whether it is confirmed or waits for human approval. All orders are demo commitments; no external order or payment is made. Changes to products, quantities, date, reference or buyer require a new quote. Interrupted order requests retry with the same idempotency key, including after a reload. The separate `/agent.html` console remains available for debugging.
+
+The homepage uses local images, fonts and a fixed product snapshot. The signed offer is the authoritative price and availability check before ordering. Asset sources are recorded in `public/storefront-assets/sources.json`. A single quote supports 1–20 basket lines. **Tarkista tuoterivit ja korvaajat** retains the inline basket review.
+
+Check the basket bridge with `node --test test/storefront-order.test.mjs test/storefront-cart.test.mjs`. The optional `scripts/check-storefront-order.mjs` browser check requires an installed Playwright module in `AIMO_PLAYWRIGHT_MODULE` and Chrome. It starts its own simulated server and temporary databases, tests quote → order → approval → audit → mandate → homepage orders, and never uses the running demo's databases or live API keys.
 
 Reference product photos use small 400 px WebP copies with fingerprinted filenames. Photos and fonts are cached by the browser; HTML, scripts, styles and JSON stay fresh during development. Regenerate the reference copies with `python3 scripts/optimize-storefront-images.py` (requires Pillow); originals and source checksums are preserved.
 
