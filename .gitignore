@@ -23,3 +23,6 @@ __pycache__/
 
 # Demon WhatsApp-linkki sisältää apurin numeron: vain paikallisesti (malli: public/demo-config.example.json)
 public/demo-config.json
+
+# WhatsApp-itsekeskustelun raportit (scripts/whatsapp-selfplay-batch.mjs): synteettiset keskustelut, ei Gitiin
+data/selfplay/

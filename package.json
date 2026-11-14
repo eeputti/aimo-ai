@@ -18,7 +18,8 @@
     "aimo:eval:spoken": "node --disable-warning=ExperimentalWarning scripts/aimo-spoken-eval.mjs",
     "eval": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/eval.mjs",
     "whatsapp": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env --env-file-if-exists=.env.whatsapp server/whatsapp-server.mjs",
-    "whatsapp:member": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env --env-file-if-exists=.env.whatsapp scripts/whatsapp-member.mjs"
+    "whatsapp:member": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env --env-file-if-exists=.env.whatsapp scripts/whatsapp-member.mjs",
+    "whatsapp:selfplay100": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env scripts/whatsapp-selfplay-batch.mjs"
   },
   "engines": {
     "node": ">=22.13"
