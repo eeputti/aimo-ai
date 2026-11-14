@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 14.11.2026 — ostoslista ranskalaisilla viivoilla (Codex)
+
+- Käyttäjän pyyntö: ostoslistan rivit näkyvät ranskalaisilla viivoilla pallukoiden sijaan. Selaimen tilausapurin Markdown-muotoilija muodostaa listoista HTML-luetteloita; `public/assistant.css` asettaa niiden listamerkiksi tavallisen `-`-viivan. Rivien sisältö, lihavoinnit ja luettelorakenne säilyvät.
+- Tarkistus: oma diff ja `git diff --check` läpi. Pelkkä tyylimuutos, ei uusia testejä, mallikutsuja tai palvelimen uudelleenkäynnistystä. Ulkoasua ei tarkistettu selaimessa. Sivun päivitys lataa uuden tyylin.
+- Muiden kesken olevat WhatsApp- ja paikallisen verkkokaupan muutokset jätetty tämän commitin ulkopuolelle. Työvaraukset ja tarkka rajaus: `docs/parallel/shopping-list-format.md`.
+
 ## 14.11.2026 — WhatsAppin ennakkotarkistus ja erillinen käynnistyspaketti (Codex, alkuperäinen testinumerochat)
 
 **Työnjako:** käyttäjä pyysi edistämään muuta sovellusta WhatsApp-kytkennän rinnalla ja tarkensi, että Claude tekee oikean mallin/mock-API:n keskustelutestit, löydettyjen vikojen korjaukset ja selaimen varademon. Tämä osuus rajattiin käynnistys-/julkaisuvalmiuteen. Työ varattiin paikallisella koordinointitaululla (`3a8aa996`), ja rajauksesta ilmoitettiin Claudelle. Varattua `docs/parallel/1.md`:tä ei muokattu; tämän osuuden ohje ja varmennustila ovat `docs/whatsapp-deploy.md`:ssä.
