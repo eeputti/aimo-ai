@@ -287,3 +287,30 @@ test('oikea ketju säännöillä ja simuloidulla rajapinnalla: viestit, korjaus,
   assert.equal(orders.list('ravintola-kulma')[0].lines.length, 2);
   o.close();
 });
+
+test('muutosvihje käyttää tilauksen omia rivejä ja kiitos ei tulosta yhteenvetoa uudelleen', async () => {
+  const { say, calls } = setup({ script: { ...ready,
+    perunaa: { intent: 'order', deliveryDate: '2026-11-16', ops: [add('peruna', { value: 2, unit: 'KG' }), { op: 'no_preference' }] },
+    1: (d) => ({ intent: 'order', ops: [{ op: 'select', ref: ref(d, 'peruna'), option: 1 }] }) } });
+  assert.match((await say('kiitos')).text, /^Ole hyvä! Kirjoita, kun tarvitset jotain\.$/);
+  await say('maitoa ja kermaa');
+  const open = await say('Kiitos paljon!');
+  assert.equal(open.status, 'collecting');
+  assert.match(open.text, /^Ole hyvä! Luonnos on tallessa/);
+  const summary = await say('1 2');
+  assert.match(summary.text, /esim\. "maito 30 l" tai "poista kerma"\.$/);
+  const thanks = await say('kiitos');
+  assert.equal(thanks.status, 'ready');
+  assert.equal(thanks.revision, summary.revision);
+  assert.doesNotMatch(thanks.text, /Tilausluonnos|Yhteensä/);
+  assert.equal(calls.quote.length, 1); // ei uutta tarjousta
+  assert.equal((await say('tilaa')).status, 'confirmed'); // hyväksyntä koskee yhä samaa yhteenvetoa
+  assert.equal(calls.submit.length, 1);
+
+  const other = setup({ script: { perunaa: { intent: 'order', deliveryDate: '2026-11-16', ops: [add('peruna', { value: 2, unit: 'KG' }), { op: 'no_preference' }] },
+    1: (d) => ({ intent: 'order', ops: [{ op: 'select', ref: ref(d, 'peruna'), option: 1 }] }) } });
+  await other.say('perunaa');
+  const one = await other.say('1');
+  assert.match(one.text, /esim\. "peruna 3 kg" tai "poista peruna"\.$/);
+  assert.doesNotMatch(one.text, /maito|voi"/);
+});

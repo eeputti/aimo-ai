@@ -137,6 +137,11 @@ export function createOrderingTools(deps = {}) {
       const top = fit.slice(0, 3);
       const cheapest = fit.reduce((a, b) => (b.price * b.qty < a.price * a.qty ? b : a));
       if (!top.includes(cheapest)) top[top.length - 1] = cheapest;
+      // Näytettävien kolmen sisällä yli kaksi kertaa halvimman hintainen vaihtoehto siirtyy muiden jälkeen
+      // (peruna 20 kg näytti ensin 72,40 €:n säkin ja halvimman 13,30 € kolmantena). Muu järjestys säilyy.
+      const floor = cheapest.price * cheapest.qty;
+      const pricey = (o) => (Number.isFinite(floor) && floor > 0 && o.price * o.qty > 2 * floor ? 1 : 0);
+      top.sort((a, b) => pricey(a) - pricey(b));
       lines.push({ ref: line.ref, total: fit.length, clarify, options: top.map((o) => ({
         productId: String(o.id), name: o.name, brand: o.brand || null, salesUnits: o.qty, salesUnitLabel: o.unitLabel,
         covers: o.quantityExplanation ? { value: o.quantityExplanation.providedItems, unit: 'PCS' } : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,

@@ -15,6 +15,8 @@ const dietLabel = (d) => [...d.claims.map((c) => CLAIM_FI[c]), ...d.excludeAller
 const CONFIRM = /^(tilaa|vahvista|vahvistan|hyväksy|hyväksyn|(kyllä|joo|ok|okei)[,\s]+(tilaa|vahvista|vahvistan))[\s.!]*$/iu;
 const VAGUE_YES = /^(joo|kyllä|ok|okei|jep|juu|selvä|hyvä|sopii)[\s.!]*$/iu;
 const CANCEL = /^(peru|peruuta|tyhjennä|aloita alusta)\b/iu;
+// Pelkkä kiitos ei muuta luonnosta eikä tulosta koko listaa uudelleen.
+const THANKS = /^(kiitos|kiitti|kiitoksia|kiitän|thx|thanks|tack)(\s+(paljon|tosi paljon|kovasti|avusta))?[\s.!]*$/iu;
 const HELP = 'Kirjoita tuotteet ja määrät, esim. "20 l laktoositonta maitoa ja 5 kg voita maanantaiksi".';
 
 const num = (n) => String(+Number(n).toFixed(3)).replace('.', ',');
@@ -88,6 +90,14 @@ function apply(draft, turn, customer, today) {
   return notes;
 }
 
+// Muutosesimerkki tilauksen omista riveistä: ei neuvota muuttamaan maitoa, jos tilauksessa ei ole maitoa.
+function changeHint(draft) {
+  const first = draft.lines.find((l) => l.quantity); const last = draft.lines[draft.lines.length - 1];
+  if (!first || !last) return 'Voit vielä muuttaa määriä tai poistaa rivejä.';
+  const more = first.quantity.value >= 4 ? Math.ceil(first.quantity.value * 1.5) : first.quantity.value + 1;
+  return `Voit vielä muuttaa, esim. "${first.productTerm} ${qty({ value: more, unit: first.quantity.unit })}" tai "poista ${last.productTerm}".`;
+}
+
 function summary(draft, q, customer) {
   const site = customer.deliverySites?.find((s) => s.id === draft.deliverySiteId);
   const warn = (ref) => { const w = draft.lines.find((l) => l.ref === ref)?.selectedWarning; return w ? `\n   Huom: ${w}` : ''; };
@@ -95,7 +105,7 @@ function summary(draft, q, customer) {
   const diet = dietLabel(draft.diet);
   const cutoff = q.lines.map((l) => l.cutoffLabel).filter(Boolean)[0];
   return [`*Tilausluonnos*, toimitus ${dateLabel(draft.deliveryDate)}${site ? `, ${site.label}` : ''}`, ...(diet ? [`Huomioitu: ${diet}`] : []), ...rows, `Yhteensä ${eur(q.totals.net)} (alv 0 %)`,
-    ...(cutoff ? [`Tilattava viimeistään ${cutoff}.`] : []), '', 'Vahvista vastaamalla *TILAA*. Voit vielä muuttaa, esim. "maitoa 30 litraa" tai "poista voi".'].join('\n');
+    ...(cutoff ? [`Tilattava viimeistään ${cutoff}.`] : []), '', `Vahvista vastaamalla *TILAA*. ${changeHint(draft)}`].join('\n');
 }
 
 /**
@@ -197,6 +207,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       } else if (CONFIRM.test(t)) {
         const last = !draft.lines.length && store.lastOrdered(conversationId);
         result = last ? { status: 'confirmed', text: `Tilaus ${last.orderId} on jo tallennettu. Uutta tilausta ei tehty.` } : await confirm(draft, customer);
+      } else if (THANKS.test(t)) {
+        const ready = draft.quote?.revision === draft.revision && !draft.pending;
+        result = ready ? { status: 'ready', text: 'Ole hyvä! Luonnos odottaa vahvistusta: vastaa *TILAA*, kun haluat tilata.' }
+          : draft.lines.length ? { status: 'collecting', text: 'Ole hyvä! Luonnos on tallessa ja jatkuu siitä, mihin jäätiin.' }
+            : { status: 'collecting', text: 'Ole hyvä! Kirjoita, kun tarvitset jotain.' };
       } else if (VAGUE_YES.test(t) && draft.quote?.revision === draft.revision && !draft.pending) {
         result = { status: 'ready', text: 'Vahvista tilaus vastaamalla *TILAA*. Muuten luonnos jää odottamaan.' };
       } else {

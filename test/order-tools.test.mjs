@@ -72,9 +72,11 @@ test('koko tilauksen ruokavalio: sisältävä pois, puuttuva allergeenitieto nä
   const nutFree = await tools.suggest({ customer, draft: draftOf([line('a')], { diet: { claims: [], excludeAllergens: ['AM'] } }) });
   // Tuote 1 sisältää maitoa: pois. Tuote 2 on varmennettu. Tuotteelta 3 puuttuu tieto: näytetään varoituksella.
   assert.deepEqual(nutFree.lines[0].options.map((o) => [o.productId, o.warning]), [['2', null], ['3', 'allergeenitieto puuttuu, tarkista itse']]);
-  // Halvin on aina näkyvissä, vaikka se ei olisi järjestyksen kärjessä.
+  // Halvin on aina näkyvissä, vaikka se ei olisi järjestyksen kärjessä. Kun muut maksavat yli kaksi kertaa sen verran, se näytetään ensin.
   const pricey = fakes({ search: async () => [found('2'), found('5'), found('6'), found('7', [], { price: 1 })] });
-  assert.deepEqual((await pricey.tools.suggest({ customer, draft: draftOf([line('a')]) })).lines[0].options.map((o) => o.productId), ['2', '5', '7']);
+  assert.deepEqual((await pricey.tools.suggest({ customer, draft: draftOf([line('a')]) })).lines[0].options.map((o) => o.productId), ['7', '2', '5']);
+  const near = fakes({ search: async () => [found('2'), found('5'), found('6'), found('7', [], { price: 3 })] });
+  assert.deepEqual((await near.tools.suggest({ customer, draft: draftOf([line('a')]) })).lines[0].options.map((o) => o.productId), ['2', '5', '7']);
   // Merkinnällä rajattu haku palautti saman ryhmän muita tuotteita (gluteeniton + tilli → maustesuola): näytetään pyydetty tuote,
   // ja puuttuva merkintä kerrotaan vain niille, joilta se puuttuu.
   const dill = fakes({ search: async (l) => (l.claims.includes('FREE_FROM_GLUTEN') ? [found('9', ['FREE_FROM_GLUTEN'], { name: 'KNORR Umami maustesuola 1kg' })]
@@ -218,4 +220,16 @@ test('oikea haku ja gateway simuloidulla rajapinnalla: vaihtoehdot, tarjous ja y
   assert.equal((await tools.submit(args)).orderId, first.orderId);
   assert.equal(orders.list('ravintola-kulma').length, 1);
   assert.equal(orders.list('ravintola-kulma')[0].buyerReference, 'whatsapp:d1');
+});
+
+test('näytettävissä kolmessa yli kaksi kertaa halvimman hintainen vaihtoehto ei ole ensimmäisenä', async () => {
+  // Perunan tapaus oikealta rajapinnalta: kallis säkki kärjessä ja halvin kolmantena.
+  const potato = (id, price, qty, kg) => found(id, [], { name: `Peruna ${id}`, price, qty, kg, litres: undefined, unitLabel: 'kpl' });
+  const { tools } = fakes({ product: () => ({ hasAllergenData: true, contains: [] }),
+    search: async () => [potato('sakki', 36.2, 2, 10), potato('ratte', 20, 2, 10), potato('pesty', 19, 2, 10), potato('irto', 0.665, 20, 1)] });
+  const s = await tools.suggest({ customer, draft: draftOf([line('a', { productTerm: 'peruna', quantity: { value: 20, unit: 'KG' } })]) });
+  assert.deepEqual(s.lines[0].options.map((o) => [o.productId, o.lineNet]), [['irto', 13.3], ['sakki', 72.4], ['ratte', 40]]);
+  // Kun hinnat ovat lähellä toisiaan, järjestys ei muutu.
+  const even = fakes({ search: async () => [found('1'), found('2', [], { price: 6 }), found('3', [], { price: 4 })] });
+  assert.deepEqual((await even.tools.suggest({ customer, draft: draftOf([line('a')]) })).lines[0].options.map((o) => o.productId), ['1', '2', '3']);
 });
