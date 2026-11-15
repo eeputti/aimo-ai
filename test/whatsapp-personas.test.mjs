@@ -207,6 +207,9 @@ test('laajennetut tarkistukset: keksityt faktat, ohjaus tukeen, botti, kiire, te
   assert.ok(!one(evening, 'Hyvää iltaa! Mitä tilataan?').newRequirement.includes('greeting_wrong_time'));
   assert.ok(one(evening, 'Moi! Mitä tilataan?').newRequirement.includes('greeting_not_time_aware'));
   assert.ok(!one(evening, 'Hyvää iltaa! Mitä tilataan?').newRequirement.includes('greeting_not_time_aware'));
+  const night = EXTENDED.find((p) => p.route === 'greeting-time' && p.slot === 'night');
+  assert.ok(!one(night, 'Moi! Mitä tilataan?').newRequirement.includes('greeting_not_time_aware'), 'yöllä neutraali moi');
+  assert.ok(one(night, 'Huomenta! Mitä tilataan?').newRequirement.includes('greeting_wrong_time'));
   assert.ok(!one(EXTENDED.find((p) => p.route === 'greeting-time' && p.slot === 'morning'), 'Huomenta! Mitä tilataan?').newRequirement.includes('greeting_wrong_time'));
 
   const cancel = X('cancel');

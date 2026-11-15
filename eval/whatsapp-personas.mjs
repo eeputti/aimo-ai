@@ -445,7 +445,9 @@ export function inspectPersona(persona, turns, list) {
   if (persona.greetingWrong && turns.length && new RegExp(persona.greetingWrong, 'iu').test(replies[0].split('\n')[0])) fresh.push('greeting_wrong_time');
   metrics.timeGreeting = turns.length ? /huomenta|päivää|iltaa|yötä/iu.test(replies[0].split('\n')[0]) : false;
   // Pelkkään tervehdykseen vastataan kellonajan mukaisella tervehdyksellä (date-first-options toteuttaa tätä).
-  if (persona.greetingCheck && turns.length && !metrics.timeGreeting) fresh.push('greeting_not_time_aware');
+  // Yöllä neutraali "Moi!" on oikein: "hyvää yötä" on hyvästely, ei tervehdys.
+  const neutralNight = persona.slot === 'night' && turns.length && /^\W*(moi|hei|terve|moro)\b/iu.test(replies[0]);
+  if (persona.greetingCheck && turns.length && !metrics.timeGreeting && !neutralNight) fresh.push('greeting_not_time_aware');
 
   // Käyttäjän päätös 15.11. klo 2.00: korilinkki vasta valmiille tilaukselle. Apuri opastaa ensin loppuun: päivä, määrät,
   // tuotevalinnat ja vaaditut ruokavaliot tai allergeenit. Uusi vaatimus, koska aiempi päätös salli linkin keskeneräiseen listaan.

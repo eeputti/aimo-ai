@@ -111,9 +111,10 @@ const redact = (text) => String(text || '').replace(/https?:\/\/\S+/gu, '[linkki
 
 /** Tiivis löydösraportti Markdownina. results: persoonakohtaiset rivit, totals: kutsut ja tokenit. */
 export function summarize(results, totals, meta) {
+  // Codexin vertailusarake vain tilaaville persoonille: pelkkä kysymys tai peruminen ei kuulu sen tilausodotuksiin.
   const count = (pick) => { const c = {}; for (const r of results) for (const f of pick(r)) { const k = f.replace(/:.*/u, ''); c[k] = (c[k] || 0) + 1; } return Object.entries(c).sort((a, b) => b[1] - a[1]); };
   const ok = results.filter((r) => !r.error);
-  const base = count((r) => r.failures || []); const fresh = count((r) => r.newRequirement || []); const codex = count((r) => r.codexFailures || []); const obs = count((r) => r.observations || []);
+  const base = count((r) => r.failures || []); const fresh = count((r) => r.newRequirement || []); const codex = count((r) => (r.persona?.expectEmpty ? [] : r.codexFailures || [])); const obs = count((r) => r.observations || []);
   const scores = {}; for (const r of ok) { const s = r.judgment?.score ?? 'ei arviota'; scores[s] = (scores[s] || 0) + 1; }
   const byCat = {}; for (const r of results) if (r.persona?.category) { const x = (byCat[r.persona.category] ||= { n: 0, pass: 0, fresh: 0 }); x.n += 1; if (!r.error && !r.failures.length) x.pass += 1; if (!r.error && !r.newRequirement.length) x.fresh += 1; }
   const byRoute = {}; for (const r of results) { const x = (byRoute[r.route] ||= { n: 0, pass: 0, fresh: 0 }); x.n += 1; if (!r.error && !r.failures.length) x.pass += 1; if (!r.error && !r.newRequirement.length) x.fresh += 1; }
@@ -135,7 +136,7 @@ export function summarize(results, totals, meta) {
     '## Perusvaatimukset (d–f)', ...base.map(([k, n]) => `- ${k}: ${n}.${example(k, (r) => r.failures || [])}`), ...(base.length ? [] : ['- ei virheitä']), '',
     '## Uusi vaatimus (a–c ja tervehdys): päivä ensin, numeroidut vaihtoehdot, 4 = lisää, tervehdys kellonajan mukaan', ...fresh.map(([k, n]) => `- ${k}: ${n}.${example(k, (r) => r.newRequirement || [])}`), ...(fresh.length ? [] : ['- ei virheitä']), '',
     '## Lisähavainnot (deterministiset, eivät kaada persoonaa)', ...obs.map(([k, n]) => `- ${k}: ${n}.${example(k, (r) => r.observations || [])}`), ...(obs.length ? [] : ['- ei havaintoja']), '',
-    '## Codexin inspectConversation (vertailu)', ...codex.map(([k, n]) => `- ${k}: ${n}`), ...(codex.length ? [] : ['- ei virheitä']), '',
+    '## Codexin inspectConversation (vertailu, vain tilaavat persoonat)', ...codex.map(([k, n]) => `- ${k}: ${n}`), ...(codex.length ? [] : ['- ei virheitä']), '',
     ...(Object.keys(byCat).length ? ['## Luokat', '| luokka | n | perus läpi | uusi läpi |', '|---|---|---|---|', ...Object.entries(byCat).map(([k, x]) => `| ${k} | ${x.n} | ${x.pass} | ${x.fresh} |`), ''] : []),
     '## Polut', '| polku | n | perus läpi | uusi läpi |', '|---|---|---|---|', ...Object.entries(byRoute).map(([k, x]) => `| ${k} | ${x.n} | ${x.pass} | ${x.fresh} |`), '',
     '## Arvioijan pisteet (1–5)', ...Object.entries(scores).sort().map(([k, n]) => `- ${k}: ${n}`), '',

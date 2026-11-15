@@ -116,7 +116,7 @@ Apuri ei anna ostoskorin linkkiä ennen kuin tilaus on valmis. Se opastaa ensin 
 
 | ajo | lähde | personat | kutsut | USD | kesto | perus läpi | uusi läpi |
 |---|---|---|---|---|---|---|---|
-| laajennettu X001–X100 | f843b06 | 100 | 1 011 | 8,55 | 16 min | 85/100 | 70/100 |
+| laajennettu X001–X100 | f843b06 | 100 | 1 011 | 8,55 | 16 min | 85/100 | 72/100 |
 | Valion data V001–V035 | 043f08f | 35 | 250 | 2,50 | 5 min | 26/35 | 31/35 |
 
 Käyttäjä rajasi jatkon pieneen budjettiin (noin 3 USD), joten näiden jälkeen ei ajettu uusia isoja joukkoja. Tarkistusten korjaukset laskettiin uudelleen tallennetuista vuoroista ilman mallikutsuja.
@@ -127,7 +127,7 @@ Löydökset tärkeysjärjestyksessä (käsin varmennettu esimerkeistä):
 3. **Kiireessä tilausaikaa ei kerrota** (`rush_no_deadline` 8/12): "Tarkkaa tilauksen takarajaa en valitettavasti tiedä", vaikka tilausaika on tiedossa. Datajoukossa sama kysymys sai oikean ajan ("ehtii tilata ti 17.11. klo 10.00 asti"), joten tieto kulkee vaihtoehtoihin mutta ei dialogin vastaukseen ennen vaihtoehtoja.
 4. **Peruminen ei tyhjennä koria** (3/3 cancel): "Luonnos on tyhjä", mutta rivi jää.
 5. **Hiilijalanjälki ja toimitusvarmuus eivät kulje vaihtoehtoihin**: "En näe tuotekohtaisia hiilijalanjälkitietoja" (V017, V020), ja varmuuskysymykseen ei vastattu (V022, V023), vaikka katalogissa on `co2` ja `reliability`. Edullisinta kysyttäessä apuri sanoi "En näe hintoja", vaikka vaihtoehtolistassa on hinnat (V025).
-6. **Kellonaikatervehdys puuttuu** (8/8).
+6. **Kellonaikatervehdys puuttui** f843b06:ssa (6/8; yöllä neutraali "Moi!" hyväksytään, koska "hyvää yötä" on hyvästely). date-first-options korjasi sen myöhemmin: 07.30 Huomenta, 14.00 Päivää, 19.30 Iltaa. Codexin vertailusarake lasketaan vain tilaaville persoonille.
 7. **Toimii hyvin:** alkuperämaa 6/6 ja allergeenit 6/6 oikein datasta, mukaan lukien laktoositon mutta ei maidoton -ansa (Valio Edam). Säilytys oikein. Ei keksittyjä toimitusmaksuja, aukioloja tai hyvityksiä. Botti tunnustaa olevansa botti. Päivien ristiriita kysytään. Murteet ymmärretään.
 
 ## Seuraavat askeleet
