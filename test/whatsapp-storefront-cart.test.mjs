@@ -36,8 +36,11 @@ test('serves the storefront-styled cart page and only allowlisted styles, fonts,
   const imageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wa-storefront-img-'));
   t.after(() => fs.rmSync(imageDir, { recursive: true, force: true }));
   fs.writeFileSync(path.join(imageDir, '123.jpg'), Buffer.from('jpeg-bytes'));
-  fs.writeFileSync(path.join(imageDir, '_meta.json'), JSON.stringify({ 123: { file: '123.jpg', type: 'image/jpeg' }, 456: { miss: 1 },
-    789: { file: '../secret.jpg', type: 'image/jpeg' }, 790: { file: '123.jpg', type: 'text/html' } }));
+  fs.writeFileSync(path.join(imageDir, '_meta.json'), JSON.stringify({ 123: { file: '123.jpg', type: 'image/jpeg', source: 'valioaimo.fi' }, 456: { miss: 1 },
+    789: { file: '../secret.jpg', type: 'image/jpeg', source: 'valioaimo.fi' }, 790: { file: '123.jpg', type: 'text/html', source: 'valioaimo.fi' },
+    // Toisen tuotteen kuva, Open Food Facts tai lähteetön merkintä ei ole Valion kuva tästä tuotteesta.
+    791: { file: '123.jpg', type: 'image/jpeg', source: 'valioaimo.fi (lähin vastaava)' }, 792: { file: '123.jpg', type: 'image/jpeg', source: 'Open Food Facts (CC BY-SA)' },
+    793: { file: '123.jpg', type: 'image/jpeg' } }));
   const base = await serveModule(t, { view: 'storefront', imageDir });
 
   const page = await fetch(`${base}/whatsapp/cart`);
@@ -73,7 +76,8 @@ test('serves the storefront-styled cart page and only allowlisted styles, fonts,
   const reference = await fetch(`${base}/whatsapp/cart/img/688127`);
   assert.equal(reference.status, 200); assert.equal(reference.headers.get('content-type'), 'image/webp');
   // Uncached, traversing, wrongly typed or malformed ids are 404: no remote image lookup via the tunnel.
-  for (const id of ['456', '789', '790', '999999', '..%2f..%2f.env', 'a.b', 'x'.repeat(21)]) {
+  // 9999298 on vertailukorin S-kauppojen kuva: ei Valion palvelimelta, ei näytetä.
+  for (const id of ['456', '789', '790', '791', '792', '793', '9999298', '999999', '..%2f..%2f.env', 'a.b', 'x'.repeat(21)]) {
     assert.equal((await raw(base, `/whatsapp/cart/img/${id}`)).status, 404, id);
   }
   for (const asset of ['sources.json', '688127.jpg', 'icons/nope.svg', '..%2fstorefront.js', 'icons/..%2f..%2f..%2fserver%2findex.mjs', 'Matter-Regular.otf.map']) {
@@ -165,12 +169,16 @@ test('the WhatsApp cart link opens the storefront cart through the tunnel, price
   assert.equal(shoppingList.lines.length, 2);
   // Prices and sales units for the page come from a checked quote of exactly this draft revision.
   const exported = JSON.parse((await raw(base, '/whatsapp/cart/api/export', auth)).body);
+  const catalog = JSON.parse(fs.readFileSync(new URL('../data/catalog.json', import.meta.url), 'utf8'));
   assert.equal(exported.state, 'ready');
   assert.equal(exported.id, shoppingList.id); assert.equal(exported.revision, shoppingList.revision);
   assert.equal(exported.lines.length, 2);
   for (const line of exported.lines) {
     assert.ok(shoppingList.lines.some((l) => l.selectedProductId === line.id), line.id);
     assert.ok(line.qty > 0 && Number.isFinite(line.price) && line.name);
+    // Nimi Valion tuotetiedoista ja vertailuhinta hintarajapinnasta (tässä simuloitu), ei sivun omaa laskelmaa.
+    assert.equal(line.name, catalog.find((p) => p.id === line.id)?.name, line.id);
+    assert.ok(line.comparison?.value > 0 && ['L', 'KG'].includes(line.comparison.unit), JSON.stringify(line));
   }
   assert.doesNotMatch(JSON.stringify(exported), /358000000001|binding|Bearer/);
 

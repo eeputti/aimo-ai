@@ -49,7 +49,8 @@ function lines() {
   if (priced?.lines) return priced.lines.map((l) => {
     const source = list.lines.find((x) => x.selectedProductId === l.id);
     const net = Number.isFinite(l.price) ? round(l.price * l.qty) : null;
-    const per = l.requested && ['L', 'KG'].includes(l.requested.unit) && l.requested.value > 0 && net != null ? { value: round(net / l.requested.value), unit: l.requested.unit === 'L' ? 'l' : 'kg' } : null;
+    // Vertailuhinta Valion hintarajapinnasta sellaisenaan; ilman sitä ei näytetä itse laskettua arvoa.
+    const per = l.comparison && Number.isFinite(l.comparison.value) ? { value: l.comparison.value, unit: { L: 'l', KG: 'kg', PCS: 'kpl' }[l.comparison.unit] || '' } : null;
     return { id: l.id, name: l.name, term: source?.productTerm || l.name, qty: l.qty, unit: l.unit || 'kpl', price: l.price, vat: l.vat, taxUnknown: l.taxUnknown || l.vat == null,
       net, per, covers: coverLabel(l.requested), note: diet(source) };
   });
@@ -128,7 +129,7 @@ function render() {
     : priced?.state === 'waiting' ? (priced.message || 'Tuotteen saatavuus pitää tarkistaa ennen tilaamista.') : '';
   $('wa-alert').hidden = !alert; $('wa-alert-text').textContent = alert;
   const vatRows = Object.entries(t.vat).map(([rate, amount]) => `<div><dt>Alv ${esc(num(rate))} %</dt><dd>${money(amount)}</dd></div>`).join('');
-  $('wa-totals').innerHTML = `<div><dt>Ostokset (alv 0 %)</dt><dd>${t.known ? money(t.net) : 'Tarkistetaan'}</dd></div><div><dt>Toimitusmaksu (alv 0 %)</dt><dd>0,00 €</dd></div><div><dt>Yhteensä (alv 0 %)</dt><dd>${t.known ? money(t.net) : 'Tarkistetaan'}</dd></div>${vatRows}<div class="cart-final"><dt>Yhteensä (sis. alv)</dt><dd>${t.gross != null ? money(t.gross) : 'Tarkistetaan'}</dd></div>`;
+  $('wa-totals').innerHTML = `<div><dt>Ostokset (alv 0 %)</dt><dd>${t.known ? money(t.net) : 'Tarkistetaan'}</dd></div><div><dt>Toimitusmaksu (alv 0 %)</dt><dd>Ei tiedossa</dd></div><div><dt>Yhteensä (alv 0 %)</dt><dd>${t.known ? money(t.net) : 'Tarkistetaan'}</dd></div>${vatRows}<div class="cart-final"><dt>Yhteensä (sis. alv)</dt><dd>${t.gross != null ? money(t.gross) : 'Tarkistetaan'}</dd></div>`;
   controls();
 }
 async function load({ keepReview = false } = {}) {

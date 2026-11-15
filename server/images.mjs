@@ -2,12 +2,12 @@
 // joten kuva haetaan laiskasti ensimmäisellä pyynnöllä ja tallennetaan levylle (data/img, ei versionhallintaan):
 //   1) Valio Aimon julkinen tuotesivu (www.valioaimo.fi/toimitustukku/<slug>/, og:image), kun tuotenimi osuu sivukartan slugiin
 //   2) Valion omille tuotteille valio.fi:n tuotesivu samalla tavalla
-//   3) Open Food Facts GTIN-koodilla (avoin data, kuvat CC BY-SA)
-// Jos mikään ei löydä, /img/<id> vastaa 404 ja UI näyttää tyhjän paikan.
+// Vain Valion oma kuva samasta tuotteesta (image-cache.mjs isValioProductImage). Toisen tuotteen "lähin vastaava" -kuvaa ja
+// Open Food Factsin kuvaa ei enää haeta eikä näytetä. Jos kuvaa ei ole, /img/<id> vastaa 404 ja UI näyttää paikkamerkin.
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadCatalog, ROOT } from './catalog.mjs';
-import { imageCache } from './image-cache.mjs';
+import { imageCache, isValioAsset, isValioProductImage } from './image-cache.mjs';
 
 export function createImageService({ root = ROOT, catalog = loadCatalog, fetcher = globalThis.fetch } = {}) {
   const DIR = path.join(root, 'data', 'img');
@@ -27,7 +27,7 @@ export function createImageService({ root = ROOT, catalog = loadCatalog, fetcher
         const { assets } = JSON.parse(fs.readFileSync(path.join(ASSETS, 'sources.json'), 'utf8'));
         for (const a of assets) {
           const productId = (a.derivedFrom || a.file).match(/^(\d+)\.(?:jpg|png|webp)$/)?.[1];
-          if (productId && (!localImages.has(productId) || a.derivedFrom)) localImages.set(productId, a);
+          if (productId && isValioAsset(a) && (!localImages.has(productId) || a.derivedFrom)) localImages.set(productId, a);
         }
       } catch { /* no reference assets in this installation */ }
     }
@@ -96,53 +96,6 @@ export function createImageService({ root = ROOT, catalog = loadCatalog, fetcher
     return { url: `https://www.valio.fi/cdn-cgi/image/width=400,format=jpeg/${raw}`, fallbackUrl: og, source: 'valio.fi', page };
   }
 
-  // Lähin vastaava: kun nimi ei osu slugiin sellaisenaan, etsitään sama tuote sanojen päällekkäisyydellä.
-  // Merkki (nimen ensimmäinen sana) pitää olla sama, ettei kuvaksi tule kilpailijan tuotetta.
-  const words = (s) => String(s).toLowerCase().replace(/[äå]/g, 'a').replace(/ö/g, 'o').normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
-  const SIZE_WORD = /^\d+$|^(l|dl|cl|ml|g|kg|kpl|x|n|uht|esl)$/;
-  const fuzzyIndexes = {};
-  async function fuzzySlug(site, name, { min, dropSizes = false }) {
-    const slugs = Object.values(await loadSlugIndex(site));
-    fuzzyIndexes[site] ||= (() => { const inv = new Map(); slugs.forEach((sl, i) => { for (const t of new Set(sl.split('-'))) { if (!inv.has(t)) inv.set(t, []); inv.get(t).push(i); } }); return inv; })();
-    const all = words(name); const brand = all[0];
-    const a = new Set(dropSizes ? all.filter((t) => !SIZE_WORD.test(t)) : all);
-    const hits = new Map();
-    for (const t of a) for (const i of fuzzyIndexes[site].get(t) || []) hits.set(i, (hits.get(i) || 0) + 1);
-    let best = null;
-    for (const [i, c] of hits) {
-      const b = new Set(slugs[i].split('-').filter((t) => !dropSizes || !SIZE_WORD.test(t)));
-      if (!b.has(brand)) continue;
-      const j = c / (a.size + b.size - c);
-      if (!best || j > best.j) best = { j, slug: slugs[i] };
-    }
-    return best && best.j >= min ? best.slug : null;
-  }
-  async function fromAimoSiteFuzzy(p) {
-    const slug = await fuzzySlug('aimo', p.name, { min: 0.6 });
-    if (!slug) return null;
-    const page = `https://www.valioaimo.fi/toimitustukku/${slug}/`;
-    const src = ogImage(await (await get(page)).text())?.match(/https:\/\/api\.valioaimo\.fi\/medias\/[^"\s]+/)?.[0];
-    return src ? { url: `https://imgfly.scarabresearch.com/w_400/${src}`, fallbackUrl: src, source: 'valioaimo.fi (lähin vastaava)', page } : null;
-  }
-  async function fromValioSiteFuzzy(p) {
-    if (!/^valio\b/i.test(p.name)) return null;
-    const slug = await fuzzySlug('valio', p.name, { min: 0.5, dropSizes: true });
-    if (!slug) return null;
-    const page = `https://www.valio.fi/tuotteet/${slug}/`;
-    const og = ogImage(await (await get(page)).text());
-    if (!og) return null;
-    const raw = og.replace(/^https:\/\/www\.valio\.fi\/cdn-cgi\/image\/[^/]+\//, '');
-    return { url: `https://www.valio.fi/cdn-cgi/image/width=400,format=jpeg/${raw}`, fallbackUrl: og, source: 'valio.fi (lähin vastaava)', page };
-  }
-
-  async function fromOpenFoodFacts(p) {
-    if (!/^\d{8,14}$/.test(p.gtin || '')) return null;
-    const res = await get(`https://world.openfoodfacts.org/api/v2/product/${p.gtin}.json?fields=image_front_url,image_front_small_url`).catch(() => null);
-    const prod = res ? (await res.json()).product : null;
-    const url = prod?.image_front_url || prod?.image_front_small_url;
-    return url ? { url, source: 'Open Food Facts (CC BY-SA)', page: `https://world.openfoodfacts.org/product/${p.gtin}` } : null;
-  }
-
   async function download(found) {
     for (const url of [found.url, found.fallbackUrl].filter(Boolean)) {
       try {
@@ -172,14 +125,14 @@ export function createImageService({ root = ROOT, catalog = loadCatalog, fetcher
     const local = localImage(id);
     if (local) return Promise.resolve(local);
     const hit = cache.get(id);
-    if (hit?.file && fs.existsSync(path.join(DIR, hit.file))) return Promise.resolve(hit);
+    // Välimuistin vanha lähin vastaava- tai Open Food Facts -kuva ei ole Valion kuva tästä tuotteesta: ei näytetä, ei haeta uudelleen.
+    if (hit?.file && fs.existsSync(path.join(DIR, hit.file))) return Promise.resolve(isValioProductImage(hit) ? hit : null);
     if (hit?.miss && Date.now() - hit.miss < MISS_TTL) return Promise.resolve(null);
     if (inflight.has(id)) return inflight.get(id);
     const job = limited(async () => {
       const p = catalog().get(id);
       if (!p) return null;
-      // Try the matching suppliers before the slower GTIN fallback (up to 10 s per miss).
-      for (const source of [fromAimoSite, fromValioSite, fromAimoSiteFuzzy, fromValioSiteFuzzy, fromOpenFoodFacts]) {
+      for (const source of [fromAimoSite, fromValioSite]) {
         const found = await source(p).catch(() => null);
         const img = found && await download(found);
         if (!img) continue;

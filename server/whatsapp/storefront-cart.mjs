@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isValioAsset, isValioProductImage } from '../image-cache.mjs';
 
 const PAGE = '/whatsapp/cart';
 const ASSETS = `${PAGE}/assets/`;
@@ -38,7 +39,7 @@ export function createStorefrontCartPage({ view = process.env.WHATSAPP_CART_VIEW
       try {
         for (const a of JSON.parse(fs.readFileSync(path.join(assetsDir, 'sources.json'), 'utf8')).assets || []) {
           const productId = (a.derivedFrom || a.file).match(/^(\w+)\.(?:jpg|png|webp)$/)?.[1];
-          if (productId && imageTypes.has(a.mime) && (!references.has(productId) || a.derivedFrom)) references.set(productId, { dir: assetsDir, file: a.file, type: a.mime });
+          if (productId && imageTypes.has(a.mime) && isValioAsset(a) && (!references.has(productId) || a.derivedFrom)) references.set(productId, { dir: assetsDir, file: a.file, type: a.mime });
         }
       } catch { /* no reference images in this installation */ }
     }
@@ -47,7 +48,8 @@ export function createStorefrontCartPage({ view = process.env.WHATSAPP_CART_VIEW
       if (next !== stamp) { meta = JSON.parse(fs.readFileSync(path.join(imageDir, '_meta.json'), 'utf8')); stamp = next; }
     } catch { /* empty cache */ }
     const hit = meta[id];
-    const found = references.get(id) || (hit?.file && { dir: imageDir, file: hit.file, type: hit.type });
+    // Vain Valion oma kuva samasta tuotteesta. Toisen tuotteen tai Open Food Factsin kuvan tilalla näkyy paikkamerkki.
+    const found = references.get(id) || (isValioProductImage(hit) && { dir: imageDir, file: hit.file, type: hit.type });
     if (!found || !/^(?:optimized\/)?\w[\w.-]{0,80}$/.test(found.file) || found.file.includes('..') || !imageTypes.has(found.type)) return null;
     const file = path.join(found.dir, found.file);
     return fs.existsSync(file) ? { file, type: found.type } : null;

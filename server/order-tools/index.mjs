@@ -277,7 +277,8 @@ export function createOrderingTools(deps = {}) {
       // Eri toimituspäivä vaatii ostajan uuden valinnan, sitä ei hyväksytä hiljaa.
       if (o.deliveryDate !== draft.deliveryDate) { issues.push(issue('DELIVERY_DATE_SHIFT', `${o.lines[0].name} toimitetaan vasta ${o.deliveryDate}.`, { ref: need.ref, deliveryDate: o.deliveryDate })); continue; }
       const l = o.lines[0];
-      lines.push({ ref: need.ref, productId: l.productId, name: l.name, salesUnits: l.quantity, salesUnitLabel: l.salesUnitLabel, covers: { value: l.covers, unit: line.quantity.unit }, unitPriceNet: l.unitPriceNet, lineNet: l.lineNet, vatRate: l.vatRate, stockKnown: l.availability.stockKnown, cutoff: o.cutoff, cutoffLabel: o.cutoffLabel });
+      lines.push({ ref: need.ref, productId: l.productId, name: l.name, salesUnits: l.quantity, salesUnitLabel: l.salesUnitLabel, covers: { value: l.covers, unit: line.quantity.unit }, unitPriceNet: l.unitPriceNet, lineNet: l.lineNet, vatRate: l.vatRate, stockKnown: l.availability.stockKnown, cutoff: o.cutoff, cutoffLabel: o.cutoffLabel,
+        comparisonPrice: l.comparisonPrice ?? null, comparisonUnit: l.comparisonUnit ?? null }); // Valion hintarajapinnan vertailuhinta korisivulle
       offers.push(o.offer); expires = Math.min(expires, Date.parse(o.expiresAt));
     }
     if (issues.length) return fail(...issues);

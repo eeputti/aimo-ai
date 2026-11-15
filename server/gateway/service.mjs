@@ -138,6 +138,8 @@ function lineOf(a, qty, extra = {}) {
     quantity: qty, salesUnit: p.salesUnit, salesUnitLabel: unitLabel(p.salesUnit),
     unitSize: { value: size.value, source: size.source }, covers: +(qty * size.value).toFixed(2),
     unitPriceNet: price.net, pricePerRequestedUnit: a.perUnit, lineNet: money(price.net * qty), vatRate: price.vatRate ?? 13.5,
+    // Valion hintarajapinnan oma vertailuhinta (comparisonPrice): korisivu näyttää tämän, ei katalogin koosta laskettua.
+    comparisonPrice: price.comparison > 0 ? price.comparison : null, comparisonUnit: price.comparison > 0 ? price.comparisonUnit || null : null,
     availability: { logisticModel: avail.model, stock: avail.amount ?? null, stockKnown: avail.amount != null, deliveryDate: avail.date },
     closingTime: avail.closingTime || null, allergens: p.contains, deliveryReliability: p.reliability ?? null, co2PerKg: p.co2 ?? null,
     priceSource: price.source, ...extra,
