@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — AI-äänen tilalle oikea ruututallenne (Codex, videochatti)
+
+- Käyttäjä hylkäsi AI-kertojaäänen ja pyysi vähemmän mainospuhetta. Video tehty uudestaan ilman ääniraitaa ja ilman puhuvaa kalvoesitystä. Lyhyet suomenkieliset reunatekstit, oikea käyttöliittymä ja sama 20 → 30 litran maitotilaus alusta ihmisen hyväksyntään ja päätöslokiin.
+- Kuvaus muuttamattomasta lähteestä043f08f: /demo → /approve.html → kaupan tilausnäkymä. Erillinen paikallinen palvelin ja omat kannat, kuusi esimerkkituotetta, simuloidut hinnat/saatavuus/aika, säännöt ilman kielimalliavainta. Ei käyttäjäkantoja, Meta-lähetyksiä, live-Valio-kutsuja, oikeita tilauksia tai maksuja. Reunamerkintä ja julkaisu kertovat simulaatiosta.
+- MP4 **76,12 s**, H.264, 1280×720 / 25fps, **0 äänivirtaa**, 1 688 805 tavua. Tallenneajuri varmisti saman tilauksen confirmed / 30kpl ja eheän lokin. Koko dekoodaus, ffprobe ja kuvaruutujen tarkistus läpi. SHA-256 a15305390ec81082e9d3f0a06986add7f8b2af6eb8b2c0f710ab311541ad0374.
+- Uusi video: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/aimo-ruutudemo.mp4 . Katselusivu käyttää uutta tiedostonimeä; aiemmat MP4-polut sisältävät myös äänettömän version. Julkaisu ja anonyymi HTTP-takaisinluku varmennettu ennen tämän kirjauksen haarapäivitystä. Tarkat rajaukset docs/pitch-video.md.
+
+
 ## 15.11.2026 — itsekeskustelu Valion datalla: laajennettu ajo, 35 dataan perustuvaa personaa ja korilinkki vasta valmiille tilaukselle (Claude Code, selfplay-100)
 
 - **Käyttäjän päätökset (klo 2):** aja laajennettu joukko ja hyödynnä Valion aineistoa (tuotedata, hiilijalanjälki, toimitusvarmuus, rajapinta). Apuri ei anna ostoskorin linkkiä ennen kuin tilaus on valmis, vaan opastaa ensin loppuun: päivä, määrät, tuotevalinnat ja allergeenit. Tämä kumoaa aiemman päätöksen, jonka mukaan avaa kori toimi keskeneräisellekin listalle. Linkkivaatimus välitettiin date-first-options-sessiolle, ja se on GitHubissa 5044a91:ssä (ei vielä mitattu itsekeskustelulla). Lopuksi käyttäjä rajasi jatkoajot noin 3 USD:iin ja pyysi nopean commitin.

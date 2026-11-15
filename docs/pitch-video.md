@@ -1,48 +1,36 @@
-# Aimo-tilausapurin suomenkielinen esittelyvideo
+# Aimo-tilausapuri: ruutudemo ilman ääntä
 
 - Katselu: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site
-- MP4: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/aimo-agent-pitch-fi.mp4
-- Puheteksti: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/pitch-script.txt
-- Suomenkielinen tekstitys: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/captions.vtt
-- Kesto: 113,832683 s (1 min 53,83 s), alle kahden minuutin.
-- Puhe, videon tekstit ja katselusivu suomeksi. Synteettinen suomenkielinen kertojaääni, tavallinen puhenopeus. H.264/AAC, 1280 × 720, 24 fps.
+- MP4: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/aimo-ruutudemo.mp4
+- Kesto: **76,12 sekuntia (1 min 16 s)**, alle palautuksen 120 sekunnin rajan.
+- **Ei ääniraitaa:** ei synteettistä puhetta, kertojaa tai musiikkia.
+- H.264, 1280 × 720, 25 fps, MP4 / faststart.
 
-Käyttäjän korjaus: video suomeksi ja vähemmän mainospuhetta. Englanninkielinen versio korvattiin. Käsikirjoitus kirjoitettiin uusiksi yhden ravintolatilauksen ympärille: WhatsApp-viesti, tuotehaku, ostoskori, tarjous, ostajan asettamat rajat ja päätösloki. Videossa on kuvitettu työnkulku. Prototyyppi ei lähetä oikeita Valio-tilauksia eikä veloita maksuja. Tiimikoordinointia ei käytetä videon sisältönä.
+## Uusi toteutustapa
 
-Lähteet: projektin README.md, docs/challenge-coverage.md ja package.json. Ei uusia malli-/Meta-/Valio-testiajoja. Videon suomenkielinen puhe tuotettiin erikseen.
+Käyttäjä hylkäsi AI-äänen ja pyysi vähemmän mainospuhetta. Aiempi puhuva kalvoesitys korvattiin projektin oikean käyttöliittymän ruututallenteella. Video seuraa yhtä tilausta; lyhyet reunatekstit auttavat seuraamaan tapahtumia.
 
-## Puheteksti
+1. Ostaja kirjoittaa: 20 l laktoositonta maitoa maanantaiksi.
+2. Apuri näyttää tuotteet. Ostaja valitsee vaihtoehdon 3.
+3. Ostaja muuttaa määräksi 30 litraa.
+4. Ostaja vastaa vain "joo". Apuri vaatii vielä erillisen TILAA-vahvistuksen.
+5. TILAA tallentaa tilauksen odottamaan ihmisen hyväksyntää.
+6. Sama tilaus näkyy projektin hyväksyntäsivulla. Ihminen hyväksyy.
+7. Päätösloki näyttää tarkistukset ja hyväksynnän; ketjun eheys on tarkistettu.
 
-00:00:00  Aimo-tilausapuri
-Rakensimme Valio Aimolle tilausapurin. Sen kautta ostaja voi valmistella tilauksen WhatsAppissa ja vahvistaa sen selaimessa.
+Noin 45 s selaindemoa, 17 s hyväksyntänäkymää, 9 s päätöslokia ja lyhyt lopputeksti. Selainlatauksia on leikattu pois. Tallennettuja vastauksia tai tilaustiloja ei korvattu keksityillä käyttöliittymäkuvilla.
 
-00:00:10  Tilaus alkaa viestistä
-Ostaja kirjoittaa: tarvitsen kaksikymmentä litraa laktoositonta maitoa ja viisi litraa kermaa maanantaiksi. Apuri kysyy puuttuvat tiedot.
+## Tallenteen lähde ja rajaukset
 
-00:00:21  Apuri etsii tuotteet
-Apuri etsii tuotteet. Hinta, saatavuus ja tilausaika tarkistetaan haasteen rajapinnasta. Laktoosittomuus varmistetaan tuotetiedoista.
-
-00:00:34  Ostaja valitsee ja tarkistaa
-Ostaja valitsee tuotteet ja määrät. Apuri lähettää linkin ostoskoriin. Lopullinen vahvistus tehdään siellä.
-
-00:00:44  Tilaukseen tarvitaan tarjous
-Taustalla Aimo Agent Gateway muodostaa allekirjoitetun tarjouksen. Hinta ja saatavuus tarkistetaan vielä ennen tilauksen tallennusta.
-
-00:00:55  Ostaja määrää agentin rajat
-Ostaja asettaa agentille säännöt. Euromäärän ylitys vaatii ihmisen hyväksynnän. Kiellettyä allergeenia ei voi hyväksyä tilaukseen.
-
-00:01:07  Päätökset jäävät lokiin
-Päätöslokista näkee tarkistukset ja hyväksynnän syyn. Saman pyynnön lähettäminen uudestaan ei tee kaksoistilausta.
-
-00:01:17  Sama rajapinta eri apureille
-Sama rajapinta palvelee verkkokauppaa ja muita ostoagentteja. Keittiödemo tekee tilausehdotuksia historiasta, varauksista ja resepteistä.
-
-00:01:29  Mitä rakensimme?
-Toteutus käyttää Nodea ja SQLitea. Agentit liittyvät siihen REST- tai MCP-rajapinnalla. Tilausoikeudet tarkistetaan koodissa.
-
-00:01:41  Tämä on toimiva prototyyppi
-Demo tallentaa testitilauksia, ei oikeita Valio-tilauksia tai maksuja. Seuraava vaihe on yhteys Aimon asiakastunnistukseen ja tilausjärjestelmään.
+- Sovelluksen lähde: eeputti/aimo-ai, commit 043f08f, muuttamaton sovelluskoodi.
+- Kuvausreitit: /demo, /approve.html?order=… sekä verkkokaupan Tilaukset → Näytä päätösketju.
+- Erillinen paikallinen palvelin ja omat SQLite-kannat. Ei käyttäjän käynnissä olevien palvelinten tai tilausten muutoksia.
+- Kuusi kuvausta varten koottua esimerkkituotetta. Nimet ja tunnisteet repossa olevasta julkisesta tuotesnapshotista; luokittelu- ja pakkauskentät paikallisia testisyötteitä. **Hinnat, saatavuus ja aika simuloitu.** Merkintä on videossa ja katselusivulla.
+- Haasteen API-avainta tai kielimalliavainta ei käytetty: sääntötulkki, oikeat tilausmoduulit, tarjousallekirjoitus, mandaatti ja loki. Tallenne ei varmista Metan viestinkuljetusta tai vapaamuotoisen kielimallikeskustelun laatua.
+- Ei oikeita Meta-viestejä, Valio-tilauksia tai maksuja. Ei aimo-team-/teamMCP-aineistoa videon sisältönä.
 
 ## Tarkistukset
 
-Koko MP4 dekoodattu ffmpegillä ilman virheitä. Kesto tarkistettu ffprobella. Jokainen puheosuus päättyy ennen kuvan vaihtumista, nopeusmuutos alle 0,5 %. Otsikoiden leveydet ja renderöidyn tekstityksen sijoittuminen tarkistettu. Sites-versio 2 julkaistu samaan julkiseen osoitteeseen, lähdecommit 316a5da416bdd2af53aa7f0ca068a454ab59c5e4.
+Tallennusajuri varmisti, että sama tilaus on lopuksi confirmed, määrä 30 ja päätösketju ehjä. Videon koko dekoodaus läpi ffmpegillä. ffprobe: 76,12 s, yksi videovirta ja **nolla äänivirtaa**. Eri vaiheiden renderöidyt ruudut tarkistettu. Tiedosto 1 688 805 tavua, SHA-256 a15305390ec81082e9d3f0a06986add7f8b2af6eb8b2c0f710ab311541ad0374.
+
+Katselusivu ja kaikki sen tarjoamat MP4-versiot on korvattu tällä äänettömällä ruutudemolla. Uusi erillinen tiedostonimi estää vanhan puhuvan videon sekoittumisen uuteen linkkiin.
