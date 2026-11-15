@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — katkennut WhatsApp-tunneli palautettu ja ilmoittautumisen sähköposti-ilmoitus koestettu (Claude Code, soittonappi-chat)
+
+- **Käyttäjän havainto ja lupa:** kokeilulinkki ei toiminut. Landing oli kunnossa, mutta `cloudflared` ei ollut käynnissä, joten Metan viestit ja korilinkit eivät päässeet Maciin. Käyttäjä pyysi: "pistä tä nyt toimimaan".
+- **Tehty:** uusi pikatunneli (PID 77519) **https://mind-bristol-expects-wit.trycloudflare.com**. Metan webhook-callback vaihdettu siihen (success, takaisinluku active=true ja samat 10 kenttää). `.env.whatsapp`:ssa vain `WHATSAPP_PUBLIC_URL` vaihtui. Node 4749 käynnistetty uudelleen samasta snapshotista (48952 → 77774): kaikkien viiden kannan taulujen rivimäärät samat ennen ja jälkeen, healthz 200 paikallisesti ja tunnelin kautta. Molemmat `nohup`-prosesseina, lokit `/private/tmp/aimo-whatsapp-tools/`.
+- **Sähköposti-ilmoitus:** käyttäjä halusi sähköpostin jokaisesta lisätystä numerosta. Codexin Gmail-ajastus hoitaa sen. Koe testinumerolla live-lomakkeesta: macOS-ilmoitus seurannasta heti, sähköposti lähti noin 40 s:ssa (Gmail-ID tallessa). Testinumero poistettu kaikkialta. Postilaatikkoa ei voitu lukea tästä chatista.
+- **Rajat:** pikatunneli voi katketa uudelleen (uusi osoite → callback, julkinen URL ja restart uudelleen). Kaikki pyörii käyttäjän Macilla. Oikeaa puhelinviestiä uuden tunnelin läpi ei lähetetty. Tarkemmin `docs/parallel/landing-call.md`.
+
 ## 15.11.2026 — landingin neljä vaihetta, viestinappi ja ilmoitus uusista numeroista (Claude Code, soittonappi-chat)
 
 - **Käyttäjän palaute:** nappia ei näkynyt, koska hänen oma selaimensa muistaa jo hyväksytyn numeron ja avaa suoraan Avaa WhatsApp -näkymän. Välikokeilu, jossa nappi oli kortin yläreunassa (Worker eea80732), peruttiin käyttäjän pyynnöstä: nappi kuuluu numeron lisäämisen jälkeen. Lopullinen ohje: turhat animaatiot pois ja vaiheet Numero vastaanotettu → Soita tai laita viesti Eelikselle → Hyväksytty WhatsAppiin → Valmis keskusteluun. Käyttäjä haluaa myös tiedon jokaisesta lisätystä numerosta.
