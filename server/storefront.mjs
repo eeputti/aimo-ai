@@ -86,6 +86,8 @@ export async function availableStorefront(r, opts = {}) {
   const quotes = await fetchQuotes(ids, date);
   for (const [i, card] of r.cards.entries()) {
     const item = r.understood.items[i];
+    // Haku ei löytänyt valikoimasta pyydettyä tuotetta lainkaan (tai mikään ei täytä ehtoja): ei toimituspäivän ongelma.
+    const catalogMiss = card.status !== 'ok';
     const exact = card.status === 'ok' ? card.list.flatMap((p) => {
       const a = orderableProduct(cat.get(p.id), quotes.get(p.id), date, item.quantity);
       return a.ok ? [a.product] : [];
@@ -119,6 +121,7 @@ export async function availableStorefront(r, opts = {}) {
     card.list = exact.length ? exact : substitutes;
     card.top = card.list.slice(0, 3); card.total = card.list.length;
     card.status = card.total ? 'ok' : 'no_match';
+    card.notInCatalog = catalogMiss && !card.total;
     // Katalogin suodatinten lukumäärät eivät kuvaa tämän päivän saatavuutta.
     card.chips = card.chips.map(({ matches, ...chip }) => chip);
     if (!card.total) card.reason = nextDeliveryDate

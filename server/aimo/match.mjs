@@ -8,7 +8,8 @@ import { stems } from '../catalog.mjs';
 export const RAW_INGREDIENT = /^(174\d\d|41731|41733|41740|22630)$/;
 
 /** Osuman taso, pienempi parempi. */
-export const TIER = { LEAD: 0, CORE: 1, HEAD: 2, PART: 3, NONE: 4 };
+// SPLIT: yhdyssanan osat erillisinä sanoina ("jäätelö Vanilja" vaniljajäätelölle): pyydetty tuote, kokonaisen nimen jälkeen.
+export const TIER = { LEAD: 0, CORE: 1, SPLIT: 1.5, HEAD: 2, PART: 3, NONE: 4 };
 // Leikkuu- ja muotosanat eivät muuta tuotetta toiseksi: lohi|filee on lohta, kinkku|viipale on kinkkua.
 const FORM = ['fileesuikaleet', 'fileesuikale', 'fileekuutiot', 'fileekuutio', 'fileeviipaleet', 'fileeviipale', 'fileepalat', 'fileepala',
   'fileet', 'filee', 'file', 'suikaleet', 'suikale', 'kuutiot', 'kuutio', 'viipaleet', 'viipale', 'palat', 'pala', 'siivut', 'siivu', 'jyvät', 'jyvä'];
@@ -81,7 +82,12 @@ export function termTier(product, item) {
   for (const w of words.length ? words : ['']) {
     // Saman pyynnön muut sanat eivät ole "toinen tuote": "Broilerin rintafilee" alkaa pyydetyllä tuotteella.
     const skip = new Set([...brandWords, ...words.filter((x) => x !== w).flatMap((x) => [x, ...stems(x)])]);
-    best = Math.min(best, wordTier(tokens, { forms: w ? formsOf(w) : [], shelf, others: new Set(words.filter((x) => x !== w)) }, skip));
+    const others = new Set(words.filter((x) => x !== w));
+    best = Math.min(best, wordTier(tokens, { forms: w ? formsOf(w) : [], shelf, others }, skip));
+    // Yhdyssana erillisinä sanoina: "GelatoLAB 5L jäätelö Vanilja" on vaniljajäätelöä, kun molemmat osat ovat nimen sanojen
+    // alussa tai lopussa. Taso SPLIT: kokonaisena kirjoitettu yhdyssana ("Vaniljajäätelö") pysyy edellä.
+    const parts = item.compounds?.[w];
+    if (parts && best > TIER.SPLIT && parts.every((x) => tokens.some((t) => t.startsWith(x) || t.endsWith(x)))) best = TIER.SPLIT;
   }
   return best;
 }
@@ -102,10 +108,10 @@ export function typeInfo(product, item) {
   if (item.productType) return { key: [0, 0, 0], tier: null, requested: null };
   const tier = termTier(product, item);
   const strict = !!item.shelf || !!item.attributes?.state || !!item.qualified;
-  const group = tier <= TIER.CORE ? 0 : tier === TIER.HEAD ? (strict ? 1 : 0) : tier === TIER.PART ? 2 : 3;
+  const group = tier <= TIER.CORE ? 0 : tier === TIER.SPLIT ? 1 : tier === TIER.HEAD ? (strict ? 1 : 0) : tier === TIER.PART ? 2 : 3;
   const shelf = item.shelf ? at(item.categories, product.category) : 0;
   const raw = RAW_INGREDIENT.test(product.category || '') ? 0 : 1;
-  return { key: [shelf, raw, group], tier, requested: group === 0 };
+  return { key: [shelf, raw, group], tier, requested: group === 0 || tier === TIER.SPLIT };
 }
 export const typeKey = (product, item) => typeInfo(product, item).key;
 export const compareKeys = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return 0; };

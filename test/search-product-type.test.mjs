@@ -132,7 +132,12 @@ test('selfplay-100:n hakulöydökset: pyydetty raaka-aine kärjessä tai kerrota
   await check('lohi', 5, 'KG', /lohi/i, /kirjolohi/i);
   await check('peruna', 18, 'KG', /peruna/i, /kypsä|suikale/i);
   const yeast = await check('tuorehiiva', 1, 'KG', /tuorehiiva/i);
-  assert.equal(yeast.more, true, 'kuivahiiva on tarjolla vasta Näytä lisää -sivulla');
+  // Tuoreen tilan pyyntö rajaa säilyvät kuiva-aineet pois: kuivahiivaa ei tarjota tuorehiivan tilalle edes lisäsivulla.
+  if (yeast.more) {
+    const next = await tools.suggest({ customer, draft: { id: 'd', deliveryDate: '2026-11-17', diet: { known: true, claims: [], excludeAllergens: [] },
+      lines: [{ ref: 'L1', productTerm: 'tuorehiiva', quantity: { value: 1, unit: 'KG' }, claims: [], excludeAllergens: [] }] }, exclude: { L1: yeast.options.map((o) => o.productId) } });
+    for (const o of next.lines[0]?.options || []) assert.doesNotMatch(o.name, /kuivahiiva/i);
+  }
   const onion = await check('sipuli', 2, 'KG', /sipuli/i);
   assert.equal(onion.options[0].covers?.unit, 'KG', 'ensimmäinen sipulivaihtoehto kattaa kilomäärän');
   assert.ok(onion.options[0].covers.value >= 2);
@@ -167,4 +172,78 @@ test('oikean haun vaihtoehdoissa on tilausaikaraja', { skip: !fs.existsSync(CATA
     lines: [{ ref: 'L1', productTerm: 'kerma', quantity: { value: 5, unit: 'L' }, claims: [], excludeAllergens: [] }] } });
   assert.ok(r.lines[0].options.length);
   for (const o of r.lines[0].options) assert.match(o.cutoff, /^2026-11-1[56]T\d{2}:\d{2}/, o.name);
+});
+
+test('200 asiakkaan hakulöydökset: edam-juusto, maidoton vaniljajäätelö, tuore tryffeli ja sokerin lava', { skip: !fs.existsSync(CATALOG) && 'data/catalog.json puuttuu' }, async () => {
+  process.env.AIMO_CATALOG = CATALOG;
+  const { loadCatalog } = await import('../server/catalog.mjs');
+  const { understand } = await import('../server/aimo/understand.mjs');
+  const tools = createOrderingTools();
+  const customer = { customerId: 'c1', buyerId: 'demo-nordic', bindingVersion: 1, permissions: { readProducts: true } };
+  const run = (term, value, unit, extra = {}, date = '2026-11-18') => tools.suggest({ customer, draft: { id: 'd', deliveryDate: date, diet: { known: true, claims: [], excludeAllergens: [] },
+    lines: [{ ref: 'L1', productTerm: term, quantity: { value, unit }, claims: [], excludeAllergens: [], ...extra }] } });
+
+  // S031/R01: yhdysmerkkisana on kaksi sanaa, eikä "edam" katoa. Ennen: saganaki, halloumi ja salaattijuusto.
+  assert.equal(understand('5 kg edam-juusto').items[0].productTerm, 'edam juusto');
+  const edam = (await run('edam-juusto', 5, 'KG')).lines[0];
+  assert.ok(edam.options.length && edam.exact);
+  for (const o of edam.options) { assert.match(o.name, /edam/i); assert.doesNotMatch(o.name, /saganaki|halloumi|salaattijuusto/i); }
+
+  // S048/R02: maidoton vaniljajäätelö löytyy myös nimestä "jäätelö Vanilja", ja vain tuotteet, joiden allergeenitieto
+  // todistaa maidottomuuden. Ennen: ei yhtään vaihtoehtoa.
+  const cat = loadCatalog();
+  const vanilla = await run('vaniljajäätelö', 5, 'L', { excludeAllergens: ['AM'] }, '2026-11-20');
+  const v = vanilla.lines[0];
+  assert.ok(v?.options.length, JSON.stringify(vanilla.issues));
+  assert.equal(v.exact, true, 'vegaaninen vaniljajäätelö on pyydetty tuote');
+  for (const o of v.options) {
+    const p = cat.get(o.productId);
+    assert.match(o.name, /vanilj/i); assert.match(o.name, /jäätelö/i);
+    assert.ok(p.hasAllergenData && !p.contains.includes('AM') && !(p.mayContain || []).includes('AM'), o.name);
+  }
+
+  // S056: tuoreiden tryffeleiden tilalle ei tarjota suklaapatukkaa, vaan kerrotaan, ettei tuotetta ole valikoimassa.
+  const truffle = await run('Tuore tryffeli', 1, 'KG', {}, '2026-11-16');
+  assert.equal(truffle.lines.length, 0);
+  assert.deepEqual(truffle.issues.map((x) => [x.code, x.notInCatalog]), [['NO_ORDERABLE_PRODUCT', true]]);
+  assert.match(truffle.issues[0].message, /Pyydettyä tuotetta ei ole valikoimassa: Tuore tryffeli/);
+  // Tuore yrtti on tuore puntti, ei kuivattu mauste.
+  for (const o of (await run('tuore tilli', 1, 'KG')).lines[0].options) assert.notEqual(cat.get(o.productId).temp, 'ambient', o.name);
+
+  // X096: "325 x Dansukker Taloussokeri 1kg" on 325 kg:n lava, eikä se tule 3 kg:n tarpeen ensimmäiselle sivulle.
+  const pallet = cat.products.find((p) => p.salesUnit === 'PAL' && /^325 x .*Taloussokeri/.test(p.name));
+  assert.equal(pallet?.kg, 325);
+  const sugar = (await run('sokeri', 3, 'KG')).lines[0];
+  assert.ok(sugar.options.length);
+  for (const o of sugar.options) { assert.notEqual(o.salesUnitLabel, 'lava', o.name); assert.ok(o.covers.value >= 3 && o.covers.value <= 12, `${o.name} ${o.covers.value}`); }
+});
+
+test('liian suuri erä jää tarpeen kattavien pienten pakkausten jälkeen ja pois ensimmäiseltä sivulta', async () => {
+  const opt = (id, name, price, extra = {}) => ({ id, name, brand: null, unit: 'ST', unitLabel: 'kpl', kg: 1, qty: 3, price, labels: [], typeRank: 0, match: 0, requested: true, ...extra });
+  const found = [
+    opt('lava', '325 x Taloussokeri 1kg', 300, { unit: 'PAL', unitLabel: 'lava', kg: 325, qty: 1 }),
+    opt('sakki', 'Kidesokeri 25kg', 30, { kg: 25, qty: 1, unitLabel: 'sk' }),
+    opt('pussi', 'Sokeri 1kg', 1, { unitLabel: 'pss' }),
+    opt('rasia', 'Sokeri 500g', 0.6, { kg: 0.5, qty: 6 }),
+  ];
+  const scored = scoreOptions(found, { productTerm: 'sokeri', quantity: { value: 3, unit: 'KG' } });
+  assert.deepEqual(scored.map((x) => [x.o.id, x.oversize]), [['pussi', false], ['rasia', false], ['sakki', true], ['lava', true]]);
+  const tools = createOrderingTools({ search: async () => found, product: () => ({ hasAllergenData: true, contains: [] }), buyer: () => ({}), requestQuote: async () => ({}), placeOrder: async () => ({}) });
+  const customer = { customerId: 'c', buyerId: 'b', bindingVersion: 1, permissions: { readProducts: true } };
+  const line = (await tools.suggest({ customer, draft: { id: 'd', deliveryDate: '2026-11-17', diet: { known: true, claims: [], excludeAllergens: [] },
+    lines: [{ ref: 'L1', productTerm: 'sokeri', quantity: { value: 3, unit: 'KG' }, claims: [], excludeAllergens: [] }] } })).lines[0];
+  assert.deepEqual(line.options.map((o) => o.productId), ['pussi', 'rasia']);
+  assert.equal(line.more, true, 'säkki ja lava ovat tarjolla lisäsivulla');
+});
+
+test('yhdyssana erillisinä sanoina on pyydetty tuote kokonaisen nimen jälkeen', () => {
+  const item = { productTerm: 'vaniljajäätelö', compounds: { vaniljajäätelö: ['vanilja', 'jäätelö'] } };
+  assert.equal(termTier({ name: 'Suomen Jäätelö Vaniljajäätelö 5l', brand: 'Suomen Jäätelö' }, item), TIER.LEAD);
+  assert.equal(termTier({ name: 'GelatoLAB-Espoo 5L jäätelö Vanilja Premium vegaaninen', brand: 'GelatoLAB-Espoo' }, item), TIER.SPLIT);
+  assert.equal(termTier({ name: 'Kymppi Vanilja kerrosmämmi 130 g', brand: 'Kymppi' }, item), TIER.NONE);
+  const info = typeInfo({ name: 'GelatoLAB-Espoo 5L jäätelö Vanilja', category: '41820' }, item);
+  assert.equal(info.requested, true);
+  assert.ok(info.key[2] > typeInfo({ name: 'Suomen Jäätelö Vaniljajäätelö 5l', category: '41820' }, item).key[2]);
+  // Lyhyt osa ei osu toisen sanan keskelle: "kana" ei ole porkkanasosekeitossa.
+  assert.equal(termTier({ name: 'Feelia Porkkanasosekeitto 3kg' }, { productTerm: 'kanakeitto', compounds: { kanakeitto: ['kana', 'keitto'] } }), TIER.NONE);
 });

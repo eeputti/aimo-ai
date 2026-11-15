@@ -146,6 +146,15 @@ function productTypeFor(word) {
 }
 
 const STATE_PREFIX = { pakaste: 'frozen', tuore: 'fresh' };
+/** "vaniljajäätelö" → ['vanilja', 'jäätelö'], kun molemmat osat ovat itse sanoja tuotenimissä. Pisin loppuosa ensin. */
+function compoundParts(word) {
+  if (!word || word.length < 8 || /\s/.test(word)) return null;
+  for (let k = 4; k <= word.length - 4; k++) {
+    const head = conceptOf(word.slice(0, k)); const tail = conceptOf(word.slice(k));
+    if (head && tail && head.word === word.slice(0, k) && tail.word === word.slice(k) && head.total >= 3 && tail.total >= 3) return [head.word, tail.word];
+  }
+  return null;
+}
 /**
  * Kirjoitettu sana → sanaston sana. Järjestys: puhekielen synonyymi, sanasto sellaisenaan, opittu sana,
  * puhekielen muoto ja astevaihtelu, yhdyssanan osat, kirjoitusvirhe. Palauttaa myös tiedon siitä, miten sana löytyi.
@@ -196,7 +205,9 @@ function parseItem(raw, lang) {
   const pct = text.match(/(\d+(?:\.\d+)?)\s*%/);
   if (pct) { item.attributes.fatPercent = Number(pct[1]); text = text.replace(pct[0], ' '); }
 
-  let tokens = text.replace(/[^a-z0-9åäöé.\s-]/g, ' ').replace(/(^|\s)-|-(\s|$)/g, ' ').replace(/\.(?!\d)/g, ' ').split(/\s+/).filter(Boolean);
+  // Ostajan yhdysmerkkisana luetaan kahtena sanana: "edam-juusto" on edam juusto. Muuten sanasto pilkkoi sen ja haki
+  // pelkällä sanalla juusto (itsepeli S031: saganaki ja halloumi edamin tilalla).
+  let tokens = text.replace(/[^a-z0-9åäöé.\s-]/g, ' ').replace(/(^|\s)-|-(\s|$)/g, ' ').replace(/([a-zåäöé])-(?=[a-zåäöé])/g, '$1 ').replace(/\.(?!\d)/g, ' ').split(/\s+/).filter(Boolean);
   // pakkauskoko ennen määrää: "10 l novobox", "1 l tölkeissä" kertoo pakkauksen vain jos varsinainen määrä on jo toisaalla ("200 x 1 l")
   const q = parseQuantity(tokens);
   if (q) {
@@ -253,6 +264,12 @@ function parseItem(raw, lang) {
     if (head.type) { item.productType = head.type.id; item.category = head.type.categories[0]; }
     else if (head.concept.top[0].share >= 0.3) item.category = head.concept.top[0].category;
     if (!head.type && head.concept.top[0].share < 0.5) item.categories = head.concept.top.filter((t) => t.share >= 0.12).map((t) => t.category); // sana elää usealla hyllyllä: haetaan kaikista
+    // Yhdyssana, jonka molemmat osat ovat tuotenimissä: "vaniljajäätelö" löytyy myös nimestä "jäätelö Vanilja" (itsepeli S048:
+    // vegaaninen vaniljajäätelö jäi löytymättä). Osat tallennetaan, jotta haku ja järjestys tunnistavat ne erillisinä sanoina.
+    for (const k of heads) {
+      const w = k.concept?.word || k.w; const parts = compoundParts(w);
+      if (parts) (item.compounds ||= {})[w] = parts;
+    }
     item.categoryLabel = item.category ? loadLexicon().categories.get(item.category)?.label || null : null;
     // Raaka-aineen oma hylly: "kana" yksin tarkoittaa raakaa broileria, ei kanatäytteistä eväsleipää.
     // Taivutettu muoto ("kanafileetä") löytää saman hyllyn sanan perusmuodon kautta.

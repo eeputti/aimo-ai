@@ -12,6 +12,9 @@ let PRODUCT_TYPES = [];
 try { ({ PRODUCT_TYPES } = await import('../gateway/contract.mjs')); } catch { /* ilman porttia rajataan pelkällä kategorialla */ }
 
 const FAT_RE = { 'fat-free': /rasvaton/i, 'semi-skimmed': /kevyt/i, whole: /täys/i }; // suomenkielisestä nimestä: englanniksi "semi-skimmed" sisältää sanan "skimmed"
+// Säilyvät makeiset, keksit, säilykkeet, kastikkeet, öljyt ja kuiva-aineet. "Tuore" raaka-aine ei ole mikään näistä:
+// tuoreiden tryffeleiden tilalle ei tarjota tryffelisuklaapatukkaa (itsepeli S056). Tuorehiiva on kylmätuote, joten se säilyy.
+const SHELF_STABLE = /^(105|211|215|219|22|52)\d+$/;
 const PORTION = /annos|portion|\d+\s*x\s*\d+\s*(cl|ml|g)\b/i; // annospakkaukset eivät vastaa litra- tai kilotarvetta
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu', MARINE_STEWARDSHIP_COUNCIL_LABEL: 'MSC', FAIR_TRADE_MARK: 'Reilu kauppa' };
 
@@ -34,6 +37,7 @@ function filterSteps(item) {
   if (item.attributes.fatPercent != null) steps.push(['fatPercent', (p) => new RegExp(`(^|\\D)${String(item.attributes.fatPercent).replace('.', '[.,]')}\\s*%`).test(p.name)]);
   if (item.attributes.treatment === 'uht') steps.push(['uht', (p) => /uht/i.test(p.name)]);
   if (item.attributes.state === 'frozen') steps.push(['frozen', (p) => p.temp === 'frozen']);
+  if (item.attributes.state === 'fresh') steps.push(['fresh', (p) => !(p.temp === 'ambient' && SHELF_STABLE.test(p.category || ''))]);
   if (item.attributes.pack?.unit === 'L') steps.push(['pack', (p) => p.litres && Math.abs(p.litres / (p.perSales || 1) - item.attributes.pack.value) < 0.01]);
   if (item.quantity && item.quantity.unit !== 'PCS' && !/annos|portion/.test(item.raw)) steps.push(['notPortionPack', (p) => !PORTION.test(p.name)]);
   // muut tuotesanat (esim. "rintafilee" pääsanan "broilerin" lisäksi) rajaavat nimen perusteella
@@ -72,13 +76,18 @@ export function resolveItem(item, opts = {}) {
   }
   // tuotesanat nimessä: jos pääsanan lisäksi on tarkentavia sanoja, suositaan tuotteita joissa ne esiintyvät
   if (terms.length && (type || item.category)) {
-    let narrowed = pool.filter((p) => terms.every((t) => nameHas(p, t)));
+    // Yhdyssanan osat erillisinä sanoina kelpaavat myös: "vaniljajäätelö" osuu nimeen "jäätelö Vanilja" (understand: compounds).
+    // Osa haetaan kokonaisena sanan alusta tai lopusta: lyhyt vartalo ("rinta" → "rin") osuisi muuten sanaan "broilerin"
+    // ja "kana" sanaan "porkkanasosekeitto".
+    const partIn = (p, x) => p._tokens.some((t) => t.startsWith(x) || t.endsWith(x));
+    const has = (p, t) => nameHas(p, t) || (item.compounds?.[t]?.every((x) => partIn(p, x)) ?? false);
+    let narrowed = pool.filter((p) => terms.every((t) => has(p, t)));
     if (!narrowed.length) {
       // Kaikki sanat eivät osu samaan nimeen: tarkin sana ratkaisee. "Oltermanni juusto": Oltermannin nimessä ei lue "juusto",
       // joten rajataan Oltermanniin eikä kaikkiin juusto-nimisiin. Tasatilanteessa pääsana (viimeinen) voittaa.
       // Tarkin = koko valikoimassa harvinaisin sana (Oltermanni 23 tuotetta, juusto 80).
       const rarity = (t) => conceptOf(t)?.total ?? Infinity;
-      const perTerm = terms.map((t) => ({ n: rarity(t), list: pool.filter((p) => nameHas(p, t)) })).filter((x) => x.list.length);
+      const perTerm = terms.map((t) => ({ n: rarity(t), list: pool.filter((p) => has(p, t)) })).filter((x) => x.list.length);
       narrowed = perTerm.reduce((best, x) => (!best || x.n <= best.n ? x : best), null)?.list || [];
     }
     if (narrowed.length) { pool = narrowed; funnel.push({ filter: 'nameTerms', remaining: pool.length }); }

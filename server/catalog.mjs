@@ -65,8 +65,20 @@ const LABEL_WORDS = [
   [/^pakaste/, (p) => p.temp === 'frozen'],
 ];
 
+// Lavan (PAL) koko puuttuu lähdedatasta: myyntiyksikössä on yksi perusyksikkö, joten paino on yhden pakkauksen paino.
+// "325 x Dansukker Suomalainen Taloussokeri 1kg" on 325 kg:n lava, ei kilon pussi (itsepeli X096: 3 kg:n tarpeelle tarjottiin
+// "3 lava (3 kg)"). Koko on nimen kappalemäärä kertaa pakkauksen koko. Ilman kappalemäärää lavan kokoa ei tiedetä.
+function palletSize(p) {
+  if (p.salesUnit !== 'PAL' || p.perSales > 1 || p._pallet) return;
+  const n = Number((String(p.name || '').match(/^\s*(\d+)\s*[x×*]/i) || [])[1]);
+  p._pallet = n > 1 ? n : 'unknown';
+  if (n > 1) { if (p.kg) p.kg = +(p.kg * n).toFixed(3); if (p.litres) p.litres = +(p.litres * n).toFixed(3); return; }
+  p.kg = null; p.litres = null;
+}
+
 export class Catalog {
   constructor(products) {
+    products.forEach(palletSize);
     this.products = products;
     this.byId = new Map(products.map((p) => [p.id, p]));
     this.vocab = new Map(); // token -> [index, position]

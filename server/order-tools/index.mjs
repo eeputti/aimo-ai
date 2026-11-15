@@ -80,10 +80,13 @@ export function scoreOptions(found, line) {
     // Isossa tilauksessa kaikki vaihtoehdot ovat kymmeniä eriä: silloin vähemmän käsiteltäviä eriä ensin.
     // Makusanana käytettävä tuote nimen loppupäässä on maku: "HAPANKAALI 400G VALKOSIPULI" on hapankaalia (haun match 1).
     const asFlavour = flavourTerm && o.match === 1;
-    return [group(o), extras >= 2 || asFlavour || flavoured(o, line) || (cost(o) !== null && cost(o) > 2 * typical) ? 1 : 0, fit, !loose && o.qty > 30 ? o.qty : 0, byMeasure && covered == null ? 0 : 1];
+    // Liian suuri: yli nelinkertainen tarve ja vähintään 5 kg tai litraa ylimääräistä, tai lava, jonka kokoa ei tiedetä.
+    const pallet = String(o.unit || '').toUpperCase() === 'PAL';
+    const oversize = (need && covered && covered > 4 * need && covered - need >= 5) || (pallet && byMeasure && covered == null) ? 1 : 0;
+    return [group(o), extras >= 2 || asFlavour || flavoured(o, line) || (cost(o) !== null && cost(o) > 2 * typical) ? 1 : 0, fit + (pallet ? 2 : 0), !loose && o.qty > 30 ? o.qty : 0, byMeasure && covered == null ? 0 : 1, oversize];
   };
   return found.map((o, i) => ({ o, i, s: score(o) })).sort((a, b) => a.s[0] - b.s[0] || a.s[1] - b.s[1] || a.s[2] - b.s[2] || a.s[3] - b.s[3] || a.i - b.i)
-    .map((x) => ({ o: x.o, group: x.s[0], regular: x.s[0] === best && x.s[1] === 0, known: x.s[4] === 1 }));
+    .map((x) => ({ o: x.o, group: x.s[0], regular: x.s[0] === best && x.s[1] === 0, known: x.s[4] === 1, oversize: x.s[5] === 1 }));
 }
 
 async function defaultDeps() {
@@ -98,6 +101,7 @@ async function defaultDeps() {
       // Tyhjän tuloksen aikaisin päivä, jolle sama haku löytää tilattavaa (rajapinnan saatavuudesta), kulkee listan mukana.
       const list = r.cards[0]?.list || [];
       list.nextDeliveryDate = r.cards[0]?.reason?.nextDeliveryDate || null;
+      list.notInCatalog = r.cards[0]?.notInCatalog === true;
       return list;
     },
     product: (id) => cat.get(String(id)),
@@ -170,7 +174,13 @@ export function createOrderingTools(deps = {}) {
       }
       let scored = scoreOptions(fit, line);
       // nextDeliveryDate: aikaisin päivä, jolle haku löytää tilattavaa, kun haku sen tietää (muuten null).
-      if (!scored.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: found.nextDeliveryDate || null })); continue; }
+      // Valikoimassa ei ole pyydettyä tuotetta lainkaan (tuore tryffeli): sanotaan se, ei toimituspäivän ongelmaksi.
+      if (!scored.length) {
+        issues.push(found.notInCatalog
+          ? issue('NO_ORDERABLE_PRODUCT', `Pyydettyä tuotetta ei ole valikoimassa: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: null, notInCatalog: true })
+          : issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: found.nextDeliveryDate || null }));
+        continue;
+      }
       // Asiakkaan selvä ehto (maustamaton) rajaa vaihtoehdot: maustettua ei tarjota edes halvimpana.
       if (wantsPlain(line)) {
         scored = scored.filter((x) => !flavoured(x.o, line));
@@ -195,7 +205,11 @@ export function createOrderingTools(deps = {}) {
       // väärää tyyppiä oleva tuote ei ohita järjestystä halvimpana, eikä sipulinippu kilotarpeeseen.
       // Ensimmäinen sivu näyttää vain pyydettyä tuotetta, kun sellaista on (haun requested): kaksi tuorehiivaa eikä kuivahiivaa
       // kolmanneksi. Saman pääsanan muut tuotteet ja valmisteet jäävät "Näytä lisää" -sivulle, mitään ei pudoteta.
-      const first = scored.some((x) => x.o.requested === true) ? scored.filter((x) => x.o.requested === true) : scored;
+      let first = scored.some((x) => x.o.requested === true) ? scored.filter((x) => x.o.requested === true) : scored;
+      // Moninkertaisesti liian suuri erä (lava tai säkkikuorma) ei tule ensimmäiselle sivulle, kun tarpeen kattava pienempi
+      // pakkaus on tarjolla (itsepeli X096: kuormalava 3 kg:n sokeritarpeeseen). Lisäsivulla se näkyy edelleen.
+      const sane = first.filter((x) => !x.oversize);
+      if (sane.length && sane.some((x) => x.known)) first = sane;
       const top0 = first[0].group;
       const flat = (x) => !flavoured(x.o, line);
       const pick = [(x) => x.regular && x.known, (x) => x.regular, (x) => x.group === top0 && x.known && flat(x), (x) => x.group === top0 && x.known, (x) => x.group === top0]
