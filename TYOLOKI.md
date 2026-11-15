@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 ilta — botti 4749 kaatumis- ja linkkikorjaukseen 1585022 (Claude Code, ongelmakatselmointichat)
+
+- **Käyttäjän lupa ("Kyllä, käynnistä"):** botti uudelleen versiolla 1585022, jossa palvelin ei kaadu virheelliseen pyyntöön ja linkin jäsennys on lineaarinen. Taululla ei ollut muuta restarttia; varaus 269bf722.
+- **Botti:** jonossa ei käsittelyssä olevia viestejä (119 done, 11 aiemmin failed). Vanha PID 21564 (ae34900) pysäytettiin TERMillä, uusi **PID 26854** snapshotista `/private/tmp/aimo-whatsapp-runtime-1585022` (git archive, node_modules ae34900-snapshotista, koska package.json ja lock samat; `.env`, `.env.whatsapp`, `data` linkkeinä). Sama komento ja tunneli, loki `/private/tmp/aimo-whatsapp-tools/whatsapp-1585022.log`. Julkaisijaa (PID 21794) ei tarvinnut käynnistää uudelleen, koska sen koodi ei muuttunut.
+- **Tarkistukset:** viiden kannan 25 taulun rivimäärät, jonon tilat ja jäsentaulun tiiviste samat ennen ja jälkeen. Healthz 200 paikallisesti ja tunnelista, `/webchat/api/` ilman avainta 401, `/demo` tunnelista 403. Elävä palvelin vastaa virheelliseen pyyntöön 400 ja jatkaa (healthz 200 perään). Workerin `/api/chat` palauttaa `available: true`, eli selainkeskustelu tavoittaa uuden botin. Ei malli-, Meta- tai tilauskutsuja.
+- **Avoinna:** botti on yhä Macin `nohup`-prosessi pikatunnelin takana. Seuraavaksi katselmuksen allergeenikohdat #2–#4.
+
 ## 15.11.2026 ilta — WhatsApp-palvelin ei enää kaadu virheelliseen pyyntöön eikä jumitu linkin luvussa (Claude Code, ongelmakatselmointichat)
 
 - **Käyttäjän pyyntö:** korjaa ensin koodikatselmuksen #1 (yksi virheellinen HTTP-pyyntö kaataa palvelimen) ja #8 (asiakkaan lähettämä linkki jumittaa palvelimen), raportti `docs/parallel/code-audit-2026-11-15-ilta.md`.
