@@ -1,7 +1,8 @@
 // A short-lived capability for one existing WhatsApp draft. No browser-local cart copy.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import { replyWithCartLink, withCartHandoffHint } from './cart-handoff.mjs';
+import { isDirectCartRequest, replyWithCartLink, withCartHandoffHint } from './cart-handoff.mjs';
+import { incompleteNote } from './dialogue.mjs';
 
 const PAGE = '/whatsapp/cart';
 const API = `${PAGE}/api`;
@@ -71,11 +72,23 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
       const handoff = await replyWithCartLink({ text: args.messages.at(-1)?.content || '', shoppingList: list,
         lastOrder: dialogue.lastOrder, pendingSuggestion: dialogue.pendingSuggestion, cartHandoff: () => issue(args.member, list) });
       if (handoff) return handoff; // Acknowledgement opens the cart, never submits an order.
+      // Suora koripyyntö keskeneräiseen tilaukseen: ei linkkiä eikä tuotetulkintaa, vaan puuttuvat tiedot ja seuraava kysymys.
+      const lastText = args.messages.at(-1)?.content || '';
+      if (list && list.status !== 'review' && isDirectCartRequest(lastText)) {
+        const shown = await ordering.chat({ ...args, messages: [...args.messages.slice(0, -1), { role: 'user', content: 'näytä' }], cartLinkAvailable: true });
+        const note = incompleteNote(list); const parts = shown.messages?.length ? shown.messages : [shown.text];
+        return withCartHandoffHint({ ...shown, cartRequested: false, messages: [note, ...parts], text: [note, ...parts].join('\n\n') });
+      }
       const result = await ordering.chat({ ...args, cartLinkAvailable: true });
       if (result.cartRequested) {
         const current = await ordering.getShoppingList(args.member);
         if (current) {
           const handoff = await replyWithCartLink({ text: 'avaa kori', shoppingList: current, cartHandoff: () => issue(args.member, current) });
+          // Keskeneräinen tilaus: ei linkkiä. Tilausmoottorin vastaus kysyy jo seuraavan puuttuvan asian.
+          if (!handoff) {
+            const note = incompleteNote(current); const messages = result.messages?.length ? result.messages : [result.text];
+            return withCartHandoffHint({ ...result, cartRequested: false, messages: [note, ...messages], text: [note, ...messages].join('\n\n') });
+          }
           if (result.conversationAnswer) return { ...handoff, messages: [result.conversationAnswer, ...handoff.messages], text: `${result.conversationAnswer}\n\n${handoff.text}` };
           return handoff;
         }

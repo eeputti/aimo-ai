@@ -347,10 +347,10 @@ test('cart link tokens cannot be forged, extended, swapped to another customer o
 
 test('an old cart link stops working after a reset, a new pairing or a revocation', async (t) => {
   const f = await fixture(t);
-  await f.whatsapp('20 l maitoa maanantaiksi');
+  await f.whatsapp('20 l maitoa maanantaiksi'); await f.whatsapp('1'); // linkki vasta valmiiseen tilaukseen
   const first = linkToken(await f.whatsapp('avaa kori'));
   const firstList = (await (await f.api(first)).json()).shoppingList;
-  await f.whatsapp('tyhjää kaikki'); await f.whatsapp('5 kg voita maanantaiksi');
+  await f.whatsapp('tyhjää kaikki'); await f.whatsapp('5 kg voita maanantaiksi'); await f.whatsapp('1');
   assert.equal((await f.api(first)).status, 410);
   assert.ok([400, 409, 410].includes((await f.api(first, { path: '/chat', body: cartInput(firstList, 'poista voi') })).status));
   assert.match((await f.bridge.getShoppingList(f.wa.member(PHONE))).lines[0].productTerm, /^voi/);
@@ -358,7 +358,7 @@ test('an old cart link stops working after a reset, a new pairing or a revocatio
   assert.equal((await f.api(second)).status, 200);
   const invitation = f.wa.invite(PHONE, 'Keittiö A', 'Testaaja'); f.wa.pair(PHONE, codeHash(invitation.code));
   assert.equal((await f.api(second)).status, 410, 're-paired number');
-  const third = linkToken(await (async () => { await f.whatsapp('20 l maitoa maanantaiksi'); return f.whatsapp('avaa kori'); })());
+  const third = linkToken(await (async () => { await f.whatsapp('20 l maitoa maanantaiksi'); await f.whatsapp('1'); return f.whatsapp('avaa kori'); })());
   assert.equal((await f.api(third)).status, 200);
   f.wa.revoke(PHONE);
   assert.equal((await f.api(third)).status, 410, 'revoked number');
@@ -367,7 +367,7 @@ test('an old cart link stops working after a reset, a new pairing or a revocatio
 
 test('a leaked cart link is rate limited per minute and per day', async (t) => {
   const f = await fixture(t);
-  await f.whatsapp('20 l maitoa maanantaiksi');
+  await f.whatsapp('20 l maitoa maanantaiksi'); await f.whatsapp('1');
   const token = linkToken(await f.whatsapp('avaa kori'));
   let list = (await (await f.api(token)).json()).shoppingList;
   const statuses = [];

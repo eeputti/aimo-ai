@@ -3,6 +3,9 @@ const ACK = /^(?:ok|okay|okei|joo|kyllä|juu|jep|jes|selvä|sopii|hyvä|👍)(?:
 const OPEN_CART = /^(?:(?:ok|okei|joo|kyllä)[,\s]+)?(?:(?:avaa|näytä)\s+(?:ostos)?kori(?:ni)?|(?:anna|lähetä|laita)\s+(?:se\s+)?linkki(?:\s+(?:ostos)?koriin)?|(?:ostos)?korilinkki|linkki\s+(?:ostos)?koriin|tilaa|vahvista|vahvistan|hyväksy|hyväksyn)(?:[,\s]+kiitos)?[.!\s]*$/iu;
 const HINT = 'Vastaa *ok*, niin saat linkin ostoskoriin. Tarkistat ja vahvistat tilauksen siellä.';
 
+/** Suora korin tai linkin pyyntö ("avaa kori", "laita linkki", vanha TILAA). */
+export function isDirectCartRequest(text) { return typeof text === 'string' && OPEN_CART.test(text.trim()); }
+
 export function isCartHandoff(text) {
   return typeof text === 'string' && (ACK.test(text.trim()) || OPEN_CART.test(text.trim()));
 }
@@ -19,7 +22,10 @@ export async function replyWithCartLink({ text, shoppingList, lastOrder, pending
   if (!cartHandoff || !isCartHandoff(text) || !shoppingList?.lines?.length) return null;
   // An answer to a product suggestion, missing quantity or diet question must keep its meaning.
   const direct = OPEN_CART.test(text.trim());
-  if (!direct && (pendingSuggestion || shoppingList.status !== 'review' || lastOrder?.status !== 'ready'
+  // Linkki vain valmiiseen tilaukseen (Eelis 15.11. klo 2.00): päivä, määrät, tuotevalinnat ja tarkennukset selvitetty.
+  // Keskeneräisessä listassa keskustelu opastaa loppuun eikä linkkiä anneta, myöskään suoraan pyydettynä.
+  if (shoppingList.status !== 'review') return null;
+  if (!direct && (pendingSuggestion || lastOrder?.status !== 'ready'
       || lastOrder.draftId !== shoppingList.id || lastOrder.revision !== shoppingList.revision)) return null;
   let url;
   try {

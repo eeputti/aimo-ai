@@ -88,7 +88,16 @@ async function fixture(t, { ask = null } = {}) {
 const version = (shoppingList) => shoppingList ? { id: shoppingList.id, revision: shoppingList.revision } : null;
 
 const linkToken = (reply) => new URL(reply.match(/https:\/\/cart\.example\.test\/whatsapp\/cart#[\w.-]+/)[0]).hash.slice(1);
-async function startCart(f, text) { await f.whatsapp(text); return linkToken(await f.whatsapp('avaa kori')); }
+// Korilinkki annetaan vain valmiiseen tilaukseen (Eelis 15.11. klo 2.00): lista viedään valmiiksi sen oman tilan mukaan.
+async function openWhenComplete(f) {
+  for (let i = 0; i < 6; i += 1) {
+    const list = await f.bridge.getShoppingList(f.wa.member(PHONE));
+    if (!list || list.status === 'review') break;
+    await f.whatsapp(list.missing.includes('deliveryDate') ? 'maanantaiksi' : list.missing.some((m) => m.startsWith('preference')) ? '2' : '1');
+  }
+  return linkToken(await f.whatsapp('avaa kori'));
+}
+async function startCart(f, text) { await f.whatsapp(text); return openWhenComplete(f); }
 const input = (list, text) => ({ text, messageId: crypto.randomUUID(), expectedList: version(list) });
 
 test('WhatsApp link opens the same saved basket without copying, quoting or ordering on GET; edits stay shared', async (t) => {
@@ -118,7 +127,7 @@ test('a natural link request reaches the real cart capability through the model 
     return { json: { route: input.message.includes('näyttää hyvältä') ? 'cart' : 'order', text: '', lookupQuery: '', suggestionTerm: '', openCart: input.message.includes('näyttää hyvältä') } };
   };
   const f = await fixture(t, { ask });
-  await f.whatsapp('20 l laktoositonta maitoa maanantaiksi');
+  await f.whatsapp('20 l laktoositonta maitoa maanantaiksi'); await f.whatsapp('1'); // valmis tilaus ennen linkkiä
   const before = await f.bridge.getShoppingList(f.wa.member(PHONE));
   const text = await f.whatsapp('ok näyttää hyvältä, laita linkki tulemaan');
   const token = linkToken(text); assert.match(text, /Tässä linkki ostoskoriisi/); assert.doesNotMatch(text, /TILAA|en pysty/);
@@ -130,9 +139,8 @@ test('browser reviews and explicitly confirms exactly once; a stale version cann
   const f = await fixture(t);
   const token = await startCart(f, '20 l laktoositonta maitoa ja 5 kg voita maanantaiksi');
   const first = (await (await f.read(token)).json()).shoppingList;
-  const half = await (await f.post(token, input(first, '1'))).json();
-  assert.equal(half.status, 'choosing'); // yksi tuoterivi kerrallaan
-  const choice = await (await f.post(token, input(half.shoppingList, '1'))).json();
+  assert.equal(first.status, 'review'); // linkki tuli vasta valmiiseen tilaukseen
+  const choice = await (await f.post(token, input(first, 'näytä'))).json();
   assert.equal(choice.status, 'ready'); assert.match(choice.text, /TILAA/);
   await f.whatsapp('maitoa sittenkin 30 litraa');
   assert.equal((await f.post(token, input(choice.shoppingList, 'TILAA'))).status, 409);
@@ -149,7 +157,8 @@ test('browser reviews and explicitly confirms exactly once; a stale version cann
 });
 
 test('capability rejects forgery, expiry, new lists, re-pairing and attempts to choose another buyer', async (t) => {
-  const f = await fixture(t); const token = await startCart(f, 'maitoa 20 litraa');
+  // Päivä annetaan suoraan: testi pysyy numerokohtaisen 10 viestin minuuttikaton alla (kello on pysäytetty).
+  const f = await fixture(t); const token = await startCart(f, 'maitoa 20 litraa maanantaiksi');
   assert.equal((await f.read('')).status, 410);
   assert.equal((await f.read(token.slice(0, -1) + (token.endsWith('a') ? 'b' : 'a'))).status, 410);
   assert.equal((await f.read(token, { origin: 'https://attacker.example' })).status, 403);
@@ -158,13 +167,13 @@ test('capability rejects forgery, expiry, new lists, re-pairing and attempts to 
   const edited = await f.post(token, { ...input(first, 'maitoa 25 litraa'), buyerId: 'another-buyer', member: f.wa.member(OTHER) });
   assert.equal(edited.status, 200);
   assert.equal(await f.bridge.getShoppingList(f.wa.member(OTHER)), null);
-  await f.whatsapp('aloitetaan alusta'); await f.whatsapp('voita 3 kg');
+  await f.whatsapp('aloitetaan alusta'); await f.whatsapp('voita 3 kg maanantaiksi');
   assert.equal((await f.read(token)).status, 410);
   assert.equal((await f.post(token, input(first, 'TILAA'))).status, 409);
-  const freshToken = linkToken(await f.whatsapp('avaa kori'));
+  const freshToken = await openWhenComplete(f);
   const invitation = f.wa.invite(PHONE, 'Uusi yritys', 'Testi'); f.wa.pair(PHONE, codeHash(invitation.code));
   assert.equal((await f.read(freshToken)).status, 410);
-  await f.whatsapp('maitoa 10 litraa'); const newToken = linkToken(await f.whatsapp('avaa kori'));
+  await f.whatsapp('maitoa 10 litraa maanantaiksi'); const newToken = await openWhenComplete(f);
   f.advance(24 * 3600_000 + 1); assert.equal((await f.read(newToken)).status, 410);
   assert.equal(f.stats().submits, 0);
 });
@@ -215,5 +224,23 @@ test('browser writes have a per-customer limit without blocking reads or making 
   assert.equal((await f.read(token)).status, 200);
   f.advance(60_001);
   assert.equal((await f.post(token, input(shoppingList, 'näytä'))).status, 200);
+  assert.equal(f.stats().submits, 0);
+});
+
+test('a cart request on an unfinished order gets what is missing and the next question; the link comes only when complete', async (t) => {
+  // Eelis 15.11. klo 2.00: "tä ois just opas tähä". Ei linkkiä keskeneräiseen tilaukseen, ei myöskään suoraan pyydettynä.
+  const f = await fixture(t);
+  await f.whatsapp('20 l laktoositonta maitoa ja 5 kg voita');
+  const noDate = await f.whatsapp('avaa kori');
+  assert.doesNotMatch(noDate, /cart\.example\.test/);
+  assert.match(noDate, /^Annan ostoskorin linkin, kun tilaus on valmis\. Vielä puuttuu toimituspäivä\./);
+  assert.match(noDate, /Mille päivälle toimitus\?/);
+  assert.equal((await f.bridge.getShoppingList(f.wa.member(PHONE))).lines.length, 2); // "avaa kori" ei lisännyt tuotetta
+  await f.whatsapp('maanantaiksi');
+  const choose = await f.whatsapp('TILAA');
+  assert.doesNotMatch(choose, /cart\.example\.test/);
+  assert.match(choose, /Vielä puuttuu tuotevalinta: maito ja voi\./); assert.match(choose, /1\) /);
+  await f.whatsapp('1'); await f.whatsapp('1');
+  assert.match(await f.whatsapp('avaa kori'), /Tässä linkki ostoskoriisi/);
   assert.equal(f.stats().submits, 0);
 });

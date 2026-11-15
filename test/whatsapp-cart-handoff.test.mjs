@@ -43,11 +43,16 @@ test('short yes keeps a pending clarification, suggestion or changed cart out of
   assert.equal(calls, 0);
 });
 
-test('a direct cart request can open an incomplete list, and legacy TILAA opens the cart without submitting', async () => {
+test('an incomplete list never gets a link, even when asked directly; a complete list opens on a direct request or legacy TILAA', async () => {
+  // Eelis 15.11. klo 2.00: linkki vasta valmiiseen tilaukseen, keskeneräisessä keskustelu opastaa loppuun.
+  let calls = 0;
+  for (const status of ['needs_details', 'needs_product_selection']) for (const text of ['avaa kori', 'laita kori', 'TILAA', 'ok']) {
+    assert.equal(await replyWithCartLink({ text, shoppingList: { ...list, status }, lastOrder: ready, cartHandoff: async () => { calls += 1; return url; } }), null, `${status} ${text}`);
+  }
+  assert.equal(calls, 0);
   for (const text of ['avaa kori', 'TILAA']) {
-    const result = await replyWithCartLink({ text, shoppingList: { ...list, status: 'needs_details' },
-      pendingSuggestion: 'kahvi', cartHandoff: async () => url });
-    assert.equal(result.status, 'collecting'); assert.match(result.text, /Tässä linkki/);
+    const result = await replyWithCartLink({ text, shoppingList: list, pendingSuggestion: 'kahvi', cartHandoff: async () => url });
+    assert.equal(result.status, 'ready'); assert.match(result.text, /Tässä linkki/);
   }
 });
 
