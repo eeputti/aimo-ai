@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — landingille reseptikuvat ja kiiretilauksen WhatsApp-esimerkki (Codex, kuvachat)
+
+- **Käyttäjän pyyntö:** logojen alle pieni päällekkäinen kuvaryhmä kahdesta annetusta pasta- ja keittokuvasta, pehmeä sininen varjo sekä reseptilinkkiä ja kiiretilausta havainnollistava viesti. Kuvista 720 px JPEG-assetit; nykyiset fontit ja numeronliitos säilyvät.
+- **Käyttäjän lopulliset sanamuodot:** kuplassa `Tämän reseptin ainekset 30 hengelle huomiseksi. Vieläkö ehtisi?`, tekstissä `Lähetä reseptilinkki tai tilaa omin sanoin. Myös kiiretilaukset käyvät. Tarkastamme osuvat toimitusajat.` Ajatusviivat poistettu pyynnön mukaan.
+- **Tarkistukset ja julkaisu:** Worker **26/26**, typecheck/build/dry-run ja diff-check läpi; selain 1280/375 px, 320 px:n mittaus ilman vaakaylivuotoa, kuvat latautuvat ja tyhjän lomakkeen validointi toimii. Julkisen sivun lopullinen teksti ja virheetön selainloki varmennettu. Worker **d725f4d6-d849-4df4-877e-6ae2465340b5** osoitteessa https://aimo-order-demo.aimo-demo-41cfac.workers.dev/ . Tarkka raportti `docs/parallel/landing-recipe-visual.md`.
+- **Rajaus:** vain landingin HTML/CSS/kuvat, ei Node-restarttia tai käyttäjäkantojen muutoksia. Reseptilinkin taustalukeminen on erillisen linkkichatin `fea99383`-työtä; esittelykuvamuutos ei itsessään lisää sitä. Tallennus erillisessä ajantasaisessa kloonissa, jaetun kansion muiden keskeneräiset työt ja indeksi säilyvät.
+
 ## 15.11.2026 — itsekeskustelun korjausmittaus: 9 löydöspersonaa paranivat 3/9 → 7/9 (Claude Code, selfplay-100)
 
 - **Käyttäjän pyyntö:** pieni mittaus korjausten jälkeen (alle 1 USD). Ajettu GitHubin 9f20407:llä: 9 personaa, 96 kutsua, noin 0,83 USD, 0 virhettä, 0 tilausta.
