@@ -36,3 +36,11 @@ CREATE TABLE IF NOT EXISTS agent_traces (
   received_at INTEGER NOT NULL,
   json TEXT NOT NULL
 );
+
+-- Selainkeskustelun päivälaskurit: session '*' on koko sivuston päiväraja. Ei viestien sisältöä.
+CREATE TABLE IF NOT EXISTS web_chat_usage (
+  day TEXT NOT NULL,
+  session TEXT NOT NULL,
+  count INTEGER NOT NULL,
+  PRIMARY KEY (day, session)
+);

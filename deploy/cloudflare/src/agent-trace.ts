@@ -89,10 +89,16 @@ export async function storeAgentTrace(env: TraceEnv, trace: AgentTrace, now = Da
 export async function handleAgentTraceRead(request: Request, env: TraceEnv, verify: (orderId: string, request: Request) => Promise<boolean>) {
   const url = new URL(request.url);
   if (!url.pathname.startsWith(`${TRACE_PREFIX}/`) || request.method !== "GET") return null;
-  const orderId = url.pathname.slice(TRACE_PREFIX.length + 1);
-  if (!ORDER_ID.test(orderId)) return json({ error: "Agentin jälkeä ei löydy." }, 404);
+  let orderId = url.pathname.slice(TRACE_PREFIX.length + 1);
+  // "Näin se toimii" -sivun esimerkki: yksi ylläpitäjän D1:ssä valitsema tilaus (landing_settings.example_trace_order).
+  const example = orderId === "esimerkki";
+  if (!example && !ORDER_ID.test(orderId)) return json({ error: "Agentin jälkeä ei löydy." }, 404);
   try {
-    if (!await verify(orderId, request)) return json({ error: "Linkki ei ole voimassa. Avaa jälki tilauksen maksusivulta." }, 404);
+    if (example) {
+      const chosen = await env.DB.prepare("SELECT value FROM landing_settings WHERE key='example_trace_order'").first<{ value: string }>();
+      if (!chosen || !ORDER_ID.test(chosen.value)) return json({ error: "Esimerkkiä ei ole valittu.", code: "not_published" }, 404);
+      orderId = chosen.value;
+    } else if (!await verify(orderId, request)) return json({ error: "Linkki ei ole voimassa. Avaa jälki tilauksen maksusivulta." }, 404);
     const row = await env.DB.prepare("SELECT json,received_at FROM agent_traces WHERE order_id=?").bind(orderId).first<{ json: string; received_at: number }>();
     if (!row) return json({ error: "Agentin jälkeä ei ole vielä julkaistu tälle tilaukselle.", code: "not_published" }, 404);
     return json({ trace: JSON.parse(row.json), receivedAt: row.received_at });

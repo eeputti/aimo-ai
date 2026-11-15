@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#003c75">
+  <title>Ostoskori | Aimo-tilausapuri</title>
+  <link rel="icon" href="/aimo-logo.png">
+  <link rel="stylesheet" href="/site.css">
+  <script type="module" src="/ostoskori.js"></script>
+</head>
+<body class="site-body">
+  <header class="site-header"><a class="site-logo" href="/" aria-label="Aimo-tilausapurin etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="120" height="42"></a><nav class="site-tabs" aria-label="Sivut"><a href="/">Etusivu</a><a href="/keskustele">Keskustele</a><a href="/ostoskori" aria-current="page">Ostoskori</a><a href="/miten">Näin se toimii</a><a href="/tilaukset">Tilaukset</a><a href="/minusta">Minusta</a></nav></header>
+  <main class="site-main">
+    <p class="site-eyebrow">OSTOSKORI</p>
+    <h1 class="site-title">Ostoskorisi.</h1>
+    <div class="site-card" id="cart-state" role="status" aria-live="polite">
+      <h2 id="cart-title">Haetaan ostoskoria…</h2>
+      <p id="cart-detail">Ostoskori on sama, jonka tilausapuri kokoaa keskustelussa.</p>
+      <div class="site-actions" id="cart-actions" hidden>
+        <a class="site-button green" href="/keskustele">Kerro tilausapurille, mitä tarvitset</a>
+        <a class="site-button ghost" href="/miten">Näin se toimii</a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

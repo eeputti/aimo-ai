@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#003c75">
+  <title>Keskustele | Aimo-tilausapuri</title>
+  <link rel="icon" href="/aimo-logo.png">
+  <link rel="stylesheet" href="/site.css">
+  <link rel="stylesheet" href="/keskustele.css">
+  <script type="module" src="/keskustele.js"></script>
+</head>
+<body class="site-body chat-page">
+  <header class="site-header"><a class="site-logo" href="/" aria-label="Aimo-tilausapurin etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="120" height="42"></a><nav class="site-tabs" aria-label="Sivut"><a href="/">Etusivu</a><a href="/keskustele" aria-current="page">Keskustele</a><a href="/ostoskori">Ostoskori</a><a href="/miten">Näin se toimii</a><a href="/tilaukset">Tilaukset</a><a href="/minusta">Minusta</a></nav></header>
+
+  <main class="phone" aria-label="Keskustelu tilausapurin kanssa">
+    <div class="wa-top">
+      <span class="avatar"><img src="/aimo-logo.png" alt="" width="40" height="40"></span>
+      <div class="who"><strong>Aimo-tilausapuri</strong><span id="presence">verkossa</span></div>
+      <a class="wa-cart" href="/ostoskori" aria-label="Avaa ostoskori"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.4 11h10.2L20 7H6.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="9" cy="19.5" r="1.5" fill="currentColor"/><circle cx="17" cy="19.5" r="1.5" fill="currentColor"/></svg><span>Ostoskori</span></a>
+      <button id="reset" class="wa-reset" type="button" aria-label="Aloita alusta uudella ostoskorilla" title="Aloita alusta uudella ostoskorilla"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 8a7.5 7.5 0 1 0 .8 6.5M19 3.5V8h-4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+
+    <div id="log" class="wa-log" role="log" aria-live="polite" aria-relevant="additions">
+      <p class="wa-day">Tänään</p>
+      <div class="wa-notice">Selainkokeilu: sama tilausapuri kuin WhatsAppissa. Tilaukset ovat demoja, rahaa ei liiku. Älä kirjoita henkilötietoja, sillä keskustelu voi näkyä demon tilausnäkymässä.</div>
+    </div>
+
+    <div id="offline" class="wa-offline" hidden role="status"></div>
+
+    <div class="wa-quick" id="quick" aria-label="Valmiit viestit">
+      <button type="button" data-text="Tarvitsen 20 litraa laktoositonta maitoa ja 5 kg voita perjantaiksi">20 l maitoa ja voita perjantaiksi</button>
+      <button type="button" data-text="Teen 40 hengelle lohikeittoa huomiseksi, mitä tarvitsen?">Lohikeittoa 40 hengelle</button>
+      <button type="button" data-text="Mitä osaat tehdä?">Mitä osaat tehdä?</button>
+    </div>
+
+    <form id="composer" class="wa-composer" autocomplete="off">
+      <label for="text" class="sr-only">Viesti</label>
+      <textarea id="text" rows="1" maxlength="2000" placeholder="Kirjoita viesti" enterkeyhint="send"></textarea>
+      <button id="send" type="submit" aria-label="Lähetä"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 20.5 21 12 3.5 3.5l2.6 7.2L15 12l-8.9 1.3z" fill="currentColor"/></svg></button>
+    </form>
+  </main>
+</body>
+</html>

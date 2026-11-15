@@ -63,6 +63,8 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
     return { member, draftId: claims.draft };
   }
   return {
+    // Selainkeskustelun Ostoskori-välilehti: sama allekirjoitettu linkki nykyiseen luonnokseen.
+    linkFor: (member, list) => issue(member, list),
     async chat(args) {
       const list = await ordering.getShoppingList(args.member);
       let dialogue = {};

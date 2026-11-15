@@ -8,6 +8,7 @@ import { createWebDemo } from './web-demo.mjs';
 import { createCartLink } from './cart-link.mjs';
 import { createStorefrontCartPage } from './storefront-cart.mjs';
 import { withDemoCheckout, handleDemoCheckoutAsset } from './checkout.mjs';
+import { createWebChat } from './web-chat.mjs';
 
 export const whatsappDbPath = () => process.env.WHATSAPP_DB || fileURLToPath(new URL('../../data/whatsapp.db', import.meta.url));
 export function whatsappSettings(env = process.env) {
@@ -41,11 +42,14 @@ export function createConfiguredWhatsApp() {
     onPrune: () => ordering?.prune(), send: createMetaSender(settings), typing: createMetaTypingIndicator(settings) });
   // Selaindemo on olemassa vain tilaustilassa, jolloin kannat ovat eristetyt.
   const webDemo = ordering ? createWebDemo({ store, chat: ordering.chat }) : null;
+  // Workers-sivuston selainkeskustelu: vain WEBCHAT_SECRETin tunteva Worker voi kutsua.
+  const webChat = cartLink ? createWebChat({ store, chat: cartLink.chat, cartLink: cartLink.linkFor, shoppingList: (member) => ordering.getShoppingList(member),
+    secret: process.env.WEBCHAT_SECRET?.trim() }) : null;
   const shoppingLists = ordering ? createShoppingListHandoff({ store, ordering, defaultPhone: process.env.WHATSAPP_DEMO_PHONE }) : null;
   return { ...channel, store,
     // Pilviversio siivoaa ajastetusti, koska siellä ei ole start()-silmukkaa.
     prune() { store.prune(); ordering?.prune(); },
-    async handle(req, res, url = new URL(req.url, 'http://localhost')) { return (cartLink ? handleDemoCheckoutAsset(req, res, url) : false) || (storefrontCart ? storefrontCart.handle(req, res, url) : false) || (cartLink ? await cartLink.handle(req, res, url) : false) || (await channel.handle(req, res, url)) || (shoppingLists ? await shoppingLists.handle(req, res, url) : false) || (webDemo ? webDemo.handle(req, res, url) : false); },
+    async handle(req, res, url = new URL(req.url, 'http://localhost')) { return (cartLink ? handleDemoCheckoutAsset(req, res, url) : false) || (storefrontCart ? storefrontCart.handle(req, res, url) : false) || (cartLink ? await cartLink.handle(req, res, url) : false) || (webChat ? await webChat.handle(req, res, url) : false) || (await channel.handle(req, res, url)) || (shoppingLists ? await shoppingLists.handle(req, res, url) : false) || (webDemo ? webDemo.handle(req, res, url) : false); },
     async close() {
       try { await channel.stop(); await ordering?.close(); }
       finally { store.close(); }

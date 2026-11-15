@@ -94,3 +94,10 @@ input[aria-invalid=true]{border-color:#c4453c;background:#fff8f7}
 .call-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}
 .call-name{font-size:17px}
 .call-number{font-size:14px;font-weight:400;letter-spacing:.02em}
+
+/* Etusivun selainkokeilu ennen WhatsApp-lomaketta (site.css tuo välilehdet). */
+.button.try{gap:10px;margin:22px 0 8px;min-height:58px;background:var(--blue);font-size:17px}
+.button.try:hover{background:#002a52}
+.button.try svg{width:22px;height:22px;flex-shrink:0}
+.try-note{margin:0 0 28px;font-size:13px;color:var(--muted)}
+.card-title{margin:0 0 12px;font-size:18px;color:var(--ink)}

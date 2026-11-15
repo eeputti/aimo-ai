@@ -163,8 +163,8 @@ test('publisher → order → demo payment link → "Katso, mitä agentti näki"
     const read = (orderId) => readAgentTrace({ orderId, ...files, ledgerHead: snapshot.ledgerHead });
     const known = new Set();
     const pushed = await pushAgentTraces({ url: origin, token, snapshot, known, read, fetcher });
-    // The just-confirmed order waits until its cart turn has been stored; the browser demo has no WhatsApp conversation.
-    assert.deepEqual(pushed.map((p) => p.orderId), [ORDER_ID]);
+    // The just-confirmed order waits until its cart turn has been stored; an order without a stored conversation is skipped once.
+    assert.deepEqual(pushed.map((p) => [p.orderId, p.skipped || null]), [[ORDER_ID, null], ['AGW-20261115-0044', 'conversation_missing']]);
     assert.equal(pushed[0].turns, 6);
     assert.deepEqual(await pushAgentTraces({ url: origin, token, snapshot, known, read, fetcher }), []);
     await assert.rejects(pushAgentTraces({ url: origin, token: 'wrong-token-'.repeat(4), snapshot, known: new Set(), read, fetcher }), /HTTP 401/);

@@ -4,6 +4,7 @@ import { renderOrderEmail } from "./email.ts";
 import { registerDemoPayment, demoPaymentEmailAllowed, describeDemoPayment, handleDemoPayment, verifyDemoPaymentLink } from "./demo-payment.ts";
 import { TRACE_PREFIX, parseAgentTrace, storeAgentTrace, handleAgentTraceRead } from "./agent-trace.ts";
 import { handleSignup } from "./signup.ts";
+import { handleWebChat, type WebChatEnv } from "./web-chat.ts";
 
 // A sender is optional: without one orders are stored and e-mail waits. Either the Cloudflare
 // send_email binding EMAIL with ORDER_EMAIL_FROM (needs an onboarded domain), or RESEND_API_KEY.
@@ -158,6 +159,9 @@ export default {
     // "Katso, mitä agentti näki": readable only with the order's own demo payment link.
     const trace = await handleAgentTraceRead(request, env, (orderId, req) => verifyDemoPaymentLink(env as OrderEnv, orderId, req));
     if (trace) return trace;
+    // Selainkeskustelu botin kanssa ja saman keskustelun ostoskori tällä sivustolla.
+    const chat = await handleWebChat(request, env as WebChatEnv);
+    if (chat) return chat;
     // Landing page sign-ups: the browser sees only its own status; the publisher token lists the numbers.
     const signup = await handleSignup(request, env);
     if (signup) return signup;

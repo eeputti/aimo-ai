@@ -7,11 +7,12 @@
   <meta name="robots" content="noindex,nofollow">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
   <title>Demomaksu | Aimo-tilausapuri</title>
+  <link rel="stylesheet" href="/site.css">
   <link rel="stylesheet" href="/demo-payment.css">
   <script type="module" src="/demo-payment.js"></script>
 </head>
 <body>
-  <header><a href="/tilaukset.html" aria-label="Aimo-demon tilaukset"><img src="/aimo-logo.png" alt="Valio Aimo" width="152" height="53"></a><span>MAKSAMISEN DEMO</span></header>
+  <header class="site-header"><a class="site-logo" href="/" aria-label="Aimo-tilausapurin etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="120" height="42"></a><nav class="site-tabs" aria-label="Sivut"><a href="/">Etusivu</a><a href="/keskustele">Keskustele</a><a href="/ostoskori" aria-current="page">Ostoskori</a><a href="/miten">Näin se toimii</a><a href="/tilaukset">Tilaukset</a><a href="/minusta">Minusta</a></nav></header>
   <main>
     <nav aria-label="Tilauksen vaiheet"><span>1. WhatsApp</span><span aria-current="step">2. Demomaksu</span><span>3. Vahvistus</span></nav>
     <section class="card">
@@ -25,7 +26,7 @@
         <p class="hint">Kokeilussa käytetään tilauksen verotonta summaa. Hyväksyminen merkitsee demomaksun onnistuneeksi ja käynnistää vahvistuksen määritettyyn testisähköpostiin.</p>
         <div id="actions"><button id="pay" type="button">Hyväksy demomaksu</button><button id="cancel" type="button" class="secondary">Keskeytä</button></div>
         <a id="trace" class="trace" hidden><span><strong>Katso, mitä agentti näki</strong><small>WhatsApp-keskustelu, tulkinta, vaihtoehdot ja portin tarkistukset tähän tilaukseen asti.</small></span><span class="arrow" aria-hidden="true">→</span></a>
-        <a class="back" href="/tilaukset.html">Palaa tilausnäkymään →</a>
+        <a class="back" href="/tilaukset">Palaa tilausnäkymään →</a>
       </div>
     </section>
   </main>

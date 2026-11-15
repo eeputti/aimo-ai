@@ -7,7 +7,9 @@ import { readAgentTrace } from './trace-reader.mjs';
 
 const WEB_DEMO_PHONE = '358000000001';
 const GENESIS = '0'.repeat(64);
-export function readSnapshot({ gatewayFile, whatsappFile, phone, includeBrowserDemo = false, now = Date.now() }) {
+// Selainkeskustelun testiasiakkaat (server/whatsapp/web-chat.mjs): synteettiset 3580000…-tunnisteet, ei oikeita numeroita.
+const WEB_CHAT_PHONE = /^3580000\d{8}$/;
+export function readSnapshot({ gatewayFile, whatsappFile, phone, includeBrowserDemo = false, includeWebChat = false, now = Date.now() }) {
   if (!gatewayFile || !whatsappFile || !/^[1-9]\d{6,14}$/.test(String(phone || '').replace(/^\+/, ''))) throw new Error('WhatsApp-demon omat kantapolut ja testinumero vaaditaan.');
   const members = openSqlite(whatsappFile, { readOnly: true });
   const channels = new Map();
@@ -16,6 +18,9 @@ export function readSnapshot({ gatewayFile, whatsappFile, phone, includeBrowserD
     for (const number of [selected, ...(includeBrowserDemo ? [WEB_DEMO_PHONE] : [])]) {
       const member = members.prepare('SELECT binding FROM members WHERE phone=?').get(number);
       if (member) channels.set(`whatsapp-demo-${member.binding}`, number === WEB_DEMO_PHONE ? 'browser-demo' : 'whatsapp');
+    }
+    if (includeWebChat) for (const member of members.prepare("SELECT phone,binding FROM members WHERE phone LIKE '3580000%'").all()) {
+      if (WEB_CHAT_PHONE.test(member.phone)) channels.set(`whatsapp-demo-${member.binding}`, 'browser-demo');
     }
   } finally { members.close(); }
   const db = openSqlite(gatewayFile, { readOnly: true });
@@ -92,9 +97,11 @@ export async function pushAgentTraces({ url, token, snapshot, known, read, fetch
   if (!token || token.length < 32) throw new Error('Julkaisuavain puuttuu.');
   const results = [];
   for (const order of snapshot.orders) {
-    if (order.channel !== 'whatsapp' || known.has(order.orderId) || now - Date.parse(order.createdAt) < TRACE_SETTLE_MS) continue;
-    const trace = read(order.orderId);
-    if (!trace) { known.add(order.orderId); results.push({ orderId: order.orderId, skipped: 'conversation_missing' }); continue; }
+    if (known.has(order.orderId) || now - Date.parse(order.createdAt) < TRACE_SETTLE_MS) continue;
+    let trace;
+    // One unreadable or refused trace must not stop the others (or the order publishing) on every cycle.
+    try { trace = read(order.orderId); } catch { trace = undefined; }
+    if (!trace) { known.add(order.orderId); results.push({ orderId: order.orderId, skipped: trace === null ? 'conversation_missing' : 'invalid' }); continue; }
     const response = await fetcher(endpoint, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
       headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(trace) });
     if (!response.ok) throw new Error(`Agentin jäljen välitys epäonnistui (HTTP ${response.status}).`);
@@ -117,7 +124,7 @@ async function main() {
   do {
     try {
       const snapshot = readSnapshot({ gatewayFile: env.GATEWAY_DB, whatsappFile: env.WHATSAPP_DB, phone: env.WHATSAPP_DEMO_PHONE,
-        includeBrowserDemo: process.argv.includes('--include-browser-demo') });
+        includeBrowserDemo: process.argv.includes('--include-browser-demo'), includeWebChat: process.argv.includes('--include-web-chat') });
       await publishOnce({ url: env.CLOUDFLARE_DEMO_URL, token: env.CLOUDFLARE_DEMO_SYNC_TOKEN, snapshot });
       console.log(JSON.stringify({ event: 'demo_published', orders: snapshot.orders.length, at: new Date().toISOString() }));
       if (orderEvents) {

@@ -101,12 +101,15 @@ export function readAgentTrace({ orderId, gatewayFile, whatsappFile, draftFile, 
     for (const r of results) {
       const m = inbox(r.id);
       if (m && m.kind !== 'text') continue;
+      // Vain ostoskorisivun toiminnot ovat ilman viestiriviä; vanhan paikallisen /demo-sivun viestejä ei tallennettu.
+      if (!m && !String(r.id).startsWith('cart:')) continue;
       turns.push(m
         ? { at: iso(m.received), source: 'whatsapp', customer: redact(m.text, 1200), action: null, replies: parts(m.id, m.reply), status: str(r.result.status, 32), revision: num(r.result.revision) }
         : { at: iso(r.created), source: 'cart', customer: null, action: CART_ACTION[r.result.status] || 'Toiminto ostoskorisivulla', replies: r.result.text ? [redact(r.result.text)] : [],
           status: str(r.result.status, 32), revision: num(r.result.revision) });
     }
     turns.sort((a, b) => a.at.localeCompare(b.at));
+    if (!turns.length) return null;
 
     const lines = (draft.lines || []).slice(0, 30);
     const understood = { deliveryDate: str(draft.deliveryDate, 10),
