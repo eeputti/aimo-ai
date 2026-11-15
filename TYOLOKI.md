@@ -2,11 +2,20 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — WhatsApp-koodin puuttumisen syy ja itsenäisesti liittyvän demon tavoite (Codex, vahvistuskoodichat)
+
+- Käyttäjä tarkensi odottavansa koodia verkkosivun lomakkeen jälkeen. Tuotannon ilmoittautumis-API: 0 pending / 2 linked / 0 ready, ei sivulle syötettyjä koodeja. Lomake ei käynnistä Metan koodipyyntöä; linked on paikallinen demoasiakas, ei Metan hyväksyntä. Metan oikealla testivastaanottajalistalla 2/5 paikkaa käytössä, joten kaikkien numeroiden poisto ei ratkaise puuttuvaa vaihetta. Poistoja tai valmiiksi-merkintöjä ei tehty.
+- Käyttäjä pyysi koodipyynnöt molemmille odottaville. Ensimmäisen numero ja FI-maatunnus syötetty Metaan, Next-toiminnon yritys ja tilan palautus aikakatkaistiin; pyynnön käynnistymistä ei voitu varmentaa. Lähetystä/toimitusta ei varmennettu, toisen numeron pyyntö aloittamatta. Tarkista Metan nykytila ennen uusintaa. Henkilötietoja tai koodeja ei tallenneta Gitiin.
+- **Käyttäjän tavoite:** kuka tahansa pääsee juttelemaan automaattisesti, joten käsin hyväksyttävä testinumero ei täytä tarvetta. Tavallinen prepaid/SIM/eSIM on mahdollinen apurinumero, kun se vastaanottaa SMS:n tai puhelun; hankintaa ei valittu. Meta tarjoaa myös automaattisesti vahvistettuja 555-yritysnumeroita hyväksyttävällä näyttönimellä. Step 2:n toisen Registered-numeron tyyppi/lähetysvalmius jäi tarkistamatta; oma SIM ei ole ainoa mahdollinen reitti.
+- **Seuraava toteutus:** käyttökelpoinen yritysnumero, rekisteröinti/CONNECTED ja viestikytkentä, oma automaattinen demoasiakas uusille tulijoille ja julkinen linkki. Nykyinen paikallinen jäsenportti edellyttää erillistä muutosta myös yritysnumerolla. Loppukoe kahdelta uudelta numerolta ilman esittelijän koodivaihetta. Valion tuotantoasiakkuutta ei tällä tunnisteta.
+- **Tarkistukset/rajat:** nykyinen koodi, asetusten rajattu luku, tuotannon tilat, Meta-UI ja viralliset numerodokumentit luettu. Vain dokumenttimuutos, diff tarkistettu; ei sovellustestien tarvetta, restarttia, numeropoistoja, tietokantakirjoituksia tai tilausta. Erillinen ajantasainen klooni säilyttää muiden yhteisen työpuun muutokset. Tarkka raportti ja viralliset lähteet: `docs/parallel/whatsapp-verification-diagnosis.md`.
+
 ## 15.11.2026 — linkkituki käytössä nykyisessä WhatsApp-palvelimessa (Codex, linkkichat)
 
 - Lähde **3bee913** on GitHubissa ja käytössä snapshotista `/private/tmp/aimo-whatsapp-runtime-3bee913`; kaikki 542 seurattua tiedostoa vastaavat commitia. Uusi worker **48952** korvasi ainoan 4749-workerin 39055 hallitusti, samalla envillä, kannoilla ja tunnelilla. Taulun varaus `7a029442`, ennakkoilmoitus #255.
 - Viiden kannan kaikkien **22 aiemman taulun** sisältöhashit, rivimäärät ja tiedostojen inodet säilyivät, eheystarkistukset ok. Vain uusi tyhjä `wa_link_progress` lisättiin. Jono oli ja on tyhjä; käyttäjän keskusteluja, koreja tai tilauksia ei nollattu. Tunneli, tilausjulkaisija ja ilmoittautumisseuranta säilyivät.
 - Paikallinen ja julkinen health **200**, korin JS **200** ja sama SHA-256, julkinen demo/juuri **403/404**. Ominaisuuden 351/351 testit ja oikean mallin koko ketju ovat alla. Ei uutta oikean puhelimen koeviestiä: käyttöönotto varmennettiin prosessi-, lähde-, kanta- ja lukevilla HTTP-tarkistuksilla. Raportti `docs/parallel/whatsapp-links-rollout.md`. Muiden keskeneräinen yhteinen työpuu säilyy.
+
 
 ## 15.11.2026 — video käyttäjän viitekuvan mukaiseen WhatsApp-ostoskoriin (Codex, videochatti)
 
