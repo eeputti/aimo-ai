@@ -1,9 +1,9 @@
 // Persistent API cache used by product lookup. AIMO_DB keeps its existing configuration name.
-import { DatabaseSync } from 'node:sqlite';
+import { openSqlite } from './sqlite.mjs';
 import path from 'node:path';
 import { ROOT } from './catalog.mjs';
 
-const db = new DatabaseSync(process.env.AIMO_DB || path.join(ROOT, 'data', 'aimo.db'));
+const db = openSqlite(process.env.AIMO_DB || path.join(ROOT, 'data', 'aimo.db'));
 db.exec(`
   PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);

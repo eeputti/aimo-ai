@@ -1,13 +1,14 @@
 // Tilausluonnosten pysyvä tallennus (TYONJAKO.md, henkilö 2). Oma kanta: ei WhatsApp-jonon eikä demotilausten tauluja.
 // Luonnos ja viestin tulos tallennetaan samassa transaktiossa, joten sama webhook-viesti ei muuta luonnosta kahdesti.
-import { DatabaseSync } from 'node:sqlite';
+import { openSqlite, isRemoteDatabase } from '../sqlite.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
 export function openDraftStore(filename = ':memory:', now = Date.now) {
-  if (filename !== ':memory:') fs.mkdirSync(path.dirname(filename), { recursive: true });
-  const db = new DatabaseSync(filename);
-  if (filename !== ':memory:') fs.chmodSync(filename, 0o600);
+  const local = filename !== ':memory:' && !isRemoteDatabase(filename);
+  if (local) fs.mkdirSync(path.dirname(filename), { recursive: true });
+  const db = openSqlite(filename);
+  if (local) fs.chmodSync(filename, 0o600);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS drafts (id TEXT PRIMARY KEY, conversation TEXT NOT NULL, state TEXT NOT NULL, json TEXT NOT NULL, updated INTEGER NOT NULL);
     CREATE INDEX IF NOT EXISTS drafts_active ON drafts(conversation, state);

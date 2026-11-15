@@ -23,6 +23,8 @@
     "node": ">=22.13"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.8.0"
+    "@anthropic-ai/sdk": "^1.8.0",
+    "@libsql/client": "^0.18.0",
+    "@vercel/functions": "^3.11.3"
   }
 }

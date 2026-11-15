@@ -1,5 +1,5 @@
 // Read-only publisher. It never imports or starts the WhatsApp worker or gateway runtime.
-import { DatabaseSync } from 'node:sqlite';
+import { openSqlite } from '../../server/sqlite.mjs';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { MAX_LINES, MAX_ORDERS, parseSnapshot } from './src/protocol.ts';
@@ -9,7 +9,7 @@ const WEB_DEMO_PHONE = '358000000001';
 const GENESIS = '0'.repeat(64);
 export function readSnapshot({ gatewayFile, whatsappFile, phone, includeBrowserDemo = false, now = Date.now() }) {
   if (!gatewayFile || !whatsappFile || !/^[1-9]\d{6,14}$/.test(String(phone || '').replace(/^\+/, ''))) throw new Error('WhatsApp-demon omat kantapolut ja testinumero vaaditaan.');
-  const members = new DatabaseSync(whatsappFile, { readOnly: true });
+  const members = openSqlite(whatsappFile, { readOnly: true });
   const channels = new Map();
   try {
     const selected = String(phone).replace(/^\+/, '');
@@ -18,7 +18,7 @@ export function readSnapshot({ gatewayFile, whatsappFile, phone, includeBrowserD
       if (member) channels.set(`whatsapp-demo-${member.binding}`, number === WEB_DEMO_PHONE ? 'browser-demo' : 'whatsapp');
     }
   } finally { members.close(); }
-  const db = new DatabaseSync(gatewayFile, { readOnly: true });
+  const db = openSqlite(gatewayFile, { readOnly: true });
   try {
     db.exec('PRAGMA busy_timeout=3000; BEGIN');
     let head = GENESIS;

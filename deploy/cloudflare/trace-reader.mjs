@@ -1,7 +1,7 @@
 // Read-only: builds the public "what the agent saw" projection of one published WhatsApp order.
 // It opens the WhatsApp, draft and gateway databases read-only and copies an allowlist of fields.
 // Phone numbers, bindings, names, keys, signatures and cart links never leave this process.
-import { DatabaseSync } from 'node:sqlite';
+import { openSqlite } from '../../server/sqlite.mjs';
 import { MAX_TEXT, MAX_TURNS, parseAgentTrace } from './src/agent-trace.ts';
 
 // Masks anything that looks like a link, an e-mail address or a phone number in free text.
@@ -63,9 +63,9 @@ const LEDGER_FIELDS = {
  */
 export function readAgentTrace({ orderId, gatewayFile, whatsappFile, draftFile, ledgerHead = null, now = Date.now() }) {
   if (!gatewayFile || !whatsappFile || !draftFile) throw new Error('Jäljen kantapolut puuttuvat.');
-  const g = new DatabaseSync(gatewayFile, { readOnly: true });
-  const w = new DatabaseSync(whatsappFile, { readOnly: true });
-  const d = new DatabaseSync(draftFile, { readOnly: true });
+  const g = openSqlite(gatewayFile, { readOnly: true });
+  const w = openSqlite(whatsappFile, { readOnly: true });
+  const d = openSqlite(draftFile, { readOnly: true });
   try {
     const row = g.prepare('SELECT buyer_id,json FROM orders WHERE id=?').get(orderId);
     if (!row) return null;

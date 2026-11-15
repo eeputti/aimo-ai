@@ -3,7 +3,7 @@
 // (storefront.mjs), tarjous ja tilaus gatewayn allekirjoitetusta ketjusta (gateway/service.mjs).
 // confirmed tarkoittaa gatewayn demotallennusta. Se ei ole oikea Valio-tilaus.
 import crypto from 'node:crypto';
-import { DatabaseSync } from 'node:sqlite';
+import { openSqlite } from '../sqlite.mjs';
 import { clock } from '../gateway/clock.mjs';
 
 const CLAIM_WORD = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
@@ -120,7 +120,7 @@ export function createOrderingTools(deps = {}) {
   const now = deps.now || (() => clock.now().getTime());
   let resolved;
   const d = async () => (resolved ||= { ...(deps.search && deps.requestQuote && deps.placeOrder && deps.buyer && deps.product ? {} : await defaultDeps()), ...deps });
-  const db = new DatabaseSync(deps.dbPath || ':memory:');
+  const db = openSqlite(deps.dbPath || ':memory:');
   db.exec(`CREATE TABLE IF NOT EXISTS tool_quotes (id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, binding TEXT NOT NULL, draft_id TEXT NOT NULL, revision INTEGER NOT NULL,
     hash TEXT NOT NULL, expires INTEGER NOT NULL, offers TEXT NOT NULL, idem_key TEXT, result TEXT, created INTEGER NOT NULL)`);
   const saved = (id) => db.prepare('SELECT * FROM tool_quotes WHERE id=?').get(String(id || ''));

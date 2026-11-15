@@ -1,13 +1,13 @@
 // Portin tallennus: tarjouspyynnöt, tilaukset ja hash-ketjutettu tapahtumaloki (audit trail).
 // Loki on append-only: jokainen rivi sisältää edellisen rivin hashin, joten yhdenkin rivin muuttaminen jälkikäteen rikkoo ketjun.
-import { DatabaseSync } from 'node:sqlite';
+import { openSqlite } from '../sqlite.mjs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { ROOT } from '../catalog.mjs';
 import { clock } from './clock.mjs';
 
 // GATEWAY_DB: testiajo (npm run eval) käyttää omaa kantaansa, jotta demon tilaukset ja loki säilyvät.
-const db = new DatabaseSync(process.env.GATEWAY_DB || path.join(ROOT, 'data', 'gateway.db'));
+const db = openSqlite(process.env.GATEWAY_DB || path.join(ROOT, 'data', 'gateway.db'));
 db.exec(`
   PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS buyers (id TEXT PRIMARY KEY, api_key TEXT UNIQUE NOT NULL, json TEXT NOT NULL);

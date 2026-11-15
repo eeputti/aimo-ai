@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import { openSqlite, isRemoteDatabase } from '../sqlite.mjs';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -6,6 +6,8 @@ import path from 'node:path';
 // Viestikatto numeroa kohden webhookin uusille viesteille: 10 minuutissa (60 s), 120 tunnissa ja 400 vuorokaudessa.
 export const MESSAGES_PER_HOUR = 120;
 export const MESSAGES_PER_DAY = 400;
+// Pilven yksi kutsu kestää enintään 300 s; tätä vanhempi käsittelyvaraus on keskeytynyt.
+export const PROCESSING_LEASE_MS = 6 * 60_000;
 export const codeHash = (code) => crypto.createHash('sha256').update(code.trim()).digest('hex');
 export function phoneNumber(value) {
   const phone = String(value || '').replace(/^\+/, '');
@@ -15,9 +17,10 @@ export function phoneNumber(value) {
 
 // One worker process per database. This database is independent of all demo order databases.
 export function openWhatsAppStore(filename, now = Date.now) {
-  if (filename !== ':memory:') fs.mkdirSync(path.dirname(filename), { recursive: true });
-  const db = new DatabaseSync(filename);
-  if (filename !== ':memory:') fs.chmodSync(filename, 0o600);
+  const local = filename !== ':memory:' && !isRemoteDatabase(filename);
+  if (local) fs.mkdirSync(path.dirname(filename), { recursive: true });
+  const db = openSqlite(filename);
+  if (local) fs.chmodSync(filename, 0o600);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS members (phone TEXT PRIMARY KEY, company TEXT NOT NULL, person TEXT NOT NULL, binding TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS invites (phone TEXT PRIMARY KEY, company TEXT NOT NULL, person TEXT NOT NULL, hash TEXT NOT NULL, expires INTEGER NOT NULL);
@@ -34,7 +37,9 @@ export function openWhatsAppStore(filename, now = Date.now) {
   const member = (phone) => db.prepare('SELECT * FROM members WHERE phone=?').get(phone);
   return {
     db, close: () => db.close(), member,
-    recover() { db.exec("UPDATE inbox SET state='pending' WHERE state='processing'"); },
+    recover() { db.exec("UPDATE inbox SET state='pending', next_at=0 WHERE state='processing'"); },
+    // Pilvessä ei ole yhtä pysyvää prosessia: vain varauksen aikarajan ylittäneet käsittelyt palautetaan jonoon.
+    recoverStale() { return db.prepare("UPDATE inbox SET state='pending' WHERE state='processing' AND next_at<=?").run(now()).changes; },
     invite(phone, company, person) {
       phone = phoneNumber(phone);
       if (!company?.trim() || !person?.trim()) throw new Error('Yritys ja henkilö vaaditaan.');
@@ -86,8 +91,10 @@ export function openWhatsAppStore(filename, now = Date.now) {
     },
     next() {
       const job = db.prepare("SELECT * FROM inbox WHERE state='pending' AND next_at<=? AND NOT EXISTS (SELECT 1 FROM inbox prior WHERE prior.phone=inbox.phone AND prior.state IN ('pending','processing') AND prior.rowid<inbox.rowid) ORDER BY received,rowid LIMIT 1").get(now());
-      if (job) db.prepare("UPDATE inbox SET state='processing', attempts=attempts+1 WHERE id=?").run(job.id);
-      return job ? { ...job, attempts: job.attempts + 1 } : null;
+      if (!job) return null;
+      // Atominen varaus: toinen samaa kantaa käyttävä prosessi ei saa samaa viestiä. next_at on käsittelyn aikaraja.
+      const claimed = db.prepare("UPDATE inbox SET state='processing', attempts=attempts+1, next_at=? WHERE id=? AND state='pending'").run(now() + PROCESSING_LEASE_MS, job.id);
+      return claimed.changes ? { ...job, attempts: job.attempts + 1 } : null;
     },
     history(binding) {
       return db.prepare('SELECT role,content FROM (SELECT seq,role,content FROM turns WHERE binding=? ORDER BY seq DESC LIMIT 18) ORDER BY seq').all(binding).map((r) => ({ ...r }));

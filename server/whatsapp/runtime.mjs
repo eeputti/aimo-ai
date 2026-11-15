@@ -42,7 +42,9 @@ export function createConfiguredWhatsApp() {
   // Selaindemo on olemassa vain tilaustilassa, jolloin kannat ovat eristetyt.
   const webDemo = ordering ? createWebDemo({ store, chat: ordering.chat }) : null;
   const shoppingLists = ordering ? createShoppingListHandoff({ store, ordering, defaultPhone: process.env.WHATSAPP_DEMO_PHONE }) : null;
-  return { ...channel,
+  return { ...channel, store,
+    // Pilviversio siivoaa ajastetusti, koska siellä ei ole start()-silmukkaa.
+    prune() { store.prune(); ordering?.prune(); },
     async handle(req, res, url = new URL(req.url, 'http://localhost')) { return (cartLink ? handleDemoCheckoutAsset(req, res, url) : false) || (storefrontCart ? storefrontCart.handle(req, res, url) : false) || (cartLink ? await cartLink.handle(req, res, url) : false) || (await channel.handle(req, res, url)) || (shoppingLists ? await shoppingLists.handle(req, res, url) : false) || (webDemo ? webDemo.handle(req, res, url) : false); },
     async close() {
       try { await channel.stop(); await ordering?.close(); }

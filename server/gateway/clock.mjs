@@ -4,7 +4,12 @@
 // DEMO_NOW_LOOP_MINUTES=420 kierrättää demokellon: se kulkee DEMO_NOW:sta eteenpäin ja palaa alkuun annetun ajan välein.
 // Syy: testirajapinta on jäädytetty (toimitus aina ma 16.11., raja su 15.11. klo 17.00), joten jatkuvasti päällä oleva demo
 // ei saa koskaan ylittää rajaa. Esim. DEMO_NOW=2026-11-15T09:00:00+02:00 ja 420 min pitää kellon su klo 9–16 välillä.
-const bootReal = Date.now();
+// DEMO_NOW_ANCHOR (oikea aika, esim. 2026-11-15T18:00:00Z) kiinnittää kellon lähtöhetken. Pilvessä on monta lyhytikäistä
+// prosessia: ilman ankkuria jokainen aloittaisi kellon omasta käynnistyksestään ja ne näyttäisivät eri aikaa.
+const anchorRaw = (process.env.DEMO_NOW_ANCHOR || '').trim();
+const anchor = anchorRaw ? Date.parse(anchorRaw) : NaN;
+if (anchorRaw && Number.isNaN(anchor)) console.warn(`[clock] DEMO_NOW_ANCHOR="${anchorRaw}" ei ole kelvollinen aika, käytetään käynnistyshetkeä`);
+const bootReal = Number.isNaN(anchor) ? Date.now() : anchor;
 const demoRaw = (process.env.DEMO_NOW || '').trim();
 const demoStart = demoRaw ? parseApiTime(demoRaw)?.getTime() : null;
 if (demoRaw && !demoStart) console.warn(`[clock] DEMO_NOW="${demoRaw}" ei ole kelvollinen aika, käytetään oikeaa kelloa`);
