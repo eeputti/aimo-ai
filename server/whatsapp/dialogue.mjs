@@ -3,9 +3,9 @@
 import { normalizeOrderUnits, presentCollectingCart } from './cart-presentation.mjs';
 import { withCartHandoffHint } from './cart-handoff.mjs';
 import { safeModelText } from './model-guard.mjs';
-import { CANCEL_ALL, DEADLINE_QUESTION, compareKind, RELIST } from '../order-conversation/index.mjs';
+import { CANCEL_ALL, DEADLINE_QUESTION, REPEAT_LAST, compareKind, RELIST } from '../order-conversation/index.mjs';
 // Ihmisen, valituksen tai laskun pyyntö: koodi liittää kanavan tukiyhteystiedon (mallin teksti ei saa sisältää yhteystietoja).
-const SUPPORT_QUESTION = /(?<![\p{L}\d])(?:ihmise\p{L}*|asiakaspalvelu\p{L}*|asiakastu\p{L}*|tukeen|tuesta|yhteystie\p{L}*|yhteyshenkilö\p{L}*|puhelinnumer\p{L}*|soitt\p{L}*|reklamaa\p{L}*|valitu\p{L}*|valitta\p{L}*|lasku\p{L}*|hyvit\p{L}*|palaut(?:e|teen|etta)|rikki|rikkinäi\p{L}*|myyjä\p{L}*)(?![\p{L}\d])/iu;
+const SUPPORT_QUESTION = /(?<![\p{L}\d])(?:ihmise\p{L}*|asiakaspalvelu\p{L}*|asiakastu\p{L}*|tukeen|tuesta|yhteystie\p{L}*|yhteyshenkilö\p{L}*|puhelinnumer\p{L}*|soitt\p{L}*|reklamaa\p{L}*|valitu\p{L}*|valitta\p{L}*|lasku\p{L}*|hyvit\p{L}*|palaut(?:e|teen|etta)|rikki|rikkinäi\p{L}*|myyjä\p{L}*|vanhentu\p{L}*|pilaantu\p{L}*|pilalla|homee\p{L}*|homehtu\p{L}*|sula(?:nu|ne)\p{L}*|myöhästy\p{L}*|puuttu(?:i|ivat))(?![\p{L}\d])/iu;
 // Väite, ettei yhteystietoja ole, on väärä, kun kanavalle on määritetty tukiyhteys.
 // Jatkokysymys yhteystiedosta ("onks numeroa tai chattia?") saa yhteystiedon, kun edellinen vastaus koski asiakaspalvelua.
 const CONTACT_FOLLOWUP = /(?<![\p{L}\d])(?:numer\p{L}*|chat\p{L}*|yhtey\p{L}*|pääse\p{L}*|tavoit\p{L}*|osoit\p{L}*|sähköpost\p{L}*|lomak\p{L}*|meili\p{L}*)(?![\p{L}\d])/iu;
@@ -183,6 +183,8 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], now =
       // Mallin vapaa teksti ei saa väittää tilauksen, hinnan tai maksun tilaa eikä sisältää linkkejä (model-guard.mjs).
       // Tilausaikarajan kertoo tilausmoottori työkalujen tiedoista: malli ei vastaa siihen itse ("en näe takarajaa" oli väärin).
       if (plan && DEADLINE_QUESTION.test(text)) plan = { ...plan, route: ['chat', 'order'].includes(plan.route) ? 'order' : plan.route, text: '' };
+      // "Sitä samaa ku viimeks": tilausmoottori kopioi edellisen tilauksen tai kertoo, ettei sitä löydy, ja kysyy päivän (S030).
+      if (plan && REPEAT_LAST.test(text)) plan = { ...plan, route: ['chat', 'order'].includes(plan.route) ? 'order' : plan.route, text: '' };
       // Vertailu (halvin, hiilijalanjälki, toimitusvarmuus) ja vaihtoehtojen uudelleen näyttäminen: tilausmoottori vastaa näytetyistä
       // vaihtoehdoista. Malli ei vastaa itse eikä pahoittele valintaa, jota ei tehty väärin (V025).
       if (plan && (compareKind(text) || RELIST.test(text)) && (plan.route === 'order' || getShoppingList({ epoch: state.epoch || '' })?.lines?.length)) {
@@ -254,6 +256,8 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
           const answer = plan.text.trim().slice(0, 1200);
           messages = [answer, ...messages]; result = { ...result, conversationAnswer: answer };
         }
+        // Korilinkki korvaa yhteenvedon: poistettu rivi kerrotaan silti linkin edellä (S056: tryffeli poistettiin sanomatta).
+        if (result.removedNote && plan?.openCart) result = { ...result, conversationAnswer: [result.conversationAnswer, result.removedNote].filter(Boolean).join('\n') };
         state.lastOrder = result;
         state.pendingSuggestion = null;
         // Enintään yksi lisäidea luonnosta kohden: ei toistuvaa lisämyyntiä samalle listalle.

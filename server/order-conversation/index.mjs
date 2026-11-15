@@ -22,6 +22,10 @@ export const DEADLINE_QUESTION = /(?:mihin|mihi|mihkä)\s+(?:asti|mennessä|saak
 // Pelkkä kiitos ei muuta luonnosta eikä tulosta koko listaa uudelleen.
 const THANKS = /^(kiitos|kiitti|kiitoksia|kiitän|thx|thanks|tack)(\s+(paljon|tosi paljon|kovasti|avusta))?[\s.!]*$/iu;
 const HELP = 'Kirjoita tuotteet ja määrät, esim. "20 l laktoositonta maitoa ja 5 kg voita maanantaiksi".';
+// Ilman tuotteita ja päivää kysytään silti ensin päivä (itsepeli X044 "60", S030 "sitä samaa ku viimeks").
+const START_QUESTION = 'Mille päivälle toimitus, ja mitä tarvitset? Esim. "20 l laktoositonta maitoa ja 5 kg voita maanantaiksi".';
+// "Sitä samaa ku viimeks": edellisen tilauksen rivit uuteen luonnokseen, päivä kysytään uudelleen.
+export const REPEAT_LAST = /(?:sama\p{L}*|samanlai\p{L}*)\s+(?:tilaus\s+)?(?:kuin|ku|ko|kun)\s+(?:viimeks\p{L}*|viime\s+kerra\p{L}*|viimeksi|edelli\p{L}*|viimeisin\p{L}*|viime\s+viiko\p{L}*)|(?:toista|tilaa\s+uudelleen|uusi)\s+(?:viime\p{L}*|edelli\p{L}*|viimeisin)\s+tilau\p{L}*/iu;
 // Toimituspäivä kysytään ensin ja yksin: saatavuus ja vaihtoehdot riippuvat päivästä.
 const DATE_QUESTION = 'Mille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.';
 // Vaihtoehtolistan vastaukset tunnistetaan koodissa, jotta numero viittaa aina viimeksi näytettyyn listaan.
@@ -197,6 +201,13 @@ function compareAnswer(kind, options = []) {
   return `${what}: ${values}. ${verdict}`;
 }
 
+// Poistettu rivi kerrotaan aina (itsepeli S036, S056: kamelinmaito ja tryffeli pudotettiin sanomatta). Rivi, jolle ei
+// löytynyt pyydettyä tuotetta, kerrotaan puuttuvaksi.
+function removedNote(removed) {
+  const gone = removed.filter((r) => r.noExact).map((r) => r.term); const other = removed.filter((r) => !r.noExact).map((r) => r.term);
+  return [gone.length ? `Pyydettyä tuotetta ei löytynyt tilattavana, joten poistin listalta: ${joinFi(gone)}.` : '', other.length ? `Poistin listalta: ${joinFi(other)}.` : ''].filter(Boolean).join(' ');
+}
+
 // Valittu rivi, jonka vaihtoehdot ostaja haluaa nähdä uudelleen: ainoa valittu, nimetty tai viimeksi käsitelty.
 function reopenTarget(draft, text) {
   const t = text.toLocaleLowerCase('fi');
@@ -250,7 +261,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
   /** opts.again = { ref, more } näyttää saman rivin listan uudelleen, opts.more hakee sille seuraavat vaihtoehdot. */
   async function advance(draft, customer, depth = 0, opts = {}) {
     draft.pending = null;
-    if (!draft.lines.length) return { status: 'collecting', text: `Luonnos on tyhjä. ${HELP}` };
+    if (!draft.lines.length) return { status: 'collecting', text: `Luonnos on tyhjä. ${draft.deliveryDate ? HELP : START_QUESTION}` };
     const list = draft.lines.map((l) => `- ${lineLabel(l)}${l.selectedName ? `: ${l.selectedName}` : ''}`).join('\n');
     // Toimituspäivä ensin ja yksin: saatavuus, hinnat ja vaihtoehdot riippuvat päivästä. Mainitut tuotteet säilyvät luonnoksessa.
     if (!draft.deliveryDate) {
@@ -319,7 +330,9 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       }
       if (!x) return { status: 'collecting', text: `${problems.join('\n')}\nKokeile toista päivää tai tarkenna tuotetta. Tilausta ei ole tehty.` };
       draft.offered[x.ref] = x.options;
-      const preference = !again && !draft.diet.known && (x.clarify || []).find((claim) => !line.answeredClaims?.includes(claim)
+      if (x.exact === false) line.noExact = true; else delete line.noExact;
+      // Ruokavaliotarkennus vain, kun vaihtoehdot ovat pyydettyä tuotetta: kamelinmaidon puuttuessa ei kysytä maidon laktoosia (S036).
+      const preference = !again && x.exact !== false && !draft.diet.known && (x.clarify || []).find((claim) => !line.answeredClaims?.includes(claim)
         && !line.claims.includes(claim) && !draft.diet.claims.includes(claim));
       if (preference) {
         draft.pending = { kind: 'preference', refs: [x.ref], claim: preference };
@@ -443,12 +456,27 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
           : wantsMore || askOnly ? { intent: 'order', ops: [] }
           : picked ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: picked }] }
             : cheapest ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: cheapest }] } : null;
+        // Edellinen tilaus uuteen tyhjään luonnokseen: tuotteet, määrät, valinnat ja ruokavalio, ei päivää.
+        const last = !draft.lines.length && REPEAT_LAST.test(t) ? store.lastOrdered(conversationId) : null;
+        if (last?.lines?.length) {
+          for (const l of last.lines.slice(0, 20)) {
+            draft.lines.push({ ref: `L${++draft.seq}`, productTerm: l.productTerm, quantity: l.quantity, claims: l.claims || [], excludeAllergens: l.excludeAllergens || [],
+              selectedProductId: l.selectedProductId || null, selectedName: l.selectedName || null, selectedWarning: l.selectedWarning || null });
+          }
+          if (last.diet) draft.diet = { known: !!last.diet.known, claims: last.diet.claims || [], excludeAllergens: last.diet.excludeAllergens || [] };
+        }
+        const repeatNote = last?.lines?.length ? `Kopioin edellisen tilauksen${last.orderId ? ` ${last.orderId}` : ''} tuotteet.` : '';
+        // Tulkki ajetaan silti: samassa viestissä voi olla lisäyksiä ("sama ku viimeks, mut 10 l maitoa lisää").
         const turn = dateAnswer || choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
           ? { op: 'update', ref, addClaims: [draft.pending.claim] } : { op: 'no_preference', ref }) }
           : await interpretTurn({ text: withoutClockWords(t), draft: structuredClone(draft), today, now: now(), receivedAt, context }));
         const moreAsked = wantsMore || Boolean(choosing && (turn.ops || []).some((o) => o.op === 'more' && (!o.ref || o.ref === choosing.refs[0])));
         const selectedBefore = new Map(draft.lines.map((l) => [l.ref, l.selectedProductId]));
+        const linesBefore = draft.lines.map((l) => ({ ref: l.ref, term: l.productTerm, noExact: !!l.noExact }));
         const notes = apply(draft, turn, customer, today);
+        const removed = linesBefore.filter((b) => !draft.lines.some((l) => l.ref === b.ref));
+        if (removed.length && draft.lines.length) notes.unshift(removedNote(removed));
+        if (repeatNote) notes.unshift(repeatNote);
         // Pyyntö näyttää tai vertailla vaihtoehtoja jo valitulle riville: valinta avataan ja sama lista näytetään uudelleen,
         // ostaja valitsee numerolla (V025: "listaa vaihtoehdot hintoineen" toisti valitun yhteenvedon neljästi).
         // Tässä viestissä tehtyä valintaa ei pureta.
@@ -458,8 +486,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         draft.turn += 1;
         const unchanged = content(draft) === before;
         if (!unchanged) { draft.revision += 1; draft.quote = null; }
-        else if (turn.intent === 'other' && !notes.length && !draft.lines.length) {
-          result = { status: 'collecting', text: `Olen Valio Aimon tilausapuri. ${HELP}` };
+        else if (!draft.lines.length && REPEAT_LAST.test(t)) {
+          // Tulkin tulkinnasta riippumatta: aiempaa tilausta ei ole, joten kysytään päivä ja tuotteet (itsepeli S030).
+          result = { status: 'collecting', text: `En löydä aiempaa tilausta tästä keskustelusta. ${draft.deliveryDate ? HELP : START_QUESTION}` };
+        } else if (turn.intent === 'other' && !notes.length && !draft.lines.length) {
+          result = { status: 'collecting', text: `Olen Valio Aimon tilausapuri. ${draft.deliveryDate ? HELP : START_QUESTION}` };
         }
         if (!result) {
           const asksDeadline = DEADLINE_QUESTION.test(t);
@@ -475,7 +506,8 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
             draft.compare = null;
             if (compare && next.status === 'ready' && draft.lines.length > 1) compared = `Kerro, minkä tuotteen vaihtoehdot näytän: ${joinFi(draft.lines.map((l) => l.productTerm))}.`;
           }
-          result = { ...next, text: [...notes, ...(asksDeadline ? [await deadlineAnswer(draft, customer, next.text)] : []), compared, next.text].filter(Boolean).join('\n') };
+          result = { ...next, text: [...notes, ...(asksDeadline ? [await deadlineAnswer(draft, customer, next.text)] : []), compared, next.text].filter(Boolean).join('\n'),
+            ...(removed.length && draft.lines.length ? { removedNote: removedNote(removed) } : {}) };
         } else if (DEADLINE_QUESTION.test(t)) result = { ...result, text: `${await deadlineAnswer(draft, customer, result.text)}\n${result.text}` };
       }
     } catch {
@@ -486,7 +518,8 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
     // Kun ostaja poistaa kaikki rivit, aiemmin tallennettu luonnos suljetaan. Muuten vanha luonnos jäisi kantaan ja
     // vastaus "Luonnos on tyhjä" olisi väärä (pilotti X016: maito jäi listalle).
     if (!draft.lines.length && draft.state === 'active' && store.get(draft.id)) draft.state = 'cancelled';
-    const out = { text: result.text, status: result.status, draftId: draft.id, revision: draft.revision, ...(result.orderId ? { orderId: result.orderId } : {}) };
+    const out = { text: result.text, status: result.status, draftId: draft.id, revision: draft.revision, ...(result.orderId ? { orderId: result.orderId } : {}),
+      ...(result.removedNote ? { removedNote: result.removedNote } : {}) };
     store.save(conversationId, draft.lines.length || draft.state !== 'active' ? draft : null, messageId, out);
     return out;
   };
