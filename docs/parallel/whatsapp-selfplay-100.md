@@ -130,6 +130,22 @@ Löydökset tärkeysjärjestyksessä (käsin varmennettu esimerkeistä):
 6. **Kellonaikatervehdys puuttui** f843b06:ssa (6/8; yöllä neutraali "Moi!" hyväksytään, koska "hyvää yötä" on hyvästely). date-first-options korjasi sen myöhemmin: 07.30 Huomenta, 14.00 Päivää, 19.30 Iltaa. Codexin vertailusarake lasketaan vain tilaaville persoonille.
 7. **Toimii hyvin:** alkuperämaa 6/6 ja allergeenit 6/6 oikein datasta, mukaan lukien laktoositon mutta ei maidoton -ansa (Valio Edam). Säilytys oikein. Ei keksittyjä toimitusmaksuja, aukioloja tai hyvityksiä. Botti tunnustaa olevansa botti. Päivien ristiriita kysytään. Murteet ymmärretään.
 
+## Korjausten mittaus 15.11. klo 2.25 (9 personaa, origin/main 9f20407, noin 0,83 USD)
+
+Löydöspersonat ajettiin uudelleen GitHubin koodilla, jossa ovat date-first-optionsin f605549 (peruminen, tilausaika, tukiyhteys, tervehdys) ja 5044a91 (linkki vasta valmiille tilaukselle). Samoilla tarkistuksilla perusvaatimukset paranivat 3/9 → 7/9 ja uusi vaatimus 4/9 → 9/9. 96 kutsua, 0 virhettä, 0 tilausta.
+
+| persona | ennen | nyt |
+|---|---|---|
+| X010 linkki keskeneräiseen | link_before_complete | ok |
+| X016 peruminen | cancel_not_applied | ok |
+| X056, X059 kiire | rush_no_deadline, link_before_complete | ok |
+| X093 tervehdys | greeting_not_time_aware | ok |
+| V032 keliaakikko "laita kori heti" | linkki ennen valintaa | ok: "Annan ostoskorin linkin, kun tilaus on valmis", gluteenittomat vaihtoehdot, linkki valinnan jälkeen |
+| X022 peruna ja porkkana | laktoosikysymys | **yhä laktoosikysymys perunasta** |
+| V017 pienin hiilijalanjälki | data_not_used:co2 | **yhä "en näe hiilijalanjälkitietoja"** |
+
+Tarkistukset tarkentuivat: gluteenittomuusmerkintä (FREE_FROM_GLUTEN) kattaa gluteeniallergian, mutta laktoositon ei kata maitoallergiaa. Valinta ilman listaa kelpaa, kun ostaja pyysi suoraan halvinta. Datan mukaan gluteeniton-otsikon alla näkyneet Elovena-kaurajuomat ovat gluteenittomia (FREE_FROM_GLUTEN, sisältävät vain kauraa).
+
 ## Seuraavat askeleet
 
 - Uusi 100 personan ajo nykyisellä koodilla mittaa 1a517f5:n, 5e0a61f:n ja 252b337:n vaikutuksen samaan baselineen (noin 9–10 USD, 17 min, `--source-ref origin/main`). Sitä ei ajettu ilman erillistä hyväksyntää.

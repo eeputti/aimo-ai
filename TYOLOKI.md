@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — itsekeskustelun korjausmittaus: 9 löydöspersonaa paranivat 3/9 → 7/9 (Claude Code, selfplay-100)
+
+- **Käyttäjän pyyntö:** pieni mittaus korjausten jälkeen (alle 1 USD). Ajettu GitHubin 9f20407:llä: 9 personaa, 96 kutsua, noin 0,83 USD, 0 virhettä, 0 tilausta.
+- **Tulos samoilla tarkistuksilla:** perusvaatimukset 3/9 → 7/9, uusi vaatimus 4/9 → 9/9. Korjaantuivat: linkki keskeneräiseen listaan (X010), peruminen (X016), kiireen tilausaika ja linkki (X056, X059), kellonaikatervehdys (X093) ja allergiaopas (V032: "Annan ostoskorin linkin, kun tilaus on valmis", gluteenittomat vaihtoehdot, linkki vasta valinnan jälkeen). Jäljellä: laktoosikysymys perunasta (X022, viesti date-first-optionsille) ja hiilijalanjälki, joka ei kulje vaihtoehtoihin (V017).
+- **Tarkistukset:** gluteenittomuusmerkintä kattaa gluteeniallergian, mutta laktoositon ei kata maitoallergiaa. Valinta ilman listaa kelpaa, kun ostaja pyysi halvinta. `test/whatsapp-personas.test.mjs` 15/15. Aiemmat ajot uudelleenlaskettuna: laajennettu 85/100 ja 72/100, data 27/35 ja 31/35. Raportti `docs/parallel/whatsapp-selfplay-100.md`.
+
 ## 15.11.2026 — riippumaton kokonaiskoe ja kaksi avointa demovikaa (Codex, testauschat)
 
 - **Käyttäjän pyyntö:** testaa nykyinen kokonaisuus ja etsi vikoja. Erillinen lähdekuva 5044a91, arviointitestien päivitys 9f20407:ään; uudet 499ab8c/0b06d9d muuttavat vain dokumentteja. Ei sovelluskoodin, asetusten tai käyttäjän kantojen muutoksia. Yhteisen työpuun keskeneräiset muutokset säilyivät; tämä dokumenttivaihe tallennetaan erillisestä kloonista.

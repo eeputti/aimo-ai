@@ -272,6 +272,8 @@ const ORDER_CLAIM = /(?<!ei\s)(?<!ole\s)\btilaus (?:on )?(?:nyt )?(?:tehty|vahvi
 const UNAVAILABLE_SAY = /(tarkkaa osumaa ei|ei (?:löydy|löytynyt|näkynyt|ole saatavilla|ole valikoimassa|ole tilattav|tilattavaa)|en löytänyt|ei valikoimassa|ei saatavilla|ei ole tarjolla|puuttuu valikoimasta)/iu;
 
 const lower = (s) => String(s || '').toLowerCase();
+// Merkintä, joka kattaa allergeenin poissulun (gluteeniton = ei gluteeniviljoja). Laktoositon ei ole maidoton.
+const ALLERGEN_CLAIM = { AW: 'FREE_FROM_GLUTEN' };
 const matchesKey = (term, key, q) => [key, ...(q?.aliases || [])].some((k) => lower(term).includes(lower(k))) && !(q?.not || []).some((n) => lower(term).includes(n));
 
 /** Numeroidut vaihtoehdot vastauksesta. Tilausyhteenveto (Yhteensä) ei ole vaihtoehtolista. */
@@ -350,7 +352,8 @@ export function inspectPersona(persona, turns, list) {
     if (blocks.length) previous = blocks;
   });
   if (persona.wantsMore && !metrics.moreRequests) fresh.push('more_never_requested');
-  if (persona.requiresSelection && !metrics.optionReplies) failures.push('options_never_shown');
+  // Valinta ilman listaa kelpaa, jos ostaja pyysi suoraan esim. halvinta: virhe vain, jos tuote jää valitsematta.
+  if (persona.requiresSelection && !metrics.optionReplies && !(list?.lines || []).every((l) => l.selectedProductId)) failures.push('options_never_shown');
 
   // (d) Ei turhia ruokavaliokysymyksiä.
   const dietQuestions = replies.flatMap((r) => questionsOf(r).filter((q) => DIET_ASK.test(q)));
@@ -370,7 +373,7 @@ export function inspectPersona(persona, turns, list) {
     const claims = [...(line.claims || []), ...(list.diet?.claims || [])];
     const banned = [...(line.excludeAllergens || []), ...(list.diet?.excludeAllergens || [])];
     if (persona.requiredClaim && !claims.includes(persona.requiredClaim)) failures.push(`claim:${key}`);
-    if (persona.requiredAllergen && !banned.includes(persona.requiredAllergen)) failures.push(`allergen:${key}`);
+    if (persona.requiredAllergen && !banned.includes(persona.requiredAllergen) && !claims.includes(ALLERGEN_CLAIM[persona.requiredAllergen])) failures.push(`allergen:${key}`);
     if (persona.requiresSelection && !line.selectedProductId) failures.push(`unselected:${key}`);
   }
   for (const line of lines) if (!Object.entries(persona.expected).some(([key, want]) => matchesKey(line.productTerm, key, want))) failures.push(`unexpected:${line.productTerm}`);
@@ -457,7 +460,8 @@ export function inspectPersona(persona, turns, list) {
     const incomplete = !l.deliveryDate || !rows.length || (l.missing || []).length || (l.status && l.status !== 'review')
       || rows.some((r) => !r.quantity || !r.selectedProductId);
     const claimsOk = !persona.requiredClaim || rows.every((r) => [...(r.claims || []), ...(l.diet?.claims || [])].includes(persona.requiredClaim));
-    const allergenOk = !persona.requiredAllergen || rows.every((r) => [...(r.excludeAllergens || []), ...(l.diet?.excludeAllergens || [])].includes(persona.requiredAllergen));
+    const allergenOk = !persona.requiredAllergen || rows.every((r) => [...(r.excludeAllergens || []), ...(l.diet?.excludeAllergens || [])].includes(persona.requiredAllergen)
+      || [...(r.claims || []), ...(l.diet?.claims || [])].includes(ALLERGEN_CLAIM[persona.requiredAllergen]));
     if (incomplete || !claimsOk || !allergenOk) fresh.push('link_before_complete');
   });
 

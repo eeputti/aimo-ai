@@ -275,3 +275,13 @@ test('Valion dataan perustuvat persoonat: totuus katalogista ja väitteiden tark
   const guide = DATA_CASES.find((p) => p.route === 'data-allergy-guide' && p.truth.allergen === 'AW' && !p.truth.claim);
   assert.ok(ask(guide, '[ostoskorilinkki]', [line('kaurajuoma', 10, 'L', { selectedProductId: '468319', selectedName: 'Oatly iKaffe 0,5L', excludeAllergens: ['AW'] })]).failures.includes('unsafe_selection'), 'gluteenia sisältävä kaurajuoma keliaakikolle');
 });
+
+test('gluteenittomuusmerkintä kattaa gluteeniallergian, valinta ilman listaa kelpaa pyydettäessä', () => {
+  const p = { ...PERSONAS[0], expected: { kaura: { value: 10, unit: 'L' } }, date: '2026-11-17', requiredAllergen: 'AW', requiresSelection: true };
+  const ok = [line('kaurajuoma', 10, 'L', { selectedProductId: 'x', claims: ['FREE_FROM_GLUTEN'] })];
+  const r = inspectPersona(p, [{ user: 'x', assistant: '[ostoskorilinkki]', list: { ...list('2026-11-17', ok), status: 'review' } }], list('2026-11-17', ok));
+  assert.ok(!r.failures.includes('allergen:kaura') && !r.newRequirement.includes('link_before_complete') && !r.failures.includes('options_never_shown'));
+  const milk = { ...p, requiredAllergen: 'AM' };
+  const lf = [line('kaurajuoma', 10, 'L', { selectedProductId: 'x', claims: ['FREE_FROM_LACTOSE'] })];
+  assert.ok(inspectPersona(milk, [{ user: 'x', assistant: '[ostoskorilinkki]', list: list('2026-11-17', lf) }], list('2026-11-17', lf)).failures.includes('allergen:kaura'), 'laktoositon ei ole maidoton');
+});
