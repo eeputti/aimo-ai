@@ -139,7 +139,9 @@ export async function handleWebChat(request: Request, env: WebChatEnv): Promise<
     let reply;
     try { reply = await callBot(origin, env, "chat", { session: id, text, messageId: input.messageId }); }
     catch { return unavailable(); }
-    if (reply.status !== 200) return json({ error: String(reply.data.error || "Viestin käsittely ei onnistunut. Yritä uudelleen.") }, reply.status === 429 ? 429 : 502, setCookie);
+    // Ei reittiä, ei avainta tai vastaus ei tullut botilta (tunneli alhaalla): botti on tauolla, ei viestin virhe.
+    if ([401, 404].includes(reply.status) || (reply.status !== 200 && !reply.data.error)) return unavailable();
+    if (reply.status !== 200) return json({ error: String(reply.data.error) }, reply.status === 429 ? 429 : 502, setCookie);
     const parts = (Array.isArray(reply.data.parts) ? reply.data.parts : []).map(p => localLinks(String(p), origin, url.origin));
     return json({ parts, status: reply.data.status ?? null }, 200, setCookie);
   } catch {

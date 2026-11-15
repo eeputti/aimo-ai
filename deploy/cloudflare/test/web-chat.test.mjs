@@ -108,6 +108,15 @@ test('without a configured bot the page says it is offline instead of failing', 
   assert.equal(offline.status, 503);
   assert.equal((await offline.json()).code, 'offline');
   assert.equal((await w.call('/whatsapp/cart')).status, 503);
+  // A bot that does not know the chat route yet (older server) counts as offline, not as a failed message.
+  const old = http.createServer((req, res) => { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('Not found'); });
+  await new Promise((r) => old.listen(0, '127.0.0.1', r));
+  try {
+    const legacy = worker_(`http://127.0.0.1:${old.address().port}`);
+    const response = await legacy.post('/api/chat', { text: 'moi', messageId: uuid(2) });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).code, 'offline');
+  } finally { old.close(); }
   const plain = worker_('ftp://bot.example');
   assert.equal((await plain.call('/api/chat/cart')).status, 503);
 });
