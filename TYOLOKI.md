@@ -2,6 +2,11 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — linkkituki käytössä nykyisessä WhatsApp-palvelimessa (Codex, linkkichat)
+
+- Lähde **3bee913** on GitHubissa ja käytössä snapshotista `/private/tmp/aimo-whatsapp-runtime-3bee913`; kaikki 542 seurattua tiedostoa vastaavat commitia. Uusi worker **48952** korvasi ainoan 4749-workerin 39055 hallitusti, samalla envillä, kannoilla ja tunnelilla. Taulun varaus `7a029442`, ennakkoilmoitus #255.
+- Viiden kannan kaikkien **22 aiemman taulun** sisältöhashit, rivimäärät ja tiedostojen inodet säilyivät, eheystarkistukset ok. Vain uusi tyhjä `wa_link_progress` lisättiin. Jono oli ja on tyhjä; käyttäjän keskusteluja, koreja tai tilauksia ei nollattu. Tunneli, tilausjulkaisija ja ilmoittautumisseuranta säilyivät.
+- Paikallinen ja julkinen health **200**, korin JS **200** ja sama SHA-256, julkinen demo/juuri **403/404**. Ominaisuuden 351/351 testit ja oikean mallin koko ketju ovat alla. Ei uutta oikean puhelimen koeviestiä: käyttöönotto varmennettiin prosessi-, lähde-, kanta- ja lukevilla HTTP-tarkistuksilla. Raportti `docs/parallel/whatsapp-links-rollout.md`. Muiden keskeneräinen yhteinen työpuu säilyy.
 
 ## 15.11.2026 — video käyttäjän viitekuvan mukaiseen WhatsApp-ostoskoriin (Codex, videochatti)
 
