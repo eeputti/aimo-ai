@@ -1,7 +1,7 @@
 // WhatsApp demo sign-up for the landing page (Meta test number phase).
 // The browser posts a phone number and gets a status token. The WhatsApp server machine polls the
 // sign-ups with the publisher token, links each number to a test customer and reports the result.
-// The Worker never calls that machine. Phone numbers are never returned to a browser.
+// The Worker never calls that machine. A sign-up's phone number is never returned to a browser.
 
 export type SignupEnv = Pick<Env, "DB" | "SYNC_TOKEN">;
 type Status = "pending" | "linked" | "ready" | "failed";
@@ -89,6 +89,24 @@ async function readJson(request: Request) {
 const view = (row: Pick<Row, "id" | "status" | "chat_url"> & { meta_code?: string | null }) =>
   ({ id: row.id, status: row.status, chatUrl: row.status === "ready" ? row.chat_url : null, codeSent: row.status === "linked" && !!row.meta_code });
 
+// "+358 50 123 4567" for a Finnish mobile number, otherwise "+" and the digits as they are.
+export function displayPhone(digits: string) {
+  const fi = /^358(\d{2})(\d{3})(\d{3,4})$/.exec(digits);
+  return fi ? `+358 ${fi[1]} ${fi[2]} ${fi[3]}` : "+" + digits;
+}
+
+// While a number waits for Meta's manual approval the page offers a short call to the presenter.
+// The number lives only in the live database (landing_settings), and only a person who has just
+// signed up sees it. A missing table or a malformed value simply hides the call button.
+async function presenterCall(env: SignupEnv, status: Status) {
+  if (status !== "pending" && status !== "linked") return {};
+  try {
+    const row = await env.DB.prepare("SELECT value FROM landing_settings WHERE key='presenter_phone'").first<{ value: string }>();
+    const digits = row ? normalizePhone("+" + String(row.value).replace(/^\+/, "")) : null;
+    return digits ? { call: { tel: "+" + digits, display: displayPhone(digits) } } : {};
+  } catch { return {}; }
+}
+
 async function create(request: Request, env: SignupEnv, url: URL, now: number) {
   // A sign-up comes only from this site's own page, never from a cross-site form or script.
   if (request.headers.get("origin") !== url.origin) return json({ error: "Lomake lähetetään vain tältä sivulta." }, 403);
@@ -119,7 +137,7 @@ async function create(request: Request, env: SignupEnv, url: URL, now: number) {
   const token = randomToken();
   await env.DB.prepare(`INSERT INTO signups(id,token_hash,phone,name,company,status,chat_url,ip_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
     .bind(id, await sha256(token), phone, name, company || DEFAULT_COMPANY, status, chatUrl, ip, now, now).run();
-  return json({ ...view({ id, status, chat_url: chatUrl }), token }, 201);
+  return json({ ...view({ id, status, chat_url: chatUrl }), ...await presenterCall(env, status), token }, 201);
 }
 
 // The same answer for an unknown id and a wrong token: the routes do not reveal which sign-ups exist.
@@ -132,7 +150,7 @@ const notFound = () => json({ error: "Ilmoittautumista ei löytynyt." }, 404);
 
 async function status(request: Request, env: SignupEnv, id: string) {
   const row = await own(request, env, id);
-  return row ? json(view(row)) : notFound();
+  return row ? json({ ...view(row), ...await presenterCall(env, row.status) }) : notFound();
 }
 
 // Meta sends its test-recipient code to the number only after the presenter adds it in Meta. The person
@@ -149,7 +167,7 @@ async function code(request: Request, env: SignupEnv, url: URL, id: string, now:
   if (!/^\d{4,8}$/.test(digits)) return json({ error: "Kirjoita WhatsAppiin tullut numerokoodi.", field: "code" }, 400);
   await env.DB.prepare("UPDATE signups SET meta_code=?,code_at=?,code_attempts=code_attempts+1,updated_at=? WHERE id=? AND status='linked'")
     .bind(digits, now, now, id).run();
-  return json(view({ ...row, meta_code: digits }));
+  return json({ ...view({ ...row, meta_code: digits }), ...await presenterCall(env, row.status) });
 }
 
 async function list(request: Request, env: SignupEnv, url: URL) {

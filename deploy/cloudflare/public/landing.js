@@ -14,6 +14,7 @@ const TEXT = {
   codeSent: ['Koodi toimitettu Aimo-tiimille', 'Koodi odottaa vielä vahvistamista Metassa. Sivulle kirjoittaminen ei yksin hyväksy numeroa. Tämä sivu päivittyy, kun Aimo-tiimi on vahvistanut numerosi.'],
   ready: ['Valmista! Avaa WhatsApp', 'Lähetä apurille viesti ja kerro, mitä keittiöösi tarvitaan. Apuri vastaa samassa keskustelussa.'],
   failed: ['Numeroa ei voitu lisätä', 'Tarkista numero ja yritä uudelleen.'],
+  call: ['Soita Eelikselle', 'Numerosi hyväksytään 5 minuutin puhelussa. Puhelun aikana WhatsAppiin tulee viisinumeroinen koodi: kerro se Eelikselle. Sen jälkeen tämä sivu avaa WhatsAppin.'],
 };
 const TRACK = {
   pending: { received: 'done', linked: 'current' },
@@ -24,13 +25,23 @@ const TRACK = {
 
 let timer = 0, startedAt = 0, current = null, last = 'pending';
 
+// The presenter's number comes from the server; it is used only as a plain international number.
+function callLink(call) {
+  return call && /^\+[1-9]\d{6,14}$/.test(call.tel || '') && /^\+[\d ]{7,20}$/.test(call.display || '') ? call : null;
+}
+
 function show(status, chatUrl, codeSent = false) {
   last = status;
   if (current) Object.assign(current, { status, chatUrl, codeSent });
   $('signup-form').hidden = true;
   $('status').hidden = false;
+  // A short call replaces waiting: it is offered until the number has been approved.
+  const call = status === 'pending' || status === 'linked' ? callLink(current?.call) : null;
+  const callButton = $('call');
+  callButton.hidden = !call;
+  if (call) { callButton.href = 'tel:' + call.tel; $('call-number').textContent = call.display; }
   const slow = status === 'pending' && Date.now() - startedAt > 45000;
-  const [title, detail] = TEXT[slow ? 'slow' : status === 'linked' && codeSent ? 'codeSent' : status] || TEXT.pending;
+  const [title, detail] = TEXT[status === 'linked' && codeSent ? 'codeSent' : call ? 'call' : slow ? 'slow' : status] || TEXT.pending;
   $('code-form').hidden = status !== 'linked';
   $('code-submit').textContent = codeSent ? 'Toimita uusi koodi' : 'Toimita koodi';
   $('status-title').textContent = title;
@@ -65,6 +76,7 @@ async function poll() {
     if (response.ok) {
       const body = await response.json();
       if (current !== signup) return;
+      signup.call = body.call || null;
       if (!(body.status === 'linked' && document.activeElement === $('code'))) show(body.status, body.chatUrl, body.codeSent);
       if (body.status === 'ready' || body.status === 'failed') return;
     } else show(last, signup.chatUrl, signup.codeSent);
@@ -106,7 +118,7 @@ $('signup-form').addEventListener('submit', async event => {
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) return fieldError(body.field, body.error || 'Ilmoittautuminen ei onnistunut. Yritä uudelleen.');
-    const signup = { id: body.id, token: body.token, status: body.status, chatUrl: body.chatUrl };
+    const signup = { id: body.id, token: body.token, status: body.status, chatUrl: body.chatUrl, call: body.call || null };
     saved.set({ id: signup.id, token: signup.token });
     follow(signup);
   } catch {
@@ -135,6 +147,7 @@ $('code-form').addEventListener('submit', async event => {
     if (!response.ok) { error.textContent = body.error || 'Koodin lähetys ei onnistunut.'; error.hidden = false; if (response.status === 409) poll(); return; }
     $('code').value = '';
     $('code').blur();
+    signup.call = body.call || null;
     show(body.status, body.chatUrl, body.codeSent);
   } catch {
     if (current === signup) { error.textContent = 'Yhteys katkesi. Yritä uudelleen.'; error.hidden = false; }

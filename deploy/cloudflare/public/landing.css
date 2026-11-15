@@ -88,3 +88,9 @@ input[aria-invalid=true]{border-color:#c4453c;background:#fff8f7}
   .card{padding:22px 18px}
 }
 @media (prefers-reduced-motion:reduce){.track li.current::before,.heart svg{animation:none}}
+.button.call{gap:12px;margin:0 0 20px;min-height:64px;background:var(--blue)}
+.button.call:hover{background:#002a52}
+.button.call svg{width:24px;height:24px;flex-shrink:0}
+.call-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}
+.call-name{font-size:17px}
+.call-number{font-size:14px;font-weight:400;letter-spacing:.02em}

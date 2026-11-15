@@ -20,3 +20,6 @@ CREATE TABLE IF NOT EXISTS signups (
 CREATE INDEX IF NOT EXISTS signups_status ON signups(status, created_at);
 CREATE INDEX IF NOT EXISTS signups_phone ON signups(phone);
 CREATE INDEX IF NOT EXISTS signups_ip ON signups(ip_hash, created_at);
+-- Landing page settings set by hand on the live database, never in Git (the repository is public).
+-- presenter_phone: international digits of the presenter, shown after a sign-up for the verification call.
+CREATE TABLE IF NOT EXISTS landing_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);

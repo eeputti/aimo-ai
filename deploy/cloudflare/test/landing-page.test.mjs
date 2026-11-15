@@ -18,10 +18,10 @@ function page() {
     fetch(url, init) { return new Promise(resolve => requests.push({ url, init, resolve })); } });
   vm.runInContext(fs.readFileSync(new URL('../public/landing.js', import.meta.url), 'utf8'), context);
   const submit = (id) => element(id).listeners.submit({ preventDefault() {} });
-  const register = async (id = 'first') => {
+  const register = async (id = 'first', extra = {}) => {
     element('phone').value = '0401234567'; element('name').value = 'Test'; element('consent').checked = true;
     const action = submit('signup-form');
-    requests.at(-1).resolve(Response.json({ id, token: id, status: 'linked' })); await action;
+    requests.at(-1).resolve(Response.json({ id, token: id, status: 'linked', ...extra })); await action;
   };
   const nextPoll = () => { const [id, fn] = tasks.entries().next().value; tasks.delete(id); return fn(); };
   return { element, requests, register, nextPoll, submit };
@@ -53,4 +53,23 @@ test('changing number during a pending request keeps the new registration pollin
   newRequest.resolve(Response.json({ status: 'ready', chatUrl: 'https://wa.me/358400000001' })); await newPoll;
   assert.equal(p.element('open-whatsapp').hidden, false);
   assert.equal(p.element('open-whatsapp').href, 'https://wa.me/358400000001');
+});
+
+test('a waiting number gets a call button to the presenter that disappears once WhatsApp is ready', async () => {
+  const p = page(); await p.register('first', { status: 'pending', call: { tel: '+358501112223', display: '+358 50 111 2223' } });
+  assert.equal(p.element('call').hidden, false);
+  assert.equal(p.element('call').href, 'tel:+358501112223');
+  assert.equal(p.element('call-number').textContent, '+358 50 111 2223');
+  assert.equal(p.element('status-title').textContent, 'Soita Eelikselle');
+  assert.match(p.element('status-detail').textContent, /5 minuutin puhelussa/);
+  const polling = p.nextPoll();
+  p.requests.at(-1).resolve(Response.json({ status: 'ready', chatUrl: 'https://wa.me/358400000000' })); await polling;
+  assert.equal(p.element('call').hidden, true);
+  assert.equal(p.element('open-whatsapp').hidden, false);
+});
+
+test('a malformed presenter number from the server is never turned into a link', async () => {
+  const p = page(); await p.register('first', { call: { tel: 'javascript:alert(1)', display: 'x' } });
+  assert.equal(p.element('call').hidden, true);
+  assert.match(p.element('status-detail').textContent, /tämä lomake ei lähetä koodia/);
 });

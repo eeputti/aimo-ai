@@ -150,3 +150,28 @@ test("Meta's code typed on the page reaches only the presenter's machine and is 
     assert.equal((await sendCode('123456')).status, 409);
   } finally { s.db.close(); }
 });
+
+test('the presenter call is offered only while a number waits for approval and only from the live setting', async () => {
+  const s = setup();
+  try {
+    // Without the setting there is no call button.
+    const plain = await (await s.signUp()).json();
+    assert.equal(plain.call, undefined);
+
+    s.db.prepare("INSERT INTO landing_settings(key,value) VALUES('presenter_phone','358501112223')").run();
+    const created = await (await s.signUp({ phone: '040 765 4321' }, { ip: '198.51.100.3' })).json();
+    assert.deepEqual(created.call, { tel: '+358501112223', display: '+358 50 111 2223' });
+    assert.deepEqual((await s.poll(created)).call, { tel: '+358501112223', display: '+358 50 111 2223' });
+
+    await s.report({ phone: '+358407654321', status: 'linked' });
+    assert.equal((await s.poll(created)).call.tel, '+358501112223');
+    const coded = await (await s.call(`/api/signups/${created.id}/code`, { method: 'POST', body: { code: '12345' }, auth: created.token })).json();
+    assert.equal(coded.call.tel, '+358501112223');
+
+    // Once WhatsApp is ready the number is no longer needed, and a broken value hides the button.
+    await s.report({ phone: '+358407654321', status: 'ready', chatUrl: chat });
+    assert.equal((await s.poll(created)).call, undefined);
+    s.db.prepare("UPDATE landing_settings SET value='soita' WHERE key='presenter_phone'").run();
+    assert.equal((await s.poll(plain)).call, undefined);
+  } finally { s.db.close(); }
+});

@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — landingille Soita Eelikselle -nappi Metan hyväksyntään (Claude Code, soittonappi-chat)
+
+- **Käyttäjän pyyntö ja päätös:** Valiolle lähetettävästä linkistä pitää päästä testaamaan. Metan testinumerossa jokainen numero hyväksytään käsin, joten käyttäjä valitsi yksinkertaisen tavan: lomakkeen (numero + nimi) jälkeen kokeilija soittaa Eelikselle, ja 5 minuutin puhelussa numero lisätään Metaan ja koodi kerrotaan. Cal.comia tai muuta varauspalvelua ei käytetä.
+- **Muutos:** `signup.ts` palauttaa odottaville (`pending`/`linked`) ilmoittautumisille `call`-tiedon, jonka numero luetaan uudesta D1-taulusta `landing_settings`. Numeroa ei ole Gitissä, koska repo on julkinen; se on vain tuotannon D1:ssä ja säilyy myöhemmissä julkaisuissa. Sivulla sininen **Soita Eelikselle** -nappi (`tel:`) ja numero tekstinä, ohjeteksti puhelusta; nappi katoaa, kun WhatsApp on valmis. Kokeilijan numeroa ei edelleenkään palauteta selaimelle.
+- **Tarkistukset ja julkaisu:** Worker **29/29**, typecheck, build ja dry-run läpi. Selain 375 px tuotannon CSP:llä mock-palvelimella keksityllä numerolla: odotus → nappi → koodikenttä → valmis, ei ylivuotoa tai konsolivirheitä. D1-taulu luotu ja arvo takaisinluettu, aiemmat ilmoittautumisrivit ennallaan. Julkaistu origin/mainin f4d29dd päältä (vastasi aiempaa versiota d725f4d6): Worker **b7f80a7e-51fb-4ba2-9b6b-eff8c933fefe**, landing.js/css tavulleen samat, healthz/tilaukset/maksusivu 200, suojattu lista 401.
+- **Avoinna:** oikeaa ilmoittautumista ei tehty tuotantoon (Gmail-ilmoitus keksitystä numerosta), joten nappi on varmennettu testeissä ja mock-palvelimella. Ilmoittautumisseuranta (`scripts/whatsapp-signups.mjs watch`) ei ollut käynnissä; puhelun aikainen `approve` vaatii sen. Metan testinumeroon mahtuu 5 vastaanottajaa. Muistilista ja numeron vaihto: `docs/parallel/landing-call.md`.
+
 ## 15.11.2026 — WhatsApp-ilmoittautumisesta sähköposti esittelijälle (Codex, ilmoituschat)
 
 - **Käyttäjän päätös:** ei SIM/eSIM-ostosta nyt; lomakkeen uudesta numerosta sähköposti käyttäjän antamaan omaan osoitteeseen, jotta hän voi itse hoitaa Metan testivastaanottajan hyväksynnän. Vastaanottaja varmennettu Gmail-profiilista, henkilötiedot pysyvät poissa Gitistä.
