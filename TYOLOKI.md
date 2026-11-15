@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 ilta — Minusta-osio poistettu julkisesta demosta (Codex)
+
+- Käyttäjä pyysi poistamaan heti Minusta-osion kaikkialta julkisesta demosta. Pyyntö valtuutti julkaisun. Poistettu `deploy/cloudflare/public/minusta.html`, linkit seitsemästä HTML-näkymästä ja Workerin korisivulle muodostamasta otsakkeesta sekä CSS-kommentin vanha sivuviittaus.
+- Työ tehty erillisessä `/private/tmp/aimo-remove-minusta`-worktreessä ajantasaisesta `origin/main` 4c7bb82:sta. Yhteisen kansion aiemmat keskeneräiset muutokset säilyvät. Varaus e73892c8 ja tauluviesti #284 tiedottivat julkaisusta. Koodi tallennettu commitiin 0e9e9ad; loki tulee erillisessä jatkocommitissa, koska ensimmäinen lokikirjoitus epäonnistui merkistökäsittelyyn.
+- **Julkaistu ja API:sta varmennettu:** Worker `85454e64-e104-4d4c-affa-1e8a5838ff89`, 100 % liikenteestä. Live: `/minusta`, `/minusta/` ja `/minusta.html` kaikki 404; seitsemän julkista näkymää sekä niiden `.html`-osoitteet 200 ilman Minusta- tai henkilöesittelysisältöä; `/healthz` ja `/api/chat` 200. Erillinen `/whatsapp/cart`-proxy palautti tarkistushetkellä 530, joten sen live-renderöinti jäi varmentamatta; otsakkeen lähde ja olemassa oleva proxytesti tarkistettu.
+- **Tarkistukset:** Worker-testit 37/37, typecheck, build/julkaisun dry-run ja `git diff --check` läpi. Ei uusia testejä pieneen poistoon. Ei botin, tunnelin tai julkaisijan restartteja eikä tilaus- tai kantakirjoituksia.
+
 ## 15.11.2026 ilta — botti 4749 kaatumis- ja linkkikorjaukseen 1585022 (Claude Code, ongelmakatselmointichat)
 
 - **Käyttäjän lupa ("Kyllä, käynnistä"):** botti uudelleen versiolla 1585022, jossa palvelin ei kaadu virheelliseen pyyntöön ja linkin jäsennys on lineaarinen. Taululla ei ollut muuta restarttia; varaus 269bf722.
