@@ -2,6 +2,16 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+
+## 15.11.2026 — video käyttäjän viitekuvan mukaiseen WhatsApp-ostoskoriin (Codex, videochatti)
+
+- Käyttäjä täsmensi videon käyttöliittymän olevan väärä ja toimitti kuvan /whatsapp/cart-ostoskorista. Korvattu /demo-keskusteluvaranäkymä juuri public/whatsapp-storefront-cart.html:n omalla ulkoasulla, fonteilla ja väreillä. Ei sivuston uudelleenmuotoilua.
+- Voimassa oleva allekirjoitettu korilinkki, 20→30 l muutos korin omalla kentällä, TARKISTA JA TILAA → VAHVISTA DEMOTILAUS → confirmed. Muuttamaton sovelluskoodi043f08f, omat erilliset kannat ja HTTPS-palvelin. Testivaltuus exceptions/1000€/tilaus,2000€/päivä. Simuloidut hinnat/saatavuus/aika, kuusi esimerkkituotetta. Ei käyttäjän kantojen muutoksia, Meta-/Valio-kutsuja tai oikeita maksuja.
+- Korjattu tallenteen värialueen virhetulkinta: full-range-lähteestä hallittu BT.709-muunnos. Sinisen ja vaalean alueen värejä verrattu PNG-lähteeseen, näytepisteiden suurin kanavaero4/255. Koko dekoodaus ja kuvaruutujen tarkistus läpi. Video50,80s,1280×720/25fps,0äänivirtaa,1 876 222tavua; SHA-256 f8d031bc7a29f990107998a5a635e84de288f062ab48250d7bf2c3b2e49f0d72. Selainajossa ei virheitä ja tilaus AGW-20261114-0002 confirmed.
+- Uusi tiedosto https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/aimo-ostoskoridemo.mp4 . Julkaisu ja anonyymi MP4-takaisinluku varmennettu ennen kirjauksen haarapäivitystä. Tarkempi kuvaus docs/pitch-video.md. Allekirjoitettua korilinkkiä tai paikallisia avaimia ei julkaista.
+
+Dokumentti päivitetty commitissa97632c1. Yhteinen dokumentti+lokipäivitys ei edennyt haaran samanaikaisten muutosten vuoksi; nämä kaksi dokumenttipäivitystä tallennettiin peräkkäin Contents-rajapinnalla säilyttäen muiden muutokset.
+
 ## 15.11.2026 — WhatsApp lukee julkisen linkin ja ehdottaa sen aineksiin sopivia tuotteita (Codex, linkkichat)
 
 - **Käyttäjän päätös:** apuri saa avata lähetetyn linkin, lähettää ensin ”Hetki, avaan linkin” -tyylisen viestin, tutkii sisällön ja ehdottaa siihen sopivia tuotteita. Ensimmäinen versio kattaa julkiset HTTPS-teksti-/HTML-sivut ja reseptien rakenteiset tiedot.
