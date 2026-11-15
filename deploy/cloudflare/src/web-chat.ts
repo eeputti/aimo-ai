@@ -43,8 +43,10 @@ async function readJson(request: Request) {
   try { return JSON.parse(text) as Record<string, unknown>; } catch { return null; }
 }
 async function callBot(origin: string, env: WebChatEnv, action: string, body: Record<string, unknown>) {
-  const response = await fetch(`${origin}/webchat/api/${action}`, { method: "POST", redirect: "error", signal: AbortSignal.timeout(90_000),
+  // Workers tukee vain follow/manual-asetuksia; uudelleenohjaus botilta on virhe.
+  const response = await fetch(`${origin}/webchat/api/${action}`, { method: "POST", redirect: "manual", signal: AbortSignal.timeout(90_000),
     headers: { authorization: `Bearer ${env.WEBCHAT_SECRET}`, "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (response.status >= 300 && response.status < 400) return { status: 502, data: {} as Record<string, unknown> };
   const data = await response.json().catch(() => ({})) as Record<string, unknown>;
   return { status: response.status, data };
 }
