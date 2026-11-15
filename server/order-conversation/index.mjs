@@ -29,6 +29,25 @@ const PICK = /^(?:nro\s*|numero\s*)?(\d{1,2})[.)]?(?:\s*kiitos)?[.!\s]*$/iu;
 const SHOW = /^(?:näytä(?:\s+(?:lista|ostoslista|tilaus|yhteenveto))?|lista)[.!?\s]*$/iu;
 const MORE = /^(?:(?:näytä|anna|hae|katso)\s+)?(?:lisää|muita|muut|enemmän)(?:\s+(?:vaihtoehtoja|vaihtoehdot|tuotteita|tuotteet))?(?:\s+kiitos)?[.!?\s]*$|^onko\s+(?:muita|muuta|lisää)(?:\s+(?:vaihtoehtoja|tuotteita))?[?.!\s]*$/iu;
 const CHEAPEST = /^(?:(?:otetaan|ota|laita|valitse|se|joo)\s+)*(?:halvin|halvinta|halvimman|halvempi|edullisin|edullisinta)(?:\s+(?:vaihtoehto|kiitos))?[.!\s]*$/iu;
+// Vertailukysymys näytetyistä vaihtoehdoista: hinta, hiilijalanjälki tai toimitusvarmuus. Koodi vastaa työkalujen tiedoista
+// eikä valitse mitään (itsepeli V017, V020, V025: malli vastasi "en näe hintoja"). "Se halvin" ilman kysymystä on valinta.
+const COMPARE = {
+  co2: /hiilijalanj|hiilidioksid|ympäristöystävällis|ilmastoystävällis|ekologisi|(?<![\p{L}\d])co2|co₂|päästö/iu,
+  reliability: /toimitusvarm|varmimmin\s+(?:toimit|perill)|varmin\s+toimitus|luotettavi\p{L}*\s+toimit/iu,
+  price: /halvi\p{L}*|edullisi\p{L}*|halvemp\p{L}*|edullisemp\p{L}*|hintoineen|hintavertailu/iu,
+};
+const ASKS = /\?|(?:^|[\s,.!])(?:mikä|mitkä|kumpi|onko|onks|onkos|oikeesti|oikeasti|vertaa\p{L}*|listaa|hintoineen)(?=$|[\s,.!?])/iu;
+export function compareKind(text) {
+  const t = String(text || '').trim();
+  if (COMPARE.co2.test(t)) return 'co2';
+  if (COMPARE.reliability.test(t)) return 'reliability';
+  if (COMPARE.price.test(t) && ASKS.test(t) && !CHEAPEST.test(t)) return 'price';
+  return null;
+}
+// Pyyntö näyttää vaihtoehdot uudelleen ("listaa vaihtoehdot hintoineen", "onko halvempia"), myös jo valitulle riville.
+export const RELIST = /(?:listaa|näytä|näyttäis\p{L}*|laita\s+näkyviin|anna)\s[^.!?\n]{0,40}vaihtoeh\p{L}*|vaihtoeh\p{L}*\s+(?:hintoineen|numeroituna|uudelleen|uudestaan)|muut\s+vaihtoeh\p{L}*|on(?:ko|ks)\s+(?:muita|halvempi\p{L}*|edullisempi\p{L}*)/iu;
+// Valinta numerolla tai järjestyssanalla samassa viestissä ("ykkönen, mut onks se halvin?") on valinta, ei pelkkä kysymys.
+const PICK_WORD = /\d|ykkö|kakko|kolmo|nelo|(?<![\p{L}])(?:eka|toka|kolmas|ensimmäi\p{L}*|toinen|viimei\p{L}*)(?![\p{L}])/iu;
 // Kiire: asiakas haluaa toimituksen mahdollisimman pian. Kellonaikatoive kirjataan, mutta sitä ei luvata:
 // tilausjärjestelmä kertoo vain toimituspäivän ja tilausaikarajan.
 const RUSH = /(?:^|[\s,.!?])(?:tänään|tänää|heti|nyt\s+heti|asap|kiire\p{L}*|pikaisesti|pikana|mahd(?:ollisimman)?\.?\s+pian|aikaisin\s+mahdollinen)(?=$|[\s,.!?])/iu;
@@ -153,6 +172,39 @@ function optionLabel(o, line) {
   const covers = !c ? '' : items ? ` (${num(c.value)} ${/kananmun/iu.test(line.productTerm) ? 'munaa' : 'kpl'})`
     : c.unit === 'PCS' && c.value === o.salesUnits ? '' : ` (${qty(c)})`;
   return `${o.name}, ${num(o.salesUnits)} ${packWord(o.salesUnits, o.salesUnitLabel)}${covers}, ${eur(o.lineNet)}${o.warning ? ` (${o.warning})` : ''}`;
+}
+
+// Vastaus vertailukysymykseen näytetyistä vaihtoehdoista: vain työkalujen palauttamat arvot, puuttuva tieto sanotaan.
+function compareAnswer(kind, options = []) {
+  const shown = options.map((o, i) => ({ o, n: i + 1 }));
+  if (!shown.length) return '';
+  if (kind === 'price') {
+    const priced = shown.filter(({ o }) => Number.isFinite(o.lineNet));
+    if (!priced.length) return '';
+    const best = priced.reduce((a, b) => (b.o.lineNet < a.o.lineNet ? b : a));
+    return `Vaihtoehdoista edullisin on ${best.n}) ${best.o.name}, ${eur(best.o.lineNet)} (alv 0 %).`;
+  }
+  const [key, what, fmt, better] = kind === 'co2'
+    ? ['co2PerKg', 'Hiilijalanjälki', (v) => `${num(v)} kg CO2e/kg`, Math.min]
+    : ['deliveryReliability', 'Toimitusvarmuus', (v) => `${Math.round(v * 100)} %`, Math.max];
+  const known = shown.filter(({ o }) => Number.isFinite(o[key]));
+  if (!known.length) return `${what}tietoa ei ole näille vaihtoehdoille, joten en voi verrata niitä siinä.`;
+  const best = better(...known.map(({ o }) => o[key]));
+  const top = known.filter(({ o }) => o[key] === best);
+  const values = shown.map(({ o, n }) => `${n}) ${Number.isFinite(o[key]) ? fmt(o[key]) : 'ei tietoa'}`).join(', ');
+  const verdict = known.length > 1 && top.length === known.length ? 'Arvo on kaikille sama.'
+    : `${kind === 'co2' ? 'Pienin' : 'Paras'}: ${joinFi(top.map(({ o, n }) => `${n}) ${o.name}`))}.`;
+  return `${what}: ${values}. ${verdict}`;
+}
+
+// Valittu rivi, jonka vaihtoehdot ostaja haluaa nähdä uudelleen: ainoa valittu, nimetty tai viimeksi käsitelty.
+function reopenTarget(draft, text) {
+  const t = text.toLocaleLowerCase('fi');
+  const chosen = draft.lines.filter((l) => l.selectedProductId);
+  if (chosen.length <= 1) return chosen[0] || null;
+  const named = chosen.filter((l) => t.includes(l.productTerm.toLocaleLowerCase('fi').slice(0, Math.max(4, l.productTerm.length - 2))));
+  if (named.length === 1) return named[0];
+  return chosen.find((l) => l.ref === draft.lastRef) || null;
 }
 
 function summary(draft, q, customer) {
@@ -384,15 +436,25 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         const wantsMore = Boolean(choosing && ((picked && picked === choosing.more) || nextNumber || MORE.test(t)));
         const cheapest = choosing && shownOptions.length && CHEAPEST.test(t)
           ? shownOptions.reduce((best, o, i) => (o.lineNet < shownOptions[best].lineNet ? i : best), 0) + 1 : null;
+        // Pelkkä vertailukysymys näytettyyn listaan ("mikä näistä on ympäristöystävällisin?"): ei valintaa eikä mallikutsua.
+        const compare = compareKind(t);
+        const askOnly = Boolean(choosing && compare && !PICK_WORD.test(t));
         const choice = SHOW.test(t) ? { intent: 'show', ops: [] }
-          : wantsMore ? { intent: 'order', ops: [] }
+          : wantsMore || askOnly ? { intent: 'order', ops: [] }
           : picked ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: picked }] }
             : cheapest ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: cheapest }] } : null;
         const turn = dateAnswer || choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
           ? { op: 'update', ref, addClaims: [draft.pending.claim] } : { op: 'no_preference', ref }) }
           : await interpretTurn({ text: withoutClockWords(t), draft: structuredClone(draft), today, now: now(), receivedAt, context }));
         const moreAsked = wantsMore || Boolean(choosing && (turn.ops || []).some((o) => o.op === 'more' && (!o.ref || o.ref === choosing.refs[0])));
+        const selectedBefore = new Map(draft.lines.map((l) => [l.ref, l.selectedProductId]));
         const notes = apply(draft, turn, customer, today);
+        // Pyyntö näyttää tai vertailla vaihtoehtoja jo valitulle riville: valinta avataan ja sama lista näytetään uudelleen,
+        // ostaja valitsee numerolla (V025: "listaa vaihtoehdot hintoineen" toisti valitun yhteenvedon neljästi).
+        // Tässä viestissä tehtyä valintaa ei pureta.
+        const reopen = !choosing && (RELIST.test(t) || compare) ? reopenTarget(draft, t) : null;
+        const reopened = reopen && selectedBefore.get(reopen.ref) === reopen.selectedProductId ? reopen : null;
+        if (reopened) { reopened.selectedProductId = null; reopened.selectedName = null; reopened.selectedWarning = null; }
         draft.turn += 1;
         const unchanged = content(draft) === before;
         if (!unchanged) { draft.revision += 1; draft.quote = null; }
@@ -402,8 +464,18 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         if (!result) {
           const asksDeadline = DEADLINE_QUESTION.test(t);
           // Muuttumaton luonnos: sama lista uudelleen (virheellinen numero) tai seuraavat vaihtoehdot ilman uutta alkuhakua.
-          const next = await advance(draft, customer, 0, choosing && unchanged ? { again: { ref: choosing.refs[0], more: choosing.more != null, exact: choosing.exact }, more: moreAsked } : {});
-          result = { ...next, text: [...notes, ...(asksDeadline ? [await deadlineAnswer(draft, customer, next.text)] : []), next.text].filter(Boolean).join('\n') };
+          const next = await advance(draft, customer, 0, choosing && unchanged ? { again: { ref: choosing.refs[0], more: choosing.more != null, exact: choosing.exact }, more: moreAsked }
+            : reopened && draft.offered[reopened.ref]?.length ? { again: { ref: reopened.ref, more: true } } : {});
+          // Vertailu näytetyistä vaihtoehdoista. Jos lista tulee vasta tarkennuksen jälkeen, kysymys muistetaan siihen asti.
+          const kind = compare || draft.compare || null;
+          let compared = '';
+          if (kind && next.status === 'choosing' && draft.pending?.kind === 'choose') { compared = compareAnswer(kind, draft.offered[draft.pending.refs[0]]); draft.compare = null; }
+          else if (kind && ['preference', 'checklist', 'date_offer', 'site'].includes(draft.pending?.kind)) draft.compare = kind;
+          else {
+            draft.compare = null;
+            if (compare && next.status === 'ready' && draft.lines.length > 1) compared = `Kerro, minkä tuotteen vaihtoehdot näytän: ${joinFi(draft.lines.map((l) => l.productTerm))}.`;
+          }
+          result = { ...next, text: [...notes, ...(asksDeadline ? [await deadlineAnswer(draft, customer, next.text)] : []), compared, next.text].filter(Boolean).join('\n') };
         } else if (DEADLINE_QUESTION.test(t)) result = { ...result, text: `${await deadlineAnswer(draft, customer, result.text)}\n${result.text}` };
       }
     } catch {

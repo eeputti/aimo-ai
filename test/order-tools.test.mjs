@@ -50,7 +50,7 @@ test('suggest antaa enintään kolme vaihtoehtoa, pyytää tarkennuksen vain jak
   assert.equal(s.lines[0].options.length, 3);
   assert.equal(s.lines[0].total, 4);
   assert.deepEqual(s.lines[0].clarify, ['FREE_FROM_LACTOSE']); // 1/4 tilattavista on laktoosittomia
-  assert.deepEqual(s.lines[0].options[0], { productId: '1', name: 'Tuote 1', brand: null, salesUnits: 2, salesUnitLabel: 'ltk', covers: { value: 20, unit: 'L' }, unitPriceNet: 5, lineNet: 10, deliveryDate: date, cutoff: null, stock: 50, labels: ['FREE_FROM_LACTOSE'], note: null, why: null, warning: null });
+  assert.deepEqual(s.lines[0].options[0], { productId: '1', name: 'Tuote 1', brand: null, salesUnits: 2, salesUnitLabel: 'ltk', covers: { value: 20, unit: 'L' }, unitPriceNet: 5, lineNet: 10, deliveryDate: date, cutoff: null, stock: 50, labels: ['FREE_FROM_LACTOSE'], note: null, co2PerKg: null, deliveryReliability: null, why: null, warning: null });
   const asked = await tools.suggest({ customer, draft: draftOf([line('a', { claims: ['FREE_FROM_LACTOSE'] })]) });
   assert.deepEqual(asked.lines[0].clarify, []);
   // Maidoton: tuote 1 sisältää maitoa, tuotteilta 3 ja 4 puuttuu allergeenitieto. Vain 2 kelpaa.

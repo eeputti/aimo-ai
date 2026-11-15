@@ -183,9 +183,12 @@ export function createOrderingTools(deps = {}) {
       // puolessa vaihtoehdoista maitoa): perunahaun yksittäinen maitoa sisältävä muusi ei tee kysymyksestä olennaista (itsepeli X097).
       const own = fit.filter(onTerm); const base = own.length ? own : fit;
       // Osuus lasketaan tuotteista, joiden allergeenitieto tunnetaan: puuttuva tieto ei ole todiste kumpaankaan suuntaan.
+      // Tiedon pitää kuitenkin kattaa vähintään puolet vaihtoehdoista: tuoreella perunalla sitä ei ole, ja kaksi tunnettua
+      // jalostettua perunatuotetta (yksi maitoa) kysyi laktoosia 25 kilon perunasta (itsepeli X022, peruna 2/23 tunnettu).
       const known = base.filter((o) => product(o.id)?.hasAllergenData);
       const ingredientShare = (allergen) => (known.length ? known.filter((o) => product(o.id).contains?.includes(allergen)).length / known.length : 0);
-      const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim) && (!c.needsAllergen || ingredientShare(c.needsAllergen) >= 0.5))
+      const mostlyContains = (allergen) => known.length >= base.length / 2 && ingredientShare(allergen) >= 0.5;
+      const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim) && (!c.needsAllergen || mostlyContains(c.needsAllergen)))
         .map((c) => ({ claim: c.claim, share: base.filter((o) => o.labels?.includes(c.claim)).length / base.length, ...c }))
         .filter((c) => base.length >= 3 && c.share >= c.min && c.share <= c.max).map((c) => c.claim);
       // Halvin nostetaan kärkeen vain parhaan tyyppiryhmän tavallisista, joiden määrä tunnetaan: maustettu, poikkeava tai
@@ -226,6 +229,9 @@ export function createOrderingTools(deps = {}) {
         unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
         cutoff: o.availability?.closingTime || null, // tilausaikaraja; ydin muotoilee sen kiireisessä tilauksessa
         stock: o.availability?.stock ?? null, labels: o.labels || [], note: o.quantityExplanation?.text || null,
+        // Katalogin hiilijalanjälki (kg CO2e/kg) ja toimitusvarmuus (0–1): ydin vastaa niillä vertailukysymykseen, ei malli.
+        co2PerKg: Number.isFinite(product(o.id)?.co2) ? product(o.id).co2 : null,
+        deliveryReliability: Number.isFinite(product(o.id)?.reliability) ? product(o.id).reliability : null,
         why: o.substituteFor ? `Korvaa tuotteen ${o.substituteFor.name}` : null,
         warning: [soft.filter((c) => !o.labels?.includes(c)).length ? `Ei merkintää: ${soft.filter((c) => !o.labels?.includes(c)).map((c) => CLAIM_WORD[c] || c).join(', ')}` : null, diet.excludeAllergens.length && !product(o.id)?.hasAllergenData ? 'allergeenitieto puuttuu, tarkista itse' : null].filter(Boolean).join('; ') || null,
       })) });
