@@ -1,4 +1,4 @@
-// A local storefront for the WhatsApp demo's existing orders. Never starts a channel worker.
+// Local diagnostics and request gate for WhatsApp orders. Never starts a channel worker.
 import { createDemoBuyerResolver } from './whatsapp/demo-buyer.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { isLocal } from './whatsapp/web-demo.mjs';
@@ -36,11 +36,6 @@ export function createLocalShop({ whatsappDb, defaultPhone, buyers, resolveBuyer
       }
       if (url.pathname === '/api/local-shop' && req.method === 'GET') { json(res, 200, context()); return true; }
       return false;
-    },
-    decorateHtml(html) {
-      return html.replace('</head>', '<meta name="aimo-local-shop" content="whatsapp-demo"></head>')
-        .replace(/(<span class="customer">)[^<]*/, '$1Testikeittiö (paikallinen demo)')
-        .replace(/(<span class="user-name">)[^<]*/, '$1Testaaja');
     },
   };
 }

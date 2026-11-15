@@ -4,7 +4,7 @@ import { config } from '../server/config.mjs';
 import { replyToAssistant } from '../server/assistant.mjs';
 
 // Exercise the real SDK serialization/stream parser, with zero external API calls.
-test('shared assistant keeps web behavior and enables only read tools in WhatsApp', async (t) => {
+test('read-only WhatsApp fallback always restricts MCP tools, including default and streamed calls', async (t) => {
   const original = { ...config }; t.after(() => Object.assign(config, original));
   Object.assign(config, { anthropicKey: 'test-key', assistantMcpUrl: 'https://example.com/mcp', assistantMcpToken: 'test-mcp' });
   const requests = [];
@@ -34,6 +34,7 @@ test('shared assistant keeps web behavior and enables only read tools in WhatsAp
   let streamed = '';
   await replyToAssistant({ messages, onText: (text) => { streamed += text; } });
   assert.equal(streamed, wa.text);
-  assert.equal(requests[1].tools[0].default_config, undefined);
-  assert.match(requests[1].system[0].text, /aina taulukolla/);
+  assert.equal(requests[1].tools[0].default_config.enabled, false);
+  assert.equal(requests[1].tools[0].configs.place_order, undefined);
+  assert.match(requests[1].system[0].text, /Et voi tehdä tilauksia/);
 });

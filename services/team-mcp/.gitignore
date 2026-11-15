@@ -1,5 +1,0 @@
-data/
-.env.coordinator
-!.env.coordinator.example
-.env.runner
-!.env.runner.example

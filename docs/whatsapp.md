@@ -1,6 +1,8 @@
 # WhatsApp-testiversio
 
-WhatsApp on nykyisen Tilausapurin toinen viestikanava: sama malliasiakas ja sama Danielin Python-MCP-tuotepalvelin. Tämä versio hakee tuotteita, hintoja, toimitusaikoja ja korvaajia. Se ei tee tilauksia, muuta verkkokaupan koria, käsittele maksuja, avaa tukipyyntöjä tai lähetä ajastettuja ilmoituksia. Tilauksen tekemiseen tarvitaan erillinen gateway-integraatio ja hyväksyntäpolku.
+Tilaustilassa (`WHATSAPP_ORDERING_ENABLED=true`) apuri kerää tarpeet, kysyy ensin puuttuvan toimituspäivän ja tarjoaa käyttäjän valittavat tuotteet. Yhteenvedon kuittaus avaa yksityisen korilinkin; lopullinen vahvistus tehdään selaimen korissa saman gatewayn kautta. WhatsApp ja kori käyttävät samaa palvelimen luonnosta. Oikeaa Valio-tilausta tai maksua ei tehdä.
+
+Ilman tilaustilan asetusta säilyy erillinen vain lukeva WhatsApp-varapolku, joka käyttää ulkoista MCP-tuotepalvelinta. Sen asetuksia ei tarvita varsinaiseen tilauspolkuun. Python-palvelimen lähde on paikallisarkistossa, ei enää tämän repon osa.
 
 **Asiakastunnistus:** tuotannon tunnistuksen ja ostovaltuudet omistaa Valio projektin nykyisen suunnan mukaisesti. Tämän version paikallinen numerorekisteri ja kutsukoodi ovat vain eristetyn testiasiakkaan tunnistusjäljitelmä. Valion asiakasrekisteriä tai oikeaa tunnistusrajapintaa ei ole kytketty.
 
@@ -46,19 +48,19 @@ Käytä vain yhtä WhatsApp-worker-prosessia kutakin tietokantaa kohti. Älä aj
 
 ### Tilausdemo (valinnainen)
 
-Oletuksena kanava on vain lukeva. `WHATSAPP_ORDERING_ENABLED=true` vaihtaa `npm run whatsapp` -palvelimen tilauskeskusteluun: luonnos, vaihtoehdot, yhteenveto ja `TILAA`-vahvistus, josta syntyy gatewayn demotilaus. Oikeaa Valio-tilausta ei lähetetä. Keskustelun kulku on tiedostossa [ordering-demo.md](ordering-demo.md).
+Oletuksena kanava on vain lukeva. `WHATSAPP_ORDERING_ENABLED=true` vaihtaa `npm run whatsapp` -palvelimen tilauskeskusteluun: luonnos, vaihtoehdot, yhteenveto ja yksityinen korilinkki; demotilaus vahvistetaan erikseen korissa. Oikeaa Valio-tilausta ei lähetetä. Keskustelun kulku on tiedostossa [ordering-demo.md](ordering-demo.md).
 
 ```bash
 WHATSAPP_ORDERING_ENABLED=true
 GATEWAY_DB=/var/data/whatsapp-gateway.db
-AIMO_DB=/var/data/whatsapp-kitchen.db
+AIMO_DB=/var/data/whatsapp-prices.db
 WHATSAPP_DRAFT_DB=/var/data/whatsapp-drafts.db
 WHATSAPP_QUOTE_DB=/var/data/whatsapp-quotes.db
 WHATSAPP_DEMO_PHONE=<valinnainen: yksi Metassa vahvistettu testinumero>
 WHATSAPP_DEMO_PERSON=<valinnainen: testaajan nimi>
 ```
 
-- `GATEWAY_DB` ja `AIMO_DB` ovat pakollisia, eivätkä ne saa osoittaa verkkokaupan `data/gateway.db`- tai `data/aimo.db`-kantaan. Palvelin ei käynnisty muuten. Näin demotilaukset ja hintavälimuisti pysyvät erillään verkkokaupan tilauksista. Tästä syystä tilausdemoa ei voi liittää `npm start` -palvelimeen asetuksella `WHATSAPP_ENABLED=true`.
+- `GATEWAY_DB` ja `AIMO_DB` ovat pakollisia, eivätkä ne saa osoittaa verkkokaupan `data/gateway.db`- tai `data/aimo.db`-kantaan. Palvelin ei käynnisty muuten. Näin demotilaukset ja hintavälimuisti pysyvät erillään verkkokaupan tilauksista. Suositeltu käynnistys on erillinen `npm run whatsapp` ja omat tietokannat.
 - `WHATSAPP_DRAFT_DB` ja `WHATSAPP_QUOTE_DB` ovat valinnaisia; oletukset ovat `data/whatsapp-drafts.db` ja `data/whatsapp-quotes.db`. Pidä ne pysyvällä levyllä, jotta luonnos säilyy uudelleenkäynnistyksessä.
 - Tilauspolku tarvitsee paikallisen katalogin (`npm run catalog`), toisin kuin vain lukeva kanava. `ASSISTANT_MCP_URL` ja `ASSISTANT_MCP_TOKEN` eivät ole tarpeen tässä tilassa.
 - `VALIO_API_KEY` tuo oikeat hinnat ja saatavuuden, ilman sitä ne simuloidaan. `ANTHROPIC_API_KEY` ottaa käyttöön mallitulkin vapaalle puhekielelle, ilman sitä viestit tulkitaan säännöillä. Gatewayn allekirjoitusavain luetaan muuttujasta `GATEWAY_PRIVATE_KEY_PEM` tai luodaan `data/`-hakemistoon.
@@ -102,7 +104,7 @@ Odota onnistumisviestiä. Lähetä sitten esimerkiksi:
 Tarvitsen 60 kananmunaa maanantaiksi. Mitä vaihtoehtoja löytyy?
 ```
 
-Jatkokysymys samassa keskustelussa käyttää tallennettua historiaa. Tunnistamaton numero saa yhdistämisohjeen; sille ei tehdä mallikutsuja. Tässä versiossa yksi numero kuuluu yhteen henkilöön ja yritykseen. Yhdistäminen ei anna osto-oikeuksia: kaikki käyttäjät ovat vain tietoja hakevia testaajia. Yritystunniste erottelee keskustelut, mutta ei vielä vaihda Valion asiakaskohtaista hinnoittelua tai anna pääsyä yrityksen tilauksiin.
+Jatkokysymys samassa keskustelussa käyttää tallennettua historiaa. Tunnistamaton numero saa yhdistämisohjeen; sille ei tehdä mallikutsuja. Tässä versiossa yksi numero kuuluu yhteen henkilöön ja yritykseen. Yhdistäminen ei anna osto-oikeuksia: tilaustilassa käyttäjät voivat vahvistaa vain eristettyjä demotilauksia oman testiasiakkuutensa valtuuksilla. Yritystunniste erottelee keskustelut, mutta ei vielä vaihda Valion asiakaskohtaista hinnoittelua tai anna pääsyä yrityksen tilauksiin.
 
 Yhteyden poistaminen:
 

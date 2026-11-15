@@ -21,8 +21,12 @@ data/eval-oracle-cache.json
 __pycache__/
 *.pyc
 
-# Demon WhatsApp-linkki sisältää apurin numeron: vain paikallisesti (malli: public/demo-config.example.json)
+# Vanhan paikallisen demon numerolliset asetukset eivät kuulu GitHubiin.
 public/demo-config.json
 
 # WhatsApp-itsekeskustelun raportit (scripts/whatsapp-selfplay-batch.mjs): synteettiset keskustelut, ei Gitiin
 data/selfplay/
+
+# Vanhan paikallisen kehitysympäristön osat säilyvät koneella, eivät uudessa GitHub-versiossa.
+services/team-mcp/
+.local-archive/

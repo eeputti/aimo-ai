@@ -11,9 +11,9 @@ import { once } from 'node:events';
 
 const skip = !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu';
 
-async function serve(t, ordering = true) {
+async function serve(t, ordering = true, entry = 'server/whatsapp-server.mjs') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-local-shop-'));
-  const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', 'server/whatsapp-server.mjs'], {
+  const child = spawn(process.execPath, ['--disable-warning=ExperimentalWarning', entry], {
     cwd: new URL('../', import.meta.url),
     env: { ...process.env, WHATSAPP_PORT: '0', PORT: '0', WHATSAPP_ENABLED: 'false', AIMO_EMBEDDED_STOREFRONT: '',
       WHATSAPP_ORDERING_ENABLED: String(ordering), VALIO_API_KEY: '', ANTHROPIC_API_KEY: '',
@@ -36,7 +36,7 @@ async function serve(t, ordering = true) {
     child.once('exit', (code) => { clearTimeout(timeout); reject(new Error(`Server exit ${code}: ${log}`)); });
     const read = (chunk) => {
       log += chunk;
-      const match = log.match(/WhatsApp test → http:\/\/localhost:(\d+)/);
+      const match = log.match(/→ http:\/\/localhost:(\d+)/);
       if (match) { clearTimeout(timeout); resolve(`http://127.0.0.1:${match[1]}`); }
     };
     child.stdout.on('data', read); child.stderr.on('data', read);
@@ -51,12 +51,12 @@ async function serve(t, ordering = true) {
   return { base, get, post, dir };
 }
 
-test('local storefront shows the exact conversation order once and approvals use the same gateway', { skip, timeout: 30000 }, async (t) => {
+test('local WhatsApp tools show the exact conversation order once and approvals use the same gateway', { skip, timeout: 30000 }, async (t) => {
   const { base, get, post, dir } = await serve(t);
   assert.equal((await get('/healthz')).mode, 'ordering-demo');
   const homepage = await (await fetch(base + '/?shop=orders')).text();
   assert.match(homepage, /aimo-local-shop/);
-  assert.match(homepage, /Testikeittiö \(paikallinen demo\)/);
+  assert.match(homepage, /WhatsAppista ostoskoriin/);
   assert.doesNotMatch(homepage, /554485 VALIO OY/);
   assert.deepEqual((await get('/api/local-shop')).accounts, []);
   assert.equal((await get('/console/state')).orders.length, 0);
@@ -82,6 +82,10 @@ test('local storefront shows the exact conversation order once and approvals use
   assert.equal(order.commit.simulated, true);
   assert.ok(done.includes(order.orderId));
   assert.equal(order.status, 'pending_approval');
+  const approvalPage = await fetch(new URL(order.approval.url, base));
+  assert.equal(approvalPage.status, 200);
+  assert.match(await approvalPage.text(), /Hyväksy demotilaus/);
+  assert.match((await fetch(base + '/approve.js')).headers.get('content-type'), /javascript/);
   order = await post(`/console/orders/${order.orderId}/approve`, { by: 'Testaaja' });
   assert.equal(order.status, 'confirmed');
   assert.match(await say('TILAA'), /Uutta tilausta ei tehty/);
@@ -91,8 +95,11 @@ test('local storefront shows the exact conversation order once and approvals use
   // Embedded mode must not seed kitchen proposals or another HTTP server/WhatsApp worker.
   const { DatabaseSync } = await import('node:sqlite');
   const prices = new DatabaseSync(path.join(dir, 'prices.db'), { readOnly: true });
-  try { assert.equal(prices.prepare('SELECT count(*) n FROM proposals').get().n, 0); } finally { prices.close(); }
+  try { assert.equal(prices.prepare("SELECT count(*) n FROM sqlite_master WHERE type='table' AND name IN ('proposals','bookings','history')").get().n, 0); } finally { prices.close(); }
 
+  for (const route of ['/kitchen.html', '/recipes.html', '/console.html', '/assistant.html', '/cart.html', '/api/planning', '/api/state', '/api/storefront/whatsapp-cart', '/console/recipes', '/console/availability']) {
+    assert.equal((await fetch(base + route)).status, 404, route);
+  }
   for (const route of ['/console/reset', '/console/demo', '/api/reset']) {
     assert.equal((await fetch(base + route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status, 403);
   }
@@ -109,4 +116,28 @@ test('read-only WhatsApp mode exposes no local storefront or ordering gateway', 
   const { base, get } = await serve(t, false);
   assert.equal((await get('/healthz')).mode, 'read-only-test');
   for (const route of ['/', '/api/local-shop', '/console/state', '/v1/orders']) assert.equal((await fetch(base + route)).status, 404);
+});
+
+
+test('standalone app starts only the local gateway and has no archived demo routes or kitchen tables', { skip, timeout: 20000 }, async (t) => {
+  const { base, get, dir } = await serve(t, false, 'server/index.mjs');
+  assert.equal((await get('/healthz')).channel, 'gateway');
+  assert.match(await (await fetch(base + '/')).text(), /WhatsAppista ostoskoriin/);
+  const contract = await get('/openapi.json');
+  assert.equal(contract.openapi, '3.1.0');
+  assert.ok(contract.paths['/v1/quotes']);
+  const mandate = await fetch(base + '/v1/mandate', { headers: { authorization: 'Bearer demo-kahvila-aalto' } });
+  assert.equal(mandate.status, 200);
+  assert.equal((await fetch(base + '/v1/mandate')).status, 401);
+  for (const route of ['/kitchen.html', '/recipes.html', '/console.html', '/api/planning', '/api/state', '/console/recipes', '/console/availability']) {
+    assert.equal((await fetch(base + route)).status, 404, route);
+  }
+  for (const headers of [{ 'cf-ray': 'tunnel' }, { origin: 'https://other.example' }, { 'sec-fetch-site': 'cross-site' }]) {
+    assert.equal((await fetch(base + '/console/state', { headers })).status, 404);
+  }
+  const { DatabaseSync } = await import('node:sqlite');
+  const prices = new DatabaseSync(path.join(dir, 'prices.db'), { readOnly: true });
+  try { assert.equal(prices.prepare("SELECT count(*) n FROM sqlite_master WHERE name IN ('proposals','bookings','history')").get().n, 0); }
+  finally { prices.close(); }
+  assert.equal((await get('/console/state')).orders.length, 0);
 });

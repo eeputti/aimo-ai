@@ -1,16 +1,12 @@
 // REST- ja MCP-sovittimet samaan sopimukseen (contract.mjs) + ihmisen konsoli (hyväksynnät, mandaatti, aikajana).
 import { OPERATIONS, REASONS, GATEWAY, AGENT_INSTRUCTIONS } from './contract.mjs';
 import { searchProducts, requestQuote, placeOrder, addToOrder, getOrder, listOrders, decideApproval, acceptSuggestion, auditTrail, mandateOf, productTypes, GatewayError } from './service.mjs';
-import { buyers, ledger, onLedger, wipeGateway } from './store.mjs';
+import { buyers, ledger, onLedger } from './store.mjs';
 import { seedBuyers, updateMandate, publicMandate } from './mandate.mjs';
 import { jwks } from './signing.mjs';
-import { clock, cutoffPassed, helsinkiLabel } from './clock.mjs';
-import { runBuyerAgent } from './buyerAgent.mjs';
+import { clock } from './clock.mjs';
 import { apiMode, config } from '../config.mjs';
-import { apiStats, fetchQuotes } from '../valioApi.mjs';
-import { RECIPES } from '../aimo/recipes.mjs';
-import { suggestRecipes } from '../llm.mjs';
-import { llmEnabled } from '../config.mjs';
+import { apiStats } from '../valioApi.mjs';
 import { watchReport, WATCH_DISCLOSURE } from './watch.mjs';
 import { SUGGEST_DISCLOSURE } from './suggest.mjs';
 
@@ -107,7 +103,6 @@ async function mcpMessage(msg, req, url) {
   }
 }
 
-const recipeIdeaCache = new Map(); // hakusana → mallin ehdotukset; sama haku ei maksa toista mallikutsua
 
 /** @returns {Promise<boolean>} true jos pyyntö käsiteltiin */
 export async function handleGateway(req, res, url) {
@@ -156,52 +151,6 @@ export async function handleGateway(req, res, url) {
         orders: listOrders(null), ledger: ledger.recent(80), chain: ledger.verify(),
       }), true;
     }
-    // Hakupaneelin esikatselu (aimo-ask.js): hinta ja saatavuus muutamalle tuotteelle samasta välimuistista kuin tarjoukset.
-    // Vain luku: ei tarjousta, ei allekirjoitusta eikä merkintää päätösketjuun. Tuntematonta ei tulkita saatavilla olevaksi.
-    if (p === '/console/availability' && m === 'GET') {
-      const ids = [...new Set((url.searchParams.get('ids') || '').split(',').map((v) => v.trim()).filter((v) => /^\d{1,12}$/.test(v)))].slice(0, 12);
-      const asked = url.searchParams.get('date') || '';
-      const date = /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : clock.today();
-      const live = ids.length ? await fetchQuotes(ids, date) : new Map();
-      return send(res, 200, {
-        date, source: apiMode(),
-        items: ids.map((id) => {
-          const { avail, price } = live.get(id) || {};
-          return {
-            productId: id, status: avail?.status || 'unknown', stock: avail?.amount ?? null, deliveryDate: avail?.date || null, closingTime: avail?.closingTime || null, cutoffLabel: avail?.closingTime ? helsinkiLabel(avail.closingTime) : null, cutoffPassed: avail?.closingTime ? cutoffPassed(avail.closingTime) : false,
-            priceNet: price && !price.error && price.net != null ? price.net : null, comparison: price?.comparison ?? null, comparisonUnit: price?.comparisonUnit || null,
-            stale: !!(avail?.stale || price?.stale),
-          };
-        }),
-      }), true;
-    }
-    // Hakupaneelin reseptihaku: omat kiinnitetyt reseptit (recipes.mjs) ja kielimallin ehdotukset raaka-aineineen per annos.
-    // Malli ei valitse tuotteita eikä hintoja: selain hakee raaka-aineet katalogista tavallisella tulkinnalla. Mallikutsusta jää rivi päätösketjuun.
-    if (p === '/console/recipes' && m === 'GET') {
-      const q = (url.searchParams.get('q') || '').trim().slice(0, 80);
-      const own = RECIPES.filter((r) => !q || r.match.test(q) || r.name.toLowerCase().includes(q.toLowerCase()))
-        .map((r) => ({ id: r.id, name: r.name, note: r.lines.slice(0, 3).map((l) => l.label.replace(/\s*\(.*\)/, '')).join(', '), pinned: true }));
-      let ai = []; let model = null; let error = null;
-      if (q.length >= 3 && llmEnabled()) {
-        const key = q.toLowerCase();
-        let hit = recipeIdeaCache.get(key);
-        if (!hit) {
-          try {
-            hit = await suggestRecipes(q);
-            if (recipeIdeaCache.size > 200) recipeIdeaCache.clear();
-            recipeIdeaCache.set(key, hit);
-            ledger.append('model', 'MODEL_CALL', { purpose: 'recipe_ideas', model: hit.model, ms: hit.ms, text: q, output: { ideas: hit.ideas.map((i) => i.name) } });
-          } catch (e) { error = String(e.message || e).slice(0, 160); }
-        }
-        if (hit) {
-          model = hit.model;
-          const taken = new Set(own.map((r) => r.name.toLowerCase()));
-          ai = hit.ideas.filter((i) => i.name && Array.isArray(i.ingredients) && i.ingredients.length && !taken.has(i.name.toLowerCase())).slice(0, 8)
-            .map((i) => ({ name: i.name, note: i.note, pinned: false, ingredients: i.ingredients.filter((g) => g.amount > 0 && g.amount < 2).slice(0, 8) }));
-        }
-      }
-      return send(res, 200, { q, items: [...own, ...ai], llm: llmEnabled(), model, error }), true;
-    }
     if (p === '/console/watch' && m === 'GET') return send(res, 200, watchReport(buyers.all())), true;
     if (p === '/console/events' && m === 'GET') {
       res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive' });
@@ -223,14 +172,6 @@ export async function handleGateway(req, res, url) {
       ledger.append(`human:${b.approver || 'ostaja'}`, 'MANDATE_UPDATED', { patch, mandate: b.mandate }, { buyerId: b.id });
       return send(res, 200, publicMandate(b)), true;
     }
-    if (p === '/console/demo' && m === 'POST') {
-      const body = await readBody(req);
-      const b = buyers.byId(String(body.buyerId || 'nordic-hotels'));
-      if (!b) throw new GatewayError(404, 'BUYER_NOT_FOUND', 'Ostajaa ei löydy');
-      // Viiteasiakas kutsuu porttia oikeilla HTTP-pyynnöillä, kuten mikä tahansa ulkopuolinen agentti.
-      return send(res, 200, await runBuyerAgent({ baseUrl: `http://127.0.0.1:${config.port}`, apiKey: b.apiKey, text: String(body.text || '').slice(0, 300), tamper: !!body.tamper, addToOrderId: body.addToOrderId ? String(body.addToOrderId).slice(0, 40) : undefined, patches: Array.isArray(body.patches) ? body.patches.slice(0, 20) : undefined })), true;
-    }
-    if (p === '/console/reset' && m === 'POST') { wipeGateway(); seedBuyers({ force: true }); ledger.append('gateway', 'DEMO_RESET', {}); return send(res, 200, { ok: true }), true; }
     throw new GatewayError(404, 'NOT_FOUND', 'Tuntematon reitti');
   } catch (err) {
     if (!(err instanceof GatewayError)) console.error('[gateway]', err);

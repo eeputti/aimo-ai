@@ -4,7 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 COPY server ./server
-COPY public/whatsapp-demo.html ./public/whatsapp-demo.html
+COPY public ./public
 COPY scripts/whatsapp-preflight.mjs ./scripts/whatsapp-preflight.mjs
 COPY deploy/whatsapp/start.mjs ./deploy/whatsapp/start.mjs
 RUN mkdir -p /app/data/whatsapp && chown -R node:node /app/data

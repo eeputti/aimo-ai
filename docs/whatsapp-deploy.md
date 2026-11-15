@@ -72,3 +72,7 @@ Kun olemassa oleva käyttöönotto siirretään levylle, pysäytä lähteen work
 - Ei oikeita Meta-, malli- tai Valio-kutsuja. Ei nykyisen demon kantojen käyttöä, palvelimen restarttia tai julkaisua.
 
 Lähteet: [Node: ympäristötiedostot](https://nodejs.org/api/cli.html#--env-filefile), [Docker: build-konteksti ja Dockerfile-kohtainen ignore-tiedosto](https://docs.docker.com/build/concepts/context/), [Docker: pysyvät levyt](https://docs.docker.com/engine/storage/volumes/), [Compose: palvelut ja mountit](https://docs.docker.com/reference/compose-file/services/).
+
+## Rajatun repon koritiedostot
+
+Dockerfile kopioi nyt korin HTML/JS/CSS-tiedostot, checkoutin, aloitusohjeen, logon sekä tarvittavat yhteiset tyylit, fontit, ikonit ja optimoidut kuvat. Dockerfilen oma ignore-tiedosto sallii nämä nimet; vanhat paikalliset näkymät tai `public/demo-config.json` eivät tule build-kontekstiin. Arkistoitu keittiö tai laaja verkkokauppakopio ei ole konttipaketin riippuvuus.

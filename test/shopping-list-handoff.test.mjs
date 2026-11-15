@@ -14,7 +14,6 @@ import { createOrderingDialogue } from '../server/whatsapp/dialogue.mjs';
 import { createWhatsAppChannel } from '../server/whatsapp/channel.mjs';
 import { createShoppingListHandoff, LIST_ROUTE } from '../server/whatsapp/shopping-list.mjs';
 import { shoppingListView } from '../server/shopping-list/index.mjs';
-import { describeShoppingList } from '../public/whatsapp-shopping-list.js';
 
 // Synthetic public product names only: exercise the real Finnish parser without challenge data.
 const catalogDir = fs.mkdtempSync(path.join(os.tmpdir(), 'handoff-catalog-'));
@@ -100,7 +99,6 @@ test('signed WhatsApp message becomes a structured list; storefront continues th
   assert.ok(list.lines[0].claims.includes('FREE_FROM_LACTOSE'));
   assert.equal(list.requiresExplicitConfirmation, true); assert.equal(f.stats().submits, 0);
   assert.doesNotMatch(JSON.stringify(initial), /358401234567|apiKey|bindingVersion|quoteId/);
-  assert.match(describeShoppingList(list), /maito: 20 l/);
   assert.equal((await f.get(initial.accounts.find((a) => a.buyerId !== initial.buyerId).buyerId)).shoppingList, null);
   f.restartDrafts(); assert.deepEqual((await f.get()).shoppingList, list);
   await f.whatsapp('20 l laktoositonta maitoa ja 5 kg voita maanantaiksi', 'meta-list-1');

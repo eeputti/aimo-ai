@@ -3,16 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hyväksyntä – Aimo Agent Gateway</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Sofia+Sans+Extra+Condensed:wght@800&display=swap" rel="stylesheet">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%23005670%27/%3E%3Cpath d=%27M8 16h10m-4-5 5 5-5 5M22 9v14%27 stroke=%27%23c0e021%27 stroke-width=%273%27 fill=%27none%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/gateway.css">
-  <link rel="stylesheet" href="/aimo-shell.css">
-  <link rel="stylesheet" href="/approve-track.css">
+  <meta name="referrer" content="no-referrer">
+  <title>Tilauksen hyväksyntä | Aimo</title>
+  <script type="module" src="/approve.js"></script>
+  <style>
+    :root { font: 17px/1.5 system-ui, sans-serif; color: #12343b; background: #f4f7f4; }
+    body { margin: 0; padding: 24px 16px; } main { max-width: 700px; margin: 5vh auto; padding: 28px; background: white; border-radius: 16px; }
+    h1 { line-height: 1.2; } li { margin-bottom: 12px; } button { font: inherit; padding: 12px 18px; border: 1px solid #005670; border-radius: 6px; cursor: pointer; margin: 4px; background: white; color: #005670; }
+    #approve { background: #005670; color: white; } button:disabled { opacity: .5; cursor: default; } .actions { margin-top: 24px; } #error { color: #a11; } a { color: #005670; }
+  </style>
 </head>
-<body>
-  <script src="/aimo-shell.js" data-page="approve"></script>
-  <main class="phone" id="phone"><p class="muted"><span class="spinner"></span> Ladataan…</p></main>
-  <script type="module" src="/gateway.js"></script>
-</body>
+<body><main>
+  <p>AIMO · TILAUSDEMO</p>
+  <h1>Tilauksen hyväksyntä</h1>
+  <p id="status" role="status">Haetaan tilausta…</p>
+  <section id="order" hidden>
+    <h2 id="number"></h2>
+    <p id="delivery"></p>
+    <ul id="lines" aria-label="Tilauksen tuotteet"></ul>
+    <p id="total"></p>
+    <h3>Tarkistuksen huomiot</h3>
+    <ul id="reasons"></ul>
+    <div class="actions">
+      <button id="approve" type="button" disabled>Hyväksy demotilaus</button>
+      <button id="reject" type="button" disabled>Hylkää demotilaus</button>
+      <button id="refresh" type="button">Päivitä tila</button>
+    </div>
+  </section>
+  <p id="error" role="alert"></p>
+  <p><small>Oikeaa Valio-tilausta tai rahansiirtoa ei tehdä. Hyväksyntä ei ohita tuotteen turvallisuus- tai saatavuustarkistuksia.</small></p>
+  <p><a href="/">Takaisin alkuun</a></p>
+</main></body>
 </html>

@@ -330,7 +330,7 @@ test('cart link tokens cannot be forged, extended, swapped to another customer o
   assert.equal((await f.api(forge({ ...claims, expires: NOW + 48 * 3600_000 }))).status, 410, 'longer than the 24 h lifetime');
   assert.equal((await f.api(forge({ ...claims, expires: 1e20 }))).status, 410);
   assert.equal((await f.api(forge({ binding: claims.binding }))).status, 410);
-  assert.equal((await f.api(`${payload}.${signature.slice(0, -1)}A`)).status, 410);
+  assert.equal((await f.api(`${payload}.${signature[0] === 'A' ? 'B' : 'A'}${signature.slice(1)}`)).status, 410);
   assert.equal((await f.api('')).status, 410);
   assert.equal((await f.api(token, { headers: { origin: 'https://evil.example' } })).status, 403);
   assert.equal((await f.api(token, { headers: { 'sec-fetch-site': 'cross-site' } })).status, 403);

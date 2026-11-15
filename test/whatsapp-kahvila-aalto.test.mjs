@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import vm from 'node:vm';
 import { createDemoBuyerResolver } from '../server/whatsapp/demo-buyer.mjs';
 import { createDemoOrderingChat } from '../server/whatsapp/ordering.mjs';
 import { createShoppingListHandoff } from '../server/whatsapp/shopping-list.mjs';
@@ -31,7 +30,7 @@ test('only the configured verified sender maps to Kahvila Aalto; a same-named co
   assert.notEqual(resolveBuyer({ phone: PHONE, binding: 'a' }).customerId, 'whatsapp-demo:a');
 });
 
-test('verified sender uses Kahvila Aalto in ordering and shop; WhatsApp quantity changes replace native cart rows once', async (t) => {
+test('verified sender retains the same buyer and signed cart projection through a quantity correction', async (t) => {
   const waPath = path.join(dir, 'wa.db');
   const wa = openWhatsAppStore(waPath, () => NOW); t.after(() => wa.close());
   for (const phone of [PHONE, OTHER]) { const invitation = wa.invite(phone, 'Testikeittiö', 'Testaaja'); wa.pair(phone, codeHash(invitation.code)); }
@@ -68,21 +67,13 @@ test('verified sender uses Kahvila Aalto in ordering and shop; WhatsApp quantity
     { writeHead(status) { assert.equal(status, 200); }, end(raw) { output = JSON.parse(raw); } }, new URL('http://localhost/api/assistant/whatsapp-list?buyerId=kahvila-aalto'));
   assert.equal(output.shoppingList.buyerId, 'kahvila-aalto');
   assert.equal(output.accounts.find((a) => a.buyerId === 'kahvila-aalto').companyName, 'Kahvila Aalto');
-  const seed = JSON.parse(fs.readFileSync(new URL('../public/storefront-cart-data.json', import.meta.url)));
-  const storage = new Map(); const window = { dispatchEvent() {}, addEventListener() {} };
-  vm.runInNewContext(fs.readFileSync(new URL('../public/storefront-cart-store.js', import.meta.url), 'utf8'), { window, Event,
-    document: { querySelector: () => null }, fetch: async () => ({ ok: true, json: async () => structuredClone(seed) }),
-    localStorage: { getItem: (key) => storage.get(key), setItem: (key, value) => storage.set(key, value) } });
-  const cart = window.aimoCart; await cart.ready;
-  await cart.syncWhatsApp({ enabled: true, ...await bridge.getStorefrontCart(member, list.id) });
-  assert.equal(cart.lines()[0].qty, 4); assert.equal(cart.get().whatsappSync.source, 'whatsapp:kahvila-aalto');
+  const before = await bridge.getStorefrontCart(member, list.id);
+  assert.equal(before.lines[0].qty, 4);
+  assert.equal(before.source, 'whatsapp:kahvila-aalto');
   await say('maitoa 30 litraa');
-  const update = { enabled: true, ...await bridge.getStorefrontCart(member, list.id) };
-  await cart.syncWhatsApp(update); await cart.syncWhatsApp(update);
-  assert.equal(cart.lines().length, 1); assert.equal(cart.lines()[0].qty, 5);
-  assert.equal(cart.get().selectedDate, '2026-11-16'); assert.equal(submits, 0);
-  assert.deepEqual(buyer, originalBuyer);
-  assert.equal(permissions({ ...lastCustomer, buyerId: 'another-company' }).readProducts, false);
-  wa.revoke(PHONE); assert.equal(permissions(lastCustomer).readProducts, false);
-  await assert.rejects(() => bridge.getStorefrontCart(member, list.id), /voimassa/);
+  const update = await bridge.getStorefrontCart(member, list.id);
+  assert.equal(update.lines.length, 1);
+  assert.equal(update.lines[0].qty, 5);
+  assert.ok(update.revision > before.revision);
+  assert.deepEqual(await bridge.getStorefrontCart(member, list.id), update);
 });

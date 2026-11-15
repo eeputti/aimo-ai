@@ -4,12 +4,12 @@ import { createConfiguredWhatsApp } from './whatsapp/runtime.mjs';
 import { isLocal } from './whatsapp/web-demo.mjs';
 
 const channel = createConfiguredWhatsApp();
-let storefront;
-function loadStorefront() {
-  // Reuse the HTTP storefront inside this process: one gateway connection, signer and ledger
-  // for both channels. Importing the handler must not start another HTTP server or worker.
+let localApp;
+function loadLocalApp() {
+  // Local order diagnostics share the same gateway connection, signer and ledger.
+  // The retired full storefront and kitchen are not loaded; importing starts no server or worker.
   process.env.AIMO_EMBEDDED_STOREFRONT = 'true';
-  return storefront ||= import('./index.mjs');
+  return localApp ||= import('./index.mjs');
 }
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -18,10 +18,10 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ ok: true, channel: 'whatsapp', mode: process.env.WHATSAPP_ORDERING_ENABLED === 'true' ? 'ordering-demo' : 'read-only-test' }));
   } else if (process.env.WHATSAPP_ORDERING_ENABLED === 'true' && isLocal(req)) {
-    try { await (await loadStorefront()).handleStorefrontRequest(req, res); }
+    try { await (await loadLocalApp()).handleStorefrontRequest(req, res); }
     catch (error) {
-      console.error('[local-shop]', error);
-      if (!res.headersSent) { res.writeHead(500, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'Testikaupan avaaminen epäonnistui.' })); }
+      console.error('[local-orders]', error);
+      if (!res.headersSent) { res.writeHead(500, { 'content-type': 'application/json' }); res.end(JSON.stringify({ error: 'Paikallisten tilaustyökalujen avaaminen epäonnistui.' })); }
       else res.end();
     }
   } else { res.writeHead(404); res.end('Not found'); }

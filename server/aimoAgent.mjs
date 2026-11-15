@@ -1,6 +1,6 @@
 // AIMO-AGENTTI: ainoa paikka, josta kielimallia kutsutaan.
 // Agentti = Aimon ohjeet, skeemat ja tarkistukset valmiin kielimallin päällä. Tehtävät (keittiön reititys ja tarkistus
-// llm.mjs, pyynnön tulkinta aimo/model.mjs, portin neuvonantaja gateway/advisor.mjs) antavat ohjeen, syötteen ja skeeman;
+// WhatsApp-dialogi, pyynnön tulkinta aimo/model.mjs, portin neuvonantaja gateway/advisor.mjs) antavat ohjeen, syötteen ja skeeman;
 // tämä moduuli omistaa asiakkaan, mallivalinnan, kutsuasetukset ja laskurit. Mallin tai toimittajan vaihto tehdään täällä.
 // Ilman ANTHROPIC_API_KEY:tä agentti on pois päältä ja sovellus toimii sääntöpohjaisesti.
 import { config, llmEnabled } from './config.mjs';

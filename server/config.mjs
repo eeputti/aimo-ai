@@ -7,7 +7,7 @@ export const config = {
   deepModel: process.env.DEEP_MODEL || 'claude-opus-5-5',
   fastModel: process.env.FAST_MODEL || 'claude-haiku-5-5',
   customer: process.env.VALIO_CUSTOMER || '123', // challengessa asiakasnumero ei vaikuta vastaukseen
-  // Danielin ostosagentti (Python-MCP-palvelin, esim. Renderissä): sivu /assistant.html. Osoite ilman tokenia, esim. https://x.onrender.com/mcp
+  // Read-only WhatsApp fallback: external product MCP service. Token is sent only in the authorization header.
   assistantMcpUrl: (process.env.ASSISTANT_MCP_URL || '').trim(),
   assistantMcpToken: (process.env.ASSISTANT_MCP_TOKEN || '').trim(),
 };

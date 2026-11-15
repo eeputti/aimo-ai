@@ -1,29 +1,12 @@
 // Hakee tuotekuvat etukäteen levylle (data/img), ettei demon ensimmäinen lataus odota niitä.
-// Aja: npm run images                → nykyinen ehdotus, korvaajat ja tavalliset demohaut
 //      npm run images -- 464306 10400 → lisäksi annetut tuotenumerot ja kokonaiset kategoriat (esim. 10400 = maidot)
 //      npm run images -- --query "laktoositon kerma" → oman haun ensimmäiset 12 tuotetta
-import fs from 'node:fs';
-import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
-import { loadCatalog, ROOT } from '../server/catalog.mjs';
+import { loadCatalog } from '../server/catalog.mjs';
 import { interpret } from '../server/aimo/index.mjs';
 import { resolveImage } from '../server/images.mjs';
 
 const cat = loadCatalog();
 const ids = new Set();
-// Read only: preparing photos must never initialize or reset the user's demo database.
-let p = null;
-const dbFile = process.env.AIMO_DB || path.join(ROOT, 'data', 'aimo.db');
-if (fs.existsSync(dbFile)) {
-  const db = new DatabaseSync(dbFile, { readOnly: true });
-  try {
-    const id = JSON.parse(db.prepare('SELECT value FROM kv WHERE key = ?').get('currentProposal')?.value || 'null');
-    if (id) p = JSON.parse(db.prepare('SELECT json FROM proposals WHERE id = ?').get(id)?.json || 'null');
-  }
-  finally { db.close(); }
-}
-for (const l of p?.lines || []) { ids.add(l.productId); for (const o of l.options || []) ids.add(o.productId); }
-for (const s of p?.skipped || []) ids.add(s.productId);
 const args = process.argv.slice(2);
 const queries = args.length === 0 || args.includes('--demo')
   ? ['maito', 'laktoositon maito', 'kerma', 'laktoositon kerma', 'voi', 'peruna', 'lohi', 'mustikka', 'jogurtti', 'tilli', 'kookosmaito', 'kananmunat', 'broileri'] : [];
