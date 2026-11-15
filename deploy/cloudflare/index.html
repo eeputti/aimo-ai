@@ -43,7 +43,7 @@
         <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+358 40 123 4567" required>
         <label for="name">Nimi</label>
         <input id="name" name="name" autocomplete="name" maxlength="60" required>
-        <p class="signup-help">Testidemossa numerosi hyväksytään käsin. Lähetä lomake ja soita sen jälkeen Eelikselle: 5 minuutin puhelussa numerosi saadaan käyttöön.</p>
+        <p class="signup-help">Testidemossa numerosi hyväksytään käsin. Lähetä numerosi, ja soita tai laita sen jälkeen Eelikselle viesti, niin hän hyväksyttää numerosi WhatsAppiin.</p>
         <label class="consent"><input id="consent" name="consent" type="checkbox" required><span>Numeroani saa käyttää tämän demon WhatsApp-keskusteluun. Tiedot poistetaan viimeistään 7 päivän kuluttua.</span></label>
         <p id="form-error" class="error" role="alert" hidden></p>
         <button id="submit" class="button" type="submit">Aloita WhatsAppissa</button>
@@ -52,7 +52,7 @@
       <div id="status" class="status" hidden aria-live="polite">
         <ol class="track" aria-label="Vaiheet">
           <li data-step="received">Numero vastaanotettu</li>
-          <li data-step="linked">Lisätty tilausapuriin</li>
+          <li data-step="call">Soita tai laita viesti Eelikselle</li>
           <li data-step="approved">Hyväksytty WhatsAppiin</li>
           <li data-step="ready">Valmis keskusteluun</li>
         </ol>
@@ -61,6 +61,10 @@
         <a id="call" class="button call" href="#" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.2 15.2 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2Z" fill="currentColor"/></svg>
           <span class="call-text"><span class="call-name">Soita Eelikselle</span><span id="call-number" class="call-number"></span></span>
+        </a>
+        <a id="message" class="button message" href="#" target="_blank" rel="noopener noreferrer" hidden>
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3.5A12.4 12.4 0 0 0 5.3 22.2L3.6 28.4l6.4-1.7A12.4 12.4 0 1 0 16 3.5Z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg>
+          <span class="call-name">Laita viesti Eelikselle</span>
         </a>
         <form id="code-form" class="code-form" hidden novalidate>
           <label for="code">Jos sait Metalta vahvistuskoodin, kirjoita se tähän</label>

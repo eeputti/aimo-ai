@@ -15,8 +15,7 @@ a:focus-visible,button:focus-visible,input[type=checkbox]:focus-visible{outline:
 .page{max-width:460px;margin:0 auto;padding:48px 16px 32px;text-align:center}
 .marks{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:18px}
 .heart{color:var(--blue);display:grid;place-items:center}
-.heart svg{width:30px;height:30px;animation:beat 1.6s ease-in-out infinite}
-@keyframes beat{0%,100%{transform:scale(1)}12%{transform:scale(1.18)}24%{transform:scale(1)}36%{transform:scale(1.12)}}
+.heart svg{width:30px;height:30px}
 .logo{display:block;width:152px;height:auto}
 .wa-icon{width:56px;height:56px;border-radius:16px;background:var(--wa);display:grid;place-items:center;box-shadow:0 8px 20px rgba(37,211,102,.3)}
 .wa-icon svg{width:34px;height:34px}
@@ -61,12 +60,11 @@ input[aria-invalid=true]{border-color:#c4453c;background:#fff8f7}
 .track li.done{color:var(--blue)}
 .track li.done::before{content:"✓";border-color:var(--blue);background:var(--blue)}
 .track li.current{color:var(--blue);font-weight:700}
-.track li.current::before{border-color:var(--blue);border-top-color:transparent;animation:spin 1s linear infinite}
+.track li.current::before{border-color:var(--blue);background:var(--sky)}
 .track li.waiting{color:var(--blue)}
 .track li.waiting::before{content:"…";border-color:var(--blue);background:var(--sky);color:var(--blue)}
 .track li.failed{color:#9f3b34}
 .track li.failed::before{content:"!";border-color:#c4453c;background:#c4453c}
-@keyframes spin{to{transform:rotate(360deg)}}
 .code-form{margin:0 0 6px}
 .code-row{display:flex;gap:10px}
 .code-row input{min-width:0;flex:1;margin:0;font-size:20px;letter-spacing:4px;text-align:center}
@@ -87,8 +85,10 @@ input[aria-invalid=true]{border-color:#c4453c;background:#fff8f7}
   h1{font-size:40px}
   .card{padding:22px 18px}
 }
-@media (prefers-reduced-motion:reduce){.track li.current::before,.heart svg{animation:none}}
-.button.call{gap:12px;margin:0 0 20px;min-height:64px;background:var(--blue)}
+.button.call{gap:12px;margin:0 0 10px;min-height:64px;background:var(--blue)}
+.button.message{gap:10px;margin:0 0 20px;background:#fff;color:var(--blue);border:2px solid var(--blue)}
+.button.message:hover{background:var(--sky)}
+.button.message svg{width:22px;height:22px;flex-shrink:0}
 .button.call:hover{background:#002a52}
 .button.call svg{width:24px;height:24px;flex-shrink:0}
 .call-text{display:flex;flex-direction:column;align-items:flex-start;line-height:1.2}

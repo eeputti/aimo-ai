@@ -60,16 +60,20 @@ test('a waiting number gets a call button to the presenter that disappears once 
   assert.equal(p.element('call').hidden, false);
   assert.equal(p.element('call').href, 'tel:+358501112223');
   assert.equal(p.element('call-number').textContent, '+358 50 111 2223');
-  assert.equal(p.element('status-title').textContent, 'Soita Eelikselle');
-  assert.match(p.element('status-detail').textContent, /5 minuutin puhelussa/);
+  assert.equal(p.element('status-title').textContent, 'Soita tai laita viesti Eelikselle');
+  assert.match(p.element('status-detail').textContent, /hyväksyttää numerosi/);
+  assert.equal(p.element('message').hidden, false);
+  assert.equal(p.element('message').href, 'https://wa.me/358501112223?text=' + encodeURIComponent('Hei Eelis! Lisäsin numeroni Aimon WhatsApp-tilausapuriin nimellä Test. Voitko hyväksyä sen?'));
   const polling = p.nextPoll();
   p.requests.at(-1).resolve(Response.json({ status: 'ready', chatUrl: 'https://wa.me/358400000000' })); await polling;
   assert.equal(p.element('call').hidden, true);
+  assert.equal(p.element('message').hidden, true);
   assert.equal(p.element('open-whatsapp').hidden, false);
 });
 
 test('a malformed presenter number from the server is never turned into a link', async () => {
   const p = page(); await p.register('first', { call: { tel: 'javascript:alert(1)', display: 'x' } });
   assert.equal(p.element('call').hidden, true);
+  assert.equal(p.element('message').hidden, true);
   assert.match(p.element('status-detail').textContent, /tämä lomake ei lähetä koodia/);
 });

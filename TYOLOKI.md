@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — landingin neljä vaihetta, viestinappi ja ilmoitus uusista numeroista (Claude Code, soittonappi-chat)
+
+- **Käyttäjän palaute:** nappia ei näkynyt, koska hänen oma selaimensa muistaa jo hyväksytyn numeron ja avaa suoraan Avaa WhatsApp -näkymän. Välikokeilu, jossa nappi oli kortin yläreunassa (Worker eea80732), peruttiin käyttäjän pyynnöstä: nappi kuuluu numeron lisäämisen jälkeen. Lopullinen ohje: turhat animaatiot pois ja vaiheet Numero vastaanotettu → Soita tai laita viesti Eelikselle → Hyväksytty WhatsAppiin → Valmis keskusteluun. Käyttäjä haluaa myös tiedon jokaisesta lisätystä numerosta.
+- **Muutos:** "Lisätty tilausapuriin" pois näkyvistä, sydämen syke ja pyörivä latausympyrä pois. Soittonapin alle **Laita viesti Eelikselle** (WhatsApp, valmis teksti kokeilijan nimellä). `whatsapp-signups.mjs watch` käynnistettiin käyttäjän Terminal-paneeliin WhatsApp-palvelimen snapshotissa: uusi numero liitetään ja näkyy macOS-ilmoituksena ja terminaalissa. Käynnistyessä se näytti kolme aiemmin odottanutta tiimin numeroa, uusia ei ollut.
+- **Tarkistukset ja julkaisu:** Worker **29/29**, typecheck/build, mock 375 px tuotannon CSP:llä (vaiheet, 0 animaatiota, viestilinkki, ei ylivuotoa). Worker **a6021dd8-49ea-4d30-9623-930c0371f2cd**: JS/CSS tavulleen samat, healthz 200, suojattu lista 401. Raportti `docs/parallel/landing-call.md`.
+
 ## 15.11.2026 — landingille Soita Eelikselle -nappi Metan hyväksyntään (Claude Code, soittonappi-chat)
 
 - **Käyttäjän pyyntö ja päätös:** Valiolle lähetettävästä linkistä pitää päästä testaamaan. Metan testinumerossa jokainen numero hyväksytään käsin, joten käyttäjä valitsi yksinkertaisen tavan: lomakkeen (numero + nimi) jälkeen kokeilija soittaa Eelikselle, ja 5 minuutin puhelussa numero lisätään Metaan ja koodi kerrotaan. Cal.comia tai muuta varauspalvelua ei käytetä.

@@ -14,13 +14,14 @@ const TEXT = {
   codeSent: ['Koodi toimitettu Aimo-tiimille', 'Koodi odottaa vielä vahvistamista Metassa. Sivulle kirjoittaminen ei yksin hyväksy numeroa. Tämä sivu päivittyy, kun Aimo-tiimi on vahvistanut numerosi.'],
   ready: ['Valmista! Avaa WhatsApp', 'Lähetä apurille viesti ja kerro, mitä keittiöösi tarvitaan. Apuri vastaa samassa keskustelussa.'],
   failed: ['Numeroa ei voitu lisätä', 'Tarkista numero ja yritä uudelleen.'],
-  call: ['Soita Eelikselle', 'Numerosi hyväksytään 5 minuutin puhelussa. Puhelun aikana WhatsAppiin tulee viisinumeroinen koodi: kerro se Eelikselle. Sen jälkeen tämä sivu avaa WhatsAppin.'],
+  call: ['Soita tai laita viesti Eelikselle', 'Eelis hyväksyttää numerosi WhatsAppiin. Saat WhatsAppiin viisinumeroisen koodin: kerro se Eelikselle. Sen jälkeen tämä sivu avaa WhatsAppin.'],
 };
+// The person sees four steps: the number is received, they call or message the presenter, Meta approval, ready.
 const TRACK = {
-  pending: { received: 'done', linked: 'current' },
-  linked: { received: 'done', linked: 'done', approved: 'waiting' },
-  ready: { received: 'done', linked: 'done', approved: 'done', ready: 'done' },
-  failed: { received: 'done', linked: 'failed' },
+  pending: { received: 'done', call: 'current' },
+  linked: { received: 'done', call: 'current' },
+  ready: { received: 'done', call: 'done', approved: 'done', ready: 'done' },
+  failed: { received: 'done', call: 'failed' },
 };
 
 let timer = 0, startedAt = 0, current = null, last = 'pending';
@@ -40,6 +41,13 @@ function show(status, chatUrl, codeSent = false) {
   const callButton = $('call');
   callButton.hidden = !call;
   if (call) { callButton.href = 'tel:' + call.tel; $('call-number').textContent = call.display; }
+  // A WhatsApp message to the presenter with the name already written, for those who would rather not call.
+  const message = $('message');
+  message.hidden = !call;
+  if (call) {
+    const name = current?.name ? ` nimellä ${current.name}` : '';
+    message.href = `https://wa.me/${call.tel.slice(1)}?text=${encodeURIComponent(`Hei Eelis! Lisäsin numeroni Aimon WhatsApp-tilausapuriin${name}. Voitko hyväksyä sen?`)}`;
+  }
   const slow = status === 'pending' && Date.now() - startedAt > 45000;
   const [title, detail] = TEXT[status === 'linked' && codeSent ? 'codeSent' : call ? 'call' : slow ? 'slow' : status] || TEXT.pending;
   $('code-form').hidden = status !== 'linked';
@@ -118,7 +126,7 @@ $('signup-form').addEventListener('submit', async event => {
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) return fieldError(body.field, body.error || 'Ilmoittautuminen ei onnistunut. Yritä uudelleen.');
-    const signup = { id: body.id, token: body.token, status: body.status, chatUrl: body.chatUrl, call: body.call || null };
+    const signup = { id: body.id, token: body.token, status: body.status, chatUrl: body.chatUrl, call: body.call || null, name };
     saved.set({ id: signup.id, token: signup.token });
     follow(signup);
   } catch {
