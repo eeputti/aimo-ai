@@ -90,7 +90,7 @@ async function proxy(request: Request, url: URL, origin: string) {
 
 export function siteHeader(current: string) {
   const tabs: [string, string, string][] = [["etusivu", "/", "Etusivu"], ["keskustele", "/keskustele", "Keskustele"], ["ostoskori", "/ostoskori", "Ostoskori"],
-    ["miten", "/miten", "Näin se toimii"], ["tilaukset", "/tilaukset", "Tilaukset"], ["minusta", "/minusta", "Minusta"]];
+    ["miten", "/miten", "Näin se toimii"], ["tilaukset", "/tilaukset", "Tilaukset"]];
   return `<header class="site-header"><a class="site-logo" href="/" aria-label="Aimo-tilausapurin etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="120" height="42"></a><nav class="site-tabs" aria-label="Sivut">${
     tabs.map(([id, href, label]) => `<a href="${href}"${id === current ? ' aria-current="page"' : ""}>${label}</a>`).join("")}</nav></header>`;
 }
