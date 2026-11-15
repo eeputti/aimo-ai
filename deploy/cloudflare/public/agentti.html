@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#003c75">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
   <title>Agentin jälki | Aimo-tilausapuri</title>
+  <link rel="stylesheet" href="/site.css">
   <link rel="stylesheet" href="/agentti.css">
   <script type="module" src="/agentti.js"></script>
 </head>
@@ -27,13 +28,23 @@
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M7 7l10 10M17 7 7 17" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
   </svg>
 
-  <header class="topbar"><a href="/tilaukset.html" aria-label="Aimo-demon tilaukset"><img src="/aimo-logo.png" alt="Valio Aimo" width="152" height="53"></a><span class="label">AGENTIN JÄLKI</span></header>
+  <header class="site-header"><a class="site-logo" href="/" aria-label="Aimo-tilausapurin etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="120" height="42"></a><nav class="site-tabs" aria-label="Sivut"><a href="/">Etusivu</a><a href="/keskustele">Keskustele</a><a href="/ostoskori">Ostoskori</a><a href="/miten" aria-current="page">Näin se toimii</a><a href="/tilaukset">Tilaukset</a><a href="/minusta">Minusta</a></nav></header>
 
   <main>
     <section class="hero" aria-labelledby="title">
       <p class="eyebrow" id="order-label">TILAUSAPURI</p>
       <h1 id="title">Näin agentti kokosi tilauksen.</h1>
       <p class="lead">WhatsApp-viesteistä ostoskoriksi ja allekirjoitetuksi tilaukseksi. Kaikki alla on tämän tilauksen omaa dataa.</p>
+      <figure id="code" class="code" hidden>
+        <div class="code-bar">
+          <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span id="code-file" class="code-file">tilausapuri/agentti.js</span>
+          <span id="code-state" class="code-state">VALMIS</span>
+          <button id="code-replay" class="code-replay" type="button" aria-label="Toista koodin kirjoitus alusta"><svg aria-hidden="true"><use href="#i-refresh"/></svg></button>
+        </div>
+        <ol id="code-lines" class="code-lines" aria-label="Agentin kutsut tämän tilauksen aikana"></ol>
+        <figcaption>Rivit on koottu tämän tilauksen tallennetusta datasta: oikeat rajapintapolut, kentät ja vastaukset, lyhennettyinä. Avaimet, allekirjoitukset ja puhelinnumerot eivät ole mukana.</figcaption>
+      </figure>
       <div id="stats" class="stats" hidden></div>
     </section>
 
