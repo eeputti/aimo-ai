@@ -19,7 +19,11 @@ Toteutus: `server/valioApi.mjs` (`lastKnownAvailability`, `lastKnownPrice`, 5 mi
 
 ## Kattavuus
 
-Varalla ovat vain tuotteet, joita botti tai paikallinen kauppa on jo kysynyt: WhatsAppin välimuistissa 471 tuotetta 15.11. illalla. Kattavuus kasvaa tavallisessa käytössä. Kokonaisia tuoteryhmiä tai kaikkia tuotteita ei haeta etukäteen.
+Varalla ovat vain tuotteet, joita botti tai paikallinen kauppa on jo kysynyt. Kokonaisia tuoteryhmiä tai kaikkia tuotteita ei haeta etukäteen.
+
+- 15.11. klo 18.15: WhatsAppin välimuistissa oli 471 tuotetta.
+- 15.11. klo 18.20 käyttäjän pyynnöstä ("Lisää ne") samaan välimuistiin (`data/whatsapp-kitchen.db`) kopioitiin paikallisen kaupan aiemmat oikeat rajapintavastaukset (`data/aimo.db`, haettu 14.11.) niille 648 tuotteelle, joita WhatsAppin välimuistissa ei vielä ollut: 1 356 riviä, `INSERT OR IGNORE`, olemassa olevia rivejä ei muutettu. Nyt varahinta on **1 119 tuotteelle**. Uusia rajapintakutsuja ei tehty. Varmuuskopio ennen lisäystä on otettu, `integrity_check` ok. Neljä lisättyä tuotetta (bataatti, hedelmäleipä, pizzakinkku, laktoositon vispikerma) löytyivät suljetulla rajapinnalla oikeilla hinnoilla ja 19.11. toimituksella.
+- Kattavuus kasvaa tavallisessa käytössä.
 
 ## Tarkistukset
 
