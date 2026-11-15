@@ -28,7 +28,8 @@ test('a model greeting uses the requested brand tone without touching the shoppi
   let calls = 0;
   const f = fixture(t, async ({ system }) => { calls++; assert.match(system, /Valio Aimon/); return plan('chat', { text: 'Hei! Kootaan keittiön ostoslista kuntoon. Mitä tarvitaan?' }); });
   const result = await f.turn('Moi');
-  assert.equal(result.text, 'Moi! Kootaan keittiön ostoslista kuntoon. Mitä tarvitaan?'); assert.equal(f.ordered.length, 0); // asiakkaan tervehdys peilataan
+  // Neutraali "Moi" saa kellonajan mukaisen tervehdyksen (testiajon kellosta), mallin oma "Hei!" korvataan.
+  assert.match(result.text, /^(?:Huomenta|Päivää|Iltaa|Moi)! Kootaan keittiön ostoslista kuntoon\. Mitä tarvitaan\?$/); assert.equal(f.ordered.length, 0);
   const reopened = createOrderingDialogue(f.options);
   assert.deepEqual(await reopened.respond({ binding: 'one', messageId: 'm1', text: 'Moi' }), result);
   assert.equal(calls, 1);
@@ -124,7 +125,7 @@ test('greetings never replay the old offer even if the model fails or routes the
     const f = fixture(t, ask);
     await f.turn('5 l maitoa'); const before = f.ordered.length;
     const greeting = await f.turn('moi');
-    assert.match(greeting.text, /^Moi! /); assert.doesNotMatch(greeting.text, /12,34|Tilausluonnos/);
+    assert.match(greeting.text, /^(?:Huomenta|Päivää|Iltaa|Moi)! /); assert.doesNotMatch(greeting.text, /12,34|Tilausluonnos/);
     assert.equal(f.ordered.length, before);
   }
 });

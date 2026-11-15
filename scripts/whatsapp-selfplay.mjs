@@ -34,7 +34,8 @@ export async function runSelfplay({ cases = SELFPLAY_CASES, maxTurns, out, maxMo
     import('../server/whatsapp/cart-link.mjs'), import('../server/whatsapp/shopping-list.mjs'), import('../server/aimoAgent.mjs'),
   ]);
   const store = openWhatsAppStore(path.join(dir, 'whatsapp.db'));
-  const ordering = createDemoOrderingChat({ store, phoneId: '999000111', draftDb: process.env.WHATSAPP_DRAFT_DB, quoteDb: process.env.WHATSAPP_QUOTE_DB });
+  // Sama tukiyhteys tilauskeskustelulle kuin kanavalle, kuten runtime.mjs:ssä.
+  const ordering = createDemoOrderingChat({ store, phoneId: '999000111', draftDb: process.env.WHATSAPP_DRAFT_DB, quoteDb: process.env.WHATSAPP_QUOTE_DB, supportContact: 'Testin ylläpito' });
   const secret = crypto.randomBytes(32).toString('hex');
   const cart = createCartLink({ store, ordering, baseUrl: 'https://selfplay.invalid', secret });
   const sent = new Map();

@@ -179,9 +179,15 @@ export function createOrderingTools(deps = {}) {
       fit = scored.map((x) => x.o);
       // Laktoosikysymys vain, jos ainakin yhdessä oikeassa vaihtoehdossa on tunnettu maitoainesosa: kananmunien
       // satunnaiset laktoositon-merkinnät eivät tee kysymyksestä olennaista.
-      const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim) && (!c.needsAllergen || fit.some((o) => product(o.id)?.contains?.includes(c.needsAllergen))))
-        .map((c) => ({ claim: c.claim, share: fit.filter((o) => o.labels?.includes(c.claim)).length / fit.length, ...c }))
-        .filter((c) => fit.length >= 3 && c.share >= c.min && c.share <= c.max).map((c) => c.claim);
+      // Tarkennus lasketaan pyydetyn tuotteen omista vaihtoehdoista, ja laktoosia kysytään vain maitotuotteesta (vähintään
+      // puolessa vaihtoehdoista maitoa): perunahaun yksittäinen maitoa sisältävä muusi ei tee kysymyksestä olennaista (itsepeli X097).
+      const own = fit.filter(onTerm); const base = own.length ? own : fit;
+      // Osuus lasketaan tuotteista, joiden allergeenitieto tunnetaan: puuttuva tieto ei ole todiste kumpaankaan suuntaan.
+      const known = base.filter((o) => product(o.id)?.hasAllergenData);
+      const ingredientShare = (allergen) => (known.length ? known.filter((o) => product(o.id).contains?.includes(allergen)).length / known.length : 0);
+      const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim) && (!c.needsAllergen || ingredientShare(c.needsAllergen) >= 0.5))
+        .map((c) => ({ claim: c.claim, share: base.filter((o) => o.labels?.includes(c.claim)).length / base.length, ...c }))
+        .filter((c) => base.length >= 3 && c.share >= c.min && c.share <= c.max).map((c) => c.claim);
       // Halvin nostetaan kärkeen vain parhaan tyyppiryhmän tavallisista, joiden määrä tunnetaan: maustettu, poikkeava tai
       // väärää tyyppiä oleva tuote ei ohita järjestystä halvimpana, eikä sipulinippu kilotarpeeseen.
       // Ensimmäinen sivu näyttää vain pyydettyä tuotetta, kun sellaista on (haun requested): kaksi tuorehiivaa eikä kuivahiivaa

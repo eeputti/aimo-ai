@@ -29,7 +29,7 @@ export function bootstrapDemoMember(store, env = process.env) {
   if (!store.pair(phone, codeHash(invitation.code))) throw new Error('Testiasiakkaan yhdistäminen epäonnistui.');
 }
 
-export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadOrdering, resolveBuyer = createDemoBuyerResolver() } = {}) {
+export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadOrdering, resolveBuyer = createDemoBuyerResolver(), supportContact } = {}) {
   let runtime; let pending;
   const queues = new Map();
   function serial(binding, work) {
@@ -63,7 +63,7 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       import('../order-conversation/runtime.mjs'), import('../gateway/store.mjs'), import('../gateway/mandate.mjs'), import('./dialogue.mjs'),
     ]);
     const ordering = await createConfiguredOrdering({ draftDb, quoteDb, permissions });
-    return { ...ordering, buyerName: (id) => buyers.byId(id)?.name, dialogue: await createConfiguredDialogue(store), ensureBuyer(customer) {
+    return { ...ordering, buyerName: (id) => buyers.byId(id)?.name, dialogue: await createConfiguredDialogue(store, { supportContact }), ensureBuyer(customer) {
       const member = store.db.prepare('SELECT * FROM members WHERE binding=?').get(customer.bindingVersion);
       if (member && resolveBuyer(member).mapped && !buyers.byId(customer.buyerId)) throw new Error('Valittua demoasiakasta ei löydy. Alusta kaupan asiakas ennen numeroliitosta.');
       if (!buyers.byId(customer.buyerId)) buyers.save({

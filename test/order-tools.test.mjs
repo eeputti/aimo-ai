@@ -245,3 +245,16 @@ test('laktoositarkennus vain, kun oikeissa vaihtoehdoissa on tunnettu maitoaines
   const m = await milk.tools.suggest({ customer, draft: draftOf([line('a')]) });
   assert.deepEqual(m.lines[0].clarify, ['FREE_FROM_LACTOSE']);
 });
+
+test('laktoositarkennus lasketaan pyydetyn tuotteen vaihtoehdoista, ei hakuun osuneista muista tuotteista', async () => {
+  // Itsepeli X097: perunahaun maitoa sisältävä muusijauhe sai kysymään perunasta laktoosittomuutta.
+  // Haku merkitsee pyydetyn tuotetyypin requested-kentällä (perunat true, muusijauhe false), kuten oikealla katalogilla.
+  const potato = (id, name, labels) => found(id, labels, { name, kg: 1, litres: undefined, qty: 15, requested: id.startsWith('P') });
+  const contains = { P1: [], P2: [], P3: [], P4: ['AM'], M1: ['AM'], M2: ['AM'] };
+  const { tools } = fakes({ product: (id) => ({ hasAllergenData: true, contains: contains[id] || [] }),
+    // Pyydetyissäkin voi olla yksittäinen maitoa sisältävä tuote (pakastemuusi) ja laktoositon-merkintöjä: ei silti maitotuote.
+    search: async () => [potato('P1', 'Peruna pesty 1 kg', ['FREE_FROM_LACTOSE']), potato('P2', 'Peruna kesä 1 kg', []), potato('P3', 'Peruna Rosamunda 1 kg', []), potato('P4', 'Perunamuusi pakaste 3 kg', []),
+      potato('M1', 'Perunamuusijauhe laktoositon 1 kg', ['FREE_FROM_LACTOSE']), potato('M2', 'Perunamuusijauhe 1 kg', [])] });
+  const s = await tools.suggest({ customer, draft: draftOf([line('a', { productTerm: 'peruna', quantity: { value: 15, unit: 'KG' } })]) });
+  assert.deepEqual(s.lines[0].clarify, []);
+});

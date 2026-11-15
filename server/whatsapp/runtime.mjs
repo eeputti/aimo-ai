@@ -28,7 +28,7 @@ export function createConfiguredWhatsApp() {
   let ordering;
   if (settings.orderingDemo) {
     bootstrapDemoMember(store);
-    ordering = createDemoOrderingChat({ store, phoneId: settings.phoneId,
+    ordering = createDemoOrderingChat({ store, phoneId: settings.phoneId, supportContact: settings.supportContact,
       draftDb: process.env.WHATSAPP_DRAFT_DB || fileURLToPath(new URL('../../data/whatsapp-drafts.db', import.meta.url)),
       quoteDb: process.env.WHATSAPP_QUOTE_DB || fileURLToPath(new URL('../../data/whatsapp-quotes.db', import.meta.url)),
     });
