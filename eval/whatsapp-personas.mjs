@@ -330,8 +330,9 @@ export function inspectPersona(persona, turns, list) {
         if (b.some((o) => !o.hasPrice)) fresh.push('options_missing_price');
         if (b.some((o) => !o.hasQuantity)) fresh.push('options_missing_quantity');
       }
-      // 4 = lisää vaihtoehtoja vaaditaan vain täydelle kolmen vaihtoehdon sivulle; vajaasta listasta ei ole enempää näytettävää.
-      if (blocks.some((b) => b.length >= 3) && !/(\b4\b|neljä)[^\n]{0,60}(lisää|muita|enemmän)|(lisää|muita|enemmän) vaihtoeh[^\n]{0,60}\b4\b/iu.test(replies[i])) fresh.push('options_no_more_hint');
+      // "4) Näytä lisää" näytetään vain, kun lisää vaihtoehtoja on (ydin: moreNo). Sitä ei voi todentaa transkriptista,
+      // joten puuttuva vihje ei ole virhe. Mittari kertoo, kuinka usein vihje näkyi.
+      if (/(\b4\b|neljä)[^\n]{0,60}(lisää|muita|enemmän)|(lisää|muita|enemmän) vaihtoeh[^\n]{0,60}\b4\b/iu.test(replies[i])) metrics.moreHints = (metrics.moreHints || 0) + 1;
     }
     // (c) "4" tuo uudet, aiemmista eroavat vaihtoehdot eikä valitse neljättä tai muuta määrää neljäksi.
     if (/^\s*(4|nelonen|neljä)\s*[.!]?\s*$/iu.test(t.user) || /^(näytä )?(lisää|muita) vaihtoehtoja/iu.test(t.user.trim())) {
@@ -340,7 +341,8 @@ export function inspectPersona(persona, turns, list) {
       else if (!blocks.length) fresh.push('more_options_not_shown');
       else {
         const seen = new Set(previous.flat().map((o) => lower(o.name)));
-        if (!blocks.flat().some((o) => !seen.has(lower(o.name)))) fresh.push('more_options_same');
+        // "Muita vaihtoehtoja ei löytynyt" ja sama lista on oikein, kun lisää ei ole.
+        if (!blocks.flat().some((o) => !seen.has(lower(o.name))) && !/(muita|lisää) vaihtoeh[^\n]{0,40}ei (löytyn|ole)|ei (löytynyt|ole) (muita|lisää)/iu.test(replies[i])) fresh.push('more_options_same');
       }
       const before = i ? turns[i - 1].list : null;
       for (const line of t.list?.lines || []) {
@@ -435,7 +437,8 @@ export function inspectPersona(persona, turns, list) {
     fee: /(toimitus\w*|rahti\w*)[^.\n]{0,60}(\d+[,.]?\d*\s?(€|euro)|ilmai|maksuton)/iu,
     hours: /(auki|aukiolo|palvelemme|päivystä|tavoitettavissa|paikalla)[^.\n]{0,60}(\d{1,2}[.:]\d{2}|klo\s?\d|\d{1,2}\s?[-–]\s?\d{1,2}|arkisin|ma\s?[-–]\s?pe)/iu,
     payment: /(maksaa|maksu|maksutav|käy)[^.\n]{0,80}(kortilla|korttimaksu|mobilepay|käteis|verkkopankki|visa|mastercard|klarna|osamaks|laskulla)/iu,
-    invoice: /(lasku|maksuaika|eräpäiv)[^.\n]{0,60}(\d+\s?(päivä|pv|vrk|vuorokau)|netto|kuukausilasku)/iu,
+    // Myönteinen väite (ei pelkkä aiheen mainitseminen ohjauksessa tukeen).
+    invoice: /(maksuaika on|eräpäivä on|laskutetaan kuukausittain|saat kuukausilasku|kuukausilasku onnistuu|kuukausilaskutus on mahdollinen)|(lasku|maksuaika|eräpäiv)[^.\n]{0,60}\d+\s?(päivä|pv|vrk|vuorokau)/iu,
     complaint: /(hyvitä|hyvitys|hyvityksen|korvaamme|palautamme rahat|lähetämme uudet|veloituksetta)/iu,
   };
   if (INVENTED[persona.factQuestion] && claimed(INVENTED[persona.factQuestion])) failures.push(`fact_invented:${persona.factQuestion}`);

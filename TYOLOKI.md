@@ -3,6 +3,13 @@
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
 
+## 15.11.2026 — itsekeskustelu korjausten jälkeen: 200 personaa 96–99/100 (Claude Code, selfplay-100)
+
+- **Käyttäjän hyväksyntä:** "Aja molemmat" WhatsApp-botti ja localhost integraatio -sessiossa kysymykseen noin 20 USD:n täysistä ajoista. Hyväksyntä tarkistettiin sen session keskustelusta ja korvasi aiemman noin 3 USD:n rajan. Budjetti noin 22 USD, todellinen kustannus 17,83 USD (laajennettu 8,61, alkuperäinen 9,22), 2 038 kutsua, 0 virhettä, 0 tilausta.
+- **Lähde:** origin/main e3b70e1, jossa ovat mukana f605549, 5044a91 ja e3b70e1. Vertailu samoilla tarkistuksilla: alkuperäinen 100 perus 88 → 96 ja uusi vaatimus 78 → 97, laajennettu 100 perus 85 → 99 ja uusi 81 → 99. Kiire 12/12, tervehdykset 8/8, murteet 20/20, virheitä tekevät 20/20. Poistuneet virheluokat: linkki keskeneräiseen listaan, kiireen tilausaika, perunan laktoosikysymys, peruminen, tervehdys sekä "4" toi samat.
+- **Jäljellä:** valitusta ei ohjattu asiakaspalveluun (X085), olematon tuote pudotettiin sanomatta (S036, S056) ja epämääräiseen avaukseen ei kysytty päivää (S030, X044). Nämä on välitetty date-first-optionsille. Hakuun jäivät edam-juusto, maidoton vaniljajäätelö, tryffelin tilalla suklaapatukka ja kuormalava (taulu #259).
+- **Tarkistukset:** "4) Näytä lisää" -vihjettä ei vaadita (ydin näyttää sen vain, kun lisää on), "muita vaihtoehtoja ei löytynyt" ja sama lista on oikein, ja laskutuksen mainitseminen tukeen ohjatessa ei ole keksitty fakta. `test/whatsapp-personas.test.mjs` 15/15 ja koko `npm test` 260/260 origin/mainin bde66b3:n päällä. Raportti `docs/parallel/whatsapp-selfplay-100.md`.
+
 ## 15.11.2026 — GitHub rajattu WhatsApp-tilausapuriin ja ostoskoriin (Codex, siistimischat)
 
 - **Käyttäjän päätös:** GitHubiin jätetään WhatsApp, sen kori ja tarvittava tausta; vanhat kokonaisuudet saa jättää paikallisesti talteen. Säilytetty myös samaan polkuun kuuluva landing, liittyminen, tilausnäkymä, demomaksu ja sähköposti sekä gatewayn REST/MCP/OpenAPI-sopimus, mandaatit, allekirjoitukset ja audit-ketju.

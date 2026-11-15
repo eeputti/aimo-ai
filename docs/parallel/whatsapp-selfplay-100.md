@@ -11,7 +11,7 @@ Tehtävä 26880afb, 15.11.2026. Eelis pyysi agentin, joka keskustelee apurin kan
 
 - `eval/whatsapp-personas.mjs`: 100 personaa (`PERSONAS`, S001–S100) generoidaan deterministisesti, 20 polkua x 5 muunnelmaa. Lisäksi 6 regressiota (`REGRESSIONS`, R01–R06) baseline-ajon löydöksistä. Omat tarkistukset `inspectPersona` erillään Codexin `inspectConversation`-funktiosta.
 - `scripts/whatsapp-selfplay-batch.mjs`: ajaa personat lapsiprosesseissa (oletus 1 persona per prosessi, `--chunk`, `--concurrency`, `--max-calls`, `--limit`, `--offset`, `--ids`, `--set regressions|all`). Kopioi lähdekoodin ajon alussa väliaikaishakemistoon, jotta rinnakkain muokattu työpuu ei vaihdu kesken ajon. Lapsiprosessi estää muut kuin paikalliset ja mallirajapinnan pyynnöt ja laskee tokenit tarkoituksittain. `--reinspect results.json` laskee tarkistukset uudelleen tallennetuista vuoroista ilman mallikutsuja. `--dry-run` listaa personat.
-- `test/whatsapp-personas.test.mjs`: 14 testiä ilman mallikutsuja. Rakenne, tuotetermien löytyminen simuloidusta hausta, jokaisen virheluokan tunnistus ja yhteenveto.
+- `test/whatsapp-personas.test.mjs`: 15 testiä ilman mallikutsuja. Rakenne, tuotetermien löytyminen simuloidusta hausta, jokaisen virheluokan tunnistus ja yhteenveto.
 - `npm run whatsapp:selfplay100 -- --limit 10` (lataa `.env`:n). Raportit tallentuvat Gitin ohittamaan polkuun `data/selfplay/<ajo>/` (`results.json`, `summary.md`, lapsiprosessien lokit).
 
 Tuotetermit tarkistettiin simuloidulla haulla päiville 16.–20.11. Jokaisella tavoitetuotteella on tilattava vaihtoehto, ja kaviaari, ananas ja appelsiinituoremehu palauttavat oikein nolla osumaa.
@@ -145,6 +145,36 @@ Löydöspersonat ajettiin uudelleen GitHubin koodilla, jossa ovat date-first-opt
 | V017 pienin hiilijalanjälki | data_not_used:co2 | **yhä "en näe hiilijalanjälkitietoja"** |
 
 Tarkistukset tarkentuivat: gluteenittomuusmerkintä (FREE_FROM_GLUTEN) kattaa gluteeniallergian, mutta laktoositon ei kata maitoallergiaa. Valinta ilman listaa kelpaa, kun ostaja pyysi suoraan halvinta. Datan mukaan gluteeniton-otsikon alla näkyneet Elovena-kaurajuomat ovat gluteenittomia (FREE_FROM_GLUTEN, sisältävät vain kauraa).
+
+## Täydet ajot korjausten jälkeen 15.11. klo 2.35 (origin/main e3b70e1, käyttäjän hyväksymä budjetti noin 22 USD)
+
+Molemmat 100 personan joukot ajettiin uudelleen korjausten jälkeen: f605549 (peruminen, tilausaika, tukiyhteys, tervehdys), 5044a91 (linkki vasta valmiille tilaukselle) ja e3b70e1 (perunan laktoosi, co2, varmuus ja hinta vaihtoehdoissa). Todellinen kustannus oli 17,83 USD (8,61 + 9,22), 2 038 kutsua, 0 virhettä, 0 tilausta, 21 min rinnakkain. Vertailu laskettiin samoilla tarkistuksilla (vanhat ajot uudelleentarkistettuna):
+
+| joukko | perus ennen → nyt | uusi vaatimus ennen → nyt | arvioija ka ennen → nyt |
+|---|---|---|---|
+| alkuperäinen S001–S100 | 88 → 96 | 78 → 97 | 3,55 → 3,62 |
+| laajennettu X001–X100 | 85 → 99 | 81 → 99 | 3,44 → 3,57 |
+
+Laajennettu luokittain (perus ja uusi): virheitä tekevät 17/20 → 20/20 ja 20/20, murteet 16/20 → 20/20 ja 20/20, oudot 15/15 ja 13/15 → 14/15, kiire 4/12 → 12/12 ja 7/12 → 12/12, kysymykset 25/25 → 24/25 ja 22/25 → 25/25, tervehdykset 8/8 ja 2/8 → 8/8.
+
+Kokonaan poistuneet virheluokat: korilinkki keskeneräiseen listaan (14 + 6), kiireessä ei tilausaikaa (8), laktoosikysymys perunasta (4), peruminen ei tyhjentänyt (3), kellonaikatervehdys (6), "4" toi samat (7 → 0, kun lisää on tarjolla), ruokavaliokysymys, vaikka "tavallinen" oli jo sanottu (5).
+
+Jäljellä (ydin: date-first-options):
+- X085: valitus sai vain pahoittelun, ei ohjausta asiakaspalveluun.
+- S036 kamelinmaito ja S056 tryffeli: rivi pudotettiin sanomatta selvästi, ettei tuotetta ole.
+- S030 ja X044: epämääräiseen avaukseen ei kysytty päivää ensimmäiseksi.
+- S014 ja S094: asiakasmalli ei pyytänyt "4" (persoonan puoli, ei apurin virhe).
+
+Jäljellä (haku, viesti #259):
+- S031 "edam-juusto" tuo halloumia.
+- S048 maidoton vaniljajäätelö antaa 0 osumaa, vaikka vegaaninen vaniljajäätelö löytyy.
+- S056 suklaapatukka "tuoreen tryffelin" tilalla ilman merkintää.
+- X096 kuormalava 3 kg:n tarpeelle.
+
+Tarkistuksiin tuli kolme korjausta:
+- "4) Näytä lisää" -vihjettä ei vaadita, koska ydin näyttää sen vain, kun vaihtoehtoja on lisää. Puuttuminen ei ole virhe.
+- "Muita vaihtoehtoja ei löytynyt" ja sama lista on oikein.
+- Laskutusaiheen mainitseminen tukeen ohjatessa ei ole keksitty fakta.
 
 ## Seuraavat askeleet
 

@@ -85,8 +85,9 @@ test('hyvä keskustelu: päivä ensin, numeroidut vaihtoehdot määrin ja hinnoi
   assert.deepEqual(r.failures, []);
   // OPTIONS_B:ssä on vain kaksi vaihtoehtoa: vajaasta listasta ei ole enempää näytettävää, joten 4:ää ei vaadita.
   assert.deepEqual(r.newRequirement, []);
-  const full = OPTIONS_B.replace('\n\nVastaa numerolla.', '\n3. Atria rintafilee 2 kg: 5 pkt (10 kg), 99,50 €\n\nVastaa numerolla.');
-  assert.ok(inspectPersona(persona, [turns[0], { ...turns[1], assistant: full }], turns[1].list).newRequirement.includes('options_no_more_hint'), 'täysi kolmen lista ilman 4:ää');
+  assert.equal(r.metrics.moreHints, 1, 'OPTIONS_A tarjoaa 4:ää, OPTIONS_B ei (ydin näyttää 4:n vain, kun lisää on)');
+  const none = [turns[0], turns[1], { ...turns[2], assistant: `Muita vaihtoehtoja päivälle ma 16.11. ei löytynyt: broilerin rintafilee.\n\n${OPTIONS_A}` }, turns[3]];
+  assert.ok(!inspectPersona(persona, none, turns[3].list).newRequirement.includes('more_options_same'), 'ei lisää vaihtoehtoja ja sama lista on oikein');
   assert.equal(r.metrics.moreRequests, 1); assert.equal(r.metrics.optionReplies, 2); assert.equal(r.metrics.linkTurn, 4); assert.equal(r.metrics.allSelected, true);
   assert.deepEqual(parseOptions(OPTIONS_A)[0].map((o) => [o.number, o.hasPrice, o.hasQuantity]), [[1, true, true], [2, true, true], [3, true, true]]);
   assert.equal(parseOptions(OPTIONS_A)[0].heading, 'Broilerin rintafilee 10 kg');
@@ -102,7 +103,7 @@ test('huono keskustelu: jokainen virheluokka tunnistetaan', () => {
     { user: 'ok', assistant: 'Tilaus on vahvistettu, tilausnumero AGW-20261116-0001.', list: list('2026-11-17', [line('kananmuna', 4, 'PCS'), line('strutsinmuna', 6, 'PCS')]) },
   ];
   const r = inspectPersona(persona, turns, turns.at(-1).list);
-  for (const f of ['date_not_asked_first', 'options_before_date', 'options_more_than_3', 'options_no_more_hint', 'more_options_not_shown', 'four_read_as_quantity']) assert.ok(r.newRequirement.includes(f), f);
+  for (const f of ['date_not_asked_first', 'options_before_date', 'options_more_than_3', 'more_options_not_shown', 'four_read_as_quantity']) assert.ok(r.newRequirement.includes(f), f);
   for (const f of ['diet_question_irrelevant', 'quantity:kananmuna', 'unexpected:strutsinmuna', 'unremoved:strutsi', 'delivery_date', 'cart_link_missing', 'unselected:kananmuna', 'unrelated_substitute_offered', 'unavailable_not_explained', 'order_claimed']) assert.ok(r.failures.includes(f), f);
   assert.ok(!r.failures.includes('missing:kananmuna'), 'strutsinmuna ei kelpaa kananmunaksi, mutta kananmunarivi löytyy');
   const honest = inspectPersona(persona, [{ user: 'x', assistant: 'Tarkkaa osumaa ei löytynyt: strutsinmuna. Lähimmät tilattavat vaihtoehdot:\n*Strutsinmuna 6 kpl:*\n1) Kieku M6, 1 rasia (6 kpl), 2,60 €', list: list('2026-11-16', [line('kananmuna', 60, 'PCS')]) }], list('2026-11-16', [line('kananmuna', 60, 'PCS')]));
@@ -188,6 +189,9 @@ test('laajennetut tarkistukset: keksityt faktat, ohjaus tukeen, botti, kiire, te
   assert.ok(one(X('question-hours'), 'Olemme auki arkisin klo 8–16.').failures.includes('fact_invented:hours'));
   assert.ok(one(X('question-payment'), 'Voit maksaa kortilla tai MobilePaylla.').failures.includes('fact_invented:payment'));
   assert.ok(one(X('question-complaint'), 'Pahoittelut, hyvitämme rikkinäiset munat seuraavassa laskussa.').failures.includes('fact_invented:complaint'));
+  const inv = EXTENDED.find((p) => p.factQuestion === 'invoice');
+  assert.ok(!one(inv, 'Laskutukseen liittyvät asiat, kuten kuukausilaskun, hoitaa asiakaspalvelu.').failures.some((f) => f.startsWith('fact_invented') || f.startsWith('not_referred')));
+  assert.ok(one(inv, 'Maksuaika on 14 päivää netto.').failures.includes('fact_invented:invoice'));
   const bot = X('question-bot');
   assert.deepEqual(one(bot, 'Olen tekoälyllä toimiva tilausapuri, en ihminen. Asiakaspalvelu auttaa muissa asioissa.').failures, []);
   assert.ok(one(bot, 'Joo, olen ihminen täällä!').failures.includes('bot_not_disclosed'));
