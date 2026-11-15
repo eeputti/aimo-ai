@@ -11,7 +11,7 @@ Tehtävä 26880afb, 15.11.2026. Eelis pyysi agentin, joka keskustelee apurin kan
 
 - `eval/whatsapp-personas.mjs`: 100 personaa (`PERSONAS`, S001–S100) generoidaan deterministisesti, 20 polkua x 5 muunnelmaa. Lisäksi 6 regressiota (`REGRESSIONS`, R01–R06) baseline-ajon löydöksistä. Omat tarkistukset `inspectPersona` erillään Codexin `inspectConversation`-funktiosta.
 - `scripts/whatsapp-selfplay-batch.mjs`: ajaa personat lapsiprosesseissa (oletus 1 persona per prosessi, `--chunk`, `--concurrency`, `--max-calls`, `--limit`, `--offset`, `--ids`, `--set regressions|all`). Kopioi lähdekoodin ajon alussa väliaikaishakemistoon, jotta rinnakkain muokattu työpuu ei vaihdu kesken ajon. Lapsiprosessi estää muut kuin paikalliset ja mallirajapinnan pyynnöt ja laskee tokenit tarkoituksittain. `--reinspect results.json` laskee tarkistukset uudelleen tallennetuista vuoroista ilman mallikutsuja. `--dry-run` listaa personat.
-- `test/whatsapp-personas.test.mjs`: 13 testiä ilman mallikutsuja. Rakenne, tuotetermien löytyminen simuloidusta hausta, jokaisen virheluokan tunnistus ja yhteenveto.
+- `test/whatsapp-personas.test.mjs`: 14 testiä ilman mallikutsuja. Rakenne, tuotetermien löytyminen simuloidusta hausta, jokaisen virheluokan tunnistus ja yhteenveto.
 - `npm run whatsapp:selfplay100 -- --limit 10` (lataa `.env`:n). Raportit tallentuvat Gitin ohittamaan polkuun `data/selfplay/<ajo>/` (`results.json`, `summary.md`, lapsiprosessien lokit).
 
 Tuotetermit tarkistettiin simuloidulla haulla päiville 16.–20.11. Jokaisella tavoitetuotteella on tilattava vaihtoehto, ja kaviaari, ananas ja appelsiinituoremehu palauttavat oikein nolla osumaa.
@@ -89,9 +89,50 @@ Ajurin tapausvalinta on yleinen: `--cases polku[:export]` (useita pilkulla). Mod
 
 **Kustannusarvio koko laajennetulle joukolle:** noin 0,11 USD tilaavaa personaa kohden ja 0,05 USD pelkkää kysymystä kohden. 100 personaa maksaa noin 9–12 USD ja vie noin 20 min neljällä rinnakkaisella prosessilla. Sitä ei ajettu ennen hyväksyntää.
 
+## Valion dataan perustuvat personat V001–V035 (käyttäjän pyyntö klo 2)
+
+Käyttäjä kysyi, auttaisivatko Valion aineistot (tuotedata, hiilijalanjälki, toimitusvarmuus, saatavuus- ja hintarajapinta). Liitetyt tiedostot ovat samat kuin projektin `data/raw/`, ja `npm run catalog` on jo tuonut niistä katalogiin alkuperämaan (17 537 tuotetta), allergeenit ja merkinnät, ainesosat, säilytysluokan, hiilijalanjäljen (11 033) ja toimitusvarmuuden (4 425). Tuoteneuvo saa nämä kentät (`publicProduct`), ja vaihtoehdot saavat saatavuusrajapinnan tilausajan (`closingTime`). Data siis auttaa, ja testit voivat tarkistaa apurin väitteet sitä vasten.
+
+`eval/whatsapp-personas-data.mjs` (`--set data`) luo personat katalogista. Oikea vastaus luetaan datasta eikä kirjoiteta käsin. Moduulin oma `inspect` ajaa perustarkistukset ja datatarkistukset:
+
+| tyyppi | n | tarkistus |
+|---|---|---|
+| alkuperämaa | 6 | väitetty maa vastaa `country`-kenttää (`origin_wrong`), tai tieto jää käyttämättä (`data_not_used:origin`) |
+| allergeenit | 6 | esim. "Onko Valio Edam e350 g maidoton?": datassa laktoositon mutta sisältää maitoa. Väärä "on maidoton" on `allergen_wrong_dangerous` |
+| säilytys | 4 | pakaste, kylmä tai kuiva vastaa `temp`-luokkaa (`storage_wrong`) |
+| pienin hiilijalanjälki | 5 | apurin suosittelema vaihtoehto on pienin näytettyjen joukossa katalogin `co2`:n mukaan (`co2_wrong`) |
+| varmin toimitus | 3 | sama `reliability`-kentällä |
+| edullisin | 3 | sama vaihtoehtojen hinnoilla |
+| tilausaika | 4 | kerrottu kellonaika vastaa `closingTime`a (simuloidusti edellisen päivän klo 12.00) |
+| allergiaopas | 4 | ostaja vaatii linkkiä heti. Valitun tuotteen allergeenit katalogista (`unsafe_selection`), eikä linkkiä anneta ennen valintaa |
+
+Saatavuus- ja hintarajapinta ajetaan edelleen simuloituna (`VALIO_API_KEY` tyhjä). Oikean rajapinnan rajoitukset ovat julkaisemattomia, ja ohjeen mukaan sitä ei kuormiteta toistuvilla ajoilla. Simulaatio noudattaa samaa sopimusta (`closingTime`, `availableDate`, `scheduleLines`).
+
+## Käyttäjän päätös: korilinkki vasta valmiille tilaukselle (klo 2.00)
+
+Apuri ei anna ostoskorin linkkiä ennen kuin tilaus on valmis. Se opastaa ensin loppuun: päivä, määrät, tuotevalinnat ja vaaditut ruokavaliot tai allergeenit. Tämä kumoaa aiemman päätöksen, jonka mukaan "avaa kori" toimi keskeneräisellekin listalle. Syy koodissa: `server/whatsapp/cart-handoff.mjs`:n `direct`-ehto ohittaa `status !== 'review'` -tarkistuksen, ja vapaatekstinen linkkipyyntö kulkee lisäksi dialogin kautta. Vaatimus välitettiin date-first-options-sessiolle, joka korjaa juuri dialogia ja ydintä. Tarkistus `link_before_complete` kuuluu uuteen vaatimukseen ja lasketaan kaikille sarjoille, myös vanhoille ajoille uudelleentarkistuksella.
+
+## Ajot 15.11. klo 2 (GitHubin koodi, `--source-ref origin/main`)
+
+| ajo | lähde | personat | kutsut | USD | kesto | perus läpi | uusi läpi |
+|---|---|---|---|---|---|---|---|
+| laajennettu X001–X100 | f843b06 | 100 | 1 011 | 8,55 | 16 min | 85/100 | 70/100 |
+| Valion data V001–V035 | 043f08f | 35 | 250 | 2,50 | 5 min | 26/35 | 31/35 |
+
+Käyttäjä rajasi jatkon pieneen budjettiin (noin 3 USD), joten näiden jälkeen ei ajettu uusia isoja joukkoja. Tarkistusten korjaukset laskettiin uudelleen tallennetuista vuoroista ilman mallikutsuja.
+
+Löydökset tärkeysjärjestyksessä (käsin varmennettu esimerkeistä):
+1. **Korilinkki annetaan keskeneräiseen listaan** (`link_before_complete` 14 + 4). Allergiaopas 0/4: "Laita kori heti" antoi linkin ennen tuotevalintaa ja allergeenin varmistusta (V032 keliaakikon kaurajuoma). Tämä on käyttäjän uuden päätöksen vastaista. Omistaja date-first-options / `cart-handoff.mjs`.
+2. **Laktoosikysymys perunasta ja porkkanasta** (X022, X023, X032, X033 murrepersonat): "Peruna: haluatko laktoositonta vai käykö tavallinen?". Juuri tämä oli käyttäjän alkuperäinen valitus. Omistaja order-tools (CLARIFY) tai ydin.
+3. **Kiireessä tilausaikaa ei kerrota** (`rush_no_deadline` 8/12): "Tarkkaa tilauksen takarajaa en valitettavasti tiedä", vaikka tilausaika on tiedossa. Datajoukossa sama kysymys sai oikean ajan ("ehtii tilata ti 17.11. klo 10.00 asti"), joten tieto kulkee vaihtoehtoihin mutta ei dialogin vastaukseen ennen vaihtoehtoja.
+4. **Peruminen ei tyhjennä koria** (3/3 cancel): "Luonnos on tyhjä", mutta rivi jää.
+5. **Hiilijalanjälki ja toimitusvarmuus eivät kulje vaihtoehtoihin**: "En näe tuotekohtaisia hiilijalanjälkitietoja" (V017, V020), ja varmuuskysymykseen ei vastattu (V022, V023), vaikka katalogissa on `co2` ja `reliability`. Edullisinta kysyttäessä apuri sanoi "En näe hintoja", vaikka vaihtoehtolistassa on hinnat (V025).
+6. **Kellonaikatervehdys puuttuu** (8/8).
+7. **Toimii hyvin:** alkuperämaa 6/6 ja allergeenit 6/6 oikein datasta, mukaan lukien laktoositon mutta ei maidoton -ansa (Valio Edam). Säilytys oikein. Ei keksittyjä toimitusmaksuja, aukioloja tai hyvityksiä. Botti tunnustaa olevansa botti. Päivien ristiriita kysytään. Murteet ymmärretään.
+
 ## Seuraavat askeleet
 
 - Uusi 100 personan ajo nykyisellä koodilla mittaa 1a517f5:n, 5e0a61f:n ja 252b337:n vaikutuksen samaan baselineen (noin 9–10 USD, 17 min, `--source-ref origin/main`). Sitä ei ajettu ilman erillistä hyväksyntää.
-- Koko laajennettu joukko X001–X100 (noin 9–12 USD) odottaa hyväksyntää.
+- Laajennettu joukko ja datajoukko on ajettu. Uudet ajot pidetään pieninä (käyttäjän raja noin 3 USD): esim. `--ids` löydöspersonoille korjausten jälkeen.
 - Jatkuvaa tai ajastettua ajoa ei luotu. Se on helppo toteuttaa samalla ajurilla, jos käyttäjä hyväksyy kustannuksen ja tahdin.
 - Codexin 100 profiilin loppukoe ja tämä sarja voidaan raportoida yhdessä, kun molempien tulokset ovat samasta lähdeversiosta.

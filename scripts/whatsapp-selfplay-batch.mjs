@@ -7,6 +7,7 @@
 //   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --offset 10 --limit 90 --concurrency 3 --max-calls 4000
 //   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --set regressions   (R01–R06, baseline-ajon löydökset)
 //   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --set extended      (X001–X100: virheet, murteet, kiire, kysymykset)
+//   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --set data          (V001–V035: vastaus tarkistetaan Valion datasta)
 //   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --set extended --source-ref origin/main   (apurin koodi GitHubista)
 //   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --cases eval/omat-tapaukset.mjs:CASES
 //     --cases: mikä tahansa projektin moduuli (polku[:export], useita pilkulla). Tapauksissa runSelfplayn kentät
@@ -30,7 +31,8 @@ const ROOT = path.resolve(path.dirname(SELF), '..');
 const arg = (name, fallback = null) => { const i = process.argv.indexOf(name); return i < 0 ? fallback : process.argv[i + 1]; };
 const flag = (name) => process.argv.includes(name);
 export const CASE_SETS = { default: 'eval/whatsapp-personas.mjs:PERSONAS', regressions: 'eval/whatsapp-personas.mjs:REGRESSIONS',
-  extended: 'eval/whatsapp-personas-extended.mjs:EXTENDED', all: 'eval/whatsapp-personas.mjs:PERSONAS,eval/whatsapp-personas.mjs:REGRESSIONS,eval/whatsapp-personas-extended.mjs:EXTENDED' };
+  extended: 'eval/whatsapp-personas-extended.mjs:EXTENDED', data: 'eval/whatsapp-personas-data.mjs:DATA_CASES',
+  all: 'eval/whatsapp-personas.mjs:PERSONAS,eval/whatsapp-personas.mjs:REGRESSIONS,eval/whatsapp-personas-extended.mjs:EXTENDED,eval/whatsapp-personas-data.mjs:DATA_CASES' };
 
 /** Tapaukset ja niiden tarkistimet tiedosto:export-listasta. Polut ovat suhteessa projektin (tai lähdekopion) juureen. */
 export async function loadCases(root, spec) {
@@ -152,7 +154,7 @@ function snapshot(caseFiles = [], sourceRef = null) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-selfplay100-src-'));
   fs.cpSync(path.join(ROOT, 'server'), path.join(dir, 'server'), { recursive: true });
   const fromRef = ['server', 'scripts/whatsapp-selfplay.mjs', 'eval/whatsapp-selfplay-cases.mjs'];
-  for (const f of new Set(['scripts/whatsapp-selfplay.mjs', 'scripts/whatsapp-selfplay-batch.mjs', 'eval/whatsapp-selfplay-cases.mjs', 'eval/whatsapp-personas.mjs', 'eval/whatsapp-personas-extended.mjs', ...caseFiles])) {
+  for (const f of new Set(['scripts/whatsapp-selfplay.mjs', 'scripts/whatsapp-selfplay-batch.mjs', 'eval/whatsapp-selfplay-cases.mjs', 'eval/whatsapp-personas.mjs', 'eval/whatsapp-personas-extended.mjs', 'eval/whatsapp-personas-data.mjs', ...caseFiles])) {
     if (!fs.existsSync(path.join(ROOT, f))) continue;
     fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.copyFileSync(path.join(ROOT, f), path.join(dir, f));
   }
@@ -170,7 +172,7 @@ function snapshot(caseFiles = [], sourceRef = null) {
     const full = path.join(dir, f); if (fs.statSync(full).isFile()) hash.update(`${f}\0`).update(fs.readFileSync(full));
   }
   const git = (...a) => { try { return execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' }); } catch { return ''; } };
-  const own = ['eval/whatsapp-personas.mjs', 'eval/whatsapp-personas-extended.mjs', 'scripts/whatsapp-selfplay-batch.mjs', ...caseFiles];
+  const own = ['eval/whatsapp-personas.mjs', 'eval/whatsapp-personas-extended.mjs', 'eval/whatsapp-personas-data.mjs', 'scripts/whatsapp-selfplay-batch.mjs', ...caseFiles];
   const dirty = (sourceRef ? git('status', '--porcelain', '--', ...own) : git('status', '--porcelain', '--', ...fromRef, ...own))
     .split('\n').filter(Boolean).map((l) => l.slice(3));
   return { dir, hash: hash.digest('hex'), commit: git('rev-parse', sourceRef || 'HEAD').trim(), sourceRef, dirty };
@@ -192,7 +194,7 @@ function runChild(src, ids, out, maxTurns, spec) {
 
 /** Tallennetut vuorot takaisin inspectPersonan muotoon. Ref = tuotesana, koska vuoroissa ei tallenneta rivin tunnistetta. */
 export function restoreTurns(result) {
-  const asList = (t, diet) => ({ deliveryDate: t.deliveryDate, diet, lines: t.lines.map((l) => ({ ref: l.term, productTerm: l.term, quantity: l.quantity, claims: l.claims || [], excludeAllergens: l.excludeAllergens || [], selectedProductId: l.selected })) });
+  const asList = (t, diet) => ({ deliveryDate: t.deliveryDate, status: t.status || null, missing: t.missing || [], diet, lines: t.lines.map((l) => ({ ref: l.term, productTerm: l.term, quantity: l.quantity, claims: l.claims || [], excludeAllergens: l.excludeAllergens || [], selectedProductId: l.selected })) });
   const diet = result.finalList?.diet || { known: false, claims: [], excludeAllergens: [] };
   return result.turns.map((t) => ({ user: t.user, assistant: t.assistant, ms: t.ms, list: asList(t, diet) }));
 }
@@ -275,7 +277,7 @@ async function main() {
     const ms = r.turns.reduce((s, t) => s + (t.ms || 0), 0); totals.assistantMs += ms; totals.personaMs += (result.ms || 0) / Math.max(1, result.ids.length);
     return { id: persona.id, route: persona.route, kitchen: persona.kitchen, style: persona.style, persona, clock: result.clock, failures: own.failures, newRequirement: own.newRequirement, observations: own.observations, metrics: own.metrics,
       codexFailures: r.failures, judgment: r.judgment, assistantMs: ms, finalList: list,
-      turns: r.turns.map((t) => ({ user: redact(t.user), assistant: redact(t.assistant), ms: t.ms, deliveryDate: t.list?.deliveryDate || null,
+      turns: r.turns.map((t) => ({ user: redact(t.user), assistant: redact(t.assistant), ms: t.ms, deliveryDate: t.list?.deliveryDate || null, status: t.list?.status || null, missing: t.list?.missing || [],
         lines: (t.list?.lines || []).map((l) => ({ term: l.productTerm, quantity: l.quantity, claims: l.claims, excludeAllergens: l.excludeAllergens, selected: l.selectedName || null })) })) };
   });
   const report = { meta, totals, results };

@@ -284,7 +284,8 @@ export function parseOptions(text) {
       const number = Number(m[1]);
       if (!current || number <= current.at(-1).number) { current = []; current.heading = heading; blocks.push(current); }
       const body = m[2].replace(/[*_]/gu, '');
-      const name = body.split(/:\s|\s[\u2013-]\s/u)[0].trim();
+      // Vanha muoto "Nimi: 5 pkt (10 kg), 47,20 €", uusi "Nimi, 4 laatikkoa (20 l), 110,60 €": nimi päättyy määrään.
+      const name = body.split(/:\s|\s[\u2013-]\s|,\s(?=\d+(?:[,.]\d+)?\s?[\p{L}]+(?:\s\(|,|\s*$))/u)[0].trim();
       const rest = body.slice(name.length).replace(PRICE, '');
       current.push({ number, name, hasPrice: true, hasQuantity: QTY.test(rest) || QTY.test(name), line: raw.trim() });
     } else if (raw.trim()) { heading = raw.replace(/[*_]/gu, '').trim(); current = null; }
@@ -445,6 +446,18 @@ export function inspectPersona(persona, turns, list) {
   metrics.timeGreeting = turns.length ? /huomenta|päivää|iltaa|yötä/iu.test(replies[0].split('\n')[0]) : false;
   // Pelkkään tervehdykseen vastataan kellonajan mukaisella tervehdyksellä (date-first-options toteuttaa tätä).
   if (persona.greetingCheck && turns.length && !metrics.timeGreeting) fresh.push('greeting_not_time_aware');
+
+  // Käyttäjän päätös 15.11. klo 2.00: korilinkki vasta valmiille tilaukselle. Apuri opastaa ensin loppuun: päivä, määrät,
+  // tuotevalinnat ja vaaditut ruokavaliot tai allergeenit. Uusi vaatimus, koska aiempi päätös salli linkin keskeneräiseen listaan.
+  turns.forEach((t, i) => {
+    if (!replies[i].includes('[ostoskorilinkki]') || persona.expectEmpty) return;
+    const l = t.list || {}; const rows = l.lines || [];
+    const incomplete = !l.deliveryDate || !rows.length || (l.missing || []).length || (l.status && l.status !== 'review')
+      || rows.some((r) => !r.quantity || !r.selectedProductId);
+    const claimsOk = !persona.requiredClaim || rows.every((r) => [...(r.claims || []), ...(l.diet?.claims || [])].includes(persona.requiredClaim));
+    const allergenOk = !persona.requiredAllergen || rows.every((r) => [...(r.excludeAllergens || []), ...(l.diet?.excludeAllergens || [])].includes(persona.requiredAllergen));
+    if (incomplete || !claimsOk || !allergenOk) fresh.push('link_before_complete');
+  });
 
   // (f) Ei tilauksia: apuri ei väitä tilausta tehdyksi (tilauskanta tarkistetaan ajurissa erikseen).
   if (replies.some((r) => ORDER_CLAIM.test(r))) failures.push('order_claimed');

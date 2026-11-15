@@ -214,6 +214,11 @@ test('laajennetut tarkistukset: keksityt faktat, ohjaus tukeen, botti, kiire, te
   assert.deepEqual(one(cancel, 'Selvä, lista tyhjennetty, mitään ei tilattu.').failures, []);
   const mixed = X('mixed-dates');
   assert.ok(inspectPersona(mixed, [{ user: mixed.first, assistant: 'Selvä! [ostoskorilinkki]', list: list('2026-11-18', [line('maito', 20, 'L', { selectedProductId: 'x' })]) }], list('2026-11-18', [line('maito', 20, 'L')])).failures.includes('date_conflict_not_asked'));
+  const early = EXTENDED.find((p) => p.route === 'greeting-time');
+  const open = [line('peruna', 25, 'KG')];
+  assert.ok(inspectPersona(early, [{ user: 'laita kori', assistant: 'Tässä linkki: [ostoskorilinkki]', list: { ...list('2026-11-18', open), status: 'needs_product_selection' } }], list('2026-11-18', open)).newRequirement.includes('link_before_complete'), 'linkki ennen tuotevalintaa');
+  const done = [line('peruna', 25, 'KG', { selectedProductId: 'x' })];
+  assert.ok(!inspectPersona(early, [{ user: 'ok', assistant: 'Tässä linkki: [ostoskorilinkki]', list: { ...list('2026-11-18', done), status: 'review' } }], list('2026-11-18', done)).newRequirement.includes('link_before_complete'));
   const wrong = X('wrong-answer');
   const turns = [{ user: wrong.first, assistant: 'Mille päivälle toimitus?', list: list(null, [line('voi', 5, 'KG')]) }, { user: 'joo 5 kg', assistant: 'Laitoin perjantaille.', list: list('2026-11-20', [line('voi', 5, 'KG')]) }];
   assert.ok(inspectPersona(wrong, turns, turns[1].list).failures.includes('date_invented'));
@@ -222,7 +227,8 @@ test('laajennetut tarkistukset: keksityt faktat, ohjaus tukeen, botti, kiire, te
 test('loadCases: yleinen tapausvalinta, oma tarkistin ja polkurajaus', async () => {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
   const all = await loadCases(root, CASE_SETS.all);
-  assert.equal(all.cases.length, 206);
+  const { DATA_CASES } = await import('../eval/whatsapp-personas-data.mjs');
+  assert.equal(all.cases.length, 206 + DATA_CASES.length);
   const codex = await loadCases(root, 'eval/whatsapp-selfplay-cases.mjs:SELFPLAY_CASES');
   assert.ok(codex.cases.length >= 5 && codex.inspectors.get(codex.cases[0].id) === inspectPersona);
   await assert.rejects(() => loadCases(root, '../etc/x.mjs'), /projektin sisällä/u);
@@ -233,4 +239,36 @@ test('loadCases: yleinen tapausvalinta, oma tarkistin ja polkurajaus', async () 
     const custom = await loadCases(root, `eval/${path.basename(dir)}/c.mjs`);
     assert.deepEqual(custom.inspectors.get('T1')(), ['custom']);
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('Valion dataan perustuvat persoonat: totuus katalogista ja väitteiden tarkistus', { skip: !fs.existsSync(CATALOG) && 'data/catalog.json puuttuu' }, async () => {
+  const { DATA_CASES, inspect } = await import('../eval/whatsapp-personas-data.mjs');
+  assert.equal(DATA_CASES.length, 35); assert.ok(DATA_CASES.every((p) => /^V\d{3}$/u.test(p.id) && p.truth && p.date && p.now));
+  const by = (route, i = 0) => DATA_CASES.filter((p) => p.route === route)[i];
+  const edam = DATA_CASES.find((p) => p.truth.name === 'Valio Edam e350 g');
+  assert.equal(edam.truth.hasIt, true, 'laktoositon Edam sisältää maitoa (AM)');
+  assert.equal(DATA_CASES.find((p) => p.truth.name === 'Alpro Soijajuoma 1L').truth.hasIt, false);
+  const ask = (persona, assistant, lines = [], date = persona.date) => inspect(persona, [{ user: persona.first, assistant, list: list(date, lines) }], list(date, lines));
+  assert.ok(ask(edam, 'Joo, Valio Edam e350 g on laktoositon ja maidoton, sopii hyvin.').failures.includes('allergen_wrong_dangerous'));
+  assert.ok(!ask(edam, 'Ei ole maidoton: se sisältää maitoa, vaikka on laktoositon.').failures.some((f) => f.startsWith('allergen')));
+  assert.ok(ask(edam, 'En pysty varmistamaan allergeeneja.').failures.includes('data_not_used:allergen'));
+  const jaffa = by('data-origin', 3);
+  assert.equal(jaffa.truth.country, 'il');
+  assert.ok(ask(jaffa, 'APPELSIINI JAFFA tulee Espanjasta.').failures.includes('origin_wrong'));
+  assert.ok(!ask(jaffa, 'Se on Israelista.').failures.some((f) => f.startsWith('origin') || f.startsWith('data_not_used')));
+  const frozen = DATA_CASES.find((p) => p.route === 'data-storage' && p.truth.temp === 'frozen');
+  assert.ok(ask(frozen, 'Säilytä jääkaapissa +4 asteessa.').failures.includes('storage_wrong'));
+  assert.ok(!ask(frozen, 'Säilytä pakastimessa -18 asteessa.').failures.some((f) => f.startsWith('storage') || f.startsWith('data_not_used')));
+  assert.ok(!ask(frozen, 'Säilytä pakastimessa. Sulata jääkaapissa ennen tarjoilua.').failures.includes('storage_wrong'));
+  const cut = by('data-cutoff');
+  assert.ok(ask(cut, 'En tiedä tilausaikaa.').failures.includes('data_not_used:cutoff'));
+  assert.ok(!ask(cut, 'Tilattava viimeistään su 15.11. klo 12.00.').failures.some((f) => f.includes('cutoff')));
+  const cheap = by('data-cheapest');
+  const opts = '*Maito 20 l:*\n1) Valio Luomu™ D-vitaminoitu rasvaton maito 1 l, 4 laatikkoa (20 l), 110,60 €\n2) 5 x Arla Luomu 1 L kevytmaito, 4 laatikkoa (20 l), 169,80 €\n3) 5 x Arla 1 L kevytmaito Suomesta, 4 laatikkoa (20 l), 171,80 €';
+  const pick = (name) => [line('maito', 20, 'L', { selectedProductId: 'x', selectedName: name })];
+  assert.ok(ask(cheap, `${opts}\nEdullisin on vaihtoehto 2.`, pick('5 x Arla Luomu 1 L kevytmaito')).failures.includes('cheapest_wrong'));
+  assert.ok(!ask(cheap, `${opts}\nEdullisin on vaihtoehto 1.`, pick('Valio Luomu™ D-vitaminoitu rasvaton maito 1 l')).failures.includes('cheapest_wrong'));
+  assert.ok(ask(cheap, opts, pick('Valio Luomu™ D-vitaminoitu rasvaton maito 1 l')).failures.includes('data_not_used:cheapest'));
+  const guide = DATA_CASES.find((p) => p.route === 'data-allergy-guide' && p.truth.allergen === 'AW' && !p.truth.claim);
+  assert.ok(ask(guide, '[ostoskorilinkki]', [line('kaurajuoma', 10, 'L', { selectedProductId: '468319', selectedName: 'Oatly iKaffe 0,5L', excludeAllergens: ['AW'] })]).failures.includes('unsafe_selection'), 'gluteenia sisältävä kaurajuoma keliaakikolle');
 });
