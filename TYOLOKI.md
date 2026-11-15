@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 ilta — botin katselmointi: miksi se tarvitsee koneen ja mikä on rikki (Claude Code, katselmointichat)
+
+- **Käyttäjän pyyntö:** käy läpi kaikkien tekijöiden työ, etsi mikä mättää ja selvitä, miksi botti ei toimi pilvessä vaan vaatii koneen. Raportti `docs/parallel/bot-audit-2026-11-15-ilta.md`.
+- **Syy koneen tarpeeseen:** WhatsApp-keskustelu, kori ja tilaukset pyörivät Node-palvelimena Eeliksen Macilla pikatunnelin takana; pilvessä on vain landing, tilausnäkymä ja demomaksu. Prosessit ovat käsin käynnistettyjä `nohup`-ajoja, Mac nukahtaa minuutissa ja koodikopio sekä tunneliohjelma ovat `/private/tmp`:ssä. Tänään viimeinen viesti käsiteltiin klo 03.01, Mac nukahti 03.17, ja seuraava viesti meni läpi vasta klo 16 tunnelin palautuksen jälkeen.
+- **Kriittinen uusi löydös:** Valion testirajapinta on jäädytetty (toimitus aina ma 16.11., tilausraja su 15.11. klo 17.00). `DEMO_NOW` puuttuu, joten klo 17 jälkeen botti ei voi tarjota yhtään tilattavaa tuotetta. Varmistettu kahdella saatavuuskutsulla ja hintavälimuistista.
+- **Muut löydökset:** tilausjulkaisija ei ole käynnissä (uusien tilausten maksusivu ei löydä tilausta); ajossa on 3bee913 ilman 025fabf:ää; tunnelin osoite vaihtuu ja vanhat korilinkit lakkaavat toimimasta; demomaksun linkki on edelleen julkisessa `/api/orders`-listassa; vain käsin hyväksytyt testinumerot voivat viestiä; kaksi testiä riippuu seinäkellosta.
+- **Tarkistukset:** uusin GitHub-koodi erillisessä kopiossa, `npm test` 268/270 (kaksi kelloriippuvaa virhettä). Vain luku -tarkistukset prosesseista, porteista, lepotilasta, terveysreiteistä ja kantojen rivimääristä. Ei restartteja, asetusmuutoksia, viestejä tai tilauksia.
+- **Seuraava askel, odottaa käyttäjän päätöstä:** pikakorjaus Macilla (`DEMO_NOW`, restart uusimmasta commitista, julkaisija käyntiin) ja pysyvä pilvi-isäntä. Suositus: Fly.io-kontti valmiilla Dockerfilellä, pysyvä levy ja yksi aina päällä oleva kone.
+
 ## 15.11.2026 — katkennut WhatsApp-tunneli palautettu ja ilmoittautumisen sähköposti-ilmoitus koestettu (Claude Code, soittonappi-chat)
 
 - **Käyttäjän havainto ja lupa:** kokeilulinkki ei toiminut. Landing oli kunnossa, mutta `cloudflared` ei ollut käynnissä, joten Metan viestit ja korilinkit eivät päässeet Maciin. Käyttäjä pyysi: "pistä tä nyt toimimaan".
