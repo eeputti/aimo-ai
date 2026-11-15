@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — WhatsApp-ilmoittautumisesta sähköposti esittelijälle (Codex, ilmoituschat)
+
+- **Käyttäjän päätös:** ei SIM/eSIM-ostosta nyt; lomakkeen uudesta numerosta sähköposti käyttäjän antamaan omaan osoitteeseen, jotta hän voi itse hoitaa Metan testivastaanottajan hyväksynnän. Vastaanottaja varmennettu Gmail-profiilista, henkilötiedot pysyvät poissa Gitistä.
+- Uusi vain lukeva `scripts/whatsapp-signup-alerts.mjs` muodostaa ilmoituksen nimestä, numerosta ja Metan ohjeesta. Erillinen Gitin ohittama 0600-SQLite pitää pysyvän duplikaattivahdin: odottavan numeron uusintalomake/restart ei lähetä lisää. Ennen lähettämistä varaus, vasta Gmailin onnistuneen viesti-ID:n jälkeen kuittaus; epäselvä lähetys täsmähaetaan Gmailista eikä lähetetä sokkona uudelleen. Koodeja ei kopioida sähköpostiin.
+- **Käytössä:** Codex-heartbeat `WhatsApp-kokeilijat sähköpostiin`, ACTIVE, 5 minuutin välein, jo yhdistetty Gmail-liitin. Edellyttää käynnissä olevaa konetta/Codexia ja Gmail-yhteyttä. Nykyisistä kahdesta odottavasta ilmoittautumisesta lähetettiin oikeat sähköpostit; molemmat takaisinluettu oikeasta INBOXista. Uusintaskannaus 0 uutta / 0 epäselvää. Seuraavaa itsenäistä ajastuskierrosta ei vielä väitetä ajetuksi. Apuri samansisältöisenä alkuperäisessä projektikansiossa.
+- **Tarkistukset:** 5/5 eristettyä testiä, syntaksi ja diff-check läpi. Ei Worker-julkaisua, palvelinrestarttia, Meta-/jäsenhyväksyntöjä, numeroiden poistoa tai tilausta. Testinumeron enintään 5 vastaanottajan raja ja Metan vahvistuskoodi säilyvät; vahvistuksen jälkeen sivun avaus nykyisellä approve-komennolla.
+- **Selvityksen rajat:** Workerissä ei sähköpostilähettäjää/avainta eikä liittimellä domain-lukuoikeutta, joten ei uutta sähköpostipalvelutiliä tai laskutusta. Jo olemassa oleva toinen Meta-numero on LIVE/VERIFIED/CONNECTED, mutta näyttönimi AVAILABLE_WITHOUT_REVIEW ja token vain messaging/public_profile; tilinhallinta/terveystiedot estyivät. Sitä ei otettu käyttöön. Tarkka raportti `docs/parallel/whatsapp-signup-notifications.md`. Jaetun työpuun muut aiemmat työt säilyvät; oma commit erillisestä ajantasaisesta kloonista.
+
+
 
 ## 15.11.2026 — WhatsApp: valitus asiakaspalveluun, puuttuvan tuotteen poisto kerrotaan ja päivä ensin ilman tuotteita (Claude Code, päivä ensin -chat)
 
