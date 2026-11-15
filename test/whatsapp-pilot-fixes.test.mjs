@@ -14,8 +14,9 @@ const at = (hhmm, day = '2026-11-15') => Date.parse(`${day}T${hhmm}:00+02:00`);
 const customer = { customerId: 'c1', buyerId: 'b1', bindingVersion: 'v1', deliverySites: [{ id: 's1', label: 'Keittiö' }], permissions: { readProducts: true, placeOrders: true } };
 const milk = (date) => ({ intent: 'order', ...(date ? { deliveryDate: date } : {}), ops: [{ op: 'add', productTerm: 'maito', quantity: { value: 20, unit: 'L' }, claims: [], excludeAllergens: [] }] });
 
-function core(script) {
-  const t = at('10:00'); let n = 0; const calls = { suggest: 0 };
+// Kello kiinnitetään ennen aikaisinta tilausaikarajaa (10.00), jotta testi ei riipu seinäkellosta.
+function core(script, hhmm = '09:00') {
+  const t = at(hhmm); let n = 0; const calls = { suggest: 0 };
   const tools = {
     suggest: async ({ draft }) => { calls.suggest += 1; const l = draft.lines[0]; return { issues: [], lines: [{ ref: l.ref, total: 2, more: false, clarify: [], exact: true,
       options: [1, 2].map((i) => ({ productId: `m-${i}`, name: `maito ${i}`, salesUnits: 4, salesUnitLabel: 'ltk', covers: l.quantity, lineNet: 10 * i, labels: [],
@@ -61,6 +62,21 @@ test('tilausaikaa kysyttäessä kerrotaan aikaisin raja työkalujen tiedoista, e
   assert.equal(asked.status, 'choosing');
   assert.match(asked.text, /^Huomiselle \(ma 16\.11\.\) ehtii tilata su 15\.11\. klo 10\.00 asti\.\nToimitus ma 16\.11\./); // aikaisin näytetyistä
   assert.equal(calls.suggest, 1); // näytetyt vaihtoehdot riittävät, ei toista hakua
+});
+
+test('mennyttä tilausaikarajaa ei luvata: kerrotaan aikaisin voimassa oleva raja tai että kaikki ovat umpeutuneet', async () => {
+  const q = 'mihin mennessä pitää tilata et huomiseks ehtii?';
+  const script = { '20 l maitoa': milk(null), [q]: { intent: 'order', deliveryDate: '2026-11-16', ops: [] } };
+  const later = core(script, '11:00'); // 10.00-raja mennyt, 12.00 voimassa
+  await later.say('20 l maitoa');
+  const one = (await later.say(q)).text;
+  assert.match(one, /^Huomiselle \(ma 16\.11\.\) ehtii tilata su 15\.11\. klo 12\.00 asti\./);
+  assert.doesNotMatch(one, /klo 10\.00 asti/);
+  const late = core(script, '13:00'); // molemmat rajat menneet
+  await late.say('20 l maitoa');
+  const none = (await late.say(q)).text;
+  assert.match(none, /^Huomiselle \(ma 16\.11\.\) tilausaika on jo umpeutunut \(su 15\.11\. klo 12\.00\)\./);
+  assert.doesNotMatch(none, /ehtii tilata/);
 });
 
 function dialogueFixture(t, plan, { supportContact } = {}) {

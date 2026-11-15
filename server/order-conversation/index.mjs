@@ -4,7 +4,7 @@
 // työkalujen palauttamista tiedoista. Tilaus lähtee vain, kun ostaja vastaa TILAA juuri näytettyyn yhteenvetoon.
 import crypto from 'node:crypto';
 import { CLAIMS } from './interpret.mjs';
-import { helsinkiLabel, parseApiTime, cutoffPassed } from '../gateway/clock.mjs';
+import { helsinkiLabel, parseApiTime } from '../gateway/clock.mjs';
 
 const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
@@ -237,6 +237,13 @@ const timeWishNote = (draft) => `Toivoit toimitusta "${draft.timeWish}": kellona
  * @param {() => number} [o.now]
  */
 export function createOrderingConversation({ store, tools, interpretTurn, now = Date.now }) {
+  // Tilausaikaraja verrataan keskustelun omaan kelloon (tuotannossa portin kello, testeissä kiinnitetty aika).
+  const cutoffPassed = (closingTime) => { const t = parseApiTime(closingTime); return t ? t.getTime() <= now() : null; };
+  // Aikaisin vielä voimassa oleva raja näytetyistä vaihtoehdoista. Mennyttä rajaa ei luvata; jos kaikki ovat menneet, se sanotaan.
+  const cutoffNote = (day, sorted) => {
+    const open = sorted.find((c) => !cutoffPassed(c));
+    return open ? `${day} ehtii tilata ${helsinkiLabel(open)} asti.` : `${day} tilausaika on jo umpeutunut (${helsinkiLabel(sorted.at(-1))}).`;
+  };
   // Kysyy puuttuvat tiedot, näyttää vaihtoehdot tai yhteenvedon. Ei koskaan valitse tuotetta, päivää tai ruokavaatimusta itse.
   // Vastaus "mihin mennessä pitää tilata": aikaisin tilausaikaraja näytetyistä vaihtoehdoista tai yhdestä hausta.
   // Ilman päivää tai tuotteita raja ei ole tiedossa, ja se sanotaan. Ei arvausta.
@@ -252,10 +259,9 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         cutoffs = (s.lines[0]?.options || []).map((o) => o.cutoff).filter((c) => parseApiTime(c));
       } catch { /* ei rajaa ilman työkalua */ }
     }
-    const first = cutoffs.sort((a, b) => parseApiTime(a) - parseApiTime(b))[0];
-    if (!first) return /Tilattava viimeistään/.test(shownText) ? '' : `${day} en saanut tilausaikarajaa tilausjärjestelmästä. Yhteenveto kertoo sen, kun tuotteet on valittu.`;
-    if (cutoffPassed(first)) return `${day} tilausaika on jo umpeutunut (${helsinkiLabel(first)}).`;
-    return `${day} ehtii tilata ${helsinkiLabel(first)} asti.`;
+    const sorted = cutoffs.sort((a, b) => parseApiTime(a) - parseApiTime(b));
+    if (!sorted.length) return /Tilattava viimeistään/.test(shownText) ? '' : `${day} en saanut tilausaikarajaa tilausjärjestelmästä. Yhteenveto kertoo sen, kun tuotteet on valittu.`;
+    return cutoffNote(day, sorted);
   }
 
   /** opts.again = { ref, more } näyttää saman rivin listan uudelleen, opts.more hakee sille seuraavat vaihtoehdot. */
@@ -350,9 +356,9 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       const notes = [...(smallest > line.quantity.value ? [`Tarve on ${qty(line.quantity)}; pienin näistä myyntieristä kattaa ${qty({ value: smallest, unit: line.quantity.unit })}.`] : []),
         ...(!line.claims.includes('EU_ORGANIC_FARMING') && x.options.every((o) => o.labels?.includes('EU_ORGANIC_FARMING')) ? ['Näytetyt vaihtoehdot ovat luomua.'] : [])];
       // Kiireessä tilausaikaraja näkyy jo vaihtoehdoissa (aikaisin näytetyistä, työkalujen tiedoista). Kellonaikaa ei luvata.
-      const cutoffAt = urgent ? x.options.map((o) => o.cutoff).filter((c) => parseApiTime(c)).sort((a, b) => parseApiTime(a) - parseApiTime(b))[0] : null;
+      const cutoffs = urgent ? x.options.map((o) => o.cutoff).filter((c) => parseApiTime(c)).sort((a, b) => parseApiTime(a) - parseApiTime(b)) : [];
       const day = draft.deliveryDate === today ? 'Tämän päivän toimitukseen' : draft.deliveryDate === addDays(today, 1) ? 'Huomiselle' : `Päivälle ${dateLabel(draft.deliveryDate)}`;
-      if (cutoffAt) notes.push(`${day} ehtii tilata ${helsinkiLabel(cutoffAt)} asti.`);
+      if (cutoffs.length) notes.push(cutoffNote(day, cutoffs));
       if (draft.timeWish && !draft.timeWishNoted) { notes.push(timeWishNote(draft)); draft.timeWishNoted = true; }
       const block = [`Toimitus ${dateLabel(draft.deliveryDate)}, hinnat alv 0 %.${diet ? ` Huomioitu: ${diet}.` : ''}`,
         ...(x.exact === false ? [`Tarkkaa osumaa ei löytynyt: ${line.productTerm}. Lähimmät tilattavat vaihtoehdot:`] : []),

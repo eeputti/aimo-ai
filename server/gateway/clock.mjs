@@ -1,10 +1,16 @@
 // Portin ainoa kello. Kaikki aikavertailut (tilausaikaraja, tarjouksen voimassaolo, päiväkatto) kulkevat tämän kautta.
 // DEMO_NOW=2026-11-14T10:00:00+02:00 kiinnittää kellon alkamaan annetusta hetkestä, ja jokainen vastaus kertoo ajan olevan simuloitu.
 // Syy: mock-rajapinnan Stock-tuotteiden tilausaika umpeutuu su 15.11. klo 17.00, minkä jälkeen mikään ei olisi tilattavissa oikealla kellolla.
+// DEMO_NOW_LOOP_MINUTES=420 kierrättää demokellon: se kulkee DEMO_NOW:sta eteenpäin ja palaa alkuun annetun ajan välein.
+// Syy: testirajapinta on jäädytetty (toimitus aina ma 16.11., raja su 15.11. klo 17.00), joten jatkuvasti päällä oleva demo
+// ei saa koskaan ylittää rajaa. Esim. DEMO_NOW=2026-11-15T09:00:00+02:00 ja 420 min pitää kellon su klo 9–16 välillä.
 const bootReal = Date.now();
 const demoRaw = (process.env.DEMO_NOW || '').trim();
 const demoStart = demoRaw ? parseApiTime(demoRaw)?.getTime() : null;
 if (demoRaw && !demoStart) console.warn(`[clock] DEMO_NOW="${demoRaw}" ei ole kelvollinen aika, käytetään oikeaa kelloa`);
+const loopRaw = (process.env.DEMO_NOW_LOOP_MINUTES || '').trim();
+const loopMs = demoStart != null && /^\d+(?:\.\d+)?$/.test(loopRaw) && Number(loopRaw) > 0 ? Math.round(Number(loopRaw) * 60000) : 0;
+if (loopRaw && !loopMs) console.warn(`[clock] DEMO_NOW_LOOP_MINUTES="${loopRaw}" ei ole käytössä (vaatii kelvollisen DEMO_NOW:n ja positiivisen minuuttimäärän)`);
 
 function helsinkiOffset(date) {
   // Europe/Helsinki-offset (+02:00 talvella, +03:00 kesällä) ilman kirjastoja.
@@ -30,10 +36,16 @@ export function parseApiTime(value) {
 
 export const clock = {
   simulated: demoStart != null,
-  now() { return new Date(demoStart != null ? demoStart + (Date.now() - bootReal) : Date.now()); },
+  /** Kiertääkö demokello. Silloin vuorokaudenajan (esim. tervehdyksen) kannattaa tulla oikeasta kellosta. */
+  looping: loopMs > 0,
+  now() {
+    if (demoStart == null) return new Date(Date.now());
+    const elapsed = Math.max(0, Date.now() - bootReal);
+    return new Date(demoStart + (loopMs ? elapsed % loopMs : elapsed));
+  },
   /** Päivämäärä Helsingin ajassa muodossa YYYY-MM-DD. */
   today() { return helsinkiDate(this.now()); },
-  info() { return { now: this.now().toISOString(), simulated: this.simulated, timezone: 'Europe/Helsinki', note: this.simulated ? 'DEMO_NOW on asetettu: portin kello on simuloitu' : undefined }; },
+  info() { return { now: this.now().toISOString(), simulated: this.simulated, ...(loopMs ? { loopMinutes: loopMs / 60000 } : {}), timezone: 'Europe/Helsinki', note: this.simulated ? `DEMO_NOW on asetettu: portin kello on simuloitu${loopMs ? ' ja kiertää' : ''}` : undefined }; },
 };
 
 export function helsinkiDate(date) {
