@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — riippumaton kokonaiskoe ja kaksi avointa demovikaa (Codex, testauschat)
+
+- **Käyttäjän pyyntö:** testaa nykyinen kokonaisuus ja etsi vikoja. Erillinen lähdekuva 5044a91, arviointitestien päivitys 9f20407:ään; uudet 499ab8c/0b06d9d muuttavat vain dokumentteja. Ei sovelluskoodin, asetusten tai käyttäjän kantojen muutoksia. Yhteisen työpuun keskeneräiset muutokset säilyivät; tämä dokumenttivaihe tallennetaan erillisestä kloonista.
+- **Avoin uusi löydös:** kaikki 36 etusivun näyttötuotetta puuttuvat käytössä olevasta 17 546 tuotteen tilauskatalogista, 31:llä on aktiivinen koriinlisäys. Oikea selain: piparkakku 8097729 → kori onnistuu → tarjous pysähtyy UNKNOWN_PRODUCTiin. Katalogin maitotuote 464306 eteni samassa selaimessa tarjouksesta ihmishyväksynnän kautta yhdeksi confirmed-tilaukseksi, päätösketju ehjä ja selainloki virheetön.
+- **Avoin aiempi löydös varmennettu:** demomaksun omistajuusraja ei pidä. Eristetty muistissa oleva D1 ja simuloitu sähköposti toistivat toisen synteettisen tilauksen maksutilan muuttamisen ilman tilaajan tunnistusta. Ei rahaa, oikeaa sähköpostia eikä hyödyntämiskutsuja julkiseen palveluun; yksityiskohtia ei julkaista mahdollisesti julkisessa repossa.
+- **Testauksen aikana korjattu muualla:** aluksi 4749 ajoi 777b5a4:ää, ja sen eristetty koe vahvisti poiston jälkeen jäävän rivin sekä keskeneräisen korilinkin. Julkaisuchatin 0b06d9d-päivityksen jälkeen riippumaton luku: PID 39055, runtime 9f204077a, 8/8 moduulihashia täsmää, poisto jättää 0 riviä eikä keskeneräiseen koriin synny linkkiä. Paikallinen/julkinen health 200. Katselmointichatti ei restartannut käyttäjän palvelinta.
+- **Tarkistukset:** sovellus **330/330**, Worker **26/26**, Team MCP **62/62**, tulkinta **26/26**, puhekielihaku **54/54** (yhteensä 498 tarkistusta), ei ohituksia. Worker typecheck/build läpi. Oma testipalvelin suljettu. Julkiset landing/tilaukset/maksusivu 200; localhost4747 ei vastaa. Ei uusia Meta-, malli- tai Valio-kutsuja tai käyttäjän tilauksia. Oikean puhelimen liittymistä ja maksuketjua ei väitetä testatuiksi.
+- **Seuraava askel:** korjaa etusivun näyttötuotteiden ja tilauskatalogin yhteys sekä demomaksun yksityinen siirtymä. Tarkka toisto, rajat ja varmennukset: `docs/parallel/system-audit-2026-11-15.md`.
+
 ## 15.11.2026 — AI-äänen tilalle oikea ruututallenne (Codex, videochatti)
 
 - Käyttäjä hylkäsi AI-kertojaäänen ja pyysi vähemmän mainospuhetta. Video tehty uudestaan ilman ääniraitaa ja ilman puhuvaa kalvoesitystä. Lyhyet suomenkieliset reunatekstit, oikea käyttöliittymä ja sama 20 → 30 litran maitotilaus alusta ihmisen hyväksyntään ja päätöslokiin.
