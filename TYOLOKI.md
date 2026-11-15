@@ -3,6 +3,13 @@
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
 
+
+## 15.11.2026 — esittelyvideo korjattu suomeksi (Codex, videochatti)
+
+- Käyttäjä vaati videon suomeksi ja vähemmän mainospuhetta. Korvattu puhe, kuvatekstit, tekstitys ja katselusivu suomenkielisillä. Käsikirjoitus kirjoitettu uudestaan käytännön tilauskuluksi ilman aiempia iskulauseita. Synteettinen Harri-ääni tavallisella nopeudella, alle 0,5 % kestokorjaus. Kesto **113,832683 s**, alle 120 s.
+- Uusi MP4: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/aimo-agent-pitch-fi.mp4 . Sama julkinen katselusivu näyttää nyt suomenkielisen videon. Vanha MP4-polku sisältää myös korjatun videon. Sites-versio 2, lähde 316a5da416bdd2af53aa7f0ca068a454ab59c5e4, julkaisu succeeded. Puheteksti ja tiedot docs/pitch-video.md (ee8caf8).
+- Tarkistettu koko videon dekoodaus, kesto, puheosuuksien loppuminen ennen kuvanvaihtoa sekä otsikoiden ja tekstityksen mahtuminen. Julkisen suomenkielisen MP4:n anonyymi takaisinluku HTTP200, SHA-256 sama kuin paikallisessa: c5e376c4f560d269e297281e798f08f3a50f6c8382054f7e29123cc29ab62af3. Ei sovellusmuutoksia tai tilaus-/Meta-/Valio-kutsuja.
+
 ## 15.11.2026 — landing pagelle Valion fontit ja sininen korostus (Claude Code, landing-chat)
 
 - **Käyttäjän pyyntö:** valittu kenttä korostuu sinisellä oranssin sijaan, ja sivulla käytetään samoja Valion fontteja kuin paikallisessa kaupassa.
