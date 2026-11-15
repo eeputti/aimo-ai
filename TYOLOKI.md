@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 ilta — puhdas julkinen repo eeputti/valioaimo-tilausapuri (Claude Code, uusi repo -chat)
+
+- **Käyttäjän päätös:** GitHubiin oma siisti repo, jossa on vain oleelliset ja oikeasti toimivat osat: https://github.com/eeputti/valioaimo-tilausapuri (Eeliksen luoma, julkinen). Kehitys voi jatkua täällä aimo-ai:ssa; valmiit commitit tuodaan uuteen repoon. Tätä repoa ei poisteta eikä sen historiaa muuteta.
+- **Sisältö:** origin/mainin d62bbd0 + 68bd180..4f8fc80 ilman `TYOLOKI.md`/`AGENTS.md`/`CLAUDE.md`, `docs/parallel/`, pitch-/videoraportteja, `docs/repository-scope.md`, `docs/whatsapp-public-demo.md` ja `eval/results.*`. Kaupalliset Matter- ja National 2 -fontit (`*.otf`) eivät ole uudessa julkisessa repossa; ne ovat vain paikallisesti, ja sivut käyttävät ilman niitä järjestelmän fonttia. Uusi README, paketin nimi `valioaimo-tilausapuri`.
+- **Korjaukset siellä:** katalogia ja fontteja vaativat testit ohitetaan ilman paikallista aineistoa (sama tapa kuin muissa testeissä), tervehdystesti kiinteällä kellolla. Samaa tilausaikarajan kellovikaa ei korjattu kahdesti: siihen otettiin tämän repon c01660a sellaisenaan.
+- **Tarkistukset:** uusi repo `npm test` 274/274 paikallisella katalogilla, puhtaalla koneella (UTC, ei katalogia eikä fontteja) 249 läpi ja 25 ohitettu, Cloudflare 29/29, aimo:eval 26/26, spoken 54/54. GitHub-commit 699c1cc varmennettu. GitHub Actions -tiedosto odottaa `workflow`-oikeutta gh-tunnukselle, joten testiajo ei vielä ole GitHubissa.
+- **Muille avustajille:** jatka tavalliseen tapaan täällä. Uuden repon kansio `/Users/eeputti/developer/valioaimo-tilausapuri` tuo täältä uudet commitit paikallisella `.sync-from-aimo-ai.sh`-skriptillä (viimeksi tuotu commit `.sync-base`-tiedostossa); se ohittaa yllä luetellut tiedostot ja huomauttaa README/package.json-muutoksista. Älä tee samaa muutosta molempiin repoihin käsin. Avaimia, kantoja ja `data/`-aineistoa ei kopioitu kumpaankaan GitHubiin.
+
 ## 15.11.2026 ilta — kiertävä demokello jäädytettyyn testirajapintaan ja tilausaikaviestin ristiriita (Claude Code, korjausjärjestys-chat)
 
 - **Käyttäjän pyyntö:** "mitä kaikkee tartteis viel, mikä täs vois olla vikana ja miten voisit korjata kaiken sen", sitten "Korjaa järjestyksessä". Löydökset vastasivat katselmointichatin raporttia `docs/parallel/bot-audit-2026-11-15-ilta.md`. Lisäksi julkaisija välittää vain `WHATSAPP_DEMO_PHONE`-ostajan tilaukset, joten muiden kokeilijoiden maksulinkki ei koskaan löydä tilausta (kannassa 5 tällaista, AGW-20261115-0003–0007). AGW-20261115-0008 (klo 16.55) puuttui Workerista, koska julkaisija ei ollut käynnissä.
