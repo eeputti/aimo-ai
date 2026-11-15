@@ -3,6 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { MAX_LINES, MAX_ORDERS, parseSnapshot } from './src/protocol.ts';
+import { readAgentTrace } from './trace-reader.mjs';
 
 const WEB_DEMO_PHONE = '358000000001';
 const GENESIS = '0'.repeat(64);
@@ -81,12 +82,37 @@ export async function pushOrderEvents({ url, token, snapshot, known, email = {},
   return results;
 }
 
+// "Katso, mitä agentti näki": push each published WhatsApp order's trace once. Opt-in (--agent-traces), because the
+// trace carries the conversation text. A trace is read only after the order has settled, so the cart page's own
+// confirmation turn is already stored. Orders whose conversation has been pruned are skipped.
+export const TRACE_SETTLE_MS = 10_000;
+export async function pushAgentTraces({ url, token, snapshot, known, read, fetcher = fetch, allowLocal = false, now = Date.now() }) {
+  const endpoint = new URL('/api/agent-traces', url);
+  if (endpoint.protocol !== 'https:' && !(allowLocal && endpoint.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(endpoint.hostname))) throw new Error('Julkaisu vaatii HTTPS-osoitteen.');
+  if (!token || token.length < 32) throw new Error('Julkaisuavain puuttuu.');
+  const results = [];
+  for (const order of snapshot.orders) {
+    if (order.channel !== 'whatsapp' || known.has(order.orderId) || now - Date.parse(order.createdAt) < TRACE_SETTLE_MS) continue;
+    const trace = read(order.orderId);
+    if (!trace) { known.add(order.orderId); results.push({ orderId: order.orderId, skipped: 'conversation_missing' }); continue; }
+    const response = await fetcher(endpoint, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
+      headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(trace) });
+    if (!response.ok) throw new Error(`Agentin jäljen välitys epäonnistui (HTTP ${response.status}).`);
+    const result = await response.json();
+    if (result.ok !== true) throw new Error('Agentin jäljen välitystä ei vahvistettu.');
+    known.add(order.orderId);
+    results.push({ orderId: order.orderId, turns: trace.turns.length, updated: result.updated });
+  }
+  return results;
+}
+
 async function main() {
   const env = process.env, watch = process.argv.includes('--watch');
   let stop = false, wake;
   const orderEvents = process.argv.includes('--order-events'), backfill = process.argv.includes('--order-events-backfill');
   // Without backfill, orders already confirmed when the publisher starts are not e-mailed again.
   let known = null;
+  const traces = process.argv.includes('--agent-traces'), traced = new Set();
   for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { stop = true; wake?.(); });
   do {
     try {
@@ -100,9 +126,14 @@ async function main() {
           email: { to: env.ORDER_EMAIL_TO, customerName: env.ORDER_EMAIL_CUSTOMER_NAME } }))
           console.log(JSON.stringify({ event: 'order_event_pushed', ...r }));
       }
+      if (traces) {
+        const read = (orderId) => readAgentTrace({ orderId, gatewayFile: env.GATEWAY_DB, whatsappFile: env.WHATSAPP_DB, draftFile: env.WHATSAPP_DRAFT_DB, ledgerHead: snapshot.ledgerHead });
+        for (const r of await pushAgentTraces({ url: env.CLOUDFLARE_DEMO_URL, token: env.CLOUDFLARE_DEMO_SYNC_TOKEN, snapshot, known: traced, read }))
+          console.log(JSON.stringify({ event: 'agent_trace_pushed', ...r }));
+      }
     } catch (error) {
       // Do not log upstream responses, tokens, database paths, or customer records.
-      console.error(JSON.stringify({ event: 'demo_publish_failed', error: error.message?.startsWith('Julkaisu') || error.message?.startsWith('Tilauskannan') || error.message?.startsWith('Tilauksen') ? error.message : 'Tarkista julkaisun asetukset ja kannat.' }));
+      console.error(JSON.stringify({ event: 'demo_publish_failed', error: error.message?.startsWith('Julkaisu') || error.message?.startsWith('Tilauskannan') || error.message?.startsWith('Tilauksen') || error.message?.startsWith('Agentin') ? error.message : 'Tarkista julkaisun asetukset ja kannat.' }));
       if (!watch) { process.exitCode = 1; return; }
     }
     if (watch && !stop) await new Promise(resolve => { const timer = setTimeout(resolve, 5000); wake = () => { clearTimeout(timer); resolve(); }; });

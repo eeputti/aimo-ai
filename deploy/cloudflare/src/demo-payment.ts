@@ -38,6 +38,13 @@ async function authenticate(request: Request, env: DemoPaymentEnv, row: PaymentR
   return crypto.subtle.verify("HMAC", key, bytes, data);
 }
 
+/** True when the request carries this order's demo payment link capability. Other pages of the same order reuse it. */
+export async function verifyDemoPaymentLink(env: DemoPaymentEnv, orderId: string, request: Request) {
+  if (!ORDER_ID.test(orderId)) return false;
+  const row = await paymentRow(env, orderId);
+  return Boolean(row && await authenticate(request, env, row));
+}
+
 /** Call after storing the authenticated order event, before attempting e-mail delivery. */
 export async function registerDemoPayment(env: DemoPaymentEnv, orderId: string, now = Date.now()) {
   if (!enabled(env)) return null;

@@ -1,7 +1,8 @@
 import { MAX_BODY_BYTES, parseSnapshot } from "./protocol.ts";
 import { parseOrderEvent } from "./order-event.ts";
 import { renderOrderEmail } from "./email.ts";
-import { registerDemoPayment, demoPaymentEmailAllowed, describeDemoPayment, handleDemoPayment } from "./demo-payment.ts";
+import { registerDemoPayment, demoPaymentEmailAllowed, describeDemoPayment, handleDemoPayment, verifyDemoPaymentLink } from "./demo-payment.ts";
+import { TRACE_PREFIX, parseAgentTrace, storeAgentTrace, handleAgentTraceRead } from "./agent-trace.ts";
 import { handleSignup } from "./signup.ts";
 
 // A sender is optional: without one orders are stored and e-mail waits. Either the Cloudflare
@@ -145,6 +146,18 @@ export default {
         return json({ ok: true, orderId: event.order.orderId, duplicate: inserted.meta.changes === 0, email });
       } catch { console.error(JSON.stringify({ event: "order_event_write_failed" })); return json({ error: "Tallennus ei onnistunut." }, 503); }
     }
+    if (url.pathname === TRACE_PREFIX && request.method === "POST") {
+      if (!(await authorized(request, env.SYNC_TOKEN))) return json({ error: "Ei julkaisuoikeutta." }, 401);
+      if (!/^application\/json\b/.test(request.headers.get("content-type") || "")) return json({ error: "JSON vaaditaan." }, 415);
+      let trace;
+      try { trace = parseAgentTrace(await readBody(request)); }
+      catch { return json({ error: "Virheellinen agentin jälki." }, 400); }
+      try { return json({ ok: true, orderId: trace.orderId, updated: await storeAgentTrace(env, trace) }); }
+      catch { console.error(JSON.stringify({ event: "agent_trace_write_failed" })); return json({ error: "Tallennus ei onnistunut." }, 503); }
+    }
+    // "Katso, mitä agentti näki": readable only with the order's own demo payment link.
+    const trace = await handleAgentTraceRead(request, env, (orderId, req) => verifyDemoPaymentLink(env as OrderEnv, orderId, req));
+    if (trace) return trace;
     // Landing page sign-ups: the browser sees only its own status; the publisher token lists the numbers.
     const signup = await handleSignup(request, env);
     if (signup) return signup;

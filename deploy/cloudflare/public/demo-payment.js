@@ -26,6 +26,9 @@ function completed(email) {
   $('pay').textContent = 'Tarkista vahvistuksen lähetys';
   $('pay').hidden = ['sent', 'not_requested', 'failed'].includes(email);
   $('cancel').hidden = true;
+  // The same capability opens this order's agent trace; nothing else is needed from the server.
+  $('trace').href = `/agentti.html#${match[1]}.${match[2]}`;
+  $('trace').hidden = false;
 }
 async function load() {
   const data = await request();

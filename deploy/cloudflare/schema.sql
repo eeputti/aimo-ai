@@ -27,3 +27,12 @@ CREATE TABLE IF NOT EXISTS demo_payments (
   expires_at INTEGER NOT NULL,
   paid_at INTEGER
 );
+
+-- "Katso, mitä agentti näki": the published conversation and gateway checks behind one order.
+-- Read only with that order's demo payment link; phone numbers and cart links are masked before publishing.
+CREATE TABLE IF NOT EXISTS agent_traces (
+  order_id TEXT PRIMARY KEY,
+  observed_at INTEGER NOT NULL,
+  received_at INTEGER NOT NULL,
+  json TEXT NOT NULL
+);
