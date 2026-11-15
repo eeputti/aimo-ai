@@ -1,72 +1,48 @@
-# Aimo Agent Gateway: palautuksen pitch-video
+# Aimo-tilausapurin suomenkielinen esittelyvideo
 
-Valio Aimo, Trusted Trade Agents, Junction 2026.
+- Katselu: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site
+- MP4: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/aimo-agent-pitch-fi.mp4
+- Puheteksti: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/pitch-script.txt
+- Suomenkielinen tekstitys: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/captions.vtt
+- Kesto: 113,832683 s (1 min 53,83 s), alle kahden minuutin.
+- Puhe, videon tekstit ja katselusivu suomeksi. Synteettinen suomenkielinen kertojaääni, tavallinen puhenopeus. H.264/AAC, 1280 × 720, 24 fps.
 
-- **Katselulinkki (julkinen, ei kirjautumista):** https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site
-- **MP4:** https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/aimo-agent-pitch.mp4
-- **Puheteksti:** https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/pitch-script.txt
-- **Tekstitys:** https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/captions.vtt
-- **Kesto:** 110,028 sekuntia (1 min 50,03 s), alle ehdottoman 120 sekunnin rajan.
-- **Formaatti:** 1280 × 720, 24 fps, H.264 / AAC, MP4, faststart.
-- **Kieli:** englanti, synteettinen kertojaääni ja videoon poltettu englanninkielinen tekstitys.
+Käyttäjän korjaus: video suomeksi ja vähemmän mainospuhetta. Englanninkielinen versio korvattiin. Käsikirjoitus kirjoitettiin uusiksi yhden ravintolatilauksen ympärille: WhatsApp-viesti, tuotehaku, ostoskori, tarjous, ostajan asettamat rajat ja päätösloki. Videossa on kuvitettu työnkulku. Prototyyppi ei lähetä oikeita Valio-tilauksia eikä veloita maksuja. Tiimikoordinointia ei käytetä videon sisältönä.
 
-## Sisältö ja rajaukset
+Lähteet: projektin README.md, docs/challenge-coverage.md ja package.json. Ei uusia malli-/Meta-/Valio-testiajoja. Videon suomenkielinen puhe tuotettiin erikseen.
 
-Videon ydin on Agent Gateway: tuotehaku, live-hinta ja saatavuus challenge-API:sta, allekirjoitettu tarjous, mandaatti, ihmisen hyväksyntä ja hash-ketjutettu loki. WhatsApp-apuri, verkkokauppa, keittiödemo ja ulkoiset agentit esitetään saman portin asiakkaina.
+## Puheteksti
 
-Videon tilauskulku on kuvitettu esimerkki, ei ruuduntallennus tai uusi oikean rajapinnan ajo. Kuvitetut vaiheet on merkitty. Oikeita tilauksia, toimituksia tai maksuja ei luvata. Tuotantointegraatiot ovat seuraava askel. Ei keksittyjä säästö-, nopeus- tai asiakasmittareita.
+00:00:00  Aimo-tilausapuri
+Rakensimme Valio Aimolle tilausapurin. Sen kautta ostaja voi valmistella tilauksen WhatsAppissa ja vahvistaa sen selaimessa.
 
-Lähteet: README.md, docs/challenge-coverage.md, package.json ja TYOLOKI.md, luettu GitHubin main-haarasta 15.11.2026 Helsingin aikaa. Logo: deploy/cloudflare/public/aimo-logo.png. Käyttäjän pyynnöstä aimo-team- ja teamMCP-nimiset tiedostot sekä vastaavat tiimikoordinointiosuudet rajattiin pitchin ulkopuolelle.
+00:00:10  Tilaus alkaa viestistä
+Ostaja kirjoittaa: tarvitsen kaksikymmentä litraa laktoositonta maitoa ja viisi litraa kermaa maanantaiksi. Apuri kysyy puuttuvat tiedot.
 
-## Kohtaukset ja puheteksti
+00:00:21  Apuri etsii tuotteet
+Apuri etsii tuotteet. Hinta, saatavuus ja tilausaika tarkistetaan haasteen rajapinnasta. Laktoosittomuus varmistetaan tuotetiedoista.
 
-### 0:00 (8 s): Aimo Agent Gateway
+00:00:34  Ostaja valitsee ja tarkistaa
+Ostaja valitsee tuotteet ja määrät. Apuri lähettää linkin ostoskoriin. Lopullinen vahvistus tehdään siellä.
 
-Meet Aimo Agent Gateway: trusted purchasing, on your terms. Built for the Valio Aimo Trusted Trade Agents challenge at Junction.
+00:00:44  Tilaukseen tarvitaan tarjous
+Taustalla Aimo Agent Gateway muodostaa allekirjoitetun tarjouksen. Hinta ja saatavuus tarkistetaan vielä ennen tilauksen tallennusta.
 
-### 0:08 (10 s): An agent can ask.
+00:00:55  Ostaja määrää agentin rajat
+Ostaja asettaa agentille säännöt. Euromäärän ylitys vaatii ihmisen hyväksynnän. Kiellettyä allergeenia ei voi hyväksyä tilaukseen.
 
-Kitchen purchasing has real constraints: allergies, stock, delivery deadlines and budgets. An agent needs a reliable way to turn a request into an authorised order.
+00:01:07  Päätökset jäävät lokiin
+Päätöslokista näkee tarkistukset ja hyväksynnän syyn. Saman pyynnön lähettäminen uudestaan ei tee kaksoistilausta.
 
-### 0:18 (10 s): Start with a real need.
+00:01:17  Sama rajapinta eri apureille
+Sama rajapinta palvelee verkkokauppaa ja muita ostoagentteja. Keittiödemo tekee tilausehdotuksia historiasta, varauksista ja resepteistä.
 
-Imagine a buyer asking for one thousand litres of lactose-free milk by Monday. Their purchasing agent sends that need to the gateway.
+00:01:29  Mitä rakensimme?
+Toteutus käyttää Nodea ja SQLitea. Agentit liittyvät siihen REST- tai MCP-rajapinnalla. Tilausoikeudet tarkistetaan koodissa.
 
-### 0:28 (12 s): Find the right product.
+00:01:41  Tämä on toimiva prototyyppi
+Demo tallentaa testitilauksia, ei oikeita Valio-tilauksia tai maksuja. Seuraava vaihe on yhteys Aimon asiakastunnistukseen ja tilausjärjestelmään.
 
-The gateway searches over seventeen thousand products, then checks live prices and availability for shortlisted options through the challenge API. Dietary requirements become structured product filters.
+## Tarkistukset
 
-### 0:40 (12 s): A quote you can verify.
-
-The buyer receives a digitally signed, fixed-price offer. Before ordering, the gateway rechecks price and stock. Expired or tampered offers are rejected, and retries cannot create duplicate orders.
-
-### 0:52 (12 s): Your mandate decides.
-
-The buyer sets spending limits, substitution rules and approval requirements. Orders outside that authority wait for a human. A forbidden allergen cannot be waved through, even by approval.
-
-### 1:04 (10 s): Every decision leaves a trail.
-
-A hash-chained audit trail records each step and checks its integrity. Both sides can inspect what was offered, why an order stopped, and who approved it.
-
-### 1:14 (14 s): One gateway. Many clients.
-
-The same gateway serves external agents, the storefront, a kitchen planning demo and a WhatsApp assistant. In WhatsApp, buyers describe their needs, choose products and open a basket to confirm.
-
-### 1:28 (12 s): Open interfaces. Explicit rules.
-
-Built with Node, SQLite, REST, MCP and OpenAPI, with signed offers and deterministic policy checks. This prototype records demo orders; real fulfilment and payments are not connected.
-
-### 1:40 (10 s): Let agents handle the routine.
-
-Our next step is integration with Aimo customer identity and order systems. Aimo Agent Gateway makes agent purchasing verifiable, controlled and ready for human decisions when they matter.
-
-## Varmennus
-
-- MP4 dekoodattu kokonaan ffmpegillä ilman dekoodausvirheitä.
-- ffprobe: 110,028 s, H.264 / AAC, 1280 × 720.
-- Puheosuuksien kestot tarkistettu: ääni päättyy ennen jokaisen kohtauksen loppua.
-- Tekstityksen sijainti ja luettavuus tarkistettu renderöidystä ruudusta.
-- Sites-julkaisu onnistui, yleisö public. MP4 ladattu takaisin ilman tunnistautumista: HTTP 200, 2 535 186 tavua, SHA-256 sama kuin paikallisessa videossa.
-- MP4 SHA-256: c14af55a5a03b9a3e5a06618a4daf95724aaa9315cc6427906a71c3e8f314b18.
-
-Video on julkaistu Sitesilla. Mahdollinen YouTube-/Vimeo-julkaisu tehdään lataamalla sama MP4 halutulle tilille. Pitch deck, palautuslomake ja tiimin yhteystiedot eivät sisälly tähän videotyövaiheeseen.
+Koko MP4 dekoodattu ffmpegillä ilman virheitä. Kesto tarkistettu ffprobella. Jokainen puheosuus päättyy ennen kuvan vaihtumista, nopeusmuutos alle 0,5 %. Otsikoiden leveydet ja renderöidyn tekstityksen sijoittuminen tarkistettu. Sites-versio 2 julkaistu samaan julkiseen osoitteeseen, lähdecommit 316a5da416bdd2af53aa7f0ca068a454ab59c5e4.
