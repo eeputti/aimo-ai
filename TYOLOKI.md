@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 ilta — botti taas tilauskuntoon ja varahinnat Valion rajapinnan katkokselle (Claude Code, katselmointichat)
+
+- **Käyttäjän pyyntö ("tee 1 ja 2"):** 1) korjaa Macilla jäädytetyn testirajapinnan klo 17 tilausraja ja pysähtynyt julkaisija; 2) botti ei saa riippua Valion testirajapinnasta, jos se suljetaan.
+- **1, käyttöönotto:** `.env.whatsapp`:iin `DEMO_NOW=2026-11-15T09:00:00+02:00` ja `DEMO_NOW_LOOP_MINUTES=420` (kiertävä kello c01660a, toisen chatin tekemä). 4749 käynnistetty uudelleen snapshotista `/private/tmp/aimo-whatsapp-runtime-c01660a` (PID 97286). Viiden kannan 25 taulun rivimäärät samat ennen ja jälkeen; jonossa ei ollut odottavia viestejä. Health 200 paikallisesti ja tunnelin kautta. Välimuistin kopiolla: ilman kelloa 0 tilattavaa, kellolla maito 13 ja voi 9. Julkaisija käynnistetty (PID 98272, `--watch --order-events`, ei backfilliä); julkinen lista päivittyi klo 18.01 ja näyttää myös AGW-20261115-0008:n. Sen maksulinkkiä ei rekisteröity, koska tilaus vahvistettiin julkaisijan ollessa pysähdyksissä.
+- **2, päätös:** kaikkien tuotteiden hintojen kertahaku hylättiin, koska rajapinnan ohje kieltää sen erikseen. Käyttäjä valitsi viimeisimmän tunnetun arvon: `VALIO_FALLBACK=last-known` käyttää rajapintakatkoksessa vain jo saatuja oikeita hintoja ja saatavuuksia ja laskee tilausajan pyydetylle päivälle samalla toimitusajalla. Kysymättömille tuotteille ei keksitä hintaa. Katkon jälkeen 5 minuutin tauko rajapintakutsuihin. Raportti `docs/parallel/valio-last-known.md`.
+- **Tarkistukset:** uusi testi 4/4, koko `npm test` 286/286 uusimman mainin päällä. Oikea tuotehaku välimuistin kopiolla, oikealla kellolla ja suljetulla rajapinnalla: maito, voi ja peruna tilattavissa oikeilla hinnoilla ja päivillä.
+- **Avoinna:** tarjouksen yleisotsikko `priceSource` sanoo yhä "live", vaikka rivi on `last-known` (`server/gateway/service.mjs` on toisen chatin varauksessa, pyydetty taululla). Varahintojen kattavuus on vain jo kysytyt tuotteet (471 WhatsAppin välimuistissa). Pilvisiirto odottaa käyttäjän tiliä.
+
 ## 15.11.2026 ilta — neljä 200 asiakkaan itsekeskustelun hakuvikaa korjattu (Claude Code, hakujärjestys-chat)
 
 - **Käyttäjän pyyntö ("Kyllä, korjaa"):** e36e3e4-ajon jäljelle jääneet hakuviat. (1) "edam-juusto" toi halloumia, (2) maidottomalle vaniljajäätelölle ei tullut osumia, vaikka vegaaninen on valikoimassa, (3) tuoreiden tryffeleiden tilalla näytettiin suklaapatukka, (4) 3 kg:n sokerille tarjottiin kuormalavaa.

@@ -7,7 +7,7 @@ import { loadCatalog } from './catalog.mjs';
 
 const TTL = { avail: 5 * 60_000, price: 30 * 60_000 };
 const mem = new Map(); // key -> {at, value}
-export const apiStats = { calls: 0, ids: 0, cacheHits: 0, errors: 0, lastMs: null, lastError: null, staleServed: 0 };
+export const apiStats = { calls: 0, ids: 0, cacheHits: 0, errors: 0, lastMs: null, lastError: null, staleServed: 0, lastKnownServed: 0 };
 
 const cacheKey = (kind, date, id) => `${apiMode()}:${kind}:${date}:${id}`;
 
@@ -107,10 +107,60 @@ function simPrice(id) {
   return { net, gross: +(net * (1 + vatRate / 100)).toFixed(2), vatRate, list: null, comparison, comparisonUnit: p?.litres && !p?.kg ? 'L' : 'KG', validTo: null, source: 'sim', fetchedAt: Date.now() };
 }
 
+// ---------- Viimeisin tunnettu arvo (VALIO_FALLBACK=last-known) ----------
+// Haasteen testirajapinta voi sulkeutua tapahtuman jälkeen. Kaikkien tuotteiden hintoja ei saa hakea etukäteen
+// (rajapinnan ohje: kysy vain tarvittavat tuotteet), joten varana käytetään vain niitä oikeita vastauksia,
+// jotka botti on jo saanut tavallisessa käytössä. Kun rajapinta ei vastaa:
+// - hinta on tuotteen viimeisin oikea hinta mille tahansa päivälle,
+// - saatavuus on viimeisin tila, ja tilausaika lasketaan pyydetylle päivälle samalla toimitusajalla kuin viimeksi,
+// - tuotteelle, jota ei ole koskaan kysytty, ei keksitä hintaa eikä saatavuutta.
+// Arvoja ei kirjoiteta välimuistiin live-arvoina. Epäonnistumisen jälkeen rajapintaa ei kysytä 5 minuuttiin,
+// jotta jokainen viesti ei odota aikakatkaisua.
+const BREAKER_MS = 5 * 60_000;
+let apiDownUntil = 0;
+const fallbackOn = () => (process.env.VALIO_FALLBACK || '').trim() === 'last-known';
+const dayDiff = (a, b) => Math.round((Date.parse(`${a}T12:00:00Z`) - Date.parse(`${b}T12:00:00Z`)) / 86_400_000);
+// Aikaleima 2026-11-15T17:00:00+0200 siirretään kokonaisina päivinä; kellonaika ja offset säilyvät.
+const shiftStamp = (stamp, days) => (stamp && /^\d{4}-\d{2}-\d{2}/.test(stamp) ? `${addDays(stamp.slice(0, 10), days)}${stamp.slice(10)}` : stamp || null);
+
+export function lastKnownAvailability(id, date) {
+  const row = apiCache.latest('live:avail', id);
+  if (!row) return null;
+  const { stale, ...v } = row.value;
+  const askedFor = row.key.split(':')[2];
+  const base = { ...v, source: 'last-known', fetchedAt: row.fetchedAt, lastKnownFor: askedFor };
+  if (v.status === 'ok') {
+    // Toimitetaan pyydettynä päivänä yhtä pitkällä tilausajalla kuin viimeisimmässä oikeassa vastauksessa.
+    return { ...base, date, closingTime: shiftStamp(v.closingTime, dayDiff(date, v.date || askedFor)) };
+  }
+  if (v.status === 'late' && v.date) {
+    const date2 = addDays(date, dayDiff(v.date, askedFor));
+    return { ...base, date: date2, closingTime: shiftStamp(v.closingTime, dayDiff(date2, v.date)) };
+  }
+  return base; // out, blocked tai unknown: ei tilattavissa
+}
+
+export function lastKnownPrice(id) {
+  const row = apiCache.latest('live:price', id);
+  if (!row || row.value.error) return null;
+  const { stale, ...v } = row.value;
+  return { ...v, source: 'last-known', fetchedAt: row.fetchedAt };
+}
+
+function serveLastKnown(kind, date, id, note) {
+  const v = kind === 'avail' ? lastKnownAvailability(id, date) : lastKnownPrice(id);
+  if (v) { apiStats.lastKnownServed += 1; return v; }
+  return kind === 'avail' ? { status: 'unknown', source: 'last-known', note: note || 'Tuotteesta ei ole aiempaa saatavuustietoa.' } : { error: true, source: 'last-known' };
+}
+
+/** Testejä varten: unohtaa edellisen rajapintavirheen. */
+export function resetApiBreaker() { apiDownUntil = 0; }
+
 /**
  * Hakee saatavuuden ja hinnan annetuille tuotteille yhdellä kertaa (2 rinnakkaista kutsua / max 1000 tuotetta).
  * Palauttaa Map(id -> {avail, price}). Virhetilanteessa palautetaan vanha välimuistiarvo merkittynä stale: true
- * tai status 'unknown' — tuntematonta ei koskaan tulkita saatavilla olevaksi.
+ * tai status 'unknown' — tuntematonta ei koskaan tulkita saatavilla olevaksi. Asetuksella VALIO_FALLBACK=last-known
+ * virhetilanteessa käytetään tuotteen viimeisintä tunnettua oikeaa arvoa (ks. yllä).
  */
 export async function fetchQuotes(ids, date, { fresh = false } = {}) {
   const unique = [...new Set(ids.map(String))];
@@ -132,6 +182,11 @@ export async function fetchQuotes(ids, date, { fresh = false } = {}) {
     return out;
   }
 
+  if (fallbackOn() && Date.now() < apiDownUntil) {
+    for (const kind of ['avail', 'price']) for (const id of need[kind]) out.get(id)[kind] = serveLastKnown(kind, date, id);
+    return out;
+  }
+
   const chunks = (list) => { const res = []; for (let i = 0; i < list.length; i += 1000) res.push(list.slice(i, i + 1000)); return res; };
   const run = async (kind, path, normalize) => {
     await Promise.all(chunks(need[kind]).map(async (chunk) => {
@@ -148,6 +203,11 @@ export async function fetchQuotes(ids, date, { fresh = false } = {}) {
       } catch (err) {
         apiStats.errors += 1;
         apiStats.lastError = String(err.message || err);
+        if (fallbackOn()) {
+          apiDownUntil = Date.now() + BREAKER_MS;
+          for (const id of chunk) out.get(id)[kind] = serveLastKnown(kind, date, id);
+          return;
+        }
         for (const id of chunk) {
           const stale = cacheRead(kind, date, id, { allowStale: true });
           if (stale) apiStats.staleServed += 1;
