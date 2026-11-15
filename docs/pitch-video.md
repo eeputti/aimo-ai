@@ -1,37 +1,30 @@
-# Aimo-tilausapuri: WhatsApp-ostoskorin ruutudemo
+# Aimo: WhatsAppista samaan ostoskoriin
 
 - Katselu: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site
-- MP4: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/aimo-ostoskoridemo.mp4
-- Kesto: **50,80 s**, alle 120 sekunnin rajan.
-- **Ei ääniraitaa**, kertojaa tai musiikkia.
-- H.264, 1280 × 720, 25 fps, BT.709, MP4 / faststart.
+- MP4: https://aimo-agent-pitch.daniel-turkkinen.chatgpt.site/aimo-whatsapp-ja-ostoskori.mp4
+- **Kesto78,48s (1min18,48s), ei ääniraitaa.** H.264,1280×720,25fps,BT.709.
 
-## Käyttäjän viitekuvan mukainen näkymä
+## Koko tilausketju samassa tallenteessa
 
-Käyttäjä täsmensi, että aiemmassa videossa oli väärä käyttöliittymä, ja lähetti kuvan WhatsApp-korilinkin avaamasta Toimitustukun näköisestä ostoskorista. Aiempi /demo-keskusteluvaranäkymä poistettiin videosta. Uusi tallenne käyttää juuri tämän korin alkuperäistä HTML:ää, CSS:ää ja fontteja:
+Käyttäjä huomautti, että pelkkään ostoskoriin rajatusta videosta oli poistettu WhatsApp-demonstraatio. Uusi video lisää keskustelun alkuun ja säilyttää käyttäjän viitekuvan mukaisen ostoskorin.
 
-- public/whatsapp-storefront-cart.html ja .js / .css
-- server/whatsapp/storefront-cart.mjs
-- reitti /whatsapp/cart
+1. Ostaja pyytää keskustelussa20l laktoositonta maitoa maanantaiksi.
+2. Apuri näyttää vaihtoehdot, ostaja valitsee tuotteen3.
+3. Ostaja pyytää avaamaan korin. Vastauksessa on Avaa ostoskori -linkki.
+4. Linkki avataan samassa selaintallenteessa. /whatsapp/cart näyttää saman tuotteen ja20l määrän.
+5. Ostaja muuttaa korin omalla muutoskentällä määräksi30l.
+6. TARKISTA JA TILAA → VAHVISTA DEMOTILAUS → confirmed,AGW-20261114-0001.
 
-Allekirjoitettu korilinkki on voimassa, joten viitekuvan vanhentuneen linkin varoitusta ei toisteta. Sivun oma Aimo-tunniste, yläpalkki, vaalea otsake, WA-ilmoitus, ostoskorin typografia ja taulukko säilyvät. Sivustoa ei muotoiltu uudelleen.
+Tallenne on yksi jatkuva selainajo. Keskustelusta luotua korilinkkiä todella klikataan, eikä keskustelua ja erillistä ostoskoria ole liimattu eri tilauksista. Ostoskorissa käytetään alkuperäisiä public/whatsapp-storefront-cart.html/js/css-tiedostoja ja fontteja.
 
-## Videon kulku
+## Mitä WhatsApp-osuus näyttää
 
-1. Avataan WhatsAppissa koottu ostoskori, jossa on 20 litraa laktoositonta maitoa.
-2. Ostaja kirjoittaa korin omaan muutoskenttään "maitoa 30 l".
-3. Tarkistetaan päivittynyt määrä, hinnat ja yhteenveto.
-4. Painetaan TARKISTA JA TILAA ja erikseen VAHVISTA DEMOTILAUS.
-5. Sama kori näyttää tallennetun, vahvistetun demotilauksen.
+WhatsApp-osuus on **projektin keskustelun selaindemo, ei oikean WhatsApp-sovelluksen tai Metan toimituksen tallenne**. Tämä kerrotaan videon otsakkeessa ja katselusivulla. Paikallinen kuvausharness käyttää projektin createWebDemo-,createDemoOrderingChat- ja createCartLink-moduuleja. Selaindemon aloitusteksti päivitettiin korivahvistusta vastaavaksi, ja palvelimen aito korilinkki esitetään klikattavana Avaa ostoskori -painikkeena. Vastauksia, tuotevalintoja, määriä tai tilaustiloja ei keksitty kuvia varten.
 
-## Tallennus ja rajaukset
+## Ympäristö ja tarkistukset
 
-Muuttamaton sovelluskoodi commitista043f08f, erillinen paikallinen HTTPS-palvelin ja omat kannat. Korilinkki, ostoslistan muutokset, tarjoukset ja tilauksen tallennus kulkevat projektin oikeiden moduulien kautta. Testiasiakkaan paikalliseksi valtuudeksi asetettiin hyväksyntä vain poikkeuksissa, 1 000 €/tilaus ja 2 000 €/päivä. Tilaus jää näihin rajoihin.
+Muuttamaton sovelluslähde043f08f, erillinen paikallinen HTTPS-palvelin ja omat kannat. Kuusi esimerkkituotetta, nimet ja tunnisteet repon julkisesta snapshotista, muut tiedot testisyötteitä. Hinnat,saatavuus ja aika simuloitu. Paikallinen testivaltuus exceptions,1000€/tilaus,2000€/päivä. Ei käyttäjäkantojen muutoksia, kielimalli-/Valio-avaimia, Meta-lähetyksiä, oikeita tilauksia tai maksuja. aimo-team-/teamMCP-aineisto ei kuulu videoon. Avaimia tai allekirjoitettua korilinkkiä ei julkaista.
 
-Kuusi esimerkkituotetta, nimet ja tunnisteet repon julkisesta snapshotista, muut tuotetiedot testisyötteitä. Hinnat, saatavuus ja aika simuloitu. Ei kielimalli- tai Valio-avainta, Meta-lähetyksiä, oikeita tilauksia tai maksuja. Paikalliset avaimet ja allekirjoitettu korilinkki eivät sisälly julkaistuihin materiaaleihin. aimo-team-/teamMCP-aineistoa ei käytetä videossa.
+Selainajuri varmisti vaihtoehdot → tuotevalinta → korilinkki → sama20l kori →30l → tarkistus → confirmed, ei selainvirheitä. Videon koko dekoodaus läpi,ffprobe78,48s ja0äänivirtaa. Sinisen ja vaalean otsakealueen värinäytteet verrattu PNG-lähteeseen, suurin kanavaero4/255.
 
-## Tarkistukset
-
-Selainajossa 20 → 30 litraa, tarkistus ja vahvistus, lopputila confirmed (AGW-20261114-0002), ei selainvirheitä. Videon koko dekoodaus läpi. ffprobe:50,80 s, yksi videovirta ja nolla äänivirtaa. Tiedosto1 876 222 tavua, SHA-256 f8d031bc7a29f990107998a5a635e84de288f062ab48250d7bf2c3b2e49f0d72.
-
-Samalla korjattiin aiemman ruututallenteen värialueen virhetulkinta: lähteen full-range-värit muunnetaan hallitusti BT.709-videoon. Enkoodatun videon sinistä yläpalkkia ja vaaleaa otsaketta verrattiin selaimen PNG-kuvaan; suurin kanavaero näissä tasavärisissä näytepisteissä4/255. Fontit ja ulkoasu tarkistettu renderöidystä ruudusta käyttäjän viitekuvaa vasten.
+Sites-versio5, julkaisu succeeded. Julkinen MP4 ladattu takaisin ilman tunnistautumista,HTTP200, paikalliseen identtinen SHA-256:4c76a85a6c6a4ef43487238071c946c08fcc59026c75d9aff0a22c1d12fa102d. Tiedosto2541465tavua. Uusi tiedostonimi välttää vanhan, vajaaksi jääneen videon välimuistiversion.
