@@ -93,6 +93,22 @@ test('extraction keeps Recipe evidence and visible text, discards scripts and ha
   assert.equal(ingredientQuantity('1 nippu', '1 nippu tilliä'), null);
 });
 
+test('extraction stays linear on a full-size page of unclosed tags, comments and elements', () => {
+  // The former lazy regexes rescanned the rest of the page from every unclosed opener (minutes per 1 MB).
+  for (const unit of ['<', '<!--', '<nav>', '<main>', '<title>', '<script>', '<script type="application/ld+json">']) {
+    const body = Buffer.from(`${unit.repeat(Math.floor(1_000_000 / unit.length))}`);
+    const started = performance.now();
+    extractPage(body);
+    extractPage(body, 'text/plain');
+    assert.ok(performance.now() - started < 1500, `${unit} took ${Math.round(performance.now() - started)} ms`);
+  }
+  // Same matches as before: unclosed elements stay text, the first closer ends an element, case-insensitive tags.
+  const mixed = extractPage(Buffer.from('<TITLE>Otsikko</title ><nav>valikko<nav>sisä</NAV>jää<!-- piilo --><Main class="m"><p>Lohikeitto 4 annosta, 400 g lohta</p></MAIN><form>auki ilman loppua'));
+  assert.equal(mixed.title, 'Otsikko');
+  assert.equal(mixed.text, 'Lohikeitto 4 annosta, 400 g lohta');
+  assert.equal(extractPage(Buffer.from('<nav>valikko</nav>Teksti ennen <form>lomake ilman loppua ja tarpeeksi pitkä sivu')).text, 'Teksti ennen lomake ilman loppua ja tarpeeksi pitkä sivu');
+});
+
 function fixture(t, options = {}) {
   let time = Date.now();
   const store = openWhatsAppStore(':memory:', () => time); t.after(() => store.close());

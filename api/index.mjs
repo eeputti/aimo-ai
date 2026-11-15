@@ -4,13 +4,13 @@ import { handle } from '../server/cloud.mjs';
 
 export default async function handler(req, res) {
   // vercel.json kirjoittaa alkuperäisen polun ?path=-parametriin; palautetaan se ennen reititystä.
-  const url = new URL(req.url, 'https://aimo.invalid');
-  const original = url.searchParams.get('__path');
-  if (url.pathname.startsWith('/api/index') && original != null) {
-    url.searchParams.delete('__path');
-    req.url = `/${original.replace(/^\/+/, '')}${url.search}`;
-  }
   try {
+    const url = new URL(req.url, 'https://aimo.invalid');
+    const original = url.searchParams.get('__path');
+    if (url.pathname.startsWith('/api/index') && original != null) {
+      url.searchParams.delete('__path');
+      req.url = `/${original.replace(/^\/+/, '')}${url.search}`;
+    }
     await handle(req, res, { waitUntil });
   } catch (err) {
     console.error('[cloud]', err);

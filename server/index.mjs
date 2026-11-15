@@ -19,7 +19,9 @@ const json = (res, status, data) => {
 
 // The export name and embedded flag remain compatible with existing WhatsApp deployments.
 export async function handleStorefrontRequest(req, res) {
-  const url = new URL(req.url, 'http://localhost');
+  let url;
+  try { url = new URL(req.url, 'http://localhost'); }
+  catch { res.writeHead(400, { 'content-type': 'text/plain' }); res.end('Bad request'); return; }
   try {
     if (whatsapp && await whatsapp.handle(req, res, url)) return;
     if (localShop?.handle(req, res, url)) return;

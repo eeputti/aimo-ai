@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 ilta — WhatsApp-palvelin ei enää kaadu virheelliseen pyyntöön eikä jumitu linkin luvussa (Claude Code, ongelmakatselmointichat)
+
+- **Käyttäjän pyyntö:** korjaa ensin koodikatselmuksen #1 (yksi virheellinen HTTP-pyyntö kaataa palvelimen) ja #8 (asiakkaan lähettämä linkki jumittaa palvelimen), raportti `docs/parallel/code-audit-2026-11-15-ilta.md`.
+- **#1:** `server/whatsapp-server.mjs` jäsentää pyyntöosoitteen virheenkäsittelyn sisällä ja vastaa 400. Koko käsittelijä on try/catchin sisällä, joten minkä tahansa reitin poikkeus (esimerkiksi paikallisen selaindemon Origin-tarkistus) antaa 500 eikä pysäytä prosessia. Sama osoitteen jäsennys korjattu `server/index.mjs`:ssä ja Vercel-funktiossa `api/index.mjs` (siellä 500; Vercel-koodi ei vielä käytössä). Kuuntelu kaikilla verkkoliitännöillä ja valvojan puute jäivät ennalleen, ne kuuluvat käyttöönottoon.
+- **#8:** `server/whatsapp/link-reader.mjs`:n HTML-jäsennys on nyt lineaarinen indexOf-läpikäynti: tagien poisto, kommentit, script/style/nav- ym. lohkot, otsikko, main/article ja JSON-LD. Osumat pysyvät samoina: ensimmäinen sulkeva tagi päättää elementin, sulkematon lohko jää tekstiksi, kirjainkoko ei vaikuta. Ainoa tarkoituksellinen ero: toisen scriptin merkkijonon sisään kirjoitettua JSON-LD:tä ei enää lueta reseptiksi.
+- **Tarkistukset:** hankalat 1 Mt:n sivut 9–24 ms; ennen 40 kt vei jo 0,6 s ja 1 Mt arviolta minuutteja. Vanha ja uusi jäsennys antoivat saman tuloksen 40 000 satunnaisella HTML-pätkällä. Uusi `test/whatsapp-server-url.test.mjs` käynnistää molemmat palvelimet väliaikaisilla kannoilla ja lähettää virheelliset pyynnöt raakana: vanhalla koodilla testi epäonnistui palvelimen kaatumiseen, uudella vastaus on 400/500 ja `/healthz` vastaa. Linkkitestiin lisätty aika- ja osumatesti. Koko `npm test` **306/306** erillisessä työpuussa origin/main ae34900:n päällä; riippuvuudet asennettiin sinne, koska yhteisen kansion `node_modules` on vanhempi kuin package.json. Ei Meta-, Valio-, malli- tai sähköpostikutsuja, käyttäjän kantoihin ei koskettu.
+- **Käyttöönotto kesken:** botti käynnistettiin juuri uudelleen versiolla ae34900 (merkintä alla, PID 21564), joten tämä korjaus ei ole vielä käytössä; se tarvitsee uuden sovitun restartin. Tässä vaiheessa palvelinta ei käynnistetty uudelleen. Seuraavaksi katselmuksen allergeenikohdat #2–#4.
+
 ## 15.11.2026 ilta — botti 4749 ja julkaisija uuteen koodiin, selainkeskustelu toimii livenä (Claude Code, agentin jälki -chat)
 
 - **Käyttäjän lupa ("Kyllä, käynnistä"):** botin palvelin ja julkaisija uudelleen sivustouudistuksen koodilla. Taululla (#282) ei ollut muuta restarttia käynnissä.
