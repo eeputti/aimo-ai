@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — WhatsApp lukee julkisen linkin ja ehdottaa sen aineksiin sopivia tuotteita (Codex, linkkichat)
+
+- **Käyttäjän päätös:** apuri saa avata lähetetyn linkin, lähettää ensin ”Hetki, avaan linkin” -tyylisen viestin, tutkii sisällön ja ehdottaa siihen sopivia tuotteita. Ensimmäinen versio kattaa julkiset HTTPS-teksti-/HTML-sivut ja reseptien rakenteiset tiedot.
+- Uusi rajattu `link-reader.mjs` tarkistaa julkiset osoitteet ja uudelleenohjaukset, sitoo tarkistetun DNS-osoitteen TLS-yhteyteen ja rajoittaa koon/ajan. `link-advice.mjs` vaatii aineksille ja määrille todellisen lähdelainauksen, laskee annoskoon ja yksiköt koodissa sekä sovittaa tarpeet oikeisiin katalogiehdokkaisiin. Puuttuva tieto ei muutu keksityksi määräksi, hinnaksi tai saatavuudeksi.
+- Kanava lähettää odotusviestin ennen lukemista, erillisellä pysyvällä kertamerkinnällä. Ehdotukset lisätään vasta erillisestä hyväksynnästä tavalliseen tilauskeskusteluun; linkki tai sivun ohje ei ole tilauslupa. Vanhan valmiin korin ”ok” ei ohita linkkiehdotuksen hyväksymistä. Määrät, päivä, tuotevalinnat ja lopullinen tilausvahvistus jatkavat nykyisessä moottorissa.
+- **Tarkistukset:** 14 uutta testiä, koko sarja **351/351** erillisessä kloonissa `e3b70e1` + linkkivaihe. Oikea HTTPS-lukija löysi kahdelta Valion reseptisivulta 4/20 annosta ja 9/11 lähdeainesta. Oikean mallin kaksi rajattua koetta yhteensä 8 kutsua, 0 rajapintavirhettä: 40 hengen muunnos, katalogituotteet, erillinen hyväksyntä ja ei-ruokasivun hallittu vastaus. Ensikokeen valmis liemi → tiiviste -virhe korjattiin erillisellä tuotemuodon vertailulla ja koodivartiolla; korjatun kokeen 5 kg valmista kalalientä ei siirry 5 kg:n tiivistetilaukseksi.
+- **Koko viestiketjun loppukoe:** julkinen Aimon resepti → oikea malli/katalogi → simuloitu WhatsApp-odotusviesti → erillinen hyväksyntä → oikea dialogi/tulkki/tilausmoottori → 11 tallennettua riviä ja toimituspäiväkysymys. 5 lisämallikutsua, 0 rajapintavirhettä, 0 tilausta. Skaalatut määrät, laktoosivaatimukset ja liemen puuttuva ostomäärä tarkistettu luonnoksesta. Ajurin kaksi aiempaa loppuasertion virhettä korjattu ja erotettu onnistuneesta uusinnasta raportissa.
+- **Rajat ja jatko:** ei kirjautumista, PDF-/video-/selainautomaatiota eikä saatavuuslupausta. Kokeissa ei Metaa, Valio-API:a tai tilausta; omat muistikannat. `d50dd29` haettu mukaan, muiden keskeneräinen yhteinen työpuu säilyy. Tarkempi toteutus, testit ja käyttöönoton seuranta: `docs/parallel/whatsapp-links.md`. Koordinoitu 4749-käyttöönotto tehdään tämän jälkeen; tämä lähdecommit ei vielä väitä uuden ominaisuuden olevan puhelimessa.
+
 ## 15.11.2026 — landingille reseptikuvat ja kiiretilauksen WhatsApp-esimerkki (Codex, kuvachat)
 
 - **Käyttäjän pyyntö:** logojen alle pieni päällekkäinen kuvaryhmä kahdesta annetusta pasta- ja keittokuvasta, pehmeä sininen varjo sekä reseptilinkkiä ja kiiretilausta havainnollistava viesti. Kuvista 720 px JPEG-assetit; nykyiset fontit ja numeronliitos säilyvät.

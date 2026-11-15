@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { isDirectCartRequest, replyWithCartLink, withCartHandoffHint } from './cart-handoff.mjs';
 import { incompleteNote } from './dialogue.mjs';
+import { hasLinkAdviceReply } from './link-advice.mjs';
 
 const PAGE = '/whatsapp/cart';
 const API = `${PAGE}/api`;
@@ -69,7 +70,8 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
         const row = store.db.prepare('SELECT json FROM wa_dialogue WHERE binding=?').get(args.member.binding);
         if (row) dialogue = JSON.parse(row.json);
       }
-      const handoff = await replyWithCartLink({ text: args.messages.at(-1)?.content || '', shoppingList: list,
+      const input = args.messages.at(-1)?.content || '';
+      const handoff = hasLinkAdviceReply(store.db, args.member.binding, input, now()) ? null : await replyWithCartLink({ text: input, shoppingList: list,
         lastOrder: dialogue.lastOrder, pendingSuggestion: dialogue.pendingSuggestion, cartHandoff: () => issue(args.member, list) });
       if (handoff) return handoff; // Acknowledgement opens the cart, never submits an order.
       // Suora koripyyntö keskeneräiseen tilaukseen: ei linkkiä eikä tuotetulkintaa, vaan puuttuvat tiedot ja seuraava kysymys.

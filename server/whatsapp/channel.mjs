@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { phoneNumber } from './store.mjs';
+import { messageLinks } from './link-reader.mjs';
 
 const same = (a, b) => crypto.timingSafeEqual(crypto.createHash('sha256').update(a).digest(), crypto.createHash('sha256').update(b).digest());
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
@@ -114,6 +115,7 @@ export function createMetaTypingIndicator(settings, fetchImpl = fetch) {
 }
 
 export function createWhatsAppChannel({ settings, store, chat, send, typing, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now, onPrune = () => {} }) {
+  store.db.exec('CREATE TABLE IF NOT EXISTS wa_link_progress (message_id TEXT PRIMARY KEY, created INTEGER NOT NULL)');
   let busy = false; let stopped = false; let timer; let active = Promise.resolve();
   const typingUpdates = new Map();
   const updateTyping = (id, force = false) => {
@@ -166,6 +168,16 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, pau
           reply = `${settings.orderingDemo ? 'Olen Valio Aimo Tilausapurin demo. Kerro tarvitsemasi tuotteet ja määrät, niin kokoan hyväksyttävän luonnoksen.' : 'Olen Aimon tuoteapuri. Voin hakea tuotteita, hintoja ja toimitusaikoja.'} Kiireelliset toimitusongelmat ja tilausmuutokset hoitaa asiakaspalvelu.\n${support}`;
         } else {
           try {
+            if (settings.orderingDemo && messageLinks(job.text).length) {
+              // Reserve before delivery: a worker retry must not repeat the waiting message.
+              // This cosmetic receipt is separate from the durable final reply and its history.
+              store.db.prepare('DELETE FROM wa_link_progress WHERE created<?').run(now() - 7 * 86400_000);
+              const fresh = store.db.prepare('INSERT OR IGNORE INTO wa_link_progress VALUES(?,?)').run(job.id, now());
+              if (fresh.changes && !stopped && store.member(job.phone)?.binding === job.binding) {
+                try { await send(job.phone, 'Hetki, avaan linkin ja katson, mitä siihen sopisi Aimon valikoimasta.', job.id); } catch { /* Final answer still proceeds if the waiting receipt fails. */ }
+              }
+              if (store.member(job.phone)?.binding !== job.binding) { store.finish(job.id, 'cancelled'); return true; }
+            }
             const result = await chat({ messages: [...store.history(member.binding), { role: 'user', content: job.text }], channel: 'whatsapp',
               member, messageId: job.id, receivedAt: job.sent_at });
             parts = replyChunks(Array.isArray(result.messages) && result.messages.length ? result.messages : [result.text]);

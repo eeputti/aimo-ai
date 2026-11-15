@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { createDemoBuyerResolver } from './demo-buyer.mjs';
 import { codeHash, phoneNumber } from './store.mjs';
+import { createConfiguredLinkAdvice } from './link-advice.mjs';
 
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
@@ -63,7 +64,7 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       import('../order-conversation/runtime.mjs'), import('../gateway/store.mjs'), import('../gateway/mandate.mjs'), import('./dialogue.mjs'),
     ]);
     const ordering = await createConfiguredOrdering({ draftDb, quoteDb, permissions });
-    return { ...ordering, buyerName: (id) => buyers.byId(id)?.name, dialogue: await createConfiguredDialogue(store, { supportContact }), ensureBuyer(customer) {
+    return { ...ordering, buyerName: (id) => buyers.byId(id)?.name, dialogue: await createConfiguredDialogue(store, { supportContact }), links: await createConfiguredLinkAdvice(store), ensureBuyer(customer) {
       const member = store.db.prepare('SELECT * FROM members WHERE binding=?').get(customer.bindingVersion);
       if (member && resolveBuyer(member).mapped && !buyers.byId(customer.buyerId)) throw new Error('Valittua demoasiakasta ei löydy. Alusta kaupan asiakas ennen numeroliitosta.');
       if (!buyers.byId(customer.buyerId)) buyers.save({
@@ -127,11 +128,16 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
         text,
       });
       const text = messages.at(-1)?.content || '';
-      const result = await (ordering.dialogue ? ordering.dialogue.respond({ binding: current.binding, messageId, text, runOrder,
+      const respond = (input) => ordering.dialogue ? ordering.dialogue.respond({ binding: current.binding, messageId, text: input, runOrder,
         getShoppingList: ({ epoch = '' } = {}) => ordering.getShoppingList?.({ conversationId: conversationId(customer, epoch), customer }) || null,
         canOpenCart: cartLinkAvailable === true && expectedList === undefined,
         inCart: expectedList !== undefined, receivedAt,
-        allowed: () => livePermissions(customer).readProducts }) : runOrder(text));
+        allowed: () => livePermissions(customer).readProducts }) : runOrder(input);
+      const linked = await ordering.links?.respond({ binding: current.binding, messageId, text,
+        shoppingList: ordering.getShoppingList?.({ conversationId: conversationId(customer), customer }) || null,
+        runOrder: respond, allowed: () => livePermissions(customer).readProducts });
+      const result = linked || await respond(text);
+      if (!livePermissions(customer).readProducts) return { status: 'error', text: 'Testiyhteys ei ole enää voimassa.' };
       if (expectedList === undefined) return result;
       if (!livePermissions(customer).readProducts) throw Object.assign(new Error('Testiyhteys ei ole enää voimassa.'), { status: 403 });
       // Capture reply + draft under the same per-customer queue. A later WhatsApp turn must not
@@ -142,7 +148,7 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       }
       return { ...result, shoppingList };
     },
-    prune() { runtime?.prune(); runtime?.dialogue?.prune(); },
+    prune() { runtime?.prune(); runtime?.dialogue?.prune(); runtime?.links?.prune(); },
     async close() { if (pending) (await pending).close(); },
   };
   return bridge;
