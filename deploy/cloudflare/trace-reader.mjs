@@ -78,7 +78,8 @@ export function readAgentTrace({ orderId, gatewayFile, whatsappFile, draftFile, 
     const draft = JSON.parse(draftRow.json);
 
     // Turns of this draft, in order. Turn results are keyed by the WhatsApp message id or a cart-page action id.
-    const results = d.prepare('SELECT message_id,created,json FROM turn_results WHERE conversation=? ORDER BY created,rowid').all(draftRow.conversation)
+    // Turn results in the order they were written (the draft store may run on the demo clock); only inbox rows carry real times.
+    const results = d.prepare('SELECT rowid,message_id,created,json FROM turn_results WHERE conversation=? ORDER BY rowid').all(draftRow.conversation)
       .map((r) => ({ id: r.message_id, created: r.created, result: json(r.json) || {} })).filter((r) => r.result.draftId === draftId);
     if (!results.length) return null;
     const byId = new Map(results.map((r) => [r.id, r]));
@@ -87,28 +88,33 @@ export function readAgentTrace({ orderId, gatewayFile, whatsappFile, draftFile, 
       const stored = w.prepare('SELECT text FROM reply_parts WHERE message_id=? ORDER BY part').all(id).map((p) => p.text);
       return (stored.length ? stored : fallback ? [fallback] : []).slice(0, 8).map((t) => redact(t));
     };
-    const first = Math.min(...results.map((r) => inbox(r.id)?.received ?? r.created));
-    const last = Math.max(...results.map((r) => r.created), Date.parse(order.createdAt) || 0);
-    // Messages in the same window that the ordering core did not record (for example "ok" → cart link),
-    // and up to two greetings just before the first turn. Messages of another draft are left out.
-    const window = w.prepare("SELECT id,text,kind,received,reply FROM inbox WHERE phone=? AND kind='text' AND received BETWEEN ? AND ? ORDER BY received,rowid").all(phone, first - 180_000, last);
+    const real = results.map((r) => inbox(r.id)?.received).filter((t) => typeof t === 'number');
+    const first = real.length ? Math.min(...real) : Math.min(...results.map((r) => r.created));
+    const lastReal = real.length ? Math.max(...real) : first;
+    // Messages the ordering core did not record (for example "ok" → cart link) up to 10 minutes after the last turn,
+    // and up to two greetings just before the first turn. Messages of another draft end the window.
+    const window = w.prepare("SELECT id,text,kind,received,reply FROM inbox WHERE phone=? AND kind='text' AND received BETWEEN ? AND ? ORDER BY received,rowid").all(phone, first - 180_000, lastReal + 600_000);
     const otherDraft = (id) => { const r = d.prepare('SELECT json FROM turn_results WHERE message_id=?').get(id); const j = r && json(r.json); return j?.draftId && j.draftId !== draftId; };
     const before = window.filter((m) => m.received < first && !otherDraft(m.id)).slice(-2);
-    const during = window.filter((m) => m.received >= first && !byId.has(m.id) && !otherDraft(m.id));
+    const stop = window.find((m) => m.received > lastReal && otherDraft(m.id))?.received ?? Infinity;
+    const during = window.filter((m) => m.received >= first && m.received < stop && !byId.has(m.id) && !otherDraft(m.id));
 
-    const turns = [];
-    for (const m of [...before, ...during]) turns.push({ at: iso(m.received), source: 'whatsapp', customer: redact(m.text, 1200), action: null, replies: parts(m.id, m.reply), status: null, revision: null });
-    for (const r of results) {
+    const items = [];
+    for (const m of [...before, ...during]) items.push({ key: m.received, turn: { at: iso(m.received), source: 'whatsapp', customer: redact(m.text, 1200), action: null, replies: parts(m.id, m.reply), status: null, revision: null } });
+    results.forEach((r, i) => {
       const m = inbox(r.id);
-      if (m && m.kind !== 'text') continue;
+      if (m && m.kind !== 'text') return;
       // Vain ostoskorisivun toiminnot ovat ilman viestiriviä; vanhan paikallisen /demo-sivun viestejä ei tallennettu.
-      if (!m && !String(r.id).startsWith('cart:')) continue;
-      turns.push(m
-        ? { at: iso(m.received), source: 'whatsapp', customer: redact(m.text, 1200), action: null, replies: parts(m.id, m.reply), status: str(r.result.status, 32), revision: num(r.result.revision) }
-        : { at: iso(r.created), source: 'cart', customer: null, action: CART_ACTION[r.result.status] || 'Toiminto ostoskorisivulla', replies: r.result.text ? [redact(r.result.text)] : [],
-          status: str(r.result.status, 32), revision: num(r.result.revision) });
-    }
-    turns.sort((a, b) => a.at.localeCompare(b.at));
+      if (!m && !String(r.id).startsWith('cart:')) return;
+      if (m) { items.push({ key: m.received, turn: { at: iso(m.received), source: 'whatsapp', customer: redact(m.text, 1200), action: null, replies: parts(m.id, m.reply), status: str(r.result.status, 32), revision: num(r.result.revision) } }); return; }
+      // A cart action happened before the next recorded chat turn (or at the end); its own timestamp may be demo time.
+      const next = results.slice(i + 1).map((x) => inbox(x.id)?.received).find((t) => typeof t === 'number');
+      items.push({ key: (next ?? Number.MAX_SAFE_INTEGER) - 0.5 + i / 1e6, cart: true, turn: { at: null, source: 'cart', customer: null, action: CART_ACTION[r.result.status] || 'Toiminto ostoskorisivulla',
+        replies: r.result.text ? [redact(r.result.text)] : [], status: str(r.result.status, 32), revision: num(r.result.revision) } });
+    });
+    items.sort((a, b) => a.key - b.key);
+    let clock = first;
+    const turns = items.map((x) => { if (!x.cart) clock = x.key; return x.cart ? { ...x.turn, at: iso(clock) } : x.turn; });
     if (!turns.length) return null;
 
     const lines = (draft.lines || []).slice(0, 30);
@@ -122,7 +128,7 @@ export function readAgentTrace({ orderId, gatewayFile, whatsappFile, draftFile, 
 
     // Every quote this draft asked for: the buyer's quotes between the first turn and the order.
     const finalQuoteId = order.offers?.[0]?.quoteId || draft.quote?.quoteId || null;
-    const quoteRows = g.prepare('SELECT id,created_at FROM quotes WHERE buyer_id=? AND created_at BETWEEN ? AND ? ORDER BY created_at').all(row.buyer_id, iso(first), order.createdAt);
+    const quoteRows = g.prepare('SELECT id,created_at FROM quotes WHERE buyer_id=? AND created_at BETWEEN ? AND ? ORDER BY created_at').all(row.buyer_id, iso(Math.min(...results.map((r) => r.created))), order.createdAt);
     const quoteIds = [...new Set([...quoteRows.map((q) => q.id), ...(finalQuoteId ? [finalQuoteId] : [])])];
     const finalQuote = finalQuoteId && json(g.prepare('SELECT json FROM quotes WHERE id=?').get(finalQuoteId)?.json || '');
     const ledgerRows = g.prepare(`SELECT seq,ts,actor,type,quote_id,order_id,payload,hash FROM ledger WHERE order_id=? OR quote_id IN (${quoteIds.map(() => '?').join(',') || "''"}) ORDER BY seq`).all(orderId, ...quoteIds);
