@@ -82,6 +82,48 @@ test('auto-ready mode, invalid numbers, approval of unknown numbers and removal'
   } finally { store.close(); }
 });
 
+test('a restarted watcher restores the manual Meta queue and announces a repeat registration once', async () => {
+  const store = openWhatsAppStore(':memory:');
+  try {
+    const signup = { phone: '+358401234567', name: 'Kokeilija', company: 'Demokeittiö', createdAt: 1 };
+    const api = fakeApi([signup]);
+    const first = createSignupLinker({ store, api, chatUrl, log: () => {} });
+    await first.tick();
+    const binding = store.member('358401234567').binding;
+    api.pending = []; api.linked = [signup];
+    const logs = [], notices = [];
+    const restarted = createSignupLinker({ store, api, chatUrl, log: m => logs.push(m), notify: m => notices.push(m) });
+    await restarted.tick(); await restarted.tick();
+    assert.equal(notices.length, 1);
+    assert.match(logs[0], /Lomake ei lähetä vahvistuskoodia/);
+    assert.equal(store.member('358401234567').binding, binding);
+    assert.equal(api.reports.at(-1).status, 'linked');
+    api.linked = [{ ...signup, createdAt: 2 }];
+    await restarted.tick(); await restarted.tick();
+    assert.equal(notices.length, 2);
+  } finally { store.close(); }
+});
+
+test('an interrupted approval is retried from durable state without approving other waiting numbers', async () => {
+  const store = openWhatsAppStore(':memory:');
+  try {
+    const signup = { phone: '+358401234567', name: 'A', company: 'Demokeittiö', createdAt: 1 };
+    const other = { ...signup, phone: '+358401234568', name: 'B' };
+    const api = fakeApi([signup, other]);
+    const linker = createSignupLinker({ store, api, chatUrl, log: () => {} });
+    await linker.tick();
+    api.pending = []; api.linked = [signup, other];
+    const report = api.report;
+    api.report = async () => { throw new Error('network interrupted'); };
+    await assert.rejects(linker.approve(signup.phone), /network interrupted/);
+    api.report = report;
+    const recovered = createSignupLinker({ store, api, chatUrl, log: () => {} });
+    assert.deepEqual(await recovered.tick(), [{ phone: '358401234567', status: 'ready' }]);
+    assert.deepEqual(api.reports.at(-1), { phone: '358401234567', status: 'ready', url: chatUrl });
+    assert.equal(store.db.prepare('SELECT approved_at FROM landing_signups WHERE phone=?').get('358401234568').approved_at, null);
+  } finally { store.close(); }
+});
+
 test('the chat link opens the assistant with the agreed first message, and the API sends the token', async () => {
   assert.equal(chatUrlFor('+358 40 000 0000'), `https://wa.me/358400000000?text=${encodeURIComponent(START_TEXT)}`);
   assert.throws(() => chatUrlFor('abc'), /numeroa/);

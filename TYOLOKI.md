@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 15.11.2026 — landingin vahvistusjonon ja selaimen seurannan korjaus (Codex, landing-vahvistuschat)
+
+- **Käyttäjän ongelma:** WhatsAppiin ei tule vahvistuskoodia landingilta. Juurisyy varmennettu koodista, tuotannon ilmoittautumisjonosta ja Metan näkyvästä vastaanottajalistasta: `linked` tarkoittaa paikallista testijäsentä, ei Metan koodipyyntöä. Kaksi uutta numeroa odottaa Metaan lisäämistä; niitä ei lisätty eikä uusia koodeja lähetetty tässä vaiheessa. Testinumero edellyttää esittelijän käsivaihetta; itsenäinen liittyminen vaatii apurille oman rekisteröidyn numeron.
+- **Korjaukset:** sivu kertoo käsivaiheen ennen lomaketta ja sen jälkeen eikä väitä koodin toimitusta numeron hyväksynnäksi. Numeronvaihdon aikainen vanha tilavastaus ei pysäytä uuden numeron seurantaa tai näytä väärää hyväksyntää. Verkkovirhe säilyttää toimitetun koodin tilan. Seurannan uudelleenkäynnistys palauttaa myös jo `linked`-tilaan ehtineet numerot esittelijälle, ja verkkovirheeseen jäänyt esittelijän hyväksyntä raportoidaan uudelleen muita numeroita hyväksymättä.
+- **Tarkistukset:** erillinen `origin/main` f843b06 -pohjainen työpuu, sovellustestit **322/322**, Worker **26/26**, tyypit/build/dry-run, syntaksi ja diff läpi. Ensimmäisen koko testiajon puuttuva katalogi/localhost-oikeus korjattu testiympäristöön. Selainketju simuloidulla hyväksynnällä ja muistissa olevalla kannalla läpi, ei JS-virheitä. Ei oikeita Meta-, malli- tai Valio-koeviestejä tai testitilauksia.
+- **Julkaistu:** Worker **6c6b6a56-3d49-4418-9609-c8ae353e24ed**, JS/CSS takaisinluettu tavulleen samaksi, sivu/health/tilaukset 200 ja suojattu numerolistaus 401. Vain ilmoittautumisseuranta vaihdettu korjattuun skriptiin (yksi PID28614/istunto88157), kaksi odottavaa käsivaihetta näkyy jälleen. WhatsApp-palvelin, tilausjulkaisija, D1-skeema ja asetukset säilyivät. Raportti `docs/parallel/landing-verification-fix.md`.
+- **Kesken:** odottavien numeroiden Metan vahvistus ja oikean puhelimen loppukoe. Sivukorjaus ei automatisoi Metan testivastaanottajan lisäystä. Yhteisen hakemiston aiemmat keskeneräiset muutokset säilyvät; Git-tallennus erillisestä työpuusta.
+
 
 
 ## 15.11.2026 — esittelyvideo korjattu suomeksi (Codex, videochatti)

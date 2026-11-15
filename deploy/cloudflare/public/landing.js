@@ -8,10 +8,10 @@ const saved = {
 };
 
 const TEXT = {
-  pending: ['Lisätään numeroasi apuriin', 'Tämä kestää yleensä muutaman sekunnin.'],
+  pending: ['Lisätään numeroasi apuriin', 'Ilmoittautumisesi on vastaanotettu. Sen jälkeen Aimo-tiimi hyväksyy numerosi WhatsApp-demoon.'],
   slow: ['Lisätään numeroasi apuriin', 'Demopalvelin ei vastannut vielä. Sivu yrittää uudelleen itsestään, voit jättää sen auki.'],
-  linked: ['Vahvista numerosi', 'Numerosi on lisätty apuriin. Seuraavaksi saat WhatsAppiin Metalta vahvistuskoodin. Kirjoita koodi tähän.'],
-  codeSent: ['Koodi lähetetty', 'Aimo-tiimi syöttää koodin WhatsAppiin. Tämä sivu päivittyy itsestään, kun numerosi on hyväksytty.'],
+  linked: ['Odottaa Aimo-tiimin hyväksyntää', 'Demo vaatii numerosi lisäämisen Metan testivastaanottajaksi. Aimo-tiimin pitää käynnistää vahvistus erikseen: tämä lomake ei lähetä koodia. Jos koodia ei tule, pyydä demon esittelijää aloittamaan vahvistus.'],
+  codeSent: ['Koodi toimitettu Aimo-tiimille', 'Koodi odottaa vielä vahvistamista Metassa. Sivulle kirjoittaminen ei yksin hyväksy numeroa. Tämä sivu päivittyy, kun Aimo-tiimi on vahvistanut numerosi.'],
   ready: ['Valmista! Avaa WhatsApp', 'Lähetä apurille viesti ja kerro, mitä keittiöösi tarvitaan. Apuri vastaa samassa keskustelussa.'],
   failed: ['Numeroa ei voitu lisätä', 'Tarkista numero ja yritä uudelleen.'],
 };
@@ -22,16 +22,17 @@ const TRACK = {
   failed: { received: 'done', linked: 'failed' },
 };
 
-let timer = 0, startedAt = 0, current = null, last = 'pending', inflight = false;
+let timer = 0, startedAt = 0, current = null, last = 'pending';
 
 function show(status, chatUrl, codeSent = false) {
   last = status;
+  if (current) Object.assign(current, { status, chatUrl, codeSent });
   $('signup-form').hidden = true;
   $('status').hidden = false;
   const slow = status === 'pending' && Date.now() - startedAt > 45000;
   const [title, detail] = TEXT[slow ? 'slow' : status === 'linked' && codeSent ? 'codeSent' : status] || TEXT.pending;
   $('code-form').hidden = status !== 'linked';
-  $('code-submit').textContent = codeSent ? 'Lähetä uudelleen' : 'Lähetä';
+  $('code-submit').textContent = codeSent ? 'Toimita uusi koodi' : 'Toimita koodi';
   $('status-title').textContent = title;
   $('status-detail').textContent = detail;
   for (const li of document.querySelectorAll('.track li')) li.className = TRACK[status]?.[li.dataset.step] || '';
@@ -47,23 +48,29 @@ function showForm() {
   $('status').hidden = true;
   $('signup-form').hidden = false;
   $('submit').disabled = false;
+  $('code').value = '';
+  $('code-error').hidden = true;
+  $('form-error').hidden = true;
 }
 
 async function poll() {
-  if (!current || inflight) return;
+  const signup = current;
+  if (!signup || signup.polling) return;
   clearTimeout(timer);
-  inflight = true;
+  signup.polling = true;
   try {
-    const response = await fetch(`/api/signups/${current.id}`, { headers: { authorization: `Bearer ${current.token}` }, cache: 'no-store' });
+    const response = await fetch(`/api/signups/${signup.id}`, { headers: { authorization: `Bearer ${signup.token}` }, cache: 'no-store' });
+    if (current !== signup) return;
     if (response.status === 404) { saved.clear(); showForm(); return; }
     if (response.ok) {
       const body = await response.json();
+      if (current !== signup) return;
       if (!(body.status === 'linked' && document.activeElement === $('code'))) show(body.status, body.chatUrl, body.codeSent);
       if (body.status === 'ready' || body.status === 'failed') return;
-    } else show(last);
-  } catch { show(last); }
-  finally { inflight = false; }
-  if (!current) return;
+    } else show(last, signup.chatUrl, signup.codeSent);
+  } catch { if (current === signup) show(last, signup.chatUrl, signup.codeSent); }
+  finally { signup.polling = false; }
+  if (current !== signup) return;
   // Every 3 s while someone is waiting; slower after a quarter of an hour or when the tab is hidden.
   const delay = document.hidden || Date.now() - startedAt > 15 * 60000 ? 15000 : 3000;
   timer = setTimeout(poll, delay);
@@ -72,7 +79,7 @@ async function poll() {
 function follow(signup, delay = 1500) {
   current = signup; startedAt = Date.now();
   clearTimeout(timer);
-  show(signup.status || 'pending', signup.chatUrl);
+  show(signup.status || 'pending', signup.chatUrl, signup.codeSent);
   if (signup.status !== 'ready') timer = setTimeout(poll, delay);
 }
 
@@ -117,18 +124,20 @@ $('code-form').addEventListener('submit', async event => {
   const code = $('code').value.replace(/[\s-]/g, '');
   if (!/^\d{4,8}$/.test(code)) { error.textContent = 'Kirjoita WhatsAppiin tullut numerokoodi.'; error.hidden = false; return; }
   if (!current) return;
+  const signup = current;
   $('code-submit').disabled = true;
   try {
-    const response = await fetch(`/api/signups/${current.id}/code`, {
-      method: 'POST', headers: { authorization: `Bearer ${current.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ code }),
+    const response = await fetch(`/api/signups/${signup.id}/code`, {
+      method: 'POST', headers: { authorization: `Bearer ${signup.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ code }),
     });
     const body = await response.json().catch(() => ({}));
+    if (current !== signup) return;
     if (!response.ok) { error.textContent = body.error || 'Koodin lähetys ei onnistunut.'; error.hidden = false; if (response.status === 409) poll(); return; }
     $('code').value = '';
     $('code').blur();
     show(body.status, body.chatUrl, body.codeSent);
   } catch {
-    error.textContent = 'Yhteys katkesi. Yritä uudelleen.'; error.hidden = false;
+    if (current === signup) { error.textContent = 'Yhteys katkesi. Yritä uudelleen.'; error.hidden = false; }
   } finally { $('code-submit').disabled = false; }
 });
 

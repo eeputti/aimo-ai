@@ -30,6 +30,7 @@
         <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+358 40 123 4567" required>
         <label for="name">Nimi</label>
         <input id="name" name="name" autocomplete="name" maxlength="60" required>
+        <p class="signup-help">Testidemoon liittyminen vaatii Aimo-tiimin hyväksynnän. Pyydä demon esittelijää vahvistamaan numerosi.</p>
         <label class="consent"><input id="consent" name="consent" type="checkbox" required><span>Numeroani saa käyttää tämän demon WhatsApp-keskusteluun. Tiedot poistetaan viimeistään 7 päivän kuluttua.</span></label>
         <p id="form-error" class="error" role="alert" hidden></p>
         <button id="submit" class="button" type="submit">Aloita WhatsAppissa</button>
@@ -45,8 +46,8 @@
         <h2 id="status-title">Lisätään numeroasi apuriin</h2>
         <p id="status-detail">Tämä kestää yleensä muutaman sekunnin.</p>
         <form id="code-form" class="code-form" hidden novalidate>
-          <label for="code">Metalta tullut vahvistuskoodi</label>
-          <div class="code-row"><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="123456"><button id="code-submit" class="button" type="submit">Lähetä</button></div>
+          <label for="code">Jos sait Metalta vahvistuskoodin, kirjoita se tähän</label>
+          <div class="code-row"><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="12345"><button id="code-submit" class="button" type="submit">Toimita koodi</button></div>
           <p id="code-error" class="error" role="alert" hidden></p>
         </form>
         <a id="open-whatsapp" class="button whatsapp" href="#" target="_blank" rel="noopener noreferrer" hidden>Avaa WhatsApp</a>

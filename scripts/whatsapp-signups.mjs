@@ -60,6 +60,17 @@ export function createSignupLinker({ store, api, chatUrl, autoReady = false, log
   const landing = phone => store.db.prepare('SELECT * FROM landing_signups WHERE phone=?').get(phone);
   const time = () => new Date(now()).toLocaleTimeString('fi-FI');
   const shownCodes = new Map();
+  const announced = new Map();
+  const announce = (signup, phone) => {
+    if (announced.has(phone) && announced.get(phone) === signup.createdAt) return;
+    announced.set(phone, signup.createdAt);
+    log(`\n[${time()}] Odottaa Meta-vahvistusta: ${signup.name} (${signup.company}) +${phone}\n`
+      + '  Lomake ei lähetä vahvistuskoodia. Käynnistä se itse Metassa:\n'
+      + '  1. Step 1. Try it out → Recipient → Manage phone number list → Add phone number.\n'
+      + '  2. Kokeilija saa koodin WhatsAppiin ja kirjoittaa sen sivulle. Syötä koodi Metaan.\n'
+      + `  3. Kun numero näkyy Metassa hyväksyttynä: ${COMMAND} approve --phone +${phone}`);
+    notify(`Demokokeilija +${phone} odottaa: käynnistä vahvistus Metassa.`);
+  };
   return {
     // One pass over the waiting sign-ups. Reporting again is harmless, so a lost report is simply retried.
     async tick() {
@@ -68,27 +79,31 @@ export function createSignupLinker({ store, api, chatUrl, autoReady = false, log
         let phone;
         try { phone = phoneNumber(signup.phone); } catch { await api.report(signup.phone, 'failed'); results.push({ phone: signup.phone, status: 'failed' }); continue; }
         const known = landing(phone);
-        let status, fresh = false;
+        let status;
         if (known) status = known.approved_at ? 'ready' : 'linked';
         else if (store.member(phone)) status = 'ready';
         else {
           const invitation = store.invite(phone, signup.company || DEFAULT_COMPANY, signup.name);
           if (!store.pair(phone, codeHash(invitation.code))) { await api.report(phone, 'failed'); results.push({ phone, status: 'failed' }); continue; }
           store.db.prepare('INSERT INTO landing_signups VALUES(?,?,?)').run(phone, now(), autoReady ? now() : null);
-          status = autoReady ? 'ready' : 'linked'; fresh = true;
+          status = autoReady ? 'ready' : 'linked';
         }
         await api.report(phone, status, status === 'ready' ? chatUrl : undefined);
         results.push({ phone, status, name: signup.name, company: signup.company });
-        if (fresh && status === 'linked') {
-          log(`\n[${time()}] Uusi kokeilija: ${signup.name} (${signup.company}) +${phone}\n`
-            + '  1. Lisää numero Metan testivastaanottajaksi: API Setup, To, Manage phone number list.\n'
-            + '  2. Kokeilija saa koodin WhatsAppiin ja kirjoittaa sen sivulle. Koodi näkyy tässä, syötä se Metaan.\n'
-            + `  3. Sitten: ${COMMAND} approve --phone +${phone}`);
-          notify(`Uusi demokokeilija +${phone}: lisää Metaan ja hyväksy.`);
-        } else if (status === 'ready') log(`[${time()}] +${phone}: valmis, WhatsApp-linkki näkyy sivulla`);
+        if (status === 'linked') announce(signup, phone);
+        else if (status === 'ready') log(`[${time()}] +${phone}: valmis, WhatsApp-linkki näkyy sivulla`);
       }
       // Meta's code typed on the landing page: shown once per new code, to be entered in Meta by hand.
       for (const signup of await api.list('linked')) {
+        const phone = phoneNumber(signup.phone);
+        // Recover an approval whose Worker report failed, including after a watcher restart.
+        if (landing(phone)?.approved_at && store.member(phone)) {
+          await api.report(phone, 'ready', chatUrl);
+          results.push({ phone, status: 'ready' });
+          continue;
+        }
+        // Linked rows used to disappear from the operator's view on restart or repeat registration.
+        if (!signup.code) { announce(signup, phone); continue; }
         if (!signup.code || shownCodes.get(signup.phone) === signup.codeAt) continue;
         shownCodes.set(signup.phone, signup.codeAt);
         log(`\n[${time()}] Metan vahvistuskoodi ${signup.phone} (${signup.name}): ${signup.code}\n`
