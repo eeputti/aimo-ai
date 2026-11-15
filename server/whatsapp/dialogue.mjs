@@ -1,6 +1,6 @@
 // Conversational presentation around the existing ordering engine. The model cannot place orders
 // or rewrite its product, price, allergy, delivery or confirmation facts.
-import { normalizeOrderUnits, presentCollectingCart } from './cart-presentation.mjs';
+import { normalizeOrderUnits, presentCollectingCart, selectionAcknowledgement } from './cart-presentation.mjs';
 import { withCartHandoffHint } from './cart-handoff.mjs';
 import { safeModelText } from './model-guard.mjs';
 import { CANCEL_ALL, DEADLINE_QUESTION, REPEAT_LAST, compareKind, RELIST } from '../order-conversation/index.mjs';
@@ -242,14 +242,16 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
         result = await runOrder(normalizeOrderUnits(orderText), { epoch: state.epoch || '', context: { history: state.history || [], lastReply: state.lastOrder?.text || '' } });
         messages = ask ? orderMessages(result) : [result.text];
         if (ask && allowed()) {
-          const presented = await presentCollectingCart({ result, previousList,
-            shoppingList: getShoppingList({ epoch: state.epoch || '' }), ask, userText: text });
+          const current = getShoppingList({ epoch: state.epoch || '' });
+          // Dialogimallin vastaus asiakkaan kysymykseen on jo viestin alku: ei toista kuittausta perään.
+          const answered = !!plan?.text?.trim() && !['error', 'rejected'].includes(result.status);
+          const presented = await presentCollectingCart({ result, previousList, shoppingList: current, ask,
+            userText: text, history: state.history || [], answered });
           if (presented) messages = presented;
-          else {
-            const current = getShoppingList({ epoch: state.epoch || '' });
-            if (result.status === 'choosing' && current && (current.id !== previousList?.id || current.revision !== previousList?.revision) && !plan?.text?.trim()) {
-              messages.unshift('Selvä, päivitin ostoskorin. Näistä voit valita sopivat tuotteet:');
-            }
+          else if (!answered) {
+            // Valinnan jälkeen kerrotaan mitä otettiin, ei aina samaa "päivitin ostoskorin" -fraasia.
+            const opening = selectionAcknowledgement({ previousList, shoppingList: current, status: result.status });
+            if (opening) messages.unshift(opening);
           }
         }
         if (plan?.text?.trim() && !['error', 'rejected'].includes(result.status)) {
@@ -306,8 +308,9 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
 export async function createConfiguredDialogue(store, { supportContact } = {}) {
   const [{ askAgent, agentEnabled }, { loadCatalog, publicProduct }, { clock }] = await Promise.all([import('../aimoAgent.mjs'), import('../catalog.mjs'), import('../gateway/clock.mjs')]);
   return createOrderingDialogue({ db: store.db, ask: agentEnabled() ? askAgent : null, now: () => clock.now().getTime(),
-    // Demokellolla (DEMO_NOW) tervehdys seuraa demoaikaa, muuten viestin vastaanottohetkeä.
-    timeOf: (receivedAt) => (clock.simulated || !receivedAt ? clock.now().getTime() : receivedAt),
+    // Kiinteällä demokellolla (DEMO_NOW) tervehdys seuraa demoaikaa. Kiertävä demokello (DEMO_NOW_LOOP_MINUTES)
+    // pitää vain tilausrajat voimassa, joten tervehdys seuraa silloin oikeaa vastaanottohetkeä (ei "Huomenta!" illalla).
+    timeOf: (receivedAt) => (clock.simulated && !clock.looping ? clock.now().getTime() : receivedAt || Date.now()),
     lookup: async (query) => loadCatalog().search(query, { limit: 4 }).map((hit) => publicProduct(hit.product)),
     // Sama tukiyhteys kuin kanavan tuki-komennossa (WHATSAPP_SUPPORT_CONTACT).
     supportContact: supportContact ?? process.env.WHATSAPP_SUPPORT_CONTACT,

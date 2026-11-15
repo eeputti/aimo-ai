@@ -180,7 +180,7 @@ test('WhatsApp kuittaa mainitut tuotteet ja kysyy ennen päivää vain päivän'
   const text = 'Luonnoksessa nyt:\n- kananmunat 50 kpl\n- kerma\n\nMille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.';
   const shoppingList = { id: 'd1', revision: 2, deliveryDate: null, lines: [{ productTerm: 'kananmunat', quantity: { value: 50, unit: 'PCS' } }, { productTerm: 'kerma', quantity: null }] };
   const messages = await presentCollectingCart({ result: { status: 'collecting', draftId: 'd1', revision: 2, text }, shoppingList, previousList: null, ask: null, userText: 'tarvis 50 kananmunaa ja kermaa' });
-  assert.deepEqual(messages, ['Joo, päivitin ostoskorin!', 'Ostoskorissasi nyt:\n- kananmunat 50 kpl\n- kerma',
+  assert.deepEqual(messages, ['Selvä, kirjasin ylös!', 'Ostoskorissasi nyt:\n- kananmunat 50 kpl\n- kerma',
     'Mille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.']);
   // Päivän jälkeen sama esitys kysyy puuttuvan määrän tavalliseen tapaan.
   const after = await presentCollectingCart({ result: { status: 'collecting', draftId: 'd1', revision: 3, text: 'Luonnoksessa nyt:\n- kananmunat 50 kpl\n- kerma\n\nKuinka paljon: kerma?' },

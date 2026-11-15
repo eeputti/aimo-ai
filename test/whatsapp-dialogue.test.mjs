@@ -15,7 +15,8 @@ function fixture(t, ask) {
   const store = openWhatsAppStore(':memory:'); t.after(() => store.close());
   store.db.prepare('INSERT INTO members VALUES(?,?,?,?)').run('358401234567', 'Testikeittiö', 'Testaaja', 'one');
   const ordered = []; const orderOptions = []; const looked = [];
-  const options = { db: store.db, ask, lookup: async (query) => { looked.push(query); return [{ name: 'Valio kuohukerma', contains: ['AM'] }]; } };
+  // Kiinteä yöaika: tervehdys on neutraali 'Moi!' eikä testi riipu seinäkellosta.
+  const options = { db: store.db, ask, timeOf: () => Date.parse('2026-11-15T02:30:00+02:00'), lookup: async (query) => { looked.push(query); return [{ name: 'Valio kuohukerma', contains: ['AM'] }]; } };
   const dialogue = createOrderingDialogue(options);
   let seq = 0;
   const turn = (text, extra = {}) => dialogue.respond({ binding: 'one', messageId: `m${++seq}`, text,
@@ -184,12 +185,15 @@ test('the real saved cart gets a natural acknowledgement, exact bullet rows and 
   await f.turn('50 l maitoa, kananmunia ja kermaa');
   await f.turn('ei');
   const result = await f.turn('maanantaiksi', 'details');
-  assert.deepEqual(result.messages, ['Joo, laitetaan!', 'Ostoskorissasi nyt:\n- maito 50 l\n- kananmuna\n- kerma',
+  assert.deepEqual(result.messages, ['Joo, laitetaan!', 'Ostoskorissasi nyt (toimitus ma 16.11.):\n- maito 50 l\n- kananmuna\n- kerma',
     'Kuinka paljon laitetaan kananmunia ja kermaa?']);
   const list = await f.list();
   assert.equal(list.lines[0].quantity.value, 50); assert.equal(list.lines[1].quantity, null); assert.equal(list.lines[2].quantity, null);
   const copyCall = f.calls.filter((c) => c.purpose === 'whatsapp_cart_reply').at(-1);
   assert.equal(copyCall.input.missingQuantityCount, 2); assert.equal(copyCall.tier, 'deep');
+  // Kuittauksen malli näkee oikean tallennetun korin, päivän ja seuraavan kysymyksen, ei pelkkää muutoslippua.
+  assert.equal(copyCall.input.deliveryDate, 'ma 16.11.'); assert.equal(copyCall.input.next, 'quantity');
+  assert.deepEqual(copyCall.input.cart, [{ product: 'maito', quantity: '50 l' }, { product: 'kananmuna', quantity: null }, { product: 'kerma', quantity: null }]);
   const router = f.calls.filter((c) => c.purpose === 'whatsapp_dialogue').at(-1);
   assert.equal(router.input.shoppingList.lines[0].quantity.value, 50);
   assert.match(router.input.lastOrderReply, /Mille päivälle toimitus/); assert.equal(router.tier, 'deep'); // päivä kysyttiin ensin assert.ok(router.timeoutMs >= 45000);
@@ -218,7 +222,7 @@ test('a failed or ungrounded copy model cannot change rows, invent quantities or
   for (const copy of [new Error('model unavailable'), { acknowledgement: 'Tilaus lähetetty, kaikki varmasti saatavilla!', quantityQuestion: 'Laitetaanko kermaa 50 l?' }]) {
     const f = cartFixture(t, copy);
     const result = await f.turn('50 l maitoa, kananmunia ja kermaa');
-    assert.equal(result.messages[0], 'Joo, päivitin ostoskorin!');
+    assert.equal(result.messages[0], 'Selvä, kirjasin ylös!');
     assert.match(result.messages[1], /- maito 50 l\n- kananmuna\n- kerma$/);
     assert.match(result.messages[2], /^Mille päivälle toimitus\?/); // ennen päivää ei kysytä määriä
     assert.doesNotMatch(result.text, /Kuinka paljon/);
@@ -242,8 +246,8 @@ test('quantity questions for arbitrary product labels stay grammatical and prese
     text: 'Luonnoksessa nyt:\n- laktoositon ruokakerma\n\nKuinka paljon: laktoositon ruokakerma?' };
   const shoppingList = { id: 'd1', revision: 1, lines: [{ ref: 'L1', productTerm: 'laktoositon ruokakerma', quantity: null }] };
   const messages = await presentCollectingCart({ result, shoppingList,
-    ask: async () => ({ json: { acknowledgement: 'Selvä, lisäsin ostoskoriin.', quantityQuestion: 'Paljonko tarvitset näitä: {{products}}?' } }) });
-  assert.equal(messages[0], 'Selvä, lisäsin ostoskoriin.');
+    ask: async () => ({ json: { acknowledgement: 'Selvä, laktoositon ruokakerma kirjattu.', quantityQuestion: 'Paljonko tarvitset näitä: {{products}}?' } }) });
+  assert.equal(messages[0], 'Selvä, laktoositon ruokakerma kirjattu.');
   assert.equal(messages.at(-1), 'Paljonko tarvitset näitä: laktoositon ruokakerma?');
 });
 
