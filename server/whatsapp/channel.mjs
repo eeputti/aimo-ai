@@ -81,9 +81,15 @@ export function linkButton(text) {
 }
 
 // WhatsApp shows a line starting with "- " as a bullet point. An en dash (–) stays a visible dash, as Eelis asked
-// on 16.11. Only the outgoing Meta text changes: the engine, the stored reply and the browser chat keep "- ".
+// on 16.11. Only the shown text changes (Meta and the browser chat, web-chat.mjs): the engine and the stored reply keep "- ".
 export function plainDashes(text) {
   return String(text ?? '').replace(/^([ \t]*)- (?=\S)/gm, '$1– ');
+}
+
+// A bare "tuki" gets the same fixed answer in WhatsApp and in the browser chat, without a model call.
+export const SUPPORT_REQUEST = /^(apua|tuki|asiakaspalvelu|help)$/iu;
+export function supportReply({ orderingDemo, supportContact }) {
+  return `${orderingDemo ? 'Olen Valio Aimo Tilausapurin demo. Kerro tarvitsemasi tuotteet ja määrät, niin kokoan hyväksyttävän luonnoksen.' : 'Olen Aimon tuoteapuri. Voin hakea tuotteita, hintoja ja toimitusaikoja.'} Kiireelliset toimitusongelmat ja tilausmuutokset hoitaa asiakaspalvelu.\nAsiakaspalvelu: ${supportContact}`;
 }
 
 export function createMetaSender(settings, fetchImpl = fetch, { linkButtons = process.env.WHATSAPP_LINK_BUTTONS !== 'false' } = {}) {
@@ -210,8 +216,8 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
         } else if (job.kind === 'unsupported' || ((job.kind === 'image' || job.kind === 'audio') && !media)) {
           reply = media ? `Käsittelen tekstiviestit${media.enabled.audio ? ', ääniviestit' : ''} ja kuvat ostoslistasta tai lähetteestä. Kirjoita tilaus viestinä tai lähetä kuva (enintään 4000 merkkiä tekstiä).`
             : 'Lähetä enintään 4000 merkin tekstiviesti. Tämä testiversio ei käsittele kuvia, ääniviestejä tai liitteitä.';
-        } else if (job.kind === 'text' && /^(apua|tuki|asiakaspalvelu|help)$/iu.test(job.text)) {
-          reply = `${settings.orderingDemo ? 'Olen Valio Aimo Tilausapurin demo. Kerro tarvitsemasi tuotteet ja määrät, niin kokoan hyväksyttävän luonnoksen.' : 'Olen Aimon tuoteapuri. Voin hakea tuotteita, hintoja ja toimitusaikoja.'} Kiireelliset toimitusongelmat ja tilausmuutokset hoitaa asiakaspalvelu.\n${support}`;
+        } else if (job.kind === 'text' && SUPPORT_REQUEST.test(job.text)) {
+          reply = supportReply(settings);
         } else {
           let input = job.text; let note = ''; let label = job.text;
           try {

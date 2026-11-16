@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { openWhatsAppStore } from '../server/whatsapp/store.mjs';
 import { createWebChat, webChatPhone, WEB_CHAT_PHONE } from '../server/whatsapp/web-chat.mjs';
+import { supportReply } from '../server/whatsapp/channel.mjs';
 
 const SECRET = 'web-chat-test-secret-' + 'x'.repeat(30);
 const A = 'a'.repeat(32), B = 'b'.repeat(32);
@@ -16,7 +17,7 @@ async function server(options = {}) {
     const said = args.messages.at(-1).content;
     return { text: `Vastaus: ${said}`, messages: [`Vastaus: ${said}`, 'Mitä muuta?'], status: 'collecting' };
   });
-  const web = createWebChat({ store, chat, secret: SECRET, cartLink: (member, list) => `https://tunnel.example/whatsapp/cart#${member.binding}.${list.id}`,
+  const web = createWebChat({ store, chat, secret: SECRET, supportContact: options.supportContact ?? 'https://example.com/tuki', cartLink: (member, list) => `https://tunnel.example/whatsapp/cart#${member.binding}.${list.id}`,
     shoppingList: async (member) => (member ? { id: 'WD-1', lines: [{}] } : null), now: options.now });
   const srv = http.createServer(async (req, res) => { if (!(await web.handle(req, res, new URL(req.url, 'http://x')))) { res.writeHead(404); res.end(); } });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
@@ -87,5 +88,33 @@ test('a daily cap across all browser sessions protects the model budget', async 
     assert.equal(capped.status, 429);
     t += 86400_000 + 1;
     assert.equal((await s.post('chat', { session: A, text: 'moi', messageId: uuid(9) })).status, 200);
+  } finally { s.close(); }
+});
+
+test('a bare "tuki" gets the same fixed WhatsApp answer without a model call and stays out of the model history', async () => {
+  const s = await server();
+  try {
+    const reply = await (await s.post('chat', { session: A, text: 'Tuki', messageId: uuid(1) })).json();
+    assert.deepEqual(reply.parts, [supportReply({ orderingDemo: true, supportContact: 'https://example.com/tuki' })]);
+    assert.match(reply.parts[0], /Asiakaspalvelu: https:\/\/example.com\/tuki$/);
+    assert.equal(s.calls.length, 0);
+    // A longer message that only mentions support still goes to the order conversation.
+    await s.post('chat', { session: A, text: 'tarvitsen tukea tilauksen kanssa', messageId: uuid(2) });
+    assert.equal(s.calls.length, 1);
+    assert.deepEqual(s.calls[0].messages.map((m) => m.content), ['tarvitsen tukea tilauksen kanssa']);
+    const history = await (await s.post('history', { session: A })).json();
+    assert.deepEqual(history.messages.map((m) => m.text), ['Tuki', 'tarvitsen tukea tilauksen kanssa']);
+  } finally { s.close(); }
+});
+
+test('reply lines that start with "- " are shown with an en dash like in WhatsApp; the stored reply keeps "- "', async () => {
+  const list = 'Ostoskorissasi nyt:\n- maito, 20 l\n- voi, 5 kg\nToimitus pe 20.11. - tarkista ennen tilausta.';
+  const s = await server({ chat: async () => ({ text: list, messages: [list] }) });
+  try {
+    const shown = 'Ostoskorissasi nyt:\n– maito, 20 l\n– voi, 5 kg\nToimitus pe 20.11. - tarkista ennen tilausta.';
+    assert.deepEqual((await (await s.post('chat', { session: A, text: 'maitoa ja voita', messageId: uuid(1) })).json()).parts, [shown]);
+    assert.deepEqual((await (await s.post('chat', { session: A, text: 'maitoa ja voita', messageId: uuid(1) })).json()).parts, [shown]);
+    assert.deepEqual((await (await s.post('history', { session: A })).json()).messages[0].parts, [shown]);
+    assert.equal(s.store.db.prepare('SELECT text FROM reply_parts WHERE message_id=?').get(`web-${uuid(1)}`).text, list);
   } finally { s.close(); }
 });

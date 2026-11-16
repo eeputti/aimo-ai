@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 yö — selainkeskustelu vastaa ja näyttää kuten WhatsApp: tuki-komento ja ajatusviivat (Claude Code, keskustele-chat)
+
+- **Käyttäjän pyyntö:** Eeliksen mukaan Workers-sivun Keskustele-botin pitää olla täsmälleen sama kuin WhatsAppin botti. Tarkistettu: kumpikin käyttää samaa `cartLink.chat`-polkua, samaa Vercel-julkaisua ja samoja Turso-kantoja (D1 `bot_backend_url` → Vercel 16.11. klo 23.50). Live-sivun "moi" sai vastauksen pilvibotilta 3 s:ssa. Tilausta ei tehty, mutta botin kantaan syntyi yksi selaimen testiasiakas. Eelis hyväksyi kahden jäljellä olevan eron yhtenäistämisen ("Kyllä, yhtenäistä").
+- **Muutos:** `channel.mjs`: tuki-tunnistus ja -vastaus yhteisiksi funktioiksi (`SUPPORT_REQUEST`, `supportReply`); WhatsAppin käytös ennallaan. `web-chat.mjs`: pelkkä "tuki", "apua", "asiakaspalvelu" tai "help" saa saman kiinteän vastauksen ja yhteystiedon (`WHATSAPP_SUPPORT_CONTACT`) ilman mallikutsua, eikä se mene mallin keskusteluhistoriaan, kuten WhatsAppissa. Vastaukset, uusinnat ja historia näytetään rivin alun ajatusviivalla (`plainDashes`). Tallennettu vastaus pysyy muodossa "- ", joten agentin jälki ja Live-näkymän jäsennys (numeroidut vaihtoehdot) eivät muutu. `runtime.mjs`:ään ei koskettu (toisen session varauksessa), vaan yhteystieto luetaan samasta ympäristömuuttujasta.
+- **Tarkoituksella jäljelle jääneet erot:** kuvat ja ääniviestit vain WhatsAppissa. "Hetki, avaan linkin…" -viesti vain WhatsAppissa; selaimessa näkyvät kirjoituspisteet, koska vastaus tulee kerralla. Viestirajat ovat eri.
+- **Tarkistukset:** kaksi uutta testiä `test/whatsapp-web-chat.test.mjs`:ssä: tuki ilman mallikutsua ja historiaa, ajatusviivat vastauksessa, uusinnassa ja historiassa sekä tallennettu "- ". Selainkeskustelun, WhatsAppin ja viivojen testit 30/30. Koko `npm test` 404/410 origin/mainin bdee619 päällä; kuusi kaatuvaa ovat libsql-testejä (`@libsql/client` puuttuu yhteisestä node_modulesista). Testeissä ei Meta-, Valio- tai mallikutsuja.
+- **Käyttöönotto kesken:** muutos tulee live-sivulle seuraavassa Vercel-julkaisussa (`vercel deploy --prod`, sessio E tai Eeliksen lupa). Worker-julkaisua ei tarvita.
+
 ## 17.11.2026 yö — maksusivu oikeaksi kassaksi: maksutiedot, Maksa-painike ja Maksu onnistui (Claude Code, maksusivuchat)
 
 - **Käyttäjän pyyntö:** Eelis halusi demomaksusivun (Tarkista ja kokeile maksua) tilalle oikean maksusivun: maksutiedot, maksun vahvistus samalta sivulta ja sen jälkeen pelkkä "maksu meni läpi" ja paluu etusivulle. Selittävää välisivua ei enää tarvita.

@@ -4,7 +4,7 @@
 // (tila done), jotta historia, korilinkki ja agentin jälki toimivat samalla tavalla.
 import crypto from 'node:crypto';
 import { codeHash } from './store.mjs';
-import { replyChunks } from './channel.mjs';
+import { plainDashes, replyChunks, supportReply, SUPPORT_REQUEST } from './channel.mjs';
 
 const PREFIX = '/webchat/api/';
 // "3580…" ei ole koskaan oikea suomalainen numero kansainvälisessä muodossa (suuntanumeron nolla jää pois).
@@ -41,8 +41,9 @@ export function webChatPhone(secret, session) {
  * @param {Function} [o.cartLink] (member) => Promise<string|null> nykyisen luonnoksen korilinkki
  * @param {Function} [o.shoppingList] (member) => Promise<object|null>
  * @param {string} o.secret WEBCHAT_SECRET
+ * @param {string} [o.supportContact] sama asiakaspalvelun yhteystieto kuin WhatsAppissa
  */
-export function createWebChat({ store, chat, cartLink, shoppingList, secret, now = Date.now }) {
+export function createWebChat({ store, chat, cartLink, shoppingList, secret, supportContact = process.env.WHATSAPP_SUPPORT_CONTACT?.trim(), now = Date.now }) {
   if (!secret) return null;
   if (secret.length < 32) throw new Error('WEBCHAT_SECRET on liian lyhyt (vähintään 32 merkkiä).');
   const expected = crypto.createHash('sha256').update(secret).digest();
@@ -58,16 +59,18 @@ export function createWebChat({ store, chat, cartLink, shoppingList, secret, now
     }
     return store.member(phone);
   }
+  // Näytetään kuten WhatsAppissa: rivin alun "- " ajatusviivana. Tallennettu vastaus pysyy ennallaan.
+  const shown = (rows) => rows.map((p) => plainDashes(p.text));
   const history = (phone) => store.db.prepare("SELECT id,text,received,reply FROM inbox WHERE phone=? AND kind='text' AND state='done' ORDER BY received DESC,rowid DESC LIMIT 40")
     .all(phone).reverse().map((m) => ({ id: m.id, at: m.received, text: m.text,
-      parts: store.db.prepare('SELECT text FROM reply_parts WHERE message_id=? ORDER BY part').all(m.id).map((p) => p.text) }));
+      parts: shown(store.db.prepare('SELECT text FROM reply_parts WHERE message_id=? ORDER BY part').all(m.id)) }));
 
   async function turn(session, text, messageId) {
     const current = member(session);
     const id = `web-${messageId}`;
     const done = store.db.prepare('SELECT id,phone,state FROM inbox WHERE id=?').get(id);
     if (done && done.phone !== current.phone) throw fail(409, 'Viestitunniste on jo käytössä.');
-    if (done?.state === 'done') return { parts: store.db.prepare('SELECT text FROM reply_parts WHERE message_id=? ORDER BY part').all(id).map((p) => p.text), repeated: true };
+    if (done?.state === 'done') return { parts: shown(store.db.prepare('SELECT text FROM reply_parts WHERE message_id=? ORDER BY part').all(id)), repeated: true };
     const day = store.db.prepare("SELECT count(*) n FROM inbox WHERE id LIKE 'web-%' AND received>=?").get(now() - 86400_000).n;
     if (day >= WEB_CHAT_PER_DAY) throw fail(429, 'Selainkokeilun päiväraja täyttyi. Pyydä oikea WhatsApp-kokeilu etusivulta.');
     const received = now();
@@ -75,13 +78,21 @@ export function createWebChat({ store, chat, cartLink, shoppingList, secret, now
     // kesken jäänyttä selainviestiä ei koskaan lähetetä Metan kautta keksittyyn numeroon.
     if (!done) store.db.prepare("INSERT INTO inbox(id,phone,text,kind,binding,received,sent_at,state,attempts) VALUES(?,?,?,'text',?,?,?,'web',1)")
       .run(id, current.phone, text, current.binding, received, received);
+    if (supportContact && SUPPORT_REQUEST.test(text)) {
+      // Sama kiinteä vastaus kuin WhatsAppissa. Ei mallikutsua, eikä se mene mallin keskusteluhistoriaan.
+      const reply = supportReply({ orderingDemo: true, supportContact });
+      const parts = replyChunks([reply]);
+      store.saveReply({ id, text }, reply, null, parts);
+      store.finish(id, 'done');
+      return { parts: parts.map(plainDashes), status: null };
+    }
     try {
       const result = await chat({ member: current, messageId: id, receivedAt: received, channel: 'web',
         messages: [...store.history(current.binding), { role: 'user', content: text }] });
       const parts = replyChunks(Array.isArray(result?.messages) && result.messages.length ? result.messages : [String(result?.text || '')]);
       store.saveReply({ id, text }, parts.join('\n\n'), current.binding, parts);
       store.finish(id, 'done');
-      return { parts, status: result?.status || null };
+      return { parts: parts.map(plainDashes), status: result?.status || null };
     } catch (error) {
       store.db.prepare("UPDATE inbox SET state='failed',error=? WHERE id=?").run('WEB_CHAT_FAILED', id);
       throw error;
