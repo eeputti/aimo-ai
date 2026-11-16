@@ -19,7 +19,14 @@ export async function drain(budgetMs = DRAIN_MS) {
   const channel = load();
   const until = Date.now() + budgetMs;
   let processed = 0;
-  while (Date.now() < until && await channel.processNext()) processed += 1;
+  while (Date.now() < until) {
+    if (await channel.processNext()) { processed += 1; continue; }
+    // Saman instanssin toinen käsittely voi olla juuri päättymässä, kun uusi viesti tuli jonoon. Yksi lyhyt
+    // uusintayritys, ettei viesti jää odottamaan minuutin tickiä.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    if (!await channel.processNext()) break;
+    processed += 1;
+  }
   return processed;
 }
 
@@ -48,7 +55,8 @@ export async function publishOrders() {
   const [{ readSnapshot, publishOnce, pushOrderEvents, pushAgentTraces }, { readAgentTrace }, { kv }] = await Promise.all([
     import('../deploy/cloudflare/publish-orders.mjs'), import('../deploy/cloudflare/trace-reader.mjs'), import('./db.mjs')]);
   const url = env.CLOUDFLARE_DEMO_URL, token = env.CLOUDFLARE_DEMO_SYNC_TOKEN;
-  const snapshot = readSnapshot({ gatewayFile: env.GATEWAY_DB, whatsappFile: env.WHATSAPP_DB, phone: env.WHATSAPP_DEMO_PHONE });
+  const snapshot = readSnapshot({ gatewayFile: env.GATEWAY_DB, whatsappFile: env.WHATSAPP_DB, phone: env.WHATSAPP_DEMO_PHONE,
+    includeWebChat: true }); // Kuten Macin julkaisija (--include-web-chat): Workers-sivuston selainkeskustelujen tilaukset.
   await publishOnce({ url, token, snapshot });
   const known = new Set(kv.get('cloud:order-events', []));
   const events = await pushOrderEvents({ url, token, snapshot, known, email: { to: env.ORDER_EMAIL_TO, customerName: env.ORDER_EMAIL_CUSTOMER_NAME } });

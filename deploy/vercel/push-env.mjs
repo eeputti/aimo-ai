@@ -2,12 +2,15 @@
 // Lähteet: Macin .env, .env.whatsapp ja deploy/cloudflare/.env.publisher sekä pilven omat arvot
 // deploy/vercel/.env.cloud-tiedostosta (Turso-osoitteet, Turso-avain, tick-salaisuus, julkinen osoite).
 // Arvot kulkevat Vercelin komentorivityökalulle stdinin kautta, eivät komentoriville tai lokiin.
-// Käyttö projektikansiosta, kun projekti on linkitetty (vercel link): node deploy/vercel/push-env.mjs [--dry-run]
+// Käyttö linkitetystä kansiosta (vercel link): node deploy/vercel/push-env.mjs [--dry-run]
+// AIMO_ENV_ROOT: kansio, jossa .env-tiedostot ovat (oletus nykyinen). AIMO_CLOUD_ENV: pilven oma tiedosto
+// (oletus <AIMO_ENV_ROOT>/deploy/vercel/.env.cloud), esim. testikantojen asetukset. Vercel-komento ajetaan nykyisessä kansiossa.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const root = process.env.AIMO_ENV_ROOT || process.cwd();
+const cloudFile = process.env.AIMO_CLOUD_ENV || path.join(root, 'deploy/vercel/.env.cloud');
 const read = (file) => {
   const values = new Map();
   if (!fs.existsSync(file)) return values;
@@ -20,7 +23,8 @@ const read = (file) => {
 
 const values = new Map();
 for (const name of ['.env', '.env.whatsapp', 'deploy/cloudflare/.env.publisher']) for (const [k, v] of read(path.join(root, name))) values.set(k, v);
-const cloud = read(path.join(root, 'deploy/vercel/.env.cloud'));
+if (!fs.existsSync(cloudFile)) { console.error(`Pilven asetustiedosto puuttuu: ${cloudFile}`); process.exit(1); }
+const cloud = read(cloudFile);
 for (const [k, v] of cloud) values.set(k, v);
 // Paikallisen ajon asetuksia, joilla ei ole merkitystä pilvessä.
 for (const key of ['PORT', 'WHATSAPP_PORT', 'WHATSAPP_ENABLED', 'AIMO_CATALOG']) values.delete(key);
@@ -34,6 +38,9 @@ const required = ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERI
   'GATEWAY_PRIVATE_KEY_PEM', 'CLOUDFLARE_DEMO_URL', 'CLOUDFLARE_DEMO_SYNC_TOKEN', 'TURSO_AUTH_TOKEN', 'TICK_SECRET',
   'WHATSAPP_DB', 'WHATSAPP_DRAFT_DB', 'WHATSAPP_QUOTE_DB', 'GATEWAY_DB', 'AIMO_DB'];
 const missing = required.filter((k) => !values.get(k));
+// Julkinen osoite tulee pilven tiedostosta, ei Macin .env.whatsapp-tiedostosta (siellä on pikatunnelin osoite).
+if (!/^https:\/\/[a-z0-9.-]+$/i.test(cloud.get('WHATSAPP_PUBLIC_URL') || '') || /trycloudflare\.com$/i.test(cloud.get('WHATSAPP_PUBLIC_URL')))
+  missing.push('WHATSAPP_PUBLIC_URL (pilven HTTPS-alkuperä tiedostossa .env.cloud)');
 if (missing.length) { console.error(`Puuttuvat asetukset: ${missing.join(', ')}`); process.exit(1); }
 const notRemote = ['WHATSAPP_DB', 'WHATSAPP_DRAFT_DB', 'WHATSAPP_QUOTE_DB', 'GATEWAY_DB', 'AIMO_DB'].filter((k) => !/^libsql:\/\//.test(values.get(k)));
 if (notRemote.length) { console.error(`Kannan pitää olla Turso-osoite (libsql://): ${notRemote.join(', ')}`); process.exit(1); }
@@ -44,7 +51,7 @@ const dryRun = process.argv.includes('--dry-run');
 for (const [key, value] of values) {
   if (dryRun) { console.log(`${key} (${value.length} merkkiä)`); continue; }
   const result = spawnSync('npx', ['--yes', 'vercel@latest', 'env', 'add', key, '--environment', 'production', '--force', '--sensitive', '--yes'],
-    { input: value, encoding: 'utf8', cwd: root, stdio: ['pipe', 'ignore', 'pipe'] });
+    { input: value, encoding: 'utf8', stdio: ['pipe', 'ignore', 'pipe'] });
   if (result.status !== 0) { console.error(`${key}: epäonnistui. ${String(result.stderr).split('\n').filter(Boolean).slice(-2).join(' ')}`); process.exit(1); }
   console.log(`${key}: asetettu`);
 }
