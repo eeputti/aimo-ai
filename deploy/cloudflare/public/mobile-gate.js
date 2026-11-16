@@ -2,6 +2,8 @@
 // Puhelimella tilausapuria kokeillaan oikeassa WhatsAppissa, joten ikkunasta voi soittaa Eelikselle tai palata etusivulle.
 // Ladataan <head>-osassa ennen sivun sisältöä (tavallinen skripti), jotta sivu ei ehdi välähtää. Tyylit site.css:ssä.
 (() => {
+  // Maksusivu on WhatsAppin tilauspolun viimeinen vaihe: ostoskorin Siirry maksamaan -painike avaa sen puhelimella.
+  if (/^\/demo-payment(\.html)?$/.test(location.pathname)) return;
   const ua = navigator.userAgent || '';
   const phone = navigator.userAgentData?.mobile === true
     || /iPhone|iPod|Android.+Mobile|Windows Phone|IEMobile|Opera Mini|BlackBerry/i.test(ua)

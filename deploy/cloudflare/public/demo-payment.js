@@ -2,7 +2,10 @@ const $ = id => document.getElementById(id);
 const linkPattern = /^(AGW-\d{8}-\d{4,12})\.([A-Za-z0-9_-]{43})$/;
 let match = linkPattern.exec(location.hash.slice(1));
 const money = cents => new Intl.NumberFormat('fi-FI', { style: 'currency', currency: 'EUR' }).format(cents / 100);
-let paid = false, busy = false;
+const euros = value => new Intl.NumberFormat('fi-FI', { style: 'currency', currency: 'EUR' }).format(value);
+const day = date => new Intl.DateTimeFormat('fi-FI', { weekday: 'short', day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(date);
+const delivery = iso => iso ? day(new Date(`${iso}T12:00:00Z`)) : 'Ei tiedossa';
+let paid = false, busy = false, order = null, amount = '';
 async function request(simulate) {
   const response = await fetch(`/api/demo-payments/${match[1]}`, {
     method: simulate ? 'POST' : 'GET', cache: 'no-store', signal: AbortSignal.timeout(15000),
@@ -13,22 +16,61 @@ async function request(simulate) {
   if (!response.ok) throw new Error(data.error || 'Maksusivua ei voitu avata.');
   return data;
 }
-function confirmation(email) {
-  const messages = { sent: 'Vahvistussähköposti on lähetetty testiosoitteeseen.', not_requested: 'Testisähköpostiosoitetta ei ole asetettu.',
-    sender_missing: 'Vahvistussähköposti odottaa lähettäjän käyttöönottoa.', retry: 'Vahvistussähköpostin lähetystä yritetään uudelleen.',
-    sending: 'Vahvistussähköpostia lähetetään.', failed: 'Vahvistussähköpostin lähetys epäonnistui. Ota yhteys demon ylläpitäjään.' };
-  return messages[email] || 'Vahvistussähköposti odottaa lähetystä.';
+// Vahvistus menee demon määritettyyn testiosoitteeseen, ei ostajan omaan sähköpostiin.
+// Kesken jäänyt lähetys jatkuu samalla hyväksynnällä ilman uutta maksua.
+const EMAIL = {
+  sent: ['Vahvistussähköposti on lähetetty.', false],
+  sending: ['Vahvistussähköpostia lähetetään.', true],
+  retry: ['Vahvistussähköpostin lähetystä yritetään uudelleen.', true],
+  sender_missing: ['Vahvistussähköposti lähtee, kun lähettäjä on otettu käyttöön.', true],
+  failed: ['Vahvistussähköpostia ei saatu lähetettyä.', false],
+};
+const METHODS = { card: 'Kortti •••• 4242', invoice: 'Lasku, 14 pv netto' };
+const methodKey = () => `aimo.payMethod.${match[1]}`;
+const chosen = () => document.querySelector('input[name="method"]:checked')?.value || 'card';
+function savedMethod() {
+  try { return sessionStorage.getItem(methodKey()); } catch { return null; }
+}
+function showState(text, error = false) {
+  $('state').hidden = false;
+  $('state').classList.toggle('is-error', error);
+  $('status').textContent = text;
+  $('state-home').hidden = !error;
+}
+function note(text) { $('note').textContent = text; $('note').hidden = !text; }
+function setBusy(on) {
+  busy = on;
+  for (const id of ['pay', 'cancel', 'resend']) $(id).disabled = on;
+  $('pay').classList.toggle('is-busy', on);
+  $('pay-label').textContent = on ? 'Käsitellään maksua…' : payLabel();
+}
+const payLabel = () => chosen() === 'invoice' ? `Hyväksy lasku ${amount}` : `Maksa ${amount}`;
+function selectMethod() {
+  const method = chosen();
+  $('detail-card').hidden = method !== 'card';
+  $('detail-invoice').hidden = method !== 'invoice';
+  if (!busy) $('pay-label').textContent = payLabel();
 }
 function completed(email) {
-  paid = true; $('heading').textContent = 'Demomaksu onnistui.';
-  $('status').textContent = `Rahaa ei veloitettu. ${confirmation(email)}`;
-  // A retry completes a previously interrupted mail send without repeating the payment.
-  $('pay').textContent = 'Tarkista vahvistuksen lähetys';
-  $('pay').hidden = ['sent', 'not_requested', 'failed'].includes(email);
-  $('cancel').hidden = true;
-  // The same capability opens this order's agent trace; nothing else is needed from the server.
+  paid = true;
+  const method = savedMethod();
+  $('state').hidden = true; $('checkout').hidden = true; $('done').hidden = false;
+  $('done-title').textContent = method === 'invoice' ? 'Tilaus vahvistettu' : 'Maksu onnistui';
+  $('done-order').textContent = order.orderId;
+  $('done-amount').textContent = amount;
+  $('done-delivery').textContent = delivery(order.deliveryDate);
+  $('done-method-row').hidden = !METHODS[method];
+  $('done-method').textContent = METHODS[method] || '';
+  const [text, retry] = EMAIL[email] || [null, false];
+  $('done-email').hidden = !text;
+  $('done-email').classList.toggle('is-sent', email === 'sent');
+  $('done-email-text').textContent = text || '';
+  $('resend').hidden = !retry;
+  // Sama tunniste avaa tämän tilauksen agentin jäljen; palvelimelta ei tarvita muuta.
   $('trace').href = `/agentti.html#${match[1]}.${match[2]}`;
   $('trace').hidden = false;
+  document.title = `${$('done-title').textContent} | Aimo-tilausapuri`;
+  $('done-title').focus({ preventScroll: true });
 }
 // Tämän selaimen omat tilaukset (Tilaukset-sivu). Vain avattujen, voimassa olevien linkkien numero ja tunniste.
 const OWN = 'aimo.ownOrders.v1';
@@ -45,44 +87,57 @@ async function load() {
     try { data = await request(); break; }
     catch (error) {
       if (attempt >= 7) throw error;
-      $('status').textContent = 'Odotetaan tilauksen siirtymistä maksusivulle…';
+      showState('Odotetaan tilauksen siirtymistä maksusivulle…');
       await new Promise(resolve => setTimeout(resolve, 1500));
     }
   }
   remember(match[1], match[2]);
-  $('order-id').textContent = data.order.orderId;
-  $('delivery').textContent = data.order.deliveryDate ? new Intl.DateTimeFormat('fi-FI', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${data.order.deliveryDate}T12:00:00Z`)) : 'Toimituspäivä puuttuu';
-  $('amount').textContent = money(data.payment.amountNetCents);
-  $('lines').replaceChildren(...data.order.lines.map(line => {
-    const row = document.createElement('li'), name = document.createElement('span'), quantity = document.createElement('span');
-    name.textContent = line.name; quantity.textContent = `${new Intl.NumberFormat('fi-FI').format(line.quantity)} ${line.unit}`;
-    row.append(name, quantity); return row;
+  order = data.order;
+  amount = money(data.payment.amountNetCents);
+  $('order-id').textContent = order.orderId;
+  $('delivery').textContent = delivery(order.deliveryDate);
+  $('amount').textContent = amount;
+  $('invoice-ref').textContent = order.orderId;
+  $('due-date').textContent = day(new Date(Date.now() + 14 * 864e5));
+  $('lines').replaceChildren(...order.lines.map(line => {
+    const row = document.createElement('li'), name = document.createElement('span'), quantity = document.createElement('small'), price = document.createElement('strong');
+    name.className = 'line-name'; name.textContent = line.name;
+    quantity.textContent = `${new Intl.NumberFormat('fi-FI').format(line.quantity)} ${line.unit}`;
+    price.textContent = euros(line.net);
+    name.append(quantity); row.append(name, price); return row;
   }));
-  $('summary').hidden = false;
-  if (data.payment.status === 'paid') completed(data.email);
-  else $('status').textContent = 'Tilaus odottaa demomaksua. Tarkista tuotteet ja toimituspäivä ennen hyväksymistä.';
+  if (data.payment.status === 'paid') return completed(data.email);
+  $('state').hidden = true; $('checkout').hidden = false;
+  selectMethod();
 }
 async function act(simulate) {
   if (busy) return;
-  busy = true; $('pay').disabled = true; $('cancel').disabled = true;
+  note('');
+  if (simulate === 'success' && !paid) {
+    try { sessionStorage.setItem(methodKey(), chosen()); } catch { /* Maksutapa näkyy vain tällä kertaa. */ }
+  }
+  setBusy(true);
   try {
     const data = await request(simulate);
     if (data.status === 'paid') completed(data.email);
-    else $('status').textContent = 'Demomaksu keskeytettiin. Tilaus odottaa edelleen maksua, eikä vahvistussähköpostia lähetetty.';
+    else note('Maksu peruttiin. Tilaus odottaa maksua, ja voit maksaa sen myöhemmin samasta linkistä.');
   } catch (error) {
-    $('status').textContent = `${error.message} ${paid ? 'Demomaksu on jo hyväksytty.' : 'Tarkista tilanne lataamalla sivu uudelleen tai yritä uudestaan.'}`;
-  } finally { busy = false; $('pay').disabled = false; $('cancel').disabled = false; }
+    if (paid) { $('done-email-text').textContent = `${error.message} Maksu on jo hyväksytty.`; $('done-email').hidden = false; }
+    else note(`${error.message} Yritä uudelleen.`);
+  } finally { setBusy(false); }
 }
+for (const input of document.querySelectorAll('input[name="method"]')) input.addEventListener('change', selectMethod);
 $('pay').addEventListener('click', () => { void act('success'); });
 $('cancel').addEventListener('click', () => { void act('cancel'); });
+$('resend').addEventListener('click', () => { void act('success'); });
 // A second link to this same page can change only the fragment; restart its read
 // so the previous order's summary and action handlers cannot remain on screen.
 window.addEventListener('hashchange', () => location.reload());
 function init() {
   if (match) return load();
   // Pelkällä tilausnumerolla ei avaudu mitään: tilaus näkyy vain sen omasta linkistä.
-  $('status').textContent = /^AGW-\d{8}-\d{4,12}$/.test(location.hash.slice(1))
-    ? 'Avaa demomaksu tilauksen omasta linkistä (ostoskorin Siirry demomaksuun -painike).'
-    : 'Avaa demomaksu tilauksen omasta maksulinkistä.';
+  showState(/^AGW-\d{8}-\d{4,12}$/.test(location.hash.slice(1))
+    ? 'Avaa maksu tilauksen omasta linkistä (ostoskorin Siirry maksamaan -painike).'
+    : 'Avaa maksu tilauksen omasta maksulinkistä.', true);
 }
-void Promise.resolve().then(init).catch(error => { $('status').textContent = error.message; });
+void Promise.resolve().then(init).catch(error => { showState(error.message, true); });
