@@ -31,6 +31,7 @@ const SELF = fileURLToPath(import.meta.url);
 const ROOT = path.resolve(path.dirname(SELF), '..');
 const arg = (name, fallback = null) => { const i = process.argv.indexOf(name); return i < 0 ? fallback : process.argv[i + 1]; };
 const flag = (name) => process.argv.includes(name);
+export const SELFPLAY_DEFAULT_NOW = '2026-11-15T09:00:00+02:00'; // sama kuin runSelfplayn DEMO_NOW
 export const CASE_SETS = { default: 'eval/whatsapp-personas.mjs:PERSONAS', regressions: 'eval/whatsapp-personas.mjs:REGRESSIONS',
   extended: 'eval/whatsapp-personas-extended.mjs:EXTENDED', data: 'eval/whatsapp-personas-data.mjs:DATA_CASES',
   all: 'eval/whatsapp-personas.mjs:PERSONAS,eval/whatsapp-personas.mjs:REGRESSIONS,eval/whatsapp-personas-extended.mjs:EXTENDED,eval/whatsapp-personas-data.mjs:DATA_CASES' };
@@ -55,7 +56,7 @@ const normalize = (r) => (Array.isArray(r) ? { failures: r, newRequirement: [], 
 
 // Hinnat USD / 1M tokenia, claude-api-taidon mallitaulukko (välimuistissa 2026-11-03). Välimuistiluku Opus 5.5: 0,20.
 // Ajattelutokenit laskutetaan output-tokeneina. Arvio on suuntaa antava: välimuistiin kirjoitusta ei eritellä.
-export const PRICES = { 'claude-opus-5-5': { input: 4, output: 20, cacheRead: 0.2 }, 'claude-haiku-5-5': { input: 0.1, output: 0.5, cacheRead: 0.01 } };
+export const PRICES = { 'claude-opus-5-5': { input: 4, output: 20, cacheRead: 0.2 }, 'claude-sonnet-5-5': { input: 2, output: 10, cacheRead: 0.1 }, 'claude-haiku-5-5': { input: 0.1, output: 0.5, cacheRead: 0.01 } };
 // Apurin ainoa fast-tason kutsu (Haiku) on lisätuote-ehdotus; sen muut kutsut ovat deep-tasoa (DEEP_MODEL). Simuloitu
 // asiakas ja arvioija ovat simTier-tasoa: uusissa ajoissa oletuksena fast, ennen 16.11.2026 tehdyissä ajoissa (meta ilman
 // simTieriä) deep. Välimuistiin kirjoitusta (cache_creation_input_tokens) agentStats ei laske, joten arvio on hieman alakanttiin.
@@ -83,8 +84,10 @@ async function child() {
   const { cases } = await loadCases(ROOT, arg('--cases', CASE_SETS.default)).then((x) => ({ cases: x.cases.filter((c) => ids.includes(c.id)) }));
   // Demokello luetaan kerran gateway/clock.mjs:n latauksessa. Ladataan se tapauksen ajalla ennen runSelfplayta, joka
   // asettaa muuten kiinteän DEMO_NOW-arvon. Erässä on vain saman now-arvon tapauksia (pääprosessi ryhmittelee).
-  const now = cases[0]?.now || null;
-  if (now) process.env.DEMO_NOW = now;
+  // Ilman tapauskohtaista now-arvoa kello kiinnitetään runSelfplayn oletukseen (su 15.11.2026 klo 9). Muuten kello latautuu
+  // oikeana ennen runSelfplayn DEMO_NOW-asetusta ja suhteelliset päivät ("tiistaiksi") ja tilausajat siirtyvät ajohetken mukana.
+  const now = cases[0]?.now || SELFPLAY_DEFAULT_NOW;
+  process.env.DEMO_NOW = now;
   const { clock } = await import(pathToFileURL(path.join(ROOT, 'server/gateway/clock.mjs')).href);
   const clockAt = clock.now().toISOString();
   // aimoAgent lukee vain mallin asetukset (config.mjs). Kantapolut luetaan vasta runSelfplayn eristämässä ympäristössä.

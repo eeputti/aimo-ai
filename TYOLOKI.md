@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 — itsepelin kello kiinnitetty ja Sonnet hintataulukkoon (Claude Code, Haiku-laatumittaus F)
+
+- **Löydetty mittausvirhe:** `scripts/whatsapp-selfplay-batch.mjs` latasi demokellon lapsiprosessissa ennen kuin `runSelfplay` asetti `DEMO_NOW`:n. Persoonat ilman omaa `now`-kenttää (S001–S100, V001–V035, R01–R06) ajoivat siksi oikealla kellolla, ja "tiistaiksi" tai "huomiseksi" siirtyi ajohetken mukana. Ajohetkellä ma 16.11. illalla simuloitu haku ei enää ehtinyt ti 17.11. toimitukselle, ja esimerkiksi S002 jäi seitsemäksi vuoroksi samaan päivänsiirtokysymykseen (apuri toisti sen, ostaja vastasi sanoin eikä numerolla). Aiemmat ajot (yöllä su 15.11.) osuivat tarkoitettuun aikaan, joten niiden tulokset pitävät. Korjaus: ilman `now`-kenttää kello kiinnitetään oletukseen su 15.11.2026 klo 9.00 (`SELFPLAY_DEFAULT_NOW`). Todennettu: S002 ja S003 läpi Haikulla, ja kello näkyy raportissa (`clock.requested`). Kaikkien, jotka ajavat itsepeliä S-, V- tai R-persoonilla 16.11. tai myöhemmin, pitää ottaa tämä korjaus mukaan.
+- **Hintataulukko:** `PRICES`iin lisätty `claude-sonnet-5-5` (2 / 10 USD per miljoona tokenia, välimuistiluku 0,10), jotta Sonnet-vertailun kustannusarvio ei lasketa Opuksen hinnalla.
+- Ei sovelluskoodin muutoksia. Mittaus ja raportti `docs/parallel/haiku-quality-2026-11-16.md` tulevat omassa commitissaan.
+
 ## 16.11.2026 ilta — selainkeskustelu puhelinkehykseen, WhatsApp-lomake korvattu soittopyynnöllä (Claude Code, etusivu-chat)
 
 - **Käyttäjän pyyntö:** Eelis halusi selainkeskustelusta pois valmiit pikaviestit (20 l maitoa ja voita perjantaiksi, Lohikeittoa 40 hengelle, Mitä osaat tehdä?), keskustelun puhelimen näköiseksi ja viereen linkin "Kokeile WhatsAppissa täältä" etusivulle. Etusivulle "Kokeile heti selaimessa" -napin alle "Kokeile WhatsAppissa", joka avaa pelkän tekstin: ota yhteyttä Eelikseen, soita 050 326 0441, niin saat WhatsApp-kokeilun. Kaikki ilmoittautumislomakkeet pois. Eelis antoi numeronsa itse julkiselle sivulle.
