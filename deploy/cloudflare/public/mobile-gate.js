@@ -13,11 +13,8 @@
     <ellipse cx="124" cy="164" rx="104" ry="8" fill="#003c75" opacity=".08"/>
     <g class="gate-laptop">
       <rect x="40" y="26" width="160" height="106" rx="11" fill="#003c75"/>
-      <rect x="49" y="35" width="142" height="88" rx="5" fill="#e6eff8"/>
-      <circle cx="98" cy="70" r="7" fill="#003c75"/><circle cx="142" cy="70" r="7" fill="#003c75"/>
-      <circle cx="100.5" cy="67.5" r="2.4" fill="#fff"/><circle cx="144.5" cy="67.5" r="2.4" fill="#fff"/>
-      <circle cx="84" cy="88" r="7" fill="#ff8fa3" opacity=".45"/><circle cx="156" cy="88" r="7" fill="#ff8fa3" opacity=".45"/>
-      <path d="M104 88q16 15 32 0" fill="none" stroke="#003c75" stroke-width="5.5" stroke-linecap="round"/>
+      <rect x="49" y="35" width="142" height="88" rx="5" fill="#fff"/>
+      <image href="/aimo-logo.png" x="62" y="57.5" width="116" height="40.3" preserveAspectRatio="xMidYMid meet"/>
       <path d="M24 134h192l-11 15a7 7 0 0 1-5.6 3H40.6a7 7 0 0 1-5.6-3z" fill="#1668e3"/>
       <rect x="104" y="134" width="32" height="5" rx="2.5" fill="#0d4fb8"/>
     </g>
