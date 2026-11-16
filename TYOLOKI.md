@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 ilta — WhatsApp-apurin laatu Haikulla mitattu: Haiku riittää (Claude Code, Haiku-laatumittaus F)
+
+- **Käyttäjän kysymys:** botin syvä malli vaihdettiin Opuksesta Haikuun kustannusten vuoksi, mutta itsekeskustelun 96–99/100 mitattiin Opuksella. Mittaus nykykoodilla (origin/main 671b9a1, kiinnitetty kaikissa ajoissa), eristetyt kannat, simuloidut hinnat ja Meta, ei Valion API:a, 0 tilausta. Mallin avain luettiin yhteisen kansion `.env`:stä kopioimatta sitä.
+- **Tulos:** Haiku 241 persoonaa: perusvaatimukset 223/241 (S 97/100, X 96/100, V 25/35, R 5/6), uusi vaatimus 237/241. Opus 15.11. samoilla tarkistuksilla S 96/100 ja X 99/100: ero alle 1 prosenttiyksikkö. Samat 10 persoonaa nykykoodilla: Haiku 9/10, Sonnet 8/10, Opus 9/10; Opusarvioijan sokkoarvio kokonaisarvosana Haiku 3,4, Opus 3,4, Sonnet 2,8 (n = 10). 0 allergeeni- tai ruokavaliovirhettä S- ja X-joukoissa.
+- **Virheet:** 18 Haikun perusvirhettä: 8 koodia tai tarkistinta (tuotefaktavastaukset, Opus kaatuu samoihin seitsemässä), 8 satunnaista (läpi Haikun uusinnassa), 2 mallista (S047 slangi "jauhis" luettu jauhoksi, S066). Lisäksi epämääräiseen avaukseen Haiku ei kysy päivää (S050, S070, S090). Koodiviat A ja C -sessioille taululla ja muistiinpanokansiossa.
+- **Kulu ja nopeus:** apurin osuus per asiakasviesti Haiku 0,0007, Sonnet 0,0078, Opus 0,0153 USD. Mittauksen kulu arviolta 3,66 USD (noin 4,0 välimuistikirjoituksineen). Haikun syvä taso tuottaa 2–5 kertaa enemmän tulostokeneita kuin Sonnet ja Opus, vuoron mediaani 6,8 s (Opus 5,6 s, Sonnet 3,9 s).
+- **Suositus:** pidä Haiku kaikkialla ja korjaa koodiviat; älä päivitä mallia. Kokeile Haikun effort-tason laskua samalla ajurilla ennen mitään mallivaihtoa (mittaamatta). Tarkka raportti `docs/parallel/haiku-quality-2026-11-16.md`.
+- **Rajat:** yksi ajo per persoona, simuloitu asiakas Haikua, 15.11. Opus-vertailu eri koodiversiolla ja Opus-asiakkaalla, Opus V-joukko nykykoodilla mittaamatta, ei sovelluskoodin muutoksia.
+
 ## 16.11.2026 ilta — korisivulla yksi nappi SIIRRY MAKSAMAAN (Claude Code, maksusiirtymä-chat)
 
 - **Käyttäjän pyyntö:** Eelis halusi, että tilaus menee läpi yhdellä painalluksella ja että napissa lukee "Siirry maksamaan" eikä "Tarkista ja tilaa". Sessio C (katselmus #10, sama vahvistuspolku) pushasi ensin f848556:n, vapautti tiedostot ja palautti muutoksen tälle chatille.
