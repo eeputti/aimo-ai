@@ -2,6 +2,16 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 yö — WhatsApp-botti siirretty Verceliin ja Tursoon, Macia ei tarvita (Claude Code, sessio E pilvisiirto)
+
+- **Käyttäjän luvat:** Eelis hyväksyi vaihdon ("Kyllä, vaihda nyt") ja sen jälkeen ensimmäisen korjauserän ("Kyllä, ota käyttöön") sekä päätti, että julkinen tilausnäkymä näyttää kaikkien WhatsApp-testaajien tilausten julkiset kentät (B:n #13).
+- **Vaihto 16.11. klo 23.47–23.50:** jono tyhjä, Macin botti (PID 34645) ja julkaisija (PID 21794) pysäytetty TERMillä, viiden kannan VACUUM INTO -kopiot siirretty Turso-kantoihin `aimo-*` (kaikki taulut täsmäävät). Oikeat asetukset Verceliin, julkaisu https://aimo-whatsapp.vercel.app, Metan callback samoilla 10 kentällä ja D1 `bot_backend_url` uuteen osoitteeseen (molemmat takaisinluettu), minuutin ajastin `aimo-whatsapp-tick` julkaistu `cf`-työkalulla. Katko noin 2 min 40 s.
+- **Varmennettu:** Eelis: "joo botti vastas!", puhelimen viesti klo 0.04 käsitelty pilvessä ensimmäisellä yrityksellä. Webhookin vahvistus 200, selainkeskustelun avain, Worker-sivun kaikki välilehdet 200 ja `/whatsapp/cart.js` Workerin kautta, tilausnäkymän `observedAt` päivittyy minuutin välein.
+- **Korjauserä käytössä (main 94c62f3):** D1 `signup-verify.sql` ajettu (5 saraketta ja indeksi, 14 riviä säilyi), Worker ja botti julkaistu samasta commitista. Mukana A, B, C, D, F, H, I ja SIIRRY MAKSAMAAN. Groq (`WHATSAPP_TRANSCRIBE`, `GROQ_API_KEY`) viety Verceliin `push-env.mjs --only`:lla. Kuvaa tai ääniviestiä ei ole vielä kokeiltu puhelimella pilvessä.
+- **Koodi (94c62f3):** pilvi käyttää D:n rinnakkaista `channel.drain`ia, ajastimelle `cf`-asetukset, `push-env.mjs --only`, julkaisuohje `docs/vercel.md`. Testit 384/384 ja Worker 59/59.
+- **Löydökset:** Valion testirajapinnan nimi ei enää ratkea, joten botti toimii välimuistin 3 252 vastauksella. Yksi asetus ei mennyt Verceliin ensimmäisellä massaviennillä, vaikka komento onnistui (korjattu yksittäin).
+- **Jatkossa:** botin käyttöönotto = Vercel-julkaisu (docs/vercel.md), Macin bottia ei käynnistetä. Paluuohje ja siivottavat (testikannat `aimo-t-*`, tunneli PID 94071, `caffeinate`) raportissa `docs/parallel/cloud-cutover.md`.
+
 ## 17.11.2026 — Haiku-mittauksen keskusteluviat C1–C7 korjattu (Claude Code, sessio C)
 
 - **Käyttäjän pyyntö:** Eelis hyväksyi sessio F:n Haiku-mittauksen (`docs/parallel/haiku-quality-2026-11-16.md`) C-löydösten korjaamisen tässä sessiossa. Raportti `docs/parallel/haiku-findings-c.md`.
