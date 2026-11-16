@@ -14,20 +14,10 @@ const INTERNAL = /^\/(demo|mcp|v1|console|api\/assistant)(\/|$)|^\/(openapi\.jso
 let app;
 const load = () => (app ||= createConfiguredWhatsApp());
 
-/** Käsittelee jonon, kunnes se on tyhjä tai aikaa on käytetty. Saman numeron viestit kulkevat järjestyksessä. */
+/** Käsittelee jonon rinnakkain (channel.drain, sama poolin koko kuin Macilla), kunnes se on tyhjä tai aikaa on käytetty.
+ *  Saman numeron viestit kulkevat järjestyksessä; saman instanssin useampi drain jakaa paikat. */
 export async function drain(budgetMs = DRAIN_MS) {
-  const channel = load();
-  const until = Date.now() + budgetMs;
-  let processed = 0;
-  while (Date.now() < until) {
-    if (await channel.processNext()) { processed += 1; continue; }
-    // Saman instanssin toinen käsittely voi olla juuri päättymässä, kun uusi viesti tuli jonoon. Yksi lyhyt
-    // uusintayritys, ettei viesti jää odottamaan minuutin tickiä.
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    if (!await channel.processNext()) break;
-    processed += 1;
-  }
-  return processed;
+  return load().drain(budgetMs);
 }
 
 const json = (res, status, body) => {

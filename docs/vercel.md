@@ -14,6 +14,7 @@ WhatsApp → Meta → Vercel (api/index.mjs → server/cloud.mjs) ⇄ Turso (5 S
 | WhatsApp-palvelin, korisivu, gateway | Vercel Hobby, `fra1` | Yksi Node-funktio, enintään 300 s ja 2 Gt per kutsu |
 | Kannat | Turso Free | Samat viisi kantaa ja SQL kuin Macilla |
 | Ajastus | Cloudflare Worker `aimo-whatsapp-tick` | Vercelin ilmaistaso sallii vain päivittäisen cronin |
+| Korisivun kuvat | `data/img` julkaisussa | Vain Valion omat tuotekuvat näytetään |
 | Landing, tilausnäkymä, maksu | Cloudflare Worker `aimo-order-demo` | Ennallaan |
 
 ## Miten sama koodi toimii pilvessä
@@ -31,20 +32,54 @@ WhatsApp → Meta → Vercel (api/index.mjs → server/cloud.mjs) ⇄ Turso (5 S
 - Ulos näkyvät vain WhatsAppin reitit. `/demo`, `/mcp`, `/v1/*`, `/openapi.json`, `/approve.html` ja
   `/api/assistant/*` palauttavat 404.
 
-## Käyttöönotto (tehdään kerran)
+## Käyttöönotto
 
-1. `npx vercel login`, `vercel link` (projekti `aimo-whatsapp`), `turso auth login`.
-2. Turso: viisi kantaa `aimo-whatsapp`, `aimo-drafts`, `aimo-quotes`, `aimo-gateway`, `aimo-kitchen` (Frankfurt)
-   ja ryhmän avain. Osoitteet ja avain Gitin ohittamaan `deploy/vercel/.env.cloud`-tiedostoon:
-   `WHATSAPP_DB`, `WHATSAPP_DRAFT_DB`, `WHATSAPP_QUOTE_DB`, `GATEWAY_DB`, `AIMO_DB`, `TURSO_AUTH_TOKEN`, `TICK_SECRET`,
-   `WHATSAPP_PUBLIC_URL=https://<projekti>.vercel.app`.
-3. `node deploy/vercel/push-env.mjs` vie asetukset Verceliin (Macin `.env`-tiedostoista + `.env.cloud`).
-4. `vercel deploy --prod`. Katalogi `data/catalog.json` kulkee mukaan julkaisuun (`.vercelignore`), ei GitHubiin.
-5. Ajastin: `deploy/vercel/tick` → `wrangler secret put TICK_URL` (`https://<projekti>.vercel.app/internal/tick`),
-   `wrangler secret put TICK_SECRET`, `wrangler deploy`.
-6. Vaihto: pysäytä Macin 4749-palvelin ja julkaisija, siirrä kannat
-   `TURSO_AUTH_TOKEN=… node deploy/vercel/migrate.mjs data/whatsapp.db=libsql://… …` (keskeytyy, jos etäkanta ei ole tyhjä,
-   ja tarkistaa jokaisen taulun sisällön), vaihda Metan webhook osoitteeseen `https://<projekti>.vercel.app/webhooks/whatsapp`.
+Tehty 16.11.2026 (sessio E, `docs/parallel/cloud-cutover.md`): projekti `eeputtis-projects/aimo-whatsapp`,
+osoite https://aimo-whatsapp.vercel.app, kannat Turso `aimo-*` (Frankfurt), ajastin `aimo-whatsapp-tick`.
+
+### Uusi versio (botin "restart")
+
+Julkaise puhtaasta tilannevedoksesta, ei työpuusta: katalogi ja kuvat ovat Gitin ohittamia, ja työpuun
+`data/catalog.json` voi olla symbolinen linkki.
+
+```bash
+SHA=$(git rev-parse --short origin/main); SNAP=/private/tmp/aimo-vercel-$SHA
+mkdir -p $SNAP/data && git archive origin/main | tar -x -C $SNAP
+cp /Users/eeputti/developer/aimo-ai/data/catalog.json $SNAP/data/ && cp -R /Users/eeputti/developer/aimo-ai/data/img $SNAP/data/img
+cp -R <edellinen tilannevedos>/.vercel $SNAP/   # tai: cd $SNAP && vercel link --yes --project aimo-whatsapp
+cd $SNAP && npx vercel@latest deploy --prod --yes
+```
+
+Tarkista julkaisun jälkeen: `curl https://aimo-whatsapp.vercel.app/healthz` (`host: cloud`) ja webhookin
+GET-vahvistus oikealla `WHATSAPP_VERIFY_TOKEN`illa (200 ja haaste takaisin).
+
+### Asetukset
+
+`node deploy/vercel/push-env.mjs` tilannevedoksesta, `AIMO_ENV_ROOT=/Users/eeputti/developer/aimo-ai`: lukee Macin
+`.env`, `.env.whatsapp`, `deploy/cloudflare/.env.publisher` ja `deploy/vercel/.env.cloud` (Turso-osoitteet, Turso-avain,
+`TICK_SECRET`, `WHATSAPP_PUBLIC_URL`). `--only=AVAIN,AVAIN` vie vain nimetyt, `AIMO_CLOUD_ENV` vaihtaa pilven tiedoston
+(esim. testikannat). Arvot kulkevat stdinin kautta. Asetus tulee voimaan vasta seuraavassa julkaisussa.
+Kerran yksi arvo ei päätynyt Verceliin, vaikka komento ilmoitti onnistuneensa: tarkista vaikutus julkaisun jälkeen.
+
+### Ajastin
+
+`deploy/vercel/tick` julkaistaan `cf`-työkalulla (sama kuin `deploy/cloudflare`; wranglerin kirjautuminen ei kata tiliä):
+
+```bash
+T=$(mktemp -d); cp deploy/vercel/tick/{worker.mjs,cloudflare.config.ts,vite.config.ts} deploy/cloudflare/package.json $T/
+ln -s "$PWD/deploy/cloudflare/node_modules" $T/node_modules
+(umask 077; printf 'TICK_URL=https://aimo-whatsapp.vercel.app/internal/tick\nTICK_SECRET=%s\n' "<.env.cloudin TICK_SECRET>" > $T/secrets)
+cd $T && npx cf deploy --secrets-file secrets
+```
+
+Uusi cron voi käynnistyä vasta noin 15 minuutin kuluttua. Onnistunut tick ei kirjoita lokiin mitään; sen näkee
+tilausnäkymän `/api/orders`-vastauksen `observedAt`-ajasta, joka päivittyy kerran minuutissa.
+
+### Kantojen siirto
+
+`node deploy/vercel/migrate.mjs paikallinen.db=libsql://… …` (`TURSO_AUTH_TOKEN` ympäristössä). Keskeytyy, jos etäkannan
+taulussa on rivejä, ja tarkistaa jokaisen taulun sisällön. Lähteeksi johdonmukainen kopio (`VACUUM INTO`) pysäytetyn
+palvelimen kannoista.
 
 ## Ylläpito Macilta
 

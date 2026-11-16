@@ -2,7 +2,7 @@
 // Lähteet: Macin .env, .env.whatsapp ja deploy/cloudflare/.env.publisher sekä pilven omat arvot
 // deploy/vercel/.env.cloud-tiedostosta (Turso-osoitteet, Turso-avain, tick-salaisuus, julkinen osoite).
 // Arvot kulkevat Vercelin komentorivityökalulle stdinin kautta, eivät komentoriville tai lokiin.
-// Käyttö linkitetystä kansiosta (vercel link): node deploy/vercel/push-env.mjs [--dry-run]
+// Käyttö linkitetystä kansiosta (vercel link): node deploy/vercel/push-env.mjs [--dry-run] [--only=AVAIN,AVAIN]
 // AIMO_ENV_ROOT: kansio, jossa .env-tiedostot ovat (oletus nykyinen). AIMO_CLOUD_ENV: pilven oma tiedosto
 // (oletus <AIMO_ENV_ROOT>/deploy/vercel/.env.cloud), esim. testikantojen asetukset. Vercel-komento ajetaan nykyisessä kansiossa.
 import fs from 'node:fs';
@@ -48,7 +48,12 @@ const local = [...values].filter(([, v]) => /\/(Users|private|var\/folders)\//.t
 if (local.length) { console.error(`Macin paikallinen polku jäisi asetukseen: ${local.join(', ')}`); process.exit(1); }
 
 const dryRun = process.argv.includes('--dry-run');
+// --only A,B vie vain nimetyt asetukset (esim. uusi avain), muut jäävät Verceliin ennalleen.
+const onlyArg = process.argv.find((a) => a.startsWith('--only='));
+const only = onlyArg ? new Set(onlyArg.slice(7).split(',').filter(Boolean)) : null;
+if (only) for (const key of only) if (!values.has(key)) { console.error(`${key}: ei löydy asetustiedostoista.`); process.exit(1); }
 for (const [key, value] of values) {
+  if (only && !only.has(key)) continue;
   if (dryRun) { console.log(`${key} (${value.length} merkkiä)`); continue; }
   const result = spawnSync('npx', ['--yes', 'vercel@latest', 'env', 'add', key, '--environment', 'production', '--force', '--sensitive', '--yes'],
     { input: value, encoding: 'utf8', stdio: ['pipe', 'ignore', 'pipe'] });
