@@ -8,9 +8,11 @@ import { helsinkiLabel, parseApiTime } from '../gateway/clock.mjs';
 
 const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
-const ALLERGEN_FI = { AM: 'maidoton', AW: 'ei gluteeniviljoja', AE: 'munaton', AN: 'pähkinätön', AP: 'ei maapähkinää', AF: 'kalaton', AY: 'soijaton', AC: 'ei äyriäisiä', AS: 'ei seesamia', BC: 'ei selleriä', BM: 'ei sinappia' };
+const ALLERGEN_FI = { AM: 'maidoton', AW: 'ei gluteeniviljoja', AE: 'munaton', AN: 'pähkinätön', AP: 'ei maapähkinää', AF: 'kalaton', AY: 'soijaton', AC: 'ei äyriäisiä', AS: 'ei seesamia', BC: 'ei selleriä', BM: 'ei sinappia' , UW: 'ei vehnää', ML: 'ei laktoosia', AU: 'ei sulfiitteja', NL: 'ei lupiinia', UM: 'ei nilviäisiä', SA: 'ei mantelia', SH: 'ei hasselpähkinää', SC: 'ei cashewpähkinää', SW: 'ei saksanpähkinää', ST: 'ei pistaasia' };
+// Ostajalle ei näytetä raakaa GS1-koodia (Haiku-mittaus 16.11. A3: "(ei allergeeneja AW)" vaihtoehtorivillä).
+const allergenFi = (a) => ALLERGEN_FI[a] || 'allergeenirajaus';
 // Gluteeniton-merkintä ja gluteeniviljojen kielto ovat ostajalle sama asia: näytetään kerran.
-const dietLabel = (d) => [...d.claims.map((c) => CLAIM_FI[c]), ...d.excludeAllergens.filter((a) => !(a === 'AW' && d.claims.includes('FREE_FROM_GLUTEN'))).map((a) => ALLERGEN_FI[a] || `ei allergeenia ${a}`)].filter(Boolean).join(', ');
+const dietLabel = (d) => [...d.claims.map((c) => CLAIM_FI[c]), ...d.excludeAllergens.filter((a) => !(a === 'AW' && d.claims.includes('FREE_FROM_GLUTEN'))).map(allergenFi)].filter(Boolean).join(', ');
 // Vahvistus tunnistetaan koodissa, ei mallilla. Pelkkä "joo" ei ole tilauslupa. Korisivu sallii vahvistuksen vain
 // vihreästä painikkeesta (cart-link.mjs), ei muutoskenttään kirjoitettuna (katselmus #10).
 export const CONFIRM = /^(tilaa|vahvista|vahvistan|hyväksy|hyväksyn|(kyllä|joo|ok|okei)[,\s]+(tilaa|vahvista|vahvistan))[\s.!]*$/iu;
@@ -87,7 +89,7 @@ const cleanQuantity = (q) => ({ value: q.value, unit: q.unit, ...(q.unit === 'PC
 // Gatewayn tilauksesta kopioitu määrä on myyntieriä: näytetään pakkaussanalla ("4 laatikkoa"), ei "4 kpl", niin kauan kuin
 // sama tuote on valittuna.
 const lineQty = (l) => (l.packLabel && l.packFor === l.selectedProductId && l.quantity?.basis === 'sales' ? `${num(l.quantity.value)} ${packWord(l.quantity.value, l.packLabel)}` : qty(l.quantity));
-const lineLabel = (l) => `${l.productTerm}${l.quantity ? ` ${lineQty(l)}` : ''}${[...l.claims.map((c) => CLAIM_FI[c]), ...(l.excludeAllergens.length ? [`ei allergeeneja ${l.excludeAllergens.join(', ')}`] : [])].filter(Boolean).map((x) => ` (${x})`).join('')}`;
+const lineLabel = (l) => `${l.productTerm}${l.quantity ? ` ${lineQty(l)}` : ''}${[...l.claims.map((c) => CLAIM_FI[c]), ...[...new Set(l.excludeAllergens.filter((a) => !(a === 'AW' && l.claims.includes('FREE_FROM_GLUTEN'))).map(allergenFi))]].filter(Boolean).map((x) => ` (${x})`).join('')}`;
 // Sisältö, jonka muutos kasvattaa revisiota ja mitätöi tarjouksen ja hyväksynnän.
 const content = (d) => JSON.stringify([d.deliveryDate, d.deliverySiteId, d.diet.claims, d.diet.excludeAllergens, d.lines.map((l) => [l.ref, l.productTerm, l.quantity, l.claims, l.excludeAllergens, l.selectedProductId || null, l.answeredClaims || []])]);
 
@@ -206,7 +208,8 @@ function compareAnswer(kind, options = []) {
   const best = better(...known.map(({ o }) => o[key]));
   const top = known.filter(({ o }) => o[key] === best);
   const values = shown.map(({ o, n }) => `${n}) ${Number.isFinite(o[key]) ? fmt(o[key]) : 'ei tietoa'}`).join(', ');
-  const verdict = known.length > 1 && top.length === known.length ? 'Arvo on kaikille sama.'
+  // "Kaikille sama" vain, kun tieto on kaikilla: muuten tuntematon vaihtoehto ei ole sama (Haiku-mittaus 16.11. V019).
+  const verdict = known.length > 1 && top.length === known.length ? (known.length === shown.length ? 'Arvo on kaikille sama.' : 'Arvo on sama niillä, joilta tieto löytyy.')
     : `${kind === 'co2' ? 'Pienin' : 'Paras'}: ${joinFi(top.map(({ o, n }) => `${n}) ${o.name}`))}.`;
   return `${what}: ${values}. ${verdict}`;
 }

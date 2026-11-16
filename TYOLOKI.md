@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — Haiku-mittauksen A1–A3 ja V019: slangi mallitulkissa, suorat tuotevastaukset, ei raakoja allergeenikoodeja (Claude Code, sessio A)
+
+- **Pyyntö:** session F:n Haiku-mittaus (`docs/parallel/haiku-quality-2026-11-16.md`) osoitti A:n alueelle koodivikoja, joita mallin vaihto ei korjaa. Eelis hyväksyi niiden korjaamisen sessiossa A, myös `order-conversation/`- ja `whatsapp/`-tiedostoissa (C:lle ja taululle ilmoitettu, varaus 8984c5a0). Raportti `docs/parallel/haiku-fixes-a.md`.
+- **A1:** mallitulkki saa viestin slangisanat synonyymitaulusta, ja samannäköinen väärä tuotesana ("jauho" sanasta "jauhis") korvataan taulun sanalla, ellei ostaja kirjoittanut sanaa itse.
+- **A2:** tuotetietokysymykseen kyllä/ei-vastaus ensin Valion kentistä ("Ei: sisältää kananmunaa."). Vain kysytty tuote näytetään: viestiin kirjoitettu katalogin tuotenimi tai osumat, joiden nimeen osuu eniten kysymyksen tuotesanoja. Merkki tai ruokavaliosana ei riitä. Kun mikään osuma ei koske kysyttyä tuotetta, sanotaan, ettei tuotetta löytynyt. "APPELSIINI JAFFA" on appelsiini (Israel), ei Hartwall Jaffa. Pelkkään tuotetietokysymykseen ei tule mallin irrallista avauslausetta. Käyttötapakysymyksessä mallin neuvo jää.
+- **A3 ja V019:** rivin otsikko näyttää "(ei gluteeniviljoja)" eikä "(ei allergeeneja AW)". Vertailu sanoo "Arvo on sama niillä, joilta tieto löytyy", kun yhdeltä puuttuu tieto.
+- **Tarkistukset:** uusi `test/haiku-findings-a.test.mjs` 5/5 (epäonnistui vanhalla koodilla), `valio-data-only`-testin odotus päivitetty tarkoitettuun muutokseen. `npm test` 377/377 origin/mainin 6d247d2 päällä, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54. Synonyymitaulu ladataan `interpret.mjs`:ssä dynaamisesti, koska staattinen tuonti latasi katalogin ennen testin omaa polkua ja rikkoi viisi testiä. Itsepeliä ei ajettu uudelleen.
+- **Käyttöönotto:** botin restart (sessio E).
+
 ## 17.11.2026 yö — reseptilinkki ja tilaus: tuntematon saatavuus ei ole "ei saatavilla"; Macin bottia ei käynnistetty (Claude Code, sessio I)
 
 - **Käyttäjän lupa ("Yes, restart"):** botti versioon 6fa9496. Tarkistuksessa Macin botti ja julkaisija olivat jo pysähtyneet noin klo 23.47, tunneli antoi 502, ja `https://aimo-whatsapp.vercel.app/healthz` vastasi `host: cloud`, eli sessio E on siirtänyt botin Verceliin (snapshot `/private/tmp/aimo-vercel-5d6ae75`). Macin bottia ei käynnistetty, jotta keskustelut eivät jakaudu kahteen kantaan. Sessiolle E lähetettiin taululla viesti #304 uuden version julkaisusta. Vastausta ei vielä tullut.

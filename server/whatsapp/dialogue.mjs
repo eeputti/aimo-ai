@@ -3,7 +3,9 @@
 import { normalizeOrderUnits, presentCollectingCart, selectionAcknowledgement } from './cart-presentation.mjs';
 import { withCartHandoffHint } from './cart-handoff.mjs';
 import { safeModelText } from './model-guard.mjs';
-import { factKinds, factProducts, factsReply, withoutProductClaims } from './product-facts.mjs';
+import { factKinds, factProducts, factsReply, namedInMessage, withoutProductClaims } from './product-facts.mjs';
+// Käyttötapakysymys tuotefaktan rinnalla ("sopiiko grilliin", "mihin käytän"): mallin neuvo jää vastaukseen.
+const USAGE_QUESTION = /(?<![\p{L}\d])(?:mihin|miten\s+(?:käytä|valmist|teen|teke)|käyttö\p{L}*|resepti\p{L}*|ruoka\p{L}*|sopi\p{L}*\s+(?!keliaak|allerg|maitoallerg)\p{L}+|kannattaa|vinkk\p{L}*)/iu;
 import { CANCEL_ALL, DEADLINE_QUESTION, REPEAT_LAST, compareKind, RELIST } from '../order-conversation/index.mjs';
 // Ihmisen, valituksen tai laskun pyyntö: koodi liittää kanavan tukiyhteystiedon (mallin teksti ei saa sisältää yhteystietoja).
 const SUPPORT_QUESTION = /(?<![\p{L}\d])(?:ihmise\p{L}*|asiakaspalvelu\p{L}*|asiakastu\p{L}*|tukeen|tuesta|yhteystie\p{L}*|yhteyshenkilö\p{L}*|puhelinnumer\p{L}*|soitt\p{L}*|reklamaa\p{L}*|valitu\p{L}*|valitta\p{L}*|lasku\p{L}*|hyvit\p{L}*|palaut(?:e|teen|etta)|rikki|rikkinäi\p{L}*|myyjä\p{L}*|vanhentu\p{L}*|pilaantu\p{L}*|pilalla|homee\p{L}*|homehtu\p{L}*|sula(?:nu|ne)\p{L}*|myöhästy\p{L}*|puuttu(?:i|ivat))(?![\p{L}\d])/iu;
@@ -245,11 +247,18 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
         // Jos tuotetta ei löydy, sanotaan se: tietoa ei täydennetä mallin omasta tietämyksestä.
         let factText = null;
         if (kinds.length) {
-          const shown = factProducts({ query, hits, shoppingList: getShoppingList({ epoch: state.epoch || '' }), product });
-          factText = await factsReply(shown, kinds)
+          // Viestiin sellaisenaan kirjoitettu tuotenimi ensin (APPELSIINI JAFFA ei ole Hartwall Jaffa), sitten haun osumat.
+          // Vain kysytty tuote näytetään, ja kyllä/ei-kysymykseen vastataan suoraan (Haiku-mittaus 16.11. A2).
+          let named = [];
+          try { named = await namedInMessage(text); } catch { /* katalogi ei ole käytettävissä: pelkkä haku */ }
+          const shown = factProducts({ query, message: text, hits: [...named, ...hits], shoppingList: getShoppingList({ epoch: state.epoch || '' }), product });
+          factText = await factsReply(shown, kinds, text)
             || (query ? `En löytänyt Valion tuotetiedoista tuotetta haulla "${query.replace(/[^\p{L}\d\s-]/gu, '').trim().slice(0, 60)}", joten en voi kertoa sen tietoja. Kerro tuotteen tarkempi nimi.`
               : 'Kerro tuotteen nimi, niin katson sen tiedot Valion tuotetiedoista.');
         }
+        // Pelkkä tuotetietokysymys: koodin Valion-tiedot ovat koko vastaus, mallin irrallinen avauslause pois
+        // ("Tarkista ne sieltä ennen ostopäätöstä"). Käyttötapakysymyksessä mallin neuvo jää.
+        if (factText && !USAGE_QUESTION.test(text)) answer = '';
         if (!answer && !factText) answer = 'Kootaan ostoslista kuntoon. Mitä keittiöön tarvitaan?';
         messages = [answer, factText].filter(Boolean);
         result = { status: state.lastOrder?.status || 'collecting', text: messages.join('\n\n') };

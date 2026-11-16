@@ -4,6 +4,7 @@
 // Puuttuva tieto sanotaan puuttuvaksi, sitä ei päätellä tuotenimestä eikä mallin omasta tietämyksestä.
 // catalog.mjs tuodaan vasta käytössä: staattinen tuonti lukisi AIMO_CATALOG-polun ennen kuin ajo on asettanut sen.
 const labels = () => import('../catalog.mjs');
+import { allergenStatus } from '../allergens.mjs';
 
 const B = '(?<![\\p{L}\\d])';
 const word = (source) => new RegExp(`${B}(?:${source})`, 'iu');
@@ -77,26 +78,102 @@ export async function factLines(p, kinds) {
  * Valion tuotetietojen vastaus WhatsAppiin, tai null jos kysymys ei koske tuotetietoja tai tuotetta ei löytynyt.
  * @param {object[]} products katalogituotteet parhaat ensin (vähintään id ja name)
  */
-export async function factsReply(products, kinds) {
+export async function factsReply(products, kinds, question = '') {
   const shown = (products || []).filter((p) => p?.id && p.name).slice(0, 2);
   if (!kinds?.length || !shown.length) return null;
-  const blocks = await Promise.all(shown.map(async (p) => [`*${p.name}* (tuotenro ${p.id}):`, ...(await factLines(p, kinds)).map((r) => `- ${r}`)].join('\n')));
+  const blocks = await Promise.all(shown.map(async (p) => {
+    const direct = await directAnswer(p, question);
+    return [`*${p.name}* (tuotenro ${p.id}):${direct ? ` ${direct}` : ''}`, ...(await factLines(p, kinds)).map((r) => `- ${r}`)].join('\n');
+  }));
   return `Valion tuotetiedoista:\n${blocks.join('\n\n')}`;
 }
 
+// Kyllä/ei-kysymykseen vastataan ensin suoraan ("Onko HK Coleslaw munaton?" → "Ei: sisältää kananmunaa."), sitten tiedot
+// (Haiku-mittaus 16.11. A2). Vastaus tulee samoista Valion kentistä kuin rivit. Puuttuva tieto ei ole kyllä eikä ei.
+const YES_NO = word('onko|onks|onkohan|onhan|sisältääkö|sisältäskö|sisältäiskö|sopiiko|käykö|voiko|pitääkö|onx');
+const PARTITIVE = { AE: 'kananmunaa', AM: 'maitoa', AN: 'pähkinöitä', AP: 'maapähkinää', AY: 'soijaa', AF: 'kalaa', AS: 'seesamia', BM: 'sinappia', BC: 'selleriä', UW: 'vehnää', AW: 'gluteeniviljoja', AC: 'äyriäisiä', AU: 'sulfiitteja', NL: 'lupiinia', UM: 'nilviäisiä' };
+// [sana kysymyksessä, GS1-koodi]. Tarkempi ensin: maapähkinä ennen pähkinää.
+const FREE_OF = [['maapähkinät(?:on|tö)', 'AP'], ['pähkinät(?:on|tö)', 'AN'], ['munat(?:on|to)', 'AE'], ['maidot(?:on|to)', 'AM'], ['soijat(?:on|to)', 'AY'], ['kalat(?:on|to)', 'AF'],
+  ['seesamit(?:on|to)', 'AS'], ['sinapit(?:on|to)', 'BM'], ['sellerit(?:on|tö)', 'BC'], ['vehnät(?:on|tö)', 'UW']].map(([re, code]) => [word(re), code]);
+const CONTAINS_OF = [['maapähkin', 'AP'], ['pähkin', 'AN'], ['kananmun|munaa|munia', 'AE'], ['maitoa|maito\\b|maidon', 'AM'], ['soija', 'AY'], ['kalaa', 'AF'], ['seesam', 'AS'], ['sinapp?i', 'BM'],
+  ['selleri', 'BC'], ['vehnä', 'UW'], ['gluteeni(?!t)', 'AW'], ['äyriäi', 'AC'], ['sulfiit', 'AU']].map(([re, code]) => [word(re), code]);
+
+async function directAnswer(p, question) {
+  const q = String(question || '');
+  if (!YES_NO.test(q)) return null;
+  const has = (label) => (p.labels || []).includes(label);
+  const allergen = (code, asksFree) => {
+    const s = allergenStatus([code], p); const part = PARTITIVE[code] || 'allergeenia';
+    if (s.contains.length) return asksFree ? `Ei: sisältää ${part}.` : `Kyllä: sisältää ${part}.`;
+    if (s.mayContain.length) return `Ei varmasti: voi sisältää ${part}.`;
+    if (s.unknown) return 'En voi sanoa: allergeenitieto puuttuu Valion tuotetiedoista.';
+    return asksFree ? `Kyllä: ${part} ei ole merkitty tuotteen allergeeneihin.` : `Ei: ${part} ei ole merkitty tuotteen allergeeneihin.`;
+  };
+  if (word('gluteenit\\p{L}*|keliaak\\p{L}*').test(q)) {
+    if (has('FREE_FROM_GLUTEN')) return 'Kyllä: merkitty gluteenittomaksi.';
+    const a = allergen('AW', true);
+    return a.startsWith('Kyllä') ? 'Ei gluteeniton-merkintää Valion tuotetiedoissa, mutta gluteeniviljoja ei ole merkitty allergeeneihin.' : a;
+  }
+  if (word('laktoosit\\p{L}*').test(q)) {
+    if (has('FREE_FROM_LACTOSE')) return 'Kyllä: merkitty laktoosittomaksi.';
+    return allergenStatus(['AM'], p).contains.length ? 'Ei: ei laktoositon-merkintää, ja tuote sisältää maitoa.' : 'Ei laktoositon-merkintää Valion tuotetiedoissa.';
+  }
+  const free = FREE_OF.find(([re]) => re.test(q));
+  if (free) return allergen(free[1], true);
+  if (word('vegaan\\p{L}*').test(q)) return has('VEGAN') ? 'Kyllä: merkitty vegaaniseksi.' : 'Ei vegaaninen-merkintää Valion tuotetiedoissa.';
+  if (word('luomu\\p{L}*').test(q)) return has('EU_ORGANIC_FARMING') ? 'Kyllä: luomu (EU).' : 'Ei luomumerkintää Valion tuotetiedoissa.';
+  if (word('suomalai\\p{L}*|kotimai\\p{L}*|suomesta').test(q)) {
+    const c = String(p.country || '').toUpperCase();
+    if (!/^[A-Z]{2}$/.test(c)) return 'En voi sanoa: alkuperämaa ei ole Valion tuotetiedoissa.';
+    return c === 'FI' ? 'Kyllä: alkuperämaa Suomi.' : `Ei: alkuperämaa ${countryName(c)}.`;
+  }
+  if (word('pakkase\\p{L}*|pakast\\p{L}*').test(q) && p.temp) return p.temp === 'frozen' ? 'Kyllä: pakaste.' : `Ei: lämpötilaluokka ${p.temp === 'chilled' ? 'kylmä' : 'kuiva'}.`;
+  if (word('huoneenlämp\\p{L}*').test(q) && p.temp) return p.temp === 'ambient' ? 'Kyllä: lämpötilaluokka kuiva.' : `Ei: lämpötilaluokka ${p.temp === 'frozen' ? 'pakaste' : 'kylmä'}.`;
+  const contains = CONTAINS_OF.find(([re]) => re.test(q));
+  if (contains && word('sisält\\p{L}*').test(q)) return allergen(contains[1], false);
+  return null;
+}
+
 const stems = (text) => String(text || '').toLocaleLowerCase('fi-FI').split(/[^\p{L}\d]+/u).filter((w) => w.length > 2).map((w) => (w.length > 4 ? w.slice(0, -1) : w));
+// Kysymyksen sanat, jotka eivät nimeä tuotetta: tuotefaktan sanat (KINDS, ALLERGEN_WORD) ja kysymyssanat.
+const QUESTION_WORD = word('onko|onks|onkohan|onhan|sisältääkö|sisältäskö|mistä|mitä|miten|missä|voiko|pitääkö|sopiiko|käykö|teidän|tuote\\p{L}*|tulee|laittaa|meillä|kiitos|keliaakiko\\p{L}*|maitoallerg\\p{L}*');
+const nameTerms = (text) => String(text || '').toLocaleLowerCase('fi-FI').split(/[^\p{L}\d]+/u)
+  .filter((w) => w.length > 2 && !QUESTION_WORD.test(w) && !ALLERGEN_WORD.test(w) && !KINDS.some(([, re]) => re.test(w))).map((w) => (w.length > 4 ? w.slice(0, -1) : w));
+const plain = (text) => String(text || '').toLocaleLowerCase('fi-FI').replace(/[®™*]/gu, '').replace(/\s+/gu, ' ').trim();
 /**
  * Mistä tuotteesta kysytään: ensin ostoskorin valittu tuote, jonka nimeen hakusana osuu (tai ainoa valittu, kun hakusanaa
  * ei ole: "onko se laktoositon?"), sitten katalogihaun osumat. Palauttaa katalogin omat tuotteet, ei mallin tekstiä.
+ * Hausta jää vain kysytty tuote (Haiku-mittaus 16.11. A2): nimi, joka on kirjoitettu viestiin sellaisenaan, tai osumat, joiden
+ * nimeen osuu eniten kysymyksen tuotesanoja. Pelkkä merkki ("HK" Suomipekonissa) tai ruokavaliosana ("gluteeniton") ei riitä,
+ * ja jos mikään osuma ei koske kysyttyä tuotetta, palautetaan tyhjä, jolloin vastaus kertoo, ettei tuotetta löytynyt.
  */
-export function factProducts({ query = '', hits = [], shoppingList = null, product = () => null }) {
+export function factProducts({ query = '', message = '', hits = [], shoppingList = null, product = () => null }) {
   const terms = stems(query);
   const selected = (shoppingList?.lines || []).filter((l) => l.selectedProductId).map((l) => ({ line: l, p: product(l.selectedProductId) })).filter((x) => x.p);
   const onTerm = (x) => terms.some((t) => stems(`${x.line.productTerm} ${x.p.name}`).some((w) => w.includes(t) || t.includes(w)));
   const fromCart = terms.length ? selected.filter(onTerm) : selected.length === 1 ? selected : [];
-  const out = [...fromCart.map((x) => x.p), ...hits.map((h) => product(h?.id) || h)];
+  let found = hits.map((h) => product(h?.id) || h).filter((p) => p?.id && p.name);
+  const asked = [...new Set([...nameTerms(query), ...nameTerms(message)])];
+  if (asked.length && found.length) {
+    const said = plain(`${message} ${query}`);
+    const exact = found.filter((p) => plain(p.name).length >= 8 && said.includes(plain(p.name)));
+    const score = (p) => { const own = stems(p.name); return asked.filter((t) => own.some((w) => w.includes(t) || t.includes(w))).length; };
+    const best = Math.max(...found.map(score));
+    found = exact.length ? exact : best > 0 ? found.filter((p) => score(p) === best) : [];
+  }
+  const out = [...fromCart.map((x) => x.p), ...found];
   const seen = new Set();
   return out.filter((p) => p?.id && !seen.has(String(p.id)) && seen.add(String(p.id)));
+}
+
+let names;
+/** Viestiin sellaisenaan kirjoitettu katalogin tuotenimi ("Mistä maasta APPELSIINI JAFFA tulee?"), pisin ensin, enintään kaksi. */
+export async function namedInMessage(text) {
+  const said = plain(text);
+  if (said.length < 8) return [];
+  const { loadCatalog } = await labels();
+  names ||= loadCatalog().products.map((p) => [plain(p.name), p]).filter(([n]) => n.length >= 8);
+  return names.filter(([n]) => said.includes(n)).sort((a, b) => b[0].length - a[0].length).slice(0, 2).map(([, p]) => p);
 }
 
 // Mallin vapaan tekstin virke, joka väittää tuotteen allergeeneista, ainesosista, alkuperästä, säilytyksestä tai merkinnöistä.
