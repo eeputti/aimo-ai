@@ -37,6 +37,19 @@
       <p class="eyebrow" id="order-label">TILAUSAPURI</p>
       <h1 id="title">Näin agentti kokosi tilauksen.</h1>
       <p class="lead">WhatsApp-viesteistä ostoskoriksi ja allekirjoitetuksi tilaukseksi. Kaikki alla on tämän tilauksen omaa dataa.</p>
+    </section>
+
+    <!-- Keskustelu vasemmalla, agentin ajo oikealla: sama tilaus kahdelta puolelta. -->
+    <div id="split" class="split" hidden>
+      <section id="keskustelu" class="pane chat-pane" aria-labelledby="chat-title">
+        <div class="pane-bar">
+          <span class="pane-icon wa" aria-hidden="true"><svg><use href="#i-chat"/></svg></span>
+          <h2 id="chat-title" class="pane-title">WhatsApp-keskustelu</h2>
+          <span class="pane-tag"><svg aria-hidden="true"><use href="#i-eye"/></svg>Vain luku</span>
+        </div>
+        <div id="chat" class="chat" aria-label="Kokin ja tilausapurin viestit"></div>
+        <p class="pane-foot">Valitse viesti, niin näet oikealta, mitä agentti teki sillä.</p>
+      </section>
       <figure id="code" class="code" hidden>
         <div class="code-bar">
           <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
@@ -47,8 +60,8 @@
         <ol id="code-lines" class="code-lines" aria-label="Agentin kutsut tämän tilauksen aikana"></ol>
         <figcaption>Rivit on koottu tämän tilauksen tallennetusta datasta: oikeat rajapintapolut, kentät ja vastaukset, lyhennettyinä. Avaimet, allekirjoitukset ja puhelinnumerot eivät ole mukana.</figcaption>
       </figure>
-      <div id="stats" class="stats" hidden></div>
-    </section>
+    </div>
+    <div id="stats" class="stats" hidden></div>
 
     <section class="how" aria-labelledby="how-title">
       <h2 id="how-title" class="sr-only">Miten tämä toimii</h2>
@@ -65,29 +78,24 @@
     <button id="retry" class="retry" type="button" hidden><svg aria-hidden="true"><use href="#i-refresh"/></svg>Yritä uudelleen</button>
 
     <div id="trace" hidden>
-      <section id="keskustelu" class="block" aria-labelledby="chat-title">
-        <div class="block-head"><span class="num">1</span><div><h2 id="chat-title">Keskustelu</h2><p>Mitä kokki kirjoitti ja mitä agentti vastasi. Korin versio kasvaa aina, kun sisältö muuttuu.</p></div></div>
-        <div id="chat" class="chat"></div>
-      </section>
-
       <section id="tulkinta" class="block" aria-labelledby="understood-title">
-        <div class="block-head"><span class="num">2</span><div><h2 id="understood-title">Mitä agentti ymmärsi</h2><p>Puhekielestä rakenteiseksi tarpeeksi. Tämän tilausmoottori tarkistaa ennen jokaista hakua.</p></div></div>
+        <div class="block-head"><span class="num">1</span><div><h2 id="understood-title">Mitä agentti ymmärsi</h2><p>Puhekielestä rakenteiseksi tarpeeksi. Tämän tilausmoottori tarkistaa ennen jokaista hakua.</p></div></div>
         <div id="delivery" class="delivery"></div>
         <div id="understood" class="needs"></div>
       </section>
 
       <section id="vaihtoehdot" class="block" aria-labelledby="options-title">
-        <div class="block-head"><span class="num">3</span><div><h2 id="options-title">Vaihtoehdot, joista valittiin</h2><p>Vain toimituspäivälle tilattavat tuotteet. Vihreä on kokin valinta.</p></div></div>
+        <div class="block-head"><span class="num">2</span><div><h2 id="options-title">Vaihtoehdot, joista valittiin</h2><p>Vain toimituspäivälle tilattavat tuotteet. Vihreä on kokin valinta.</p></div></div>
         <div id="options"></div>
       </section>
 
       <section id="portti" class="block" aria-labelledby="gate-title">
-        <div class="block-head"><span class="num">4</span><div><h2 id="gate-title">Portti tarkisti</h2><p>Jokainen vaihe on rivi tilausportin päätösketjussa. Rivit on ketjutettu tiivisteillä.</p></div></div>
+        <div class="block-head"><span class="num">3</span><div><h2 id="gate-title">Portti tarkisti</h2><p>Jokainen vaihe on rivi tilausportin päätösketjussa. Rivit on ketjutettu tiivisteillä.</p></div></div>
         <ol id="ledger" class="ledger"></ol>
       </section>
 
       <section id="tilaus" class="block" aria-labelledby="order-title">
-        <div class="block-head"><span class="num">5</span><div><h2 id="order-title">Lopullinen tilaus</h2><p id="order-note"></p></div></div>
+        <div class="block-head"><span class="num">4</span><div><h2 id="order-title">Lopullinen tilaus</h2><p id="order-note"></p></div></div>
         <ul id="order-lines" class="order-lines"></ul>
         <div id="totals" class="totals"></div>
       </section>

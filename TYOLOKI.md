@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 yö — agentin jälki: keskustelu vasemmalla, agentin ajo oikealla rinnakkain (Claude Code, agentin jälki -sivu)
+
+- **Käyttäjän pyyntö:** Eelis halusi agentin jälki -sivulle (`/agentti`) WhatsApp-keskustelun vasemmalle (vain luku, ei kirjoituskenttää) ja agentin koodinäkymän oikealle rinnakkain, koska se selkeyttää paljon.
+- **Muutos (`deploy/cloudflare/public/agentti.html/css/js`):** keskustelu ja koodinäkymä ovat otsikon alla samassa rivissä. Leveällä näytöllä (vähintään 1000 px) rivi levenee 1 320 px:iin asti, paneelit ovat yhtä korkeat (noin ruudun korkeus, 520–860 px) ja kumpikin vierii itse. Kapeammalla ne ovat allekkain, kumpikin enintään 70 % ruudun korkeudesta. Keskustelupaneelissa on WhatsApp-otsake ja merkki "Vain luku". Tilastoruudut, kulkukaavio ja tarkemmat osiot (ymmärsi, vaihtoehdot, portti, tilaus) ovat ennallaan alla, numeroituna nyt 1–4.
+- **Viesti ja rivi yhdessä:** jokainen kokin viesti ja ostoskorisivun toiminto on kytketty vastaavaan riviin agentin ajossa (viestit lainatun tekstin perusteella, korin toiminnot järjestyksessä). Hiiri tai näppäimistön kohdistus korostaa parin kummallakin puolella, ja valinta vierittää toisen paneelin parin kohdalle ja välähdyttää sen. Agentin ajo näyttää enintään kahdeksan viestiä, joten väliin jäävillä ei ole paria. Koodinäkymä kirjoittuu esiin kuten ennen ja seuraa nyt kursoria paneelin sisällä, kunnes lukija vierittää itse.
+- **Rajaus:** jaettuun `agent-code.js`:ään ei koskettu (sivu käyttää sen valmiita `codeLines`-, `renderCode`- ja `createPlayer`-funktioita), joten Näin se toimii- ja Keskustele-sivut ovat ennallaan. Sessio "Tuotteiden näyttölogiikka" tekee seuraavaksi vaihtoehto-osioon oman `agent-options.js`:n ja kytkee sen tämän commitin päälle.
+- **Tarkistukset:** Worker-testit 59/59 ja `node --check`. Selaimessa paikallisella staattisella esikatselulla julkaistun esimerkkitilauksen AGW-20261115-0008 jäljellä (haettu kerran tiedostoksi): 1440 px rinnakkain (keskustelu 543 px, koodi 761 px), 1024 px rinnakkain (400 ja 560 px), 768 px allekkain, ei vaakavieritystä eikä konsolivirheitä. 9 viestiä/korin toimintoa kytkeytyi 9 koodiriviin, kaksi väliin jäänyttä viestiä ilman paria, korostus molempiin suuntiin, kirjoitus seurasi kursoria loppuun. Selainpaneeli oli piilossa, joten pehmeää vieritystä ei nähty liikkeessä; vierityksen kohta tarkistettiin välittömällä vierityksellä. Puhelinleveyttä ei katsottu, koska sivuston puhelinesto peittää sen.
+- **Käyttöönotto kesken:** Workeria ei julkaistu. Muutos näkyy live-sivulla vasta Worker-julkaisussa, johon kysytään lupa.
+
 ## 17.11.2026 yö — WhatsAppin tuoterivit selkokielelle: luettava nimi, määrä yhteensä, kilohinta (Claude Code, sessio B)
 
 - **Käyttäjän pyyntö (kuvakaappaus):** rivi "PP PERUNA 1KG ANNABELLE: 2 kpl (2 kg), 1,52 €" ei kerro selvästi, paljonko tulee yhteensä. "Haluun et tä botti on fiksu."
