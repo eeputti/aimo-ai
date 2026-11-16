@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 yö — WhatsAppin tuoterivit selkokielelle: luettava nimi, määrä yhteensä, kilohinta (Claude Code, sessio B)
+
+- **Käyttäjän pyyntö (kuvakaappaus):** rivi "PP PERUNA 1KG ANNABELLE: 2 kpl (2 kg), 1,52 €" ei kerro selvästi, paljonko tulee yhteensä. "Haluun et tä botti on fiksu."
+- **Muutos:** uusi `server/order-conversation/wording.mjs` ja sen käyttö `index.mjs`:n tilausluonnoksessa, vaihtoehdoissa, "Luonnoksessa nyt" -listassa ja vertailuissa. Isoin kirjaimin kirjoitettu tukkunimi luettavaksi ("PP peruna 1 kg annabelle"), määrä muodossa "4 laatikkoa à 5 l, yhteensä 20 l", pyöristys ylöspäin näkyy ("yhteensä 6 kg (pyysit 5 kg)") ja Valion vertailuhinta samassa yksikössä ("1,52 € (0,76 €/kg)"). Vain esitystapa: tiedot Valion datasta ja tarjouksesta, mitään ei arvata. Raportti `docs/parallel/whatsapp-wording.md`.
+- **Tarkistukset:** uusi `test/whatsapp-wording.test.mjs` 5/5 (myös kaikki 3 081 isoin kirjaimin kirjoitettua katalogin nimeä), viiden vanhan keskustelutestin tekstiodotukset päivitetty, `npm test` 405/405, koko keskustelu oikealla katalogilla tulostettuna. Ei malli-, Meta- tai Valio-kutsuja, ei restarttia.
+- **Käyttöönotto:** botin seuraavassa päivityksessä, ei asetuksia.
+
 ## 17.11.2026 — Haiku-mittauksen V023: toimitusvarmuuskysymys tunnistetaan molemmissa sanajärjestyksissä (Claude Code, sessio C)
 
 - **Käyttäjän pyyntö:** Eelis hyväksyi F:n lisälöydöksen V023 korjaamisen. "Mikä näistä toimitetaan varmimmin?" ei tunnistunut vertailukysymykseksi, ja malli vastasi 2/4 ajossa "En pysty itse arvioimaan".

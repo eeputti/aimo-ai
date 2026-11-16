@@ -50,7 +50,7 @@ test('vertailukysymys näytettyyn listaan saa vastauksen vaihtoehtojen tiedoista
   const co2 = await say('Mikä vaihtoehdoista on ympäristöystävällisin, eli pienin hiilijalanjälki?');
   assert.equal(co2.status, 'choosing');
   assert.match(co2.text, /^Hiilijalanjälki: 1\) 1,1 kg CO2e\/kg, 2\) 0,9 kg CO2e\/kg, 3\) ei tietoa\. Pienin: 2\) maito 2\.\nToimitus ke 18\.11\./);
-  assert.match(co2.text, /\n1\) maito 1, 4 laatikkoa \(20 l\), 110,60 €\n2\) maito 2/);
+  assert.match(co2.text, /\n1\) maito 1, 4 laatikkoa à 5 l, yhteensä 20 l, 110,60 €\n2\) maito 2/);
   const price = await say('Mikä vaihtoehdoista tulee edullisimmaksi?');
   assert.match(price.text, /^Vaihtoehdoista edullisin on 1\) maito 1, 110,60 € \(alv 0 %\)\./);
   assert.match((await say('mikä toimitetaan varmimmin? toimitusvarmuus?')).text, /^Toimitusvarmuus: 1\) 98 %, 2\) ei tietoa, 3\) 91 %\. Paras: 1\) maito 1\./);

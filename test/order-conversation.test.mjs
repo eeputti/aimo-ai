@@ -76,7 +76,7 @@ test('päivä ensin ja puuttuvat määrät samassa viestissä, ruokavalintaa kys
   assert.equal(d.status, 'choosing');
   assert.match(d.text, /Toimitus ma 16\.11\., hinnat alv 0 %\. Huomioitu: pähkinätön, ei maapähkinää\./);
   assert.deepEqual(store.active('conv').diet, { known: true, claims: [], excludeAllergens: ['AN', 'AP'] });
-  assert.match(d.text, /\*Maito 20 l:\*\n1\) maito 1, 2 laatikkoa \(20 l\), 10,00 €\n2\) maito 2, 2 laatikkoa \(20 l\), 20,00 €\nVastaa 1 tai 2\. Sen jälkeen valitaan kerma\./);
+  assert.match(d.text, /\*Maito 20 l:\*\n1\) maito 1, 2 laatikkoa à 10 l, yhteensä 20 l, 10,00 €\n2\) maito 2, 2 laatikkoa à 10 l, yhteensä 20 l, 20,00 €\nVastaa 1 tai 2\. Sen jälkeen valitaan kerma\./);
   assert.doesNotMatch((await say('näytä')).text, /Onko allergioita/); // ei kysytä toista kertaa
   const past = await say('huomenna');
   assert.match(past.text, /Toimituspäivän pitää olla tuleva päivä/);
@@ -204,7 +204,7 @@ test('määrän muutos kasvattaa revisiota, mitätöi hyväksynnän ja vaatii uu
   const changed = await say('maitoa 30');
   assert.equal(changed.status, 'ready');
   assert.equal(changed.revision, first.revision + 1);
-  assert.match(changed.text, /\(30 l\)/);
+  assert.match(changed.text, /yhteensä 30 l/);
   assert.equal(calls.quote.length, 2);
   assert.equal(calls.quote[1].lines[0].selectedProductId, 'maito-1'); // valinta säilyy, tarjous tarkistetaan uudelleen
   await say('tilaa');
@@ -340,7 +340,7 @@ test('oikea ketju säännöillä ja simuloidulla rajapinnalla: viestit, korjaus,
   assert.equal(unclear.revision, summary.revision);
   const changed = await say('maitoa 30 litraa');
   assert.equal(changed.revision, summary.revision + 1);
-  assert.match(changed.text, /\(30 l\)/);
+  assert.match(changed.text, /yhteensä 30 l/);
   const done = await say('tilaa');
   assert.ok(['confirmed', 'pending_approval'].includes(done.status), done.text);
   await say('tilaa');
