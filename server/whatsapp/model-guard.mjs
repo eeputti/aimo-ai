@@ -23,6 +23,9 @@ const CLAIMS = [
   // Asiakkuus, oikeudet ja henkilöllisyys eivät muutu viestillä.
   re('<B>(?:oikeu|valtuu|asiakkuu|asiakastun|käyttäjätun|tunnu|rooli)\\p{L}*[^.!?\\n]*<B>(?:muutettu|muutin|päivitetty|päivitin|lisätty|myönnetty|myönsin|vaihdettu|vaihdoin|korotettu|nostettu|poistettu|ohitettu)<E>'),
   re('<B>olet\\s+(?:nyt\\s+)?(?:valion|aimon)\\s+(?:työntekijä|ylläpitäjä|edustaja)<E>'),
+  // Lupaus palata asiaan myöhemmin: apuri vastaa vain asiakkaan viestiin eikä voi lähettää mitään omin päin
+  // (Haiku-mittaus V025: "palaan siihen sitten", eikä vastausta tullut).
+  re('<B>palaa(?:n|mme)\\s+(?:siihen|asiaan|tähän|sinulle|teille|myöhemmin|pian|heti|kun|sitten)<E>|<B>(?:otan|otamme)\\s+(?:sinuun\\s+|teihin\\s+)?yhteyttä<E>|<B>(?:ilmoitan|ilmoitamme|kerron|kerromme|lähetän|lähetämme|vastaan)\\s+(?:sinulle\\s+|teille\\s+)?(?:myöhemmin|heti kun|sitten kun|kun saan)<E>'),
 ];
 // Sisäisen ohjeen tai rakenteen vuoto: koko vastaus korvataan, ei vain virkettä.
 const LEAK = re('<B>(?:route|lookupQuery|suggestionTerm|openCart|capabilities|cartLink|shoppingList|lastOrderReply|pendingSuggestion|addQuestion|pendingQuestion|productTerm|quantityValue|excludeAllergens)<E>|<B>Olet Valio Aimon<E>|<B>Route (?:order|chat|cart|reset)<E>|<B>järjestelmä(?:kehote|kehotteen|kehotteesi|ohje|ohjeet|ohjeeni|prompt)\\p{L}*|<B>system prompt<E>|<B>minun ohjeeni<E>|<B>ohjeeni (?:ovat|kuuluvat)<E>');

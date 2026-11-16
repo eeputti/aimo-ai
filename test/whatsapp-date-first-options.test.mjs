@@ -115,7 +115,7 @@ test('päivä ja puuttuvat määrät kysytään ensin samassa viestissä, ja vai
     '2) Munax M10 kananmuna, 5 rasiaa (50 munaa), 14,50 €',
     '3) Edullinen M10 kananmuna, 5 rasiaa (50 munaa), 12,40 €',
     '4) Näytä lisää vaihtoehtoja',
-    'Vastaa 1, 2 tai 3. Sen jälkeen valitaan kerma.',
+    'Vastaa 1, 2, 3 tai 4. Sen jälkeen valitaan kerma.', // lisävaihtoehtojen numero ohjeessa (Haiku-mittaus C1)
   ].join('\n'));
   assert.ok(calls.search.every((c) => c.deliveryDate === MONDAY && c.term === 'kananmunat')); // kermaa ei vielä haeta
   const asked = calls.interpret.length;
@@ -165,7 +165,7 @@ test('annettua päivää ei kysytä uudelleen ja päivän vaihto hakee vaihtoehd
   const first = await say('50 kananmunaa maanantaiksi');
   assert.equal(first.status, 'choosing');
   assert.doesNotMatch(first.text, /Mille päivälle/);
-  assert.match(first.text, /Vastaa 1, 2 tai 3\.$/);
+  assert.match(first.text, /Vastaa 1, 2, 3 tai 4\.$/);
   await say('4');
   assert.deepEqual(store.active('conv').seen.L1, ['E1', 'E2', 'E6', 'E3', 'E4', 'E5']);
   const moved = await say('eiku tiistaiksi');

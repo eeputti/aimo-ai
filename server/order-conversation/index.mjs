@@ -70,6 +70,14 @@ const RUSH_DATE_QUESTION = 'Mille päivälle toimitus? Jos on kiire, kirjoita es
 // ("käykö tavallinen?"), joten ne eivät lisää vaatimusta eivätkä toista kysymystä.
 const PREF_YES = /^(?:1[.)]?|laktoosit(?:tomana|tomina|onta|on)|joo|kyllä|juu|jep|selvä)(?:[,\s]+kiitos)?[.!\s]*$/iu;
 const PREF_NO = /^(?:2[.)]?|ei|ei väliä|ei tarvitse|ei tarvi|tavallinen|tavallista|tavalliset|ihan tavallista|ihan tavalliset|normaali|normaalia|ihan normi|kumpikin käy|kaikki käy|(?:(?:joo|juu|kyllä|no)[,\s]+)?(?:ok|okei|okay|hyvä|sopii|käy|kelpaa)(?:[,\s]+(?:hyvin|se|kiitos|tavallinen|vaan|vain))*)[.!\s]*$/iu;
+// "Vaihda tavalliseen" valittuun laktoosittomaan tuotteeseen (Haiku-mittaus C4, X079): valinta avataan ja näytetään tavalliset.
+const SWITCH_REGULAR = /vaihd\p{L}*\s+(?:se\s+|ne\s+)?tavalli\p{L}*|(?:en|ei)\s+(?:tarvitse|tarvi\p{L}*|halua|haluta|tarvita)\s+(?:olla\s+)?laktoositon\p{L}*|tavalli\p{L}*\s+(?:tilalle|tilalla)/iu;
+const lactoseFree = (o) => Boolean(o && ((o.labels || []).includes('FREE_FROM_LACTOSE') || /laktoositon|laktoositonta|lactose[- ]?free|(?<![\p{L}])hyla(?![\p{L}])/iu.test(o.name || '')));
+// Asiakkaan valtuutus "valitse ensimmäinen sopiva" (C5, S018): koodi valitsee näytetyn listan ykkösen ja kertoo sen.
+const FIRST_SUITABLE = /(?:ensimmäi\p{L}*|eka|ykkö\p{L}*)\s+(?:sopiv\p{L}*|vaihtoeh\p{L}*)|mikä\s+tahansa\s+(?:sopiva|käy|kelpaa)/iu;
+// Sanallinen kielto aikaisimman päivän ehdotukseen ("ei käy ti, tarvin maanantaiks", C2, X066).
+const DATE_REFUSAL = /^\s*(?:ei|en|eikä|no\s+ei)(?![\p{L}])/iu;
+const mentions = (text, term) => String(text).toLocaleLowerCase('fi').includes(term.toLocaleLowerCase('fi').slice(0, Math.max(4, term.length - 2)));
 const DATE_YES = /^(?:1[.)]?|kyllä|joo|juu|jep|ok|okei|sopii|vaihda|vaihdetaan|käy)(?:[,\s]+(?:kiitos|vaan|vain|sopii|käy|vaihda|vaihdetaan|se))*[.!\s]*$/iu;
 const DATE_NO = /^(?:2[.)]?|ei|ei kiitos|pidetään|pidä|ei käy)(?:[,\s]+(?:kiitos|pidetään|pidä|se|sama|päivä))*[.!\s]*$/iu;
 const addDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -300,6 +308,18 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       } catch { /* ei rajaa ilman työkalua */ }
     }
     const sorted = cutoffs.sort((a, b) => parseApiTime(a) - parseApiTime(b));
+    // Pyydetylle päivälle ei ehdi, ja aikaisin päivä on tiedossa: kerrotaan se ja sen tilausaikaraja (C2, X066).
+    const e = !sorted.length && draft.earliest?.from === draft.deliveryDate ? draft.earliest : null;
+    if (e) {
+      let later = [];
+      try {
+        const line = draft.lines.find((l) => l.ref === e.ref) || draft.lines[0];
+        const s = await tools.suggest({ customer, draft: { ...draft, deliveryDate: e.date, lines: [line] } });
+        later = (s.lines[0]?.options || []).map((o) => o.cutoff).filter((c) => parseApiTime(c)).sort((a, b) => parseApiTime(a) - parseApiTime(b));
+      } catch { /* päivä kerrotaan ilman rajaa */ }
+      const open = later.find((c) => !cutoffPassed(c));
+      return `${day} ei enää ehdi tilata. Aikaisin toimitettava päivä on ${dateLabel(e.date)}${open ? `, ja sille ehtii tilata ${helsinkiLabel(open)} asti` : ''}.`;
+    }
     if (!sorted.length) return /Tilattava viimeistään/.test(shownText) ? '' : `${day} en saanut tilausaikarajaa tilausjärjestelmästä. Yhteenveto kertoo sen, kun tuotteet on valittu.`;
     return cutoffNote(day, sorted);
   }
@@ -378,6 +398,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
             if (earliest) {
               const from = draft.deliveryDate;
               draft.pending = { kind: 'date_offer', date: earliest, from, refs: [l.ref] };
+              draft.earliest = { from, date: earliest, ref: l.ref }; // jos ostaja pitää päivän, aikaisin päivä kerrotaan silti
               const when = from === today ? 'Tänään' : from === addDays(today, 1) ? `Huomiseksi (${dateLabel(from)})` : `Päivälle ${dateLabel(from)}`;
               return { status: 'collecting', text: [...problems, `${when} ei enää ehdi: ${l.productTerm}. Aikaisin toimitettava päivä on ${dateLabel(earliest)}`,
                 `Vaihdetaanko koko tilauksen toimitus päivälle ${dateLabel(earliest)}?`, `1) kyllä, ${dateLabel(earliest)}`, `2) ei, pidetään ${dateLabel(from)}`].join('\n') };
@@ -386,7 +407,16 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
           problems.push(...s.issues.map((i) => i.message));
         }
       }
-      if (!x) return { status: 'collecting', text: `${problems.join('\n')}\nKokeile toista päivää tai tarkenna tuotetta. Tilausta ei ole tehty.` };
+      if (!x) {
+        const e = draft.earliest?.from === draft.deliveryDate ? draft.earliest : null;
+        const hint = e ? `Aikaisin toimitettava päivä on ${dateLabel(e.date)}. Kirjoita "${dateLabel(e.date)}", jos se käy.` : 'Kokeile toista päivää tai tarkenna tuotetta.';
+        return { status: 'collecting', text: `${problems.join('\n')}\n${hint} Tilausta ei ole tehty.` };
+      }
+      if (line.avoidClaims?.includes('FREE_FROM_LACTOSE')) {
+        const regular = x.options.filter((o) => !lactoseFree(o));
+        if (regular.length) x = { ...x, options: regular };
+        else if (!again) problems.push(`Tavallista (ei laktoositonta) vaihtoehtoa ei löytynyt: ${line.productTerm}. Näytän kaikki vaihtoehdot.`);
+      }
       draft.offered[x.ref] = x.options;
       if (x.exact === false) line.noExact = true; else delete line.noExact;
       // Ruokavaliotarkennus vain, kun vaihtoehdot ovat pyydettyä tuotetta: kamelinmaidon puuttuessa ei kysytä maidon laktoosia (S036).
@@ -396,9 +426,18 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         draft.pending = { kind: 'preference', refs: [x.ref], claim: preference };
         return { status: 'collecting', text: `Luonnoksessa nyt:\n${list}\n\n${cap(line.productTerm)}: haluatko laktoositonta vai käykö tavallinen?\n1) laktoositon\n2) tavallinen käy` };
       }
+      // Ostajan valtuutus "valitse ensimmäinen sopiva": ykkönen valitaan ja kerrotaan, ellei tarkkaa osumaa tai varoitusta ole.
+      if (line.pickFirst && x.exact !== false && x.options[0] && !x.options[0].warning) {
+        const o = x.options[0];
+        line.selectedProductId = o.productId; line.selectedName = o.name; line.selectedWarning = null; delete line.pickFirst;
+        draft.revision += 1; draft.quote = null;
+        const next = await advance(draft, customer, depth);
+        return { ...next, text: [...problems, `Valitsin ensimmäisen sopivan vaihtoehdon: ${cap(lineLabel(line))}: ${optionLabel(o, line)}.`, next.text].join('\n\n') };
+      }
       const moreNo = x.more ? x.options.length + 1 : null;
       draft.pending = { kind: 'choose', refs: [x.ref], options: x.options.length, more: moreNo, ...(x.exact === false ? { exact: false } : {}) };
-      const numbers = x.options.map((_, i) => String(i + 1));
+      // Lisävaihtoehtojen numero kuuluu ohjeeseen, kun se näkyy listassa (C1: "Vastaa 1, 2 tai 3" ja rivi 4).
+      const numbers = [...x.options.map((_, i) => String(i + 1)), ...(moreNo ? [String(moreNo)] : [])];
       const how = numbers.length === 1 ? 'Vastaa 1.' : `Vastaa ${numbers.slice(0, -1).join(', ')} tai ${numbers.at(-1)}.`;
       const later = open.filter((l) => l.ref !== x.ref).map((l) => l.productTerm);
       const diet = dietLabel(draft.diet);
@@ -544,12 +583,34 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         // jutustelusta rivejä "mirin pit tila" ja "half" (katselmus #21). Määrä viestissä tarkoittaa tilausmuutosta.
         const questionOnly = interpreted !== dateAnswer && interpreted !== choice && (DEADLINE_QUESTION.test(t) || compareKind(t) || RELIST.test(t)) && !/\d/.test(t);
         const turn = questionOnly ? { ...interpreted, ops: (interpreted.ops || []).filter((o) => o.op !== 'add') } : interpreted;
+        // Sanallinen vastaus päivänsiirtoon: sama päivä tai kielto pitää pyydetyn päivän, eikä siirtoa kysytä uudelleen (C2).
+        if (offer && !dateAnswer && (turn.deliveryDate === offer.from || (!turn.deliveryDate && DATE_REFUSAL.test(t)))) {
+          draft.keptDates = [...new Set([...(draft.keptDates || []), offer.from])];
+        }
+        const pendingRefs = draft.pending?.refs || [];
         const moreAsked = wantsMore || Boolean(choosing && (turn.ops || []).some((o) => o.op === 'more' && (!o.ref || o.ref === choosing.refs[0])));
         const selectedBefore = new Map(draft.lines.map((l) => [l.ref, l.selectedProductId]));
         const linesBefore = draft.lines.map((l) => ({ ref: l.ref, term: l.productTerm, noExact: !!l.noExact }));
         const notes = apply(draft, turn, customer, today);
         const removed = linesBefore.filter((b) => !draft.lines.some((l) => l.ref === b.ref));
         if (removed.length && draft.lines.length) notes.unshift(removedNote(removed));
+        // "Vaihda tavalliseen": valittu laktoositon tuote vaihdetaan avaamalla valinta, ja vaihtoehdoista näytetään tavalliset (C4).
+        if (SWITCH_REGULAR.test(t) && !draft.diet.claims.includes('FREE_FROM_LACTOSE')) {
+          const chosen = draft.lines.filter((l) => l.selectedProductId && !l.claims.includes('FREE_FROM_LACTOSE')
+            && lactoseFree((draft.offered[l.ref] || []).find((o) => o.productId === l.selectedProductId) || { name: l.selectedName }));
+          const named = chosen.filter((l) => mentions(t, l.productTerm));
+          for (const l of named.length ? named : chosen) {
+            l.avoidClaims = ['FREE_FROM_LACTOSE']; l.answeredClaims = [...new Set([...(l.answeredClaims || []), 'FREE_FROM_LACTOSE'])];
+            l.selectedProductId = null; l.selectedName = null; l.selectedWarning = null; delete draft.offered[l.ref]; delete draft.seen?.[l.ref];
+          }
+        }
+        // "Valitse ensimmäinen sopiva": nimetylle riville, muuten kysytylle riville, muuten kaikille valitsemattomille (C5).
+        if (FIRST_SUITABLE.test(t)) {
+          const open = draft.lines.filter((l) => !l.selectedProductId);
+          const named = open.filter((l) => mentions(t, l.productTerm));
+          const asked = open.filter((l) => pendingRefs.includes(l.ref));
+          for (const l of named.length ? named : asked.length ? asked : open) l.pickFirst = true;
+        }
         // Kaikki rivit poistettu: luonnos suljetaan, myös sen päivä (pilotti X016).
         if (linesBefore.length && !draft.lines.length) draft.state = 'cancelled';
         if (repeatNote) notes.unshift(repeatNote);

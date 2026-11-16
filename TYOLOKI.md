@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — Haiku-mittauksen keskusteluviat C1–C7 korjattu (Claude Code, sessio C)
+
+- **Käyttäjän pyyntö:** Eelis hyväksyi sessio F:n Haiku-mittauksen (`docs/parallel/haiku-quality-2026-11-16.md`) C-löydösten korjaamisen tässä sessiossa. Raportti `docs/parallel/haiku-findings-c.md`.
+- **Muutokset:** vastausohje sisältää lisävaihtoehtojen numeron, "Vastaa 1, 2, 3 tai 4." (C1). Sanallinen kielto päivänsiirtoon pitää päivän eikä toista kysymystä, ja tilausaikakysymykseen kerrotaan aikaisin päivä ja sen raja (C2). Epämääräinen avaus kysyy päivän ja tuotteet ilman mallia (C3). "Vaihda tavalliseen" avaa laktoosittoman valinnan ja näyttää tavalliset (C4). "Valitse ensimmäinen sopiva" valitsee ykkösen ja kertoo sen (C5). Tervehdys vain keskustelun alussa tai pelkkään tervehdykseen (C6). Mallin lupaus palata asiaan myöhemmin pudotetaan (C7).
+- **Koordinointi:** sessio A muutti samoja tiedostoja (f7b779b) eri riveillä; sovittiin, että A pushaa ensin ja C rebasee.
+- **Tarkistukset:** uudet testit 7/7 (C1–C6 kaatuivat ennen korjausta), koko `npm test` 384/384 A:n muutosten päälle rebasettuna. Mittausta ei ajettu uudelleen oikealla mallilla.
+- **Avoinna:** käyttöön botin seuraavassa sovitussa restartissa (sessio E). Suositus: F:n 30 persoonan otos (noin 0,10 USD) ennen ja jälkeen.
+
 ## 17.11.2026 — Haiku-mittauksen A1–A3 ja V019: slangi mallitulkissa, suorat tuotevastaukset, ei raakoja allergeenikoodeja (Claude Code, sessio A)
 
 - **Pyyntö:** session F:n Haiku-mittaus (`docs/parallel/haiku-quality-2026-11-16.md`) osoitti A:n alueelle koodivikoja, joita mallin vaihto ei korjaa. Eelis hyväksyi niiden korjaamisen sessiossa A, myös `order-conversation/`- ja `whatsapp/`-tiedostoissa (C:lle ja taululle ilmoitettu, varaus 8984c5a0). Raportti `docs/parallel/haiku-fixes-a.md`.

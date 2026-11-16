@@ -31,6 +31,18 @@ export function greetingFor(text, at) {
   const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Helsinki', hour: 'numeric', hourCycle: 'h23' }).format(new Date(at)));
   return hour >= 5 && hour < 10 ? 'Huomenta!' : hour >= 10 && hour < 17 ? 'Päivää!' : hour >= 17 && hour < 22 ? 'Iltaa!' : 'Moi!';
 }
+// Epämääräinen avaus ilman tuotteita ("tarvis vähän kaikkee keittiöön", "no niin, taas loppu tavarat"): päivä ja tuotteet
+// kysytään koodissa ilman mallia (Haiku-mittaus C3, S050, S070, S090). Vain kun jokainen sana on tarve- tai täytesana.
+const VAGUE_NEED = /^(?:tarvi\p{L}*|tarttis\p{L}*|tilau\p{L}*|tilata|tilais\p{L}*|tilattais\p{L}*|auttaa|auta|apua|loppu\p{L}*|tavara\p{L}*|kaikke\p{L}*|kaikkea|kaikenlais\p{L}*|ostoks\p{L}*|ostoslist\p{L}*|täydenn\p{L}*)$/iu;
+const VAGUE_FILLER = new Set(['moi', 'hei', 'heippa', 'moro', 'morjes', 'morjens', 'terve', 'huomenta', 'päivää', 'iltaa', 'hyvää', 'no', 'niin', 'nii', 'joo', 'juu',
+  'ok', 'okei', 'taas', 'vähän', 'vähä', 'vähäsen', 'pikkasen', 'jotain', 'jotakin', 'keittiöön', 'keittiölle', 'meille', 'mulle', 'minulle', 'me', 'mä', 'mää', 'minä',
+  'meillä', 'on', 'olis', 'ois', 'olisi', 'pitäis', 'pitäisi', 'pitää', 'voisitteko', 'voisitko', 'voitko', 'voitteko', 'voisko', 'vois', 'kanssa', 'tehdä', 'teen',
+  'tekis', 'tekisin', 'ravintolaan', 'ravintolalle', 'tänne', 'lisää', 'kamaa', 'juttuja', 'tuotteita', 'ruokaa', 'kiitos', 'jos', 'sais', 'saisi', 'saisin',
+  'saada', 'sitten', 'sit', 'eli', 'nyt', 'uusi', 'uuden', 'uutta', 'yks', 'yksi', 'pientä', 'kyllä', 'vielä']);
+export function isVagueOpening(text) {
+  const words = String(text || '').toLocaleLowerCase('fi-FI').match(/\p{L}+/gu) || [];
+  return !/\d/u.test(text) && words.length > 0 && words.length <= 12 && words.some((w) => VAGUE_NEED.test(w)) && words.every((w) => VAGUE_NEED.test(w) || VAGUE_FILLER.has(w));
+}
 /** Korvaa viestin alun tervehdyksen annetulla, tai poistaa sen (greeting=null). */
 export function withGreeting(greeting, text) {
   const rest = String(text || '').replace(LEADING_GREETING, '').trim();
@@ -133,10 +145,12 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
     async respond({ binding, messageId, text, runOrder, getShoppingList = () => null, canOpenCart = false, inCart = false, allowed = () => true, receivedAt }) {
       const cached = db.prepare('SELECT json FROM wa_dialogue_results WHERE message_id=? AND binding=?').get(messageId, binding);
       if (cached) return JSON.parse(cached.json);
-      const row = db.prepare('SELECT json FROM wa_dialogue WHERE binding=?').get(binding);
+      const row = db.prepare('SELECT json, updated FROM wa_dialogue WHERE binding=?').get(binding);
       let state = row ? JSON.parse(row.json) : {};
-      // Tervehdys vain vastauksena asiakkaan tervehdykseen (tyypillisesti keskustelun alussa), ei joka viestiin eikä selainkorissa.
-      const greeting = !inCart && LEADING_GREETING.test(text.trim()) ? greetingFor(text, timeOf(receivedAt)) : null;
+      // Tervehdys vain vastauksena asiakkaan tervehdykseen keskustelun alussa (ei aiempaa keskustelua tai yli kahden tunnin tauko)
+      // tai pelkkään tervehdykseen. Kesken keskustelun "Hei, ..." ei saa irrallista "Iltaa!" (Haiku-mittaus C6), eikä selainkorissa.
+      const conversationStart = !row || !state.history?.length || now() - row.updated > 2 * 3600_000;
+      const greeting = !inCart && LEADING_GREETING.test(text.trim()) && (conversationStart || GREETING.test(text.trim())) ? greetingFor(text, timeOf(receivedAt)) : null;
       let orderText = text; let plan; let result; let messages; let reset = false;
       const freshStart = async (reply) => {
         // Cancel only this customer's current draft. A new namespace also excludes old completed orders
@@ -161,6 +175,13 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
         state.pendingSuggestion = null;
         result = { status: 'collecting', ...state.lastOrder, text: `Selvä, jatketaan nykyisellä listalla.${state.lastOrder?.status === 'ready' ? ' Vahvista valmis tilaus vastaamalla *TILAA*.' : ' Kerro, mitä keittiöön tarvitaan seuraavaksi.'}` };
         messages = [result.text];
+      }
+      // Epämääräinen avaus tyhjään listaan: tilausmoottori kertoo luonnoksen tilan (myös jo annetun päivän) ja kysyy päivän ja tuotteet.
+      if (!result && !positive && isVagueOpening(text) && !getShoppingList({ epoch: state.epoch || '' })?.lines?.length) {
+        const shown = await runOrder('näytä', { epoch: state.epoch || '', context: { history: state.history || [], lastReply: state.lastOrder?.text || '' } });
+        const reply = String(shown.text || '').replace(/^Luonnos on tyhjä\.\s*/u, '');
+        result = { ...shown, text: reply }; messages = [reply];
+        state.lastOrder = result;
       }
       if (!result && !positive && !CONTROL.test(text) && ask) {
         try {
