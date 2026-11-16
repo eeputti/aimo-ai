@@ -102,7 +102,7 @@ test('tänään ei enää ehdi: kerrotaan aikaisin toimituspäivä ja tilausaika
   assert.equal(store.active('c').deliveryDate, '2026-11-15'); // päivää ei vaihdeta ilman lupaa
   const options = await say('1');
   assert.equal(store.active('c').deliveryDate, '2026-11-16');
-  assert.match(options.text, /\*Kananmunat 50 kpl:\*\n1\) kananmunat 1, 5 rasiaa \(50 munaa\), 10,00 €/);
+  assert.match(options.text, /\*Kananmunat 50 kpl:\*\n1\) kananmunat 1, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 10,00 €/);
   assert.match(options.text, /Huomiselle ehtii tilata su 15\.11\. klo 12\.00 asti\./);
   assert.match(options.text, /Toivoit toimitusta "ennen klo 7": kellonaikaa en näe tilausjärjestelmästä, joten en voi luvata sitä\. Toimituspäivä on ma 16\.11\.(?!\.)/);
   const summary = await say('1');

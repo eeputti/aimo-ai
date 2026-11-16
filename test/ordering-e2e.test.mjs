@@ -89,7 +89,7 @@ test('WhatsApp-viestistä demotilaukseen: tarkistuslista, valinta, muutos, vahvi
 
   // Määrän muutos tuottaa uuden yhteenvedon, eikä pelkkä "joo" ole tilauslupa.
   const changed = await say('m5', 'maitoa 30 litraa');
-  assert.match(changed, /\(30 l\)/);
+  assert.match(changed, /yhteensä 30 l/);
   assert.match(changed, /laktoositon/i);
   assert.match(await say('m6', 'joo'), /Vahvista tilaus vastaamalla \*TILAA\*/);
   assert.equal(orders.list(buyerId).length, 0);

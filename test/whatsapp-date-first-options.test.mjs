@@ -111,9 +111,9 @@ test('päivä ja puuttuvat määrät kysytään ensin samassa viestissä, ja vai
   assert.equal(options.text, [
     'Toimitus ma 16.11., hinnat alv 0 %.',
     '*Kananmunat 50 kpl:*',
-    '1) Kieku M10 kananmuna, 5 rasiaa (50 munaa), 13,90 €',
-    '2) Munax M10 kananmuna, 5 rasiaa (50 munaa), 14,50 €',
-    '3) Edullinen M10 kananmuna, 5 rasiaa (50 munaa), 12,40 €',
+    '1) Kieku M10 kananmuna, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 13,90 €',
+    '2) Munax M10 kananmuna, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 14,50 €',
+    '3) Edullinen M10 kananmuna, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 12,40 €',
     '4) Näytä lisää vaihtoehtoja',
     'Vastaa 1, 2, 3 tai 4. Sen jälkeen valitaan kerma.', // lisävaihtoehtojen numero ohjeessa (Haiku-mittaus C1)
   ].join('\n'));
@@ -122,12 +122,12 @@ test('päivä ja puuttuvat määrät kysytään ensin samassa viestissä, ja vai
 
   const more = await say('4');
   assert.equal(calls.interpret.length, asked); // numero ratkaistaan koodissa
-  assert.match(more.text, /1\) Pihapiiri M10 kananmuna, 5 rasiaa \(50 munaa\), 15,20 €\n2\) Kartano M10 kananmuna, 5 rasiaa \(50 munaa\), 15,90 €\n3\) Hyvä M10 kananmuna, 5 rasiaa \(50 munaa\), 16,40 €\n4\) Näytä lisää vaihtoehtoja/);
+  assert.match(more.text, /1\) Pihapiiri M10 kananmuna, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 15,20 €\n2\) Kartano M10 kananmuna, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 15,90 €\n3\) Hyvä M10 kananmuna, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 16,40 €\n4\) Näytä lisää vaihtoehtoja/);
   assert.doesNotMatch(more.text, /Kieku|Munax|Edullinen/);
   assert.equal(more.revision, options.revision); // selaaminen ei muuta luonnosta
 
   const last = await say('näytä lisää');
-  assert.match(last.text, /1\) Luomu M10 kananmuna, 5 rasiaa \(50 munaa\), 19,90 €\n2\) Vapaa M10 kananmuna, 5 rasiaa \(50 munaa\), 21,00 €\nVastaa 1 tai 2\./);
+  assert.match(last.text, /1\) Luomu M10 kananmuna, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 19,90 €\n2\) Vapaa M10 kananmuna, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 21,00 €\nVastaa 1 tai 2\./);
   assert.doesNotMatch(last.text, /Näytä lisää/);
 
   const searches = calls.search.length;
@@ -148,7 +148,7 @@ test('päivä ja puuttuvat määrät kysytään ensin samassa viestissä, ja vai
 
   const creamList = await say('1');
   assert.equal(store.active('conv').lines[0].selectedProductId, 'E7'); // numero viittasi viimeksi näytettyyn listaan
-  assert.match(creamList.text, /\*Kerma 5 l:\*\n1\) Valio kuohukerma 1 l, 5 laatikkoa \(5 l\), 11,00 €\n2\) Arla kuohukerma 1 l, 5 laatikkoa \(5 l\), 9,50 €\nVastaa 1 tai 2\.$/);
+  assert.match(creamList.text, /\*Kerma 5 l:\*\n1\) Valio kuohukerma 1 l, 5 laatikkoa, yhteensä 5 l, 11,00 €\n2\) Arla kuohukerma 1 l, 5 laatikkoa, yhteensä 5 l, 9,50 €\nVastaa 1 tai 2\.$/);
   assert.doesNotMatch(creamList.text, /Kananmunat 50 kpl:/);
 
   const summary = await say('halvin');

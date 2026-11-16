@@ -1,5 +1,5 @@
 // "Katso, mitä agentti näki": draws one order's published trace. All text goes through textContent.
-import { nf, money, time, day, quantity, CLAIM, ALLERGEN, STATUS, FLAG, EXCLUDED, el, cap, mountTraceCode } from './agent-code.js';
+import { nf, money, time, day, quantity, CLAIM, ALLERGEN, STATUS, FLAG, EXCLUDED, el, cap, lit, short, codeLines, renderCode, createPlayer } from './agent-code.js';
 const $ = (id) => document.getElementById(id);
 const LINK = /^(AGW-\d{8}-\d{4,12})\.([A-Za-z0-9_-]{43})$/;
 const match = LINK.exec(location.hash.slice(1));
@@ -50,13 +50,15 @@ function stats(trace) {
 
 function chat(trace) {
   const nodes = [];
-  for (const turn of trace.turns) {
+  trace.turns.forEach((turn, n) => {
     if (turn.source === 'cart') {
       const pill = el('div', 'cart-event');
+      pill.dataset.turn = String(n);
       pill.append(icon('cart'), el('span', '', turn.action), el('time', '', time(turn.at)));
       nodes.push(pill);
     } else if (turn.customer) {
       const row = el('div', 'msg customer');
+      row.dataset.turn = String(n);
       const bubble = el('div', 'bubble');
       bubble.append(whatsappText(turn.customer), el('time', '', time(turn.at)));
       row.append(bubble); nodes.push(row);
@@ -71,7 +73,7 @@ function chat(trace) {
       if (!turn.revision && !turn.status) meta.append(chip(turn.source === 'cart' ? 'Ostoskorisivu' : 'Keskustelu, kori ennallaan'));
       stack.append(meta); row.append(stack); nodes.push(row);
     }
-  }
+  });
   $('chat').replaceChildren(...nodes);
 }
 
@@ -203,14 +205,79 @@ function order(trace) {
   }
 }
 
+// The agent's run beside the chat. The lines type out when the pane comes into view, and the pane
+// follows the cursor until the reader scrolls it or picks a message.
+let followCode = true;
 function codeView(trace) {
-  mountTraceCode({ figure: $('code'), file: $('code-file'), list: $('code-lines'), state: $('code-state'), replay: $('code-replay') }, trace);
+  const list = $('code-lines');
+  const items = renderCode(list, codeLines(trace));
+  $('code-file').textContent = `tilausapuri/${trace.orderId}.js`;
+  $('code').hidden = false;
+  ['wheel', 'touchstart'].forEach((type) => list.addEventListener(type, () => { followCode = false; }, { passive: true }));
+  const onLine = () => {
+    const li = followCode && list.querySelector('.cursor')?.closest('li');
+    if (!li) return;
+    const bottom = li.offsetTop + li.offsetHeight + 24;
+    if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+  };
+  const runner = createPlayer(list, $('code-state'), { onLine });
+  const play = () => { followCode = !reduceMotion(); list.scrollTop = 0; runner.play(items); };
+  $('code-replay').onclick = play;
+  if (!('IntersectionObserver' in window)) { play(); return items; }
+  items.forEach((li) => li.classList.add('pending'));
+  const seen = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) { seen.disconnect(); play(); } }, { threshold: 0.15 });
+  seen.observe($('code'));
+  return items;
+}
+
+const reduceMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Scrolls a pane so the target is in its middle and briefly marks it. Moves the page only when the pane is off screen.
+function reveal(scroller, target, mark) {
+  const behavior = reduceMotion() ? 'auto' : 'smooth';
+  const box = scroller.getBoundingClientRect();
+  if (box.bottom < 80 || box.top > innerHeight - 80) scroller.scrollIntoView({ block: 'nearest', behavior });
+  scroller.scrollTo({ top: Math.max(0, target.offsetTop - (scroller.clientHeight - target.offsetHeight) / 2), behavior });
+  mark.classList.remove('flash'); void mark.offsetWidth; mark.classList.add('flash');
+}
+
+// Pairs each chat message with its line in the agent's run: customer messages by their quoted text
+// (the run lists at most eight of them), cart-page actions in order.
+function link(trace, items) {
+  const quoted = items.filter((li) => li.querySelector('.res-text')?.textContent.startsWith('"'));
+  const cartCalls = items.filter((li) => li.querySelector('.lc')?.textContent.startsWith('await ostoskori.'));
+  let next = 0, cart = 0;
+  trace.turns.forEach((turn, n) => {
+    const row = $('chat').querySelector(`[data-turn="${n}"]`);
+    if (!row) return;
+    let line = null;
+    if (turn.source === 'cart') line = cartCalls[cart++] || null;
+    else if (turn.source === 'whatsapp') {
+      const key = lit(short(turn.customer));
+      const at = quoted.findIndex((li, i) => i >= next && li.querySelector('.res-text').textContent === key);
+      if (at >= 0) { line = quoted[at]; next = at + 1; }
+    }
+    if (!line) return;
+    const pair = [row, line];
+    const on = () => pair.forEach((node) => node.classList.add('hl'));
+    const off = () => pair.forEach((node) => node.classList.remove('hl'));
+    row.classList.add('linked'); line.classList.add('linked');
+    row.tabIndex = 0;
+    row.title = 'Näytä agentin rivi'; line.title = 'Näytä viesti keskustelussa';
+    const toLine = () => { followCode = false; reveal($('code-lines'), line, line); };
+    const toRow = () => reveal($('chat'), row, row.querySelector('.bubble') || row);
+    for (const node of pair) { node.addEventListener('mouseenter', on); node.addEventListener('mouseleave', off); }
+    row.addEventListener('focus', on); row.addEventListener('blur', off);
+    row.addEventListener('click', toLine);
+    row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toLine(); } });
+    line.addEventListener('click', toRow);
+  });
 }
 
 function render(trace) {
   names = new Map([...trace.options.flatMap((g) => g.shown.map((o) => [o.productId, o.name])), ...trace.order.lines.map((l) => [l.productId, l.name])]);
   $('order-label').textContent = `${example ? 'ESIMERKKITILAUS' : 'TILAUS'} ${trace.orderId}`;
-  codeView(trace); stats(trace); chat(trace); understood(trace); options(trace); ledger(trace); order(trace);
+  $('split').hidden = false;
+  chat(trace); link(trace, codeView(trace)); stats(trace); understood(trace); options(trace); ledger(trace); order(trace);
   $('raw').textContent = JSON.stringify(trace, null, 2);
   $('trace').hidden = false;
   $('status').hidden = true; $('retry').hidden = true;

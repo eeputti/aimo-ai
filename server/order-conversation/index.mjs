@@ -5,6 +5,7 @@
 import crypto from 'node:crypto';
 import { CLAIMS, DEADLINE_QUESTION } from './interpret.mjs';
 import { helsinkiLabel, parseApiTime } from '../gateway/clock.mjs';
+import { packWord, readableName, summaryRow, optionRow } from './wording.mjs';
 
 const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
@@ -82,9 +83,7 @@ const mentions = (text, term) => String(text).toLocaleLowerCase('fi').includes(t
 const DATE_YES = /^(?:1[.)]?|kyllä|joo|juu|jep|ok|okei|sopii|vaihda|vaihdetaan|käy)(?:[,\s]+(?:kiitos|vaan|vain|sopii|käy|vaihda|vaihdetaan|se))*[.!\s]*$/iu;
 const DATE_NO = /^(?:2[.)]?|ei|ei kiitos|pidetään|pidä|ei käy)(?:[,\s]+(?:kiitos|pidetään|pidä|se|sama|päivä))*[.!\s]*$/iu;
 const addDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
-// Myyntierän sana lukumäärän kanssa: "5 rasiaa", "1 rasia". Tuntematon tunnus näytetään sellaisenaan.
-const PACK = { ras: ['rasia', 'rasiaa'], ltk: ['laatikko', 'laatikkoa'], pkt: ['paketti', 'pakettia'], pss: ['pussi', 'pussia'], prk: ['purkki', 'purkkia'],
-  pl: ['pullo', 'pulloa'], krt: ['kartonki', 'kartonkia'], kan: ['kanisteri', 'kanisteria'], sk: ['säkki', 'säkkiä'], kää: ['kääre', 'käärettä'] };
+// Myyntierän sana ("5 rasiaa") ja tuoterivien selkokielinen esitys ovat wording.mjs:ssä.
 
 const num = (n) => String(+Number(n).toFixed(3)).replace('.', ',');
 const eur = (n) => `${Number(n).toFixed(2).replace('.', ',')} €`;
@@ -191,14 +190,11 @@ function changeHint(draft) {
 }
 
 const joinFi = (names) => (names.length < 2 ? names[0] || '' : `${names.slice(0, -1).join(', ')} ja ${names.at(-1)}`);
-const packWord = (n, label) => { const w = PACK[label]; return w ? (Number(n) === 1 ? w[0] : w[1]) : label; };
-// Vaihtoehto ostajan omassa yksikössä: myyntierä ja sen kattama määrä, esim. "5 rasiaa (50 munaa)".
+// Vaihtoehto ostajan ymmärtämänä: luettava nimi, myyntierät, yhden koko ja määrä yhteensä,
+// esim. "Kananmunat M10, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 12,40 €" (wording.mjs). Otsikkorivi kertoo jo pyydetyn määrän.
+const itemNounOf = (covers, line) => (covers?.unit === 'PCS' && line?.quantity?.basis === 'items' ? (/kananmun/iu.test(line.productTerm || '') ? 'munaa' : 'kpl') : undefined);
 function optionLabel(o, line) {
-  const c = o.covers;
-  const items = c?.unit === 'PCS' && line.quantity?.basis === 'items';
-  const covers = !c ? '' : items ? ` (${num(c.value)} ${/kananmun/iu.test(line.productTerm) ? 'munaa' : 'kpl'})`
-    : c.unit === 'PCS' && c.value === o.salesUnits ? '' : ` (${qty(c)})`;
-  return `${o.name}, ${num(o.salesUnits)} ${packWord(o.salesUnits, o.salesUnitLabel)}${covers}, ${eur(o.lineNet)}${o.warning ? ` (${o.warning})` : ''}`;
+  return `${optionRow(o, { itemNoun: itemNounOf(o.covers, line) })}${o.warning ? ` (${o.warning})` : ''}`;
 }
 
 // Vastaus vertailukysymykseen näytetyistä vaihtoehdoista: vain työkalujen palauttamat arvot, puuttuva tieto sanotaan.
@@ -209,7 +205,7 @@ function compareAnswer(kind, options = []) {
     const priced = shown.filter(({ o }) => Number.isFinite(o.lineNet));
     if (!priced.length) return '';
     const best = priced.reduce((a, b) => (b.o.lineNet < a.o.lineNet ? b : a));
-    return `Vaihtoehdoista edullisin on ${best.n}) ${best.o.name}, ${eur(best.o.lineNet)} (alv 0 %).`;
+    return `Vaihtoehdoista edullisin on ${best.n}) ${readableName(best.o.name)}, ${eur(best.o.lineNet)} (alv 0 %).`;
   }
   const [key, what, fmt, better] = kind === 'co2'
     ? ['co2PerKg', 'Hiilijalanjälki', (v) => `${num(v)} kg CO2e/kg`, Math.min]
@@ -221,7 +217,7 @@ function compareAnswer(kind, options = []) {
   const values = shown.map(({ o, n }) => `${n}) ${Number.isFinite(o[key]) ? fmt(o[key]) : 'ei tietoa'}`).join(', ');
   // "Kaikille sama" vain, kun tieto on kaikilla: muuten tuntematon vaihtoehto ei ole sama (Haiku-mittaus 16.11. V019).
   const verdict = known.length > 1 && top.length === known.length ? (known.length === shown.length ? 'Arvo on kaikille sama.' : 'Arvo on sama niillä, joilta tieto löytyy.')
-    : `${kind === 'co2' ? 'Pienin' : 'Paras'}: ${joinFi(top.map(({ o, n }) => `${n}) ${o.name}`))}.`;
+    : `${kind === 'co2' ? 'Pienin' : 'Paras'}: ${joinFi(top.map(({ o, n }) => `${n}) ${readableName(o.name)}`))}.`;
   return `${what}: ${values}. ${verdict}`;
 }
 
@@ -245,7 +241,9 @@ function reopenTarget(draft, text) {
 function summary(draft, q, customer) {
   const site = customer.deliverySites?.find((s) => s.id === draft.deliverySiteId);
   const warn = (ref) => { const w = draft.lines.find((l) => l.ref === ref)?.selectedWarning; return w ? `\n   Huom: ${w}` : ''; };
-  const rows = q.lines.map((l, i) => `${i + 1}. ${l.name}: ${num(l.salesUnits)} ${l.salesUnitLabel}${l.covers && !(l.covers.unit === 'PCS' && l.covers.value === l.salesUnits) ? ` (${qty(l.covers)})` : ''}, ${eur(l.lineNet)}${warn(l.ref)}`);
+  // "PP peruna 1 kg annabelle: 2 kpl, yhteensä 2 kg (pyysit 1,5 kg), 1,52 € (0,76 €/kg)" (wording.mjs, Eelis 17.11.).
+  const rows = q.lines.map((l, i) => { const d = draft.lines.find((x) => x.ref === l.ref);
+    return `${i + 1}. ${summaryRow(l, { requested: d?.quantity, itemNoun: itemNounOf(l.covers, d) })}${warn(l.ref)}`; });
   const diet = dietLabel(draft.diet);
   // Tarjous vanhenee aikaisimpaan tilausaikarajaan, joten se näytetään, ei ensimmäisen rivin rajaa (katselmus #18).
   const cutoffAt = (l) => parseApiTime(l.cutoff)?.getTime() ?? Infinity;
@@ -340,7 +338,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       }
       return { status: 'collecting', text: `Luonnos on tyhjä. ${draft.deliveryDate ? HELP : START_QUESTION}` };
     }
-    const list = draft.lines.map((l) => `- ${lineLabel(l)}${l.selectedName ? `: ${l.selectedName}` : ''}`).join('\n');
+    const list = draft.lines.map((l) => `- ${lineLabel(l)}${l.selectedName ? `: ${readableName(l.selectedName)}` : ''}`).join('\n');
     const noQty = draft.lines.filter((l) => !l.quantity);
     const quantityQuestion = `Kuinka paljon: ${noQty.map((l) => l.productTerm).join(', ')}?`;
     // Toimituspäivä ensin: saatavuus, hinnat ja vaihtoehdot riippuvat päivästä. Puuttuvat määrät kysytään samassa viestissä

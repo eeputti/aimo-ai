@@ -2,6 +2,22 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 yö — agentin jälki: keskustelu vasemmalla, agentin ajo oikealla rinnakkain (Claude Code, agentin jälki -sivu)
+
+- **Käyttäjän pyyntö:** Eelis halusi agentin jälki -sivulle (`/agentti`) WhatsApp-keskustelun vasemmalle (vain luku, ei kirjoituskenttää) ja agentin koodinäkymän oikealle rinnakkain, koska se selkeyttää paljon.
+- **Muutos (`deploy/cloudflare/public/agentti.html/css/js`):** keskustelu ja koodinäkymä ovat otsikon alla samassa rivissä. Leveällä näytöllä (vähintään 1000 px) rivi levenee 1 320 px:iin asti, paneelit ovat yhtä korkeat (noin ruudun korkeus, 520–860 px) ja kumpikin vierii itse. Kapeammalla ne ovat allekkain, kumpikin enintään 70 % ruudun korkeudesta. Keskustelupaneelissa on WhatsApp-otsake ja merkki "Vain luku". Tilastoruudut, kulkukaavio ja tarkemmat osiot (ymmärsi, vaihtoehdot, portti, tilaus) ovat ennallaan alla, numeroituna nyt 1–4.
+- **Viesti ja rivi yhdessä:** jokainen kokin viesti ja ostoskorisivun toiminto on kytketty vastaavaan riviin agentin ajossa (viestit lainatun tekstin perusteella, korin toiminnot järjestyksessä). Hiiri tai näppäimistön kohdistus korostaa parin kummallakin puolella, ja valinta vierittää toisen paneelin parin kohdalle ja välähdyttää sen. Agentin ajo näyttää enintään kahdeksan viestiä, joten väliin jäävillä ei ole paria. Koodinäkymä kirjoittuu esiin kuten ennen ja seuraa nyt kursoria paneelin sisällä, kunnes lukija vierittää itse.
+- **Rajaus:** jaettuun `agent-code.js`:ään ei koskettu (sivu käyttää sen valmiita `codeLines`-, `renderCode`- ja `createPlayer`-funktioita), joten Näin se toimii- ja Keskustele-sivut ovat ennallaan. Sessio "Tuotteiden näyttölogiikka" tekee seuraavaksi vaihtoehto-osioon oman `agent-options.js`:n ja kytkee sen tämän commitin päälle.
+- **Tarkistukset:** Worker-testit 59/59 ja `node --check`. Selaimessa paikallisella staattisella esikatselulla julkaistun esimerkkitilauksen AGW-20261115-0008 jäljellä (haettu kerran tiedostoksi): 1440 px rinnakkain (keskustelu 543 px, koodi 761 px), 1024 px rinnakkain (400 ja 560 px), 768 px allekkain, ei vaakavieritystä eikä konsolivirheitä. 9 viestiä/korin toimintoa kytkeytyi 9 koodiriviin, kaksi väliin jäänyttä viestiä ilman paria, korostus molempiin suuntiin, kirjoitus seurasi kursoria loppuun. Selainpaneeli oli piilossa, joten pehmeää vieritystä ei nähty liikkeessä; vierityksen kohta tarkistettiin välittömällä vierityksellä. Puhelinleveyttä ei katsottu, koska sivuston puhelinesto peittää sen.
+- **Käyttöönotto kesken:** Workeria ei julkaistu. Muutos näkyy live-sivulla vasta Worker-julkaisussa, johon kysytään lupa.
+
+## 17.11.2026 yö — WhatsAppin tuoterivit selkokielelle: luettava nimi, määrä yhteensä, kilohinta (Claude Code, sessio B)
+
+- **Käyttäjän pyyntö (kuvakaappaus):** rivi "PP PERUNA 1KG ANNABELLE: 2 kpl (2 kg), 1,52 €" ei kerro selvästi, paljonko tulee yhteensä. "Haluun et tä botti on fiksu."
+- **Muutos:** uusi `server/order-conversation/wording.mjs` ja sen käyttö `index.mjs`:n tilausluonnoksessa, vaihtoehdoissa, "Luonnoksessa nyt" -listassa ja vertailuissa. Isoin kirjaimin kirjoitettu tukkunimi luettavaksi ("PP peruna 1 kg annabelle"), määrä muodossa "4 laatikkoa à 5 l, yhteensä 20 l", pyöristys ylöspäin näkyy ("yhteensä 6 kg (pyysit 5 kg)") ja Valion vertailuhinta samassa yksikössä ("1,52 € (0,76 €/kg)"). Vain esitystapa: tiedot Valion datasta ja tarjouksesta, mitään ei arvata. Raportti `docs/parallel/whatsapp-wording.md`.
+- **Tarkistukset:** uusi `test/whatsapp-wording.test.mjs` 5/5 (myös kaikki 3 081 isoin kirjaimin kirjoitettua katalogin nimeä), viiden vanhan keskustelutestin tekstiodotukset päivitetty, `npm test` 405/405, koko keskustelu oikealla katalogilla tulostettuna. Ei malli-, Meta- tai Valio-kutsuja, ei restarttia.
+- **Käyttöönotto:** botin seuraavassa päivityksessä, ei asetuksia.
+
 ## 17.11.2026 — Haiku-mittauksen V023: toimitusvarmuuskysymys tunnistetaan molemmissa sanajärjestyksissä (Claude Code, sessio C)
 
 - **Käyttäjän pyyntö:** Eelis hyväksyi F:n lisälöydöksen V023 korjaamisen. "Mikä näistä toimitetaan varmimmin?" ei tunnistunut vertailukysymykseksi, ja malli vastasi 2/4 ajossa "En pysty itse arvioimaan".
