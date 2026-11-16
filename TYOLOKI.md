@@ -2,6 +2,24 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 ilta — korisivulla yksi nappi SIIRRY MAKSAMAAN (Claude Code, maksusiirtymä-chat)
+
+- **Käyttäjän pyyntö:** Eelis halusi, että tilaus menee läpi yhdellä painalluksella ja että napissa lukee "Siirry maksamaan" eikä "Tarkista ja tilaa". Sessio C (katselmus #10, sama vahvistuspolku) pushasi ensin f848556:n, vapautti tiedostot ja palautti muutoksen tälle chatille.
+- **Muutos (7bc2063):** WhatsAppin korisivun TARKISTA JA TILAA ja vihreä VAHVISTA DEMOTILAUS ovat nyt yksi SIIRRY MAKSAMAAN -nappi. Se pyytää ensin yhteenvedon (tuore tarjous samasta luonnoksen versiosta, jota moottori vaatii), vahvistaa sen heti perään `confirm`-lipulla ja siirtyy suoraan demomaksusivulle. Maksusivun Hyväksy demomaksu on viimeinen vaihe, eikä rahaa veloiteta.
+  - Nappi toimii vain valmiille korille.
+  - Hyväksyntää odottava tilaus jää sivulle.
+  - Keskeytynyt vahvistus uusitaan samalla tunnisteella.
+  - Muutoskenttään kirjoitettu "hyväksyn" ei edelleenkään tilaa.
+  - Workersin tyhjä korikuori, `cart-link.mjs`:n virheteksti ja `docs/ordering-demo.md` päivitetty samaan.
+  - Yksityiskohdat: `docs/parallel/cart-pay-button.md`.
+- **Tarkistukset:**
+  - Korin ja vahvistussäännön testit 45/45, myös rebasen jälkeen.
+  - `npm test` 333/338: viisi Turso-testiä kaatuu puuttuvaan `@libsql/client`-pakettiin, ei liity muutokseen.
+  - Worker 54/54.
+  - Selaimessa eristetyllä palvelimella yksi painallus teki tasan yhden tilauksen ja käynnisti siirtymän `/demo-payment.html#AGW-20261114-0001`. Uudelleenlataus näytti kuittauksen siirtymättä uudelleen, ja keskeneräisellä korilla nappi oli pois käytöstä.
+  - Oikeaa maksusivua ja puhelinta ei kokeiltu.
+- **Käyttöönotto kesken:** muutos näkyy vasta botin seuraavassa sovitussa restartissa tai pilvijulkaisussa. Workersin `ostoskori.html` tarvitsee Worker-julkaisun.
+
 ## 16.11.2026 — ilmoittautuminen todistaa numeron WhatsApp-koodilla ja työjono käsittelee asiakkaat rinnakkain (Claude Code, sessio D)
 
 - **Pyyntö:** Eelis pyysi tekemään jäljellä olevat työt rinnakkaisissa sessioissa. Sessio D korjasi koodikatselmuksen #14 (ilmoittautuminen ei todistanut numeron omistusta) ja #12 (yksi hidas asiakas pysäytti kaikki). Koodi on commitissa 14dddf8; tämä merkintä tulee erikseen, koska H:n pysähtynyt sessio jätti TYOLOKI-varauksen auki.
