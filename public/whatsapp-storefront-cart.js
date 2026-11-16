@@ -5,7 +5,7 @@ const token = location.hash.slice(1);
 // Sama avain kuin aiemmalla korisivulla: kesken jäänyt pyyntö säilyy myös sivun vaihtuessa.
 const storageKey = `aimo.whatsapp-cart.pending.${token.slice(-24)}`;
 const doneKey = `aimo.whatsapp-cart.done.${token.slice(-24)}`;
-let list = null; let priced = null; let busy = false; let reviewed = false; let pending = null; let done = null; let rows = [];
+let list = null; let priced = null; let busy = false; let pending = null; let done = null; let rows = [];
 try { pending = JSON.parse(sessionStorage.getItem(storageKey)); } catch { /* read-only browsing still works */ }
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -91,10 +91,10 @@ function totals() {
 function controls() {
   const locked = busy || !list || !!pending || !!done;
   for (const el of document.querySelectorAll('#wa-edit-form input, #wa-edit-form button, [data-prefill]')) el.disabled = locked;
-  $('wa-review').disabled = locked;
+  // SIIRRY MAKSAMAAN vain valmiille korille (päivä, tuotteet ja määrät kunnossa); puutteet näkyvät keltaisessa huomiossa.
+  $('wa-review').disabled = locked || list.status !== 'review';
   $('wa-review').hidden = !!done;
   $('wa-retry').hidden = !pending; $('wa-retry').disabled = busy;
-  $('wa-confirm').hidden = !reviewed || locked;
 }
 function render() {
   if (!list) {
@@ -136,60 +136,80 @@ async function load({ keepReview = false } = {}) {
   const before = list && `${list.id}:${list.revision}`;
   const data = await request(); const next = data.shoppingList || null;
   const p = await prices(next);
-  if (!keepReview || before !== (next && `${next.id}:${next.revision}`)) { reviewed = false; $('wa-review-panel').hidden = true; }
+  if (!keepReview || before !== (next && `${next.id}:${next.revision}`)) $('wa-review-panel').hidden = true;
   list = next; priced = p; render();
 }
-// Vahvistuspainike tulee vasta erikseen pyydetyn tarkistuksen jälkeen; muutoksen jälkeen ohjataan tarkistukseen.
-const tidy = (text, review) => text.replace(/(?:Vahvista(?: valmis)?(?: tilaus)? vastaamalla|vastaa)\s+\*?TILAA\*?(?:,\s*kun haluat tilata)?[.!]?/giu,
-  review ? 'Vahvista tilaus alla olevasta vihreästä painikkeesta.' : 'Paina TARKISTA JA TILAA, kun haluat vahvistaa tilauksen.');
+// Apurin teksti neuvoo vastaamaan TILAA; korisivulla tilataan SIIRRY MAKSAMAAN -painikkeella.
+const tidy = (text) => text.replace(/(?:Vahvista(?: valmis)?(?: tilaus)? vastaamalla|vastaa)\s+\*?TILAA\*?(?:,\s*kun haluat tilata)?[.!]?/giu,
+  'Paina SIIRRY MAKSAMAAN, kun haluat tilata.');
 const formatted = (text) => esc(text).replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>');
-// confirm = vihreä vahvistuspainike. Palvelin hylkää muutoskenttään kirjoitetun vahvistuksen ("hyväksyn", "tilaa").
-async function send(text, review = false, confirm = false) {
-  if (busy || done || (!list && !pending)) return;
+// confirm = SIIRRY MAKSAMAAN -painikkeen vahvistus. Palvelin hylkää muutoskenttään kirjoitetun vahvistuksen ("hyväksyn", "tilaa").
+// pay = pyyntö kuuluu SIIRRY MAKSAMAAN -polkuun: valmis yhteenveto ei avaa vastauspaneelia, koska tilaus jatkuu heti.
+async function send(text, review = false, confirm = false, pay = false) {
+  if (busy || done || (!list && !pending)) return null;
   if (!pending) {
-    pending = { text, messageId: crypto.randomUUID(), expectedList: { id: list.id, revision: list.revision }, review, ...(confirm ? { confirm: true } : {}) };
+    pending = { text, messageId: crypto.randomUUID(), expectedList: { id: list.id, revision: list.revision }, review, ...(confirm ? { confirm: true } : {}), ...(pay ? { pay: true } : {}) };
     try { sessionStorage.setItem(storageKey, JSON.stringify(pending)); }
-    catch { pending = null; tell('Salli selaimen istuntotallennus ennen tilauksen muuttamista tai vahvistamista.'); return; }
+    catch { pending = null; tell('Salli selaimen istuntotallennus ennen tilauksen muuttamista tai vahvistamista.'); return null; }
   }
-  busy = true; reviewed = false; controls(); tell(pending.review ? 'Tarkistetaan tilausta…' : 'Päivitetään ostoskoria…');
+  busy = true; controls(); tell(pending.pay ? 'Tehdään tilausta…' : 'Päivitetään ostoskoria…');
   try {
-    const wasReview = pending.review;
-    const data = await request('/chat', pending);
+    const paying = pending.pay === true;
+    const { text: message, messageId, expectedList, confirm: confirmed } = pending;
+    const data = await request('/chat', { text: message, messageId, expectedList, ...(confirmed ? { confirm: true } : {}) });
     pending = null; sessionStorage.removeItem(storageKey);
     if (['confirmed', 'pending_approval'].includes(data.status)) {
       done = { status: data.status, text: data.text || '', ...(data.checkout ? { checkout: data.checkout } : {}), orderId: data.orderId };
       try { sessionStorage.setItem(doneKey, JSON.stringify(done)); } catch { /* the receipt is also in WhatsApp */ }
-      showDone(); render(); tell($('wa-done-title').textContent);
-      window.dispatchEvent(new CustomEvent('aimo:order-result', { detail: data })); return;
+      showDone({ go: true }); render(); tell(done.status === 'confirmed' && done.checkout?.url ? 'Siirrytään demomaksuun…' : $('wa-done-title').textContent);
+      window.dispatchEvent(new CustomEvent('aimo:order-result', { detail: data })); return data;
     }
     const next = data.shoppingList || null; const p = await prices(next);
     list = next; priced = p;
-    $('wa-reply').innerHTML = formatted(data.status === 'ready' ? tidy(data.text || '', wasReview) : data.text || '');
-    $('wa-review-panel').hidden = false;
-    reviewed = wasReview && data.status === 'ready' && !!list;
     render();
-    tell(reviewed ? 'Tarkista yhteenveto. Vahvista vasta, kun kaikki on oikein.' : 'Ostoskori päivitetty.');
-    $('wa-message').value = '';
-    if (wasReview || !reviewed) $('wa-review-panel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!(paying && data.status === 'ready')) showReply(data, paying);
+    return data;
   } catch (error) {
     if ([400, 403, 409, 410, 413, 415].includes(error.status)) {
       pending = null; sessionStorage.removeItem(storageKey);
       if (error.status === 409) {
         $('wa-review-panel').hidden = true;
-        try { await load(); error.message = 'Ostoskori muuttui WhatsAppissa ja on nyt päivitetty. Tarkista tilaus uudelleen ennen vahvistamista.'; }
+        try { await load(); error.message = 'Ostoskori muuttui WhatsAppissa ja on nyt päivitetty. Tarkista ostoskori ja paina SIIRRY MAKSAMAAN uudelleen.'; }
         catch { list = null; render(); }
       } else if ([403, 410].includes(error.status)) { list = null; render(); showProblem(error.message); }
     }
     tell(error.message);
+    return null;
   } finally { busy = false; controls(); }
 }
-function showDone() {
+// SIIRRY MAKSAMAAN: palvelin vahvistaa vain tarjouksen, joka on tehty samasta luonnoksen versiosta, joten nappi pyytää
+// ensin yhteenvedon (tuore tarjous) ja vahvistaa sen heti perään. Vahvistettu tilaus avaa demomaksun, jonka
+// Hyväksy demomaksu -painike on viimeinen vaihe. Jos yhteenveto ei ole valmis, apurin vastaus kertoo syyn.
+async function pay() {
+  // Kesken jäänyt vahvistus uusitaan samalla tunnisteella: palvelin palauttaa saman tuloksen, vaikka kori olisi jo suljettu.
+  if (pending?.pay && pending.confirm) { await send('TILAA', false, true, true); return; }
+  const review = await send('näytä', true, false, true);
+  if (review?.status !== 'ready' || done) return;
+  if (list?.status === 'review') await send('TILAA', false, true, true);
+  else showReply(review, true);
+}
+function showReply(data, paying) {
+  $('wa-reply').innerHTML = formatted(data.status === 'ready' ? tidy(data.text || '') : data.text || '');
+  $('wa-review-panel').hidden = false;
+  tell(paying ? 'Tilausta ei tehty. Katso apurin vastaus.' : 'Ostoskori päivitetty.');
+  if (!paying) $('wa-message').value = '';
+  $('wa-review-panel').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+function showDone({ go = false } = {}) {
   $('wa-review-panel').hidden = true; $('wa-edit-form').hidden = true;
   $('wa-done-title').textContent = done.status === 'confirmed' ? 'Demotilaus vahvistettu' : 'Tilaus odottaa hyväksyntää';
   $('wa-done-text').innerHTML = formatted(done.text); $('wa-done').hidden = false;
-  // Demomaksun siirtymä tulee maksupolun omasta moduulista vain vahvistetulle tilaukselle, jolla on checkout-tieto.
+  // Demomaksun linkki tulee maksupolun omasta moduulista vain vahvistetulle tilaukselle, jolla on checkout-tieto. Juuri tehty
+  // tilaus siirtyy suoraan maksuun; linkki jää näkyviin takaisin palatessa tai jos siirtymä ei onnistu.
   if (done.status === 'confirmed' && done.checkout?.url) {
-    import('/whatsapp/checkout.js').then((m) => m.showDemoCheckout?.(done, { container: $('demo-checkout'), document })).catch(() => {});
+    import('/whatsapp/checkout.js').then((m) => {
+      if (m.showDemoCheckout?.(done, { container: $('demo-checkout'), document }) && go) location.assign(done.checkout.url);
+    }).catch(() => {});
   }
 }
 function showProblem(text) {
@@ -212,9 +232,8 @@ document.addEventListener('error', (ev) => {
   const img = ev.target;
   if (img instanceof HTMLImageElement && img.closest('.cart-picture')) { img.hidden = true; img.closest('.cart-picture').classList.add('wa-noimg'); }
 }, true);
-$('wa-review').addEventListener('click', () => { void send('näytä', true); });
-$('wa-confirm').addEventListener('click', () => { if (reviewed) void send('TILAA', false, true); });
-$('wa-retry').addEventListener('click', () => { if (pending) void send(pending.text, pending.review, pending.confirm === true); });
+$('wa-review').addEventListener('click', () => { void pay(); });
+$('wa-retry').addEventListener('click', () => { if (pending?.pay) void pay(); else if (pending) void send(pending.text, pending.review, pending.confirm === true); });
 $('wa-edit-form').addEventListener('submit', (ev) => { ev.preventDefault(); const text = $('wa-message').value.trim(); if (text && !pending) void send(text); });
 // Sivun sisäiset linkit (yläpalkin Ostoskori ja Toimituspäivä, ohituslinkki) vierittävät kohteeseen vaihtamatta
 // fragmenttia: siinä on korilinkin tunniste, ja sen katoaminen avasi "Korilinkki on vanhentunut" (katselmus #9).

@@ -21,7 +21,7 @@ test('Ostoskori tab is the storefront cart, empty, with a way to WhatsApp', () =
   assert.match(html, /Ostoskorisi on tyhjä\./);
   assert.match(html, /<a class="kori-wa" href="\/#whatsapp">.*Siirry tilaamaan WhatsAppissa<\/a>/);
   assert.match(html, /Tämä on vain demo\.<\/strong> Ostoskori ei kokoonnu tänne itsestään: se ilmestyy vasta, kun klikkaat WhatsAppissa linkkiä Avaa ostoskori\./);
-  assert.match(html, /<button type="button" class="cart-checkout" disabled>TARKISTA JA TILAA<\/button>/);
+  assert.match(html, /<button type="button" class="cart-checkout" disabled>SIIRRY MAKSAMAAN<\/button>/);
   // Sivuston välilehdet ylimpänä, Ostoskori valittuna.
   assert.match(html, /<body[^>]*>\s*<header class="site-header">.*<a href="\/ostoskori" aria-current="page">Ostoskori<\/a>/);
   assert.doesNotMatch(html, /·/);

@@ -52,7 +52,7 @@ test('serves the storefront-styled cart page and only allowlisted styles, fonts,
   for (const directive of ["default-src 'none'", "script-src 'self'", "style-src 'self'", "font-src 'self'", "connect-src 'self'", "frame-ancestors 'none'"]) assert.ok(csp.includes(directive), directive);
   assert.doesNotMatch(csp, /unsafe|\*/);
   const html = await page.text();
-  for (const piece of ['class="cart-page wa-cart"', 'class="store-header"', 'id="wa-days"', 'TARKISTA JA TILAA', 'VAHVISTA DEMOTILAUS', 'Tilausdemo']) assert.ok(html.includes(piece), piece);
+  for (const piece of ['class="cart-page wa-cart"', 'class="store-header"', 'id="wa-days"', 'SIIRRY MAKSAMAAN', 'Tilausdemo']) assert.ok(html.includes(piece), piece);
   // The strict CSP blocks inline styles and handlers, so the markup must not rely on them.
   assert.doesNotMatch(html, /\sstyle=|\son[a-z]+=/i);
   assert.doesNotMatch(html, /\/storefront-assets\/|https?:\/\//);

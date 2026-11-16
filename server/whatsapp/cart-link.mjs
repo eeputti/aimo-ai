@@ -13,7 +13,7 @@ export const CHAT_PER_DAY = 200;
 // Hintojen vienti tekee välimuistin ohi uuden tarjouksen (Valion hinta- ja saatavuuskutsut): raja per korilinkin
 // asiakassidos, jotta vuorotellen päivittyvät tai toistuvasti haetut korit eivät aiheuta 429-virheitä (katselmus #23).
 export const EXPORT_PER_MINUTE = 30;
-const CONFIRM_ONLY_FROM_BUTTON = 'Tilausta ei tehty. Vahvista tilaus painamalla TARKISTA JA TILAA ja sen jälkeen vihreää VAHVISTA DEMOTILAUS -painiketta.';
+const CONFIRM_ONLY_FROM_BUTTON = 'Tilausta ei tehty. Tilaa painamalla SIIRRY MAKSAMAAN.';
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const unavailable = () => fail(410, 'Korilinkki on vanhentunut tai ostoskori on suljettu. Pyydä WhatsAppissa uusi linkki.');
 const assets = new Map([
@@ -141,7 +141,7 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
             || (input.confirm !== undefined && typeof input.confirm !== 'boolean')) {
           throw fail(400, 'Tarkista viesti ja ostoskorin versio.');
         }
-        // Tilauksen vahvistus vain vihreästä VAHVISTA DEMOTILAUS -painikkeesta, joka näkyy TARKISTA JA TILAA -vaiheen jälkeen.
+        // Tilauksen vahvistus vain SIIRRY MAKSAMAAN -painikkeesta (se pyytää ensin yhteenvedon ja vahvistaa sen perään).
         // Muutoskenttään kirjoitettu "hyväksyn" tai "tilaa" ei tee tilausta (katselmus #10), ja painike lähettää vain vahvistuksen.
         const confirming = CONFIRM.test(input.text.trim());
         if (confirming !== (input.confirm === true)) throw fail(400, confirming ? CONFIRM_ONLY_FROM_BUTTON : 'Vahvistuspainike lähettää vain tilauksen vahvistuksen.');

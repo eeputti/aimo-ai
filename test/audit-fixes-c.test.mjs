@@ -154,7 +154,7 @@ test('#10 korisivun muutoskenttään kirjoitettu "hyväksyn" tai "tilaa" ei tee 
   for (const text of ['hyväksyn', 'Hyväksy', 'tilaa', 'TILAA', 'joo tilaa', 'vahvistan', 'ok vahvista']) {
     const response = await f.post({ text });
     assert.equal(response.status, 400, text);
-    assert.match((await response.json()).error, /TARKISTA JA TILAA.*VAHVISTA DEMOTILAUS/, text);
+    assert.match((await response.json()).error, /SIIRRY MAKSAMAAN/, text);
   }
   assert.equal(f.chats.length, 0); // ei tilausmoottoriin eikä mallikutsuja
   // Painike lähettää vain vahvistuksen; muu teksti tai väärän tyyppinen lippu hylätään.

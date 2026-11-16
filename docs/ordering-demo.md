@@ -10,7 +10,7 @@ Varsinainen polku käyttää yhtä palvelimella tallennettua luonnosta WhatsAppi
 4. Vastaa tuotekohtaisiin tarkennuksiin ja valitse tuotteet numero kerrallaan. `Näytä lisää` hakee muita vaihtoehtoja.
 5. Pyydä tarvittaessa `maitoa sittenkin 30 litraa`. Tarkista, että muut rivit ja ruokarajoitteet säilyvät.
 6. Kuittaa yhteenveto ja avaa WhatsAppin lähettämä **Avaa ostoskori** -linkki. Tarkista tuotteet, pakkaukset, hinta ja päivä.
-7. Valitse **Tarkista ja tilaa**, lue uusi yhteenveto ja vahvista erillisellä **Vahvista demotilaus** -painikkeella. Tuote-, määrä- tai päivämuutos mitätöi aiemman hyväksynnän.
+7. Valitse **Siirry maksamaan**. Painike pyytää tuoreen yhteenvedon, tekee demotilauksen ja avaa demomaksun, jonka **Hyväksy demomaksu** on viimeinen vaihe. Painike toimii vasta, kun toimituspäivä, tuotteet ja määrät ovat kunnossa.
 8. Tarkista tilausnumero. Sivun uudelleenlataus ja saman vahvistuksen uusinta eivät saa tehdä toista tilausta. Mahdollinen demomaksu avautuu vasta rakenteisesti vahvistetulle tilaukselle.
 
 Käytä toimituspäivää, jolle taustapalvelu tarjoaa tuotteita. Haasteen rajapinnan kellot ja saatavuus voivat estää vanhojen esimerkkipäivien tilaamisen. `DEMO_NOW` on erikseen asetettava demokello, ei tuotannon toimituslupaus.
