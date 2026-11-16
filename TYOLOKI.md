@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 — WhatsApp-botti Verceliin testinä, vaihto odottaa (Claude Code, sessio E pilvisiirto)
+
+- **Käyttäjän lupa:** Eelis hyväksyi asetusten ja salaisuuksien viennin Vercel-projektiin `aimo-whatsapp` testijulkaisuna (erilliset Turso-testikannat `aimo-t-*`, väärä Meta-token, ei yhteyttä Worker-sivustoon). Macin botti ja julkaisija ennallaan.
+- **Muutos (9744f42):** pilven julkaisija välittää selainkeskustelun tilaukset kuten Macin `--include-web-chat`, korisivun Valion kuvat julkaisuun, jonon käsittelyyn yksi uusintayritys, `push-env.mjs` vaatii julkisen osoitteen pilven tiedostosta.
+- **Tarkistukset:** pilvi- ja Turso-testit 5/5 sekä selainkeskustelu 3/3 paikallisesti. https://aimo-whatsapp.vercel.app: healthz, 404-reitit, webhookin vahvistus ja allekirjoitus, jono Tursossa, pariutus, selainkeskustelu oikealla mallilla korilinkkiin asti, korisivu ja kuvat, tick. Kantojen siirron harjoitus Macin kopioilla 12 s, kaikki taulut täsmäävät.
+- **Löydös:** Valion testirajapinnan nimi ei enää ratkea (ENOTFOUND). Botti toimii vain välimuistin 3 252 vastauksella, joten välimuistikanta pitää siirtää pilveen.
+- **Kesken:** varsinainen vaihto (oikeat asetukset, kantasiirto, Metan callback, D1 `bot_backend_url`, tick-worker, Macin pysäytys) vaatii Eeliksen erillisen OK:n. Ohje ja paluu: `docs/parallel/cloud-cutover.md`.
+
 ## 16.11.2026 ilta — Näin se toimii lyhyeksi, Keskustele-sivulle live-agenttinäkymä, puhelimille tietokone-esto (Claude Code, Näin se toimii -chat)
 
 - **Käyttäjän pyyntö:** Näin se toimii -sivulle vain "Ei varmaan tarvitse selitellä, juttele itse täältä:" ja nappi Keskustele-sivulle, alle esimerkkiajo koodina (ei tarvitse olla live). Keskustele-sivulla isolla ruudulla vasemmalla keskustelu, oikealla ylhäällä "Kokeile oikeassa WhatsAppissa" logon kanssa ja sen alla koko ajan päivittyvä näkymä siitä, mitä agentti ymmärsi; palkissa pienellä "Mitä nämä tarkoittavat? Katso, miten agentti toimii". Puhelimella kaikilla sivuilla ponnahdusikkuna: käytäthän tätä tietokoneella, puhelimella toimii vain WhatsApp, ole yhteydessä Eelikseen, hauska tietokonekuva.
