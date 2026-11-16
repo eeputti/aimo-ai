@@ -2,6 +2,24 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — kiloina myytävä tuote ja kappalemäärä: ei enää "100 kpl → 100 kg, 899 €", vaan botti kysyy kilot (Claude Code, keskeneräinen kori -chat)
+
+- **Käyttäjän pyyntö ("Korjaa se"):** Eeliksen puhelinkuvassa rivi "Kanan fileesuikale 100 kpl" näytti vaihtoehdot "maustamaton 2 kg, 100 kg (100 kg), 899,00 €".
+- **Syy:** tuote 462306 myydään kiloina (`salesUnit` KG, vaihtuvapainoinen), joten myyntierä on 1 kg. Kappalemäärä, jolta puuttuu `basis`-tarkenne, tarkoittaa myyntieriä, joten 100 kpl → 100 myyntierää → 100 kg. Rivin "100 kpl" alkuperää (reseptilinkki tai asiakkaan viesti) ei voitu tarkistaa pilvikannasta.
+- **Päätös:** yhteistä muunnosta (`server/gateway/quantity.mjs`) ei muutettu, koska verkkokaupan korissa kiloina myytävän tuotteen PCS-määrä tarkoittaa nimenomaan kiloja. Korjaus on vain tilauskeskustelussa (`server/order-conversation/index.mjs`, `advance` ja `apply`).
+  - Kun rivin määrä on kappaleina ja vähintään puolet näytetyistä vaihtoehdoista myydään kiloina, botti sanoo esim. "Kanan fileesuikale myydään kiloina, joten määrästä 100 kpl en voi laskea tilattavia kiloja." ja kysyy "Kuinka monta kiloa laitetaan: kanan fileesuikale?".
+  - Pelkkä luku tai "30 kg" vastauksena on kiloja (`byWeight`). Vastaus tunnistetaan koodissa ilman tulkkia.
+  - Jos alle puolet vaihtoehdoista myydään kiloina, ne vain jätetään pois kappaleriviltä. Esimerkiksi "10 kpl ruisleipää" toimii kuten ennen.
+  - Ennallaan: edellisestä tilauksesta kopioitu rivi (`packFor`, valmiiksi myyntierinä) ja munien kappalemäärä (`basis: 'items'`).
+- **Tarkistukset:**
+  - Uusi `test/whatsapp-weight-count.test.mjs` 3/3. Kolmas testi käyttää oikeaa katalogia simuloiduin hinnoin.
+  - Oikea katalogi: "100 kpl kanan fileesuikaletta maanantaiksi" → kilokysymys → "30" → "Atria Kanan Fileesuikale Miedosti Suolattu 3kg, 10 rasiaa, yhteensä 30 kg, 192,60 €" ja kaksi muuta.
+  - Ennen sääntöä "vähintään puolet" sama haku antoi "100 rasiaa (300 kg), 1926 €". Voi ja ruisleipä kappaleina ennallaan. "3 kpl juustoa" kysyy nyt kilot.
+  - Koko `npm test` 404/410 yhdistämisen jälkeen (9bde0c8:n selkokielinen rivi ja 09ddd10 mukana). Kuusi kaatuvaa ovat samat libsql/Turso-testit. `aimo:eval` 26/26.
+  - Ei malli-, Valio-, Meta- tai tilauskutsuja.
+- **Löydetty, ei korjattu:** voin vaihtoehto "Valio voi 4x5 kg HYLA®, 5 laatikkoa (0,4 kg), 5,45 €" on katalogin koko- tai hintatiedon vanha virhe, ei tämän muutoksen seuraus.
+- **Käyttöönotto kesken:** puhelimeen seuraavassa Vercel-julkaisussa yhdessä 3b51b3d:n kanssa (sessio E).
+
 ## 17.11.2026 yö — agentin jälki: keskustelu vasemmalla, agentin ajo oikealla rinnakkain (Claude Code, agentin jälki -sivu)
 
 - **Käyttäjän pyyntö:** Eelis halusi agentin jälki -sivulle (`/agentti`) WhatsApp-keskustelun vasemmalle (vain luku, ei kirjoituskenttää) ja agentin koodinäkymän oikealle rinnakkain, koska se selkeyttää paljon.
