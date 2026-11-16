@@ -23,7 +23,8 @@ const GREETING = /^(moi|moikka|moro|morjens|morjes|hei|heippa|terve|hello|hi|huo
 // Tervehdys Helsingin ajasta (viestin vastaanottohetki tai demokello). Asiakkaan oma arkinen tervehdys peilataan;
 // vuorokaudenaikaan sidottu tervehdys tulee aina kellosta, joten väärää vuorokaudenaikaa ei sanota.
 // Neutraali moi/hei saa kellonajan mukaisen tervehdyksen; vain erottuva tyyli peilataan.
-const MIRROR = { morjes: 'Morjes!', morjens: 'Morjes!', moro: 'Moro!', moikka: 'Moikka!', terve: 'Terve!' };
+// Rento moro tai moikka saa iloisen "No moikka!" (Eelis 17.11.).
+const MIRROR = { morjes: 'Morjes!', morjens: 'Morjes!', moro: 'No moikka!', moikka: 'No moikka!', terve: 'Terve!' };
 const LEADING_GREETING = /^(?:(?:hyvää\s+)?(?:huomenta|päivää|iltaa|yötä)|moi(?:kka)?|moro|morjen?s|hei(?:ppa)?|terve|hello|hi)(?=$|[\s!.,])[!.,]*\s*/iu;
 export function greetingFor(text, at) {
   const word = (String(text || '').trim().toLocaleLowerCase('fi-FI').match(/^\p{L}+/u) || [''])[0];
@@ -55,6 +56,41 @@ export function isFreshStart(text) {
   const request = text.trim().replace(/[.!?]+$/u, '').replace(/^(?:hei|moi|moikka)[,\s]+/iu, '')
     .replace(/^(?:voitko|voisitko|voiks|voisit|haluan|haluaisin)\s+/iu, '').replace(/[,\s]+(?:kiitos|pliis)$/iu, '').trim();
   return /^(?:(?:tyhjää|tyhjennä|tyhjentää|nollaa|nollata)(?:\s+(?:ihan\s+)?(?:kaikki(?:\s+(?:rivit|tuotteet))?|(?:koko\s+)?(?:ostoslista|lista|luonnos)(?:n)?))?|(?:poista|poistaa|unohda)\s+(?:kaikki(?:\s+(?:rivit|tuotteet))?|(?:koko\s+)?(?:ostoslista|lista|luonnos))|(?:aloita|aloittaa|aloitetaan|aloitetaanko|alotetaan|alotetaanko)\s+(?:ihan\s+)?alusta|peru|peruuta)$/iu.test(request);
+}
+// Kesken jäänyt ostoskori (Eelis 17.11.): kun koria ei ole käsitelty tauon aikana (oletus 2 h) ja uusi viesti muuttaisi sitä,
+// apuri näyttää vanhan korin ja kysyy, lisätäänkö viesti siihen vai aloitetaanko uusi tilaus. Viesti odottaa vastausta, eikä
+// mitään lisätä ennen sitä. Vanhaa koria ei unohdeta hiljaa: kesken jääneet luonnokset poistuvat vasta 7 päivän säilytyksen jälkeen.
+const STALE_NEW_VERB = /(?<![\p{L}\d])(?:unoh\p{L}*|poist\p{L}*|heit\p{L}*|tyhj\p{L}*|nolla\p{L}*)(?![\p{L}\d])/iu;
+const STALE_OLD = /(?<![\p{L}\d])(?:vanha\p{L}*|samaan|sama\p{L}*\s+(?:kori\p{L}*|lista\p{L}*|tilau\p{L}*)|entise\p{L}*|aiempaan|edelliseen|jatke\p{L}*|jatka\p{L}*)(?![\p{L}\d])/iu;
+const STALE_NEW = /(?<![\p{L}\d])(?:uus\p{L}*|aloit\p{L}*|alot\p{L}*|puhtaalta)(?![\p{L}\d])/iu;
+const STALE_ONE = /^\s*(?:1|yks|yksi|ykkönen|eka|joo|juu|kyllä|jep|ok|okei|sopii|lisää|lisätään|lisätää)(?![\p{L}\d])/iu;
+const STALE_TWO = /^\s*(?:2|kaks|kaksi|kakkonen|toka|ei)(?![\p{L}\d])/iu;
+/** Vastaus kesken jääneen korin kysymykseen: 'old' (lisätään vanhaan), 'new' (uusi tilaus) tai null (epäselvä). */
+export function staleCartChoice(text) {
+  const t = String(text || '').trim();
+  if (!t || t.length > 120) return null;
+  if (STALE_NEW_VERB.test(t)) return 'new';
+  if (STALE_OLD.test(t)) return 'old';
+  if (STALE_NEW.test(t)) return 'new';
+  if (STALE_TWO.test(t)) return 'new';
+  if (STALE_ONE.test(t)) return 'old';
+  return null;
+}
+// Kuittaus tai kiitos ei ole uutta tilaussisältöä: siitä ei kysytä vanhan korin kohtaloa.
+const PLAIN_ACK = /^(?:kiitos|kiitti|kiitoksia|thx|thanks|ok|okei|joo|juu|jep|selvä|hyvä|sopii)(?:[,\s]+(?:kiitos|paljon))*[.!\s]*$/iu;
+const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
+const dayLabel = (iso) => new Intl.DateTimeFormat('fi-FI', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'numeric' }).format(new Date(`${iso}T12:00:00Z`));
+/** Vanha kori ja kysymys omina viesteinään. withText: kysymys koskee asiakkaan uutta viestiä ("tämä"). */
+export function staleCartMessages(list, { today, withText, again = false }) {
+  const amount = (q) => (q ? `${String(+Number(q.value).toFixed(3)).replace('.', ',')} ${UNIT_FI[q.unit] || ''}`.trim() : '');
+  const rows = list.lines.slice(0, 8).map((l) => `- ${[l.productTerm, amount(l.quantity)].filter(Boolean).join(' ')}`);
+  if (list.lines.length > 8) rows.push(`- ja ${list.lines.length - 8} muuta`);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(list.deliveryDate || '')
+    ? (list.deliveryDate < today ? ` (toimitus oli ${dayLabel(list.deliveryDate)}, se päivä on jo mennyt)` : ` (toimitus ${dayLabel(list.deliveryDate)})`) : '';
+  const question = withText
+    ? 'Lisätäänkö tämä vanhaan ostoskoriin?\n1) kyllä, lisätään vanhaan\n2) ei, aloitetaan uusi tilaus'
+    : 'Jatketaanko sitä vai aloitetaanko uusi tilaus?\n1) jatketaan vanhaa\n2) aloitetaan uusi tilaus';
+  return again ? [`Vastaa vielä 1 tai 2, niin pääsen eteenpäin.\n${question}`] : [`Edellinen ostoskorisi jäi kesken${date}:\n${rows.join('\n')}`, question];
 }
 // Vaihtoehtolistan vastaukset (numero, näytä lisää, halvin) menevät suoraan tilausmoottorille ilman dialogimallia.
 const CONTROL = /^(?:(?:(?:joo|kyllä|ok|okei)[,\s]+)?(?:tilaa|vahvista|vahvistan|hyväksy|hyväksyn|peru|peruuta|tyhjennä|aloita alusta|näytä|lista)|\d+(?:\s+\d+)*|(?:(?:näytä|anna|hae)\s+)?(?:lisää|muita)\s+vaihtoehtoja|näytä\s+(?:lisää|muita)|onko\s+muita(?:\s+vaihtoehtoja)?|(?:se\s+)?(?:halvin|halvinta|edullisin))[.!?\s]*$/iu;
@@ -126,7 +162,10 @@ export function orderMessages(result) {
 }
 
 // product(id) palauttaa katalogin (Valion tuotetietojen) tuotteen: tuotekysymyksen faktat luetaan siitä, ei mallilta.
-export function createOrderingDialogue({ db, ask, lookup = async () => [], product = () => null, now = Date.now, timeOf = (receivedAt) => receivedAt || now(), supportContact = '' }) {
+// activityAt: viestin oikea lähetyshetki tauon mittaamiseen. Demokello voi kiertää, joten tauko ei saa tulla siitä.
+// staleAfterMs: tauko, jonka jälkeen kesken jääneestä korista kysytään (0 = ei kysytä).
+export function createOrderingDialogue({ db, ask, lookup = async () => [], product = () => null, now = Date.now, timeOf = (receivedAt) => receivedAt || now(),
+  activityAt = (receivedAt) => receivedAt || now(), staleAfterMs = 2 * 3600_000, supportContact = '' }) {
   const support = String(supportContact || '').trim().slice(0, 200);
   db.exec(`CREATE TABLE IF NOT EXISTS wa_dialogue (binding TEXT PRIMARY KEY, json TEXT NOT NULL, updated INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS wa_dialogue_results (message_id TEXT PRIMARY KEY, binding TEXT NOT NULL, json TEXT NOT NULL, created INTEGER NOT NULL);`);
@@ -142,30 +181,86 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
     return result;
   };
   return {
-    async respond({ binding, messageId, text, runOrder, getShoppingList = () => null, canOpenCart = false, inCart = false, allowed = () => true, receivedAt }) {
+    async respond({ binding, messageId, text: incoming, runOrder, getShoppingList = () => null, canOpenCart = false, inCart = false, allowed = () => true, receivedAt }) {
       const cached = db.prepare('SELECT json FROM wa_dialogue_results WHERE message_id=? AND binding=?').get(messageId, binding);
       if (cached) return JSON.parse(cached.json);
       const row = db.prepare('SELECT json, updated FROM wa_dialogue WHERE binding=?').get(binding);
       let state = row ? JSON.parse(row.json) : {};
+      // Tauko edellisestä viestistä oikeassa ajassa. Vanha tila ilman aikaleimaa ei kerro taukoa: siitä ei kysytä korin kohtaloa.
+      const at = Number(activityAt(receivedAt));
+      const since = (value) => (Number.isFinite(at) && Number.isFinite(value) ? at - value : null);
+      const idle = since(state.lastActivity);
+      // Korin tauko lasketaan viimeisestä korin käsittelystä: välissä kysytty tuotekysymys ei tee vanhasta korista tuoretta.
+      const cartIdle = since(state.cartActivity ?? state.lastActivity);
       // Tervehdys vain vastauksena asiakkaan tervehdykseen keskustelun alussa (ei aiempaa keskustelua tai yli kahden tunnin tauko)
       // tai pelkkään tervehdykseen. Kesken keskustelun "Hei, ..." ei saa irrallista "Iltaa!" (Haiku-mittaus C6), eikä selainkorissa.
-      const conversationStart = !row || !state.history?.length || now() - row.updated > 2 * 3600_000;
-      const greeting = !inCart && LEADING_GREETING.test(text.trim()) && (conversationStart || GREETING.test(text.trim())) ? greetingFor(text, timeOf(receivedAt)) : null;
-      let orderText = text; let plan; let result; let messages; let reset = false;
-      const freshStart = async (reply) => {
-        // Cancel only this customer's current draft. A new namespace also excludes old completed orders
-        // from the next empty-list confirmation; its deterministic epoch makes reset retries safe.
+      const conversationStart = !row || !state.history?.length || (idle ?? now() - row.updated) > 2 * 3600_000;
+      const greeting = !inCart && LEADING_GREETING.test(incoming.trim()) && (conversationStart || GREETING.test(incoming.trim())) ? greetingFor(incoming, timeOf(receivedAt)) : null;
+      let text = incoming; let plan; let result; let messages; let reset = false; let lead = ''; let touched = false;
+      // Cancel only this customer's current draft. A new namespace also excludes old completed orders
+      // from the next empty-list confirmation; its deterministic epoch makes reset retries safe.
+      const cancelCurrent = async () => {
         const cancelled = await runOrder('aloita alusta', { epoch: state.epoch || '', operation: 'reset' });
-        if (cancelled.status === 'error') { result = cancelled; messages = [cancelled.text]; return; }
+        if (cancelled.status === 'error') return cancelled;
         const hadOrder = ['confirmed', 'pending_approval'].includes(state.lastOrder?.status);
         state = { epoch: messageId };
-        reset = true;
-        result = { status: 'collecting', text: `${reply || 'Selvä, ostoslista on tyhjä ja aloitetaan alusta. Mitä tarvitset keittiöön?'}${hadOrder ? '\nAiemmin lähetetyt tilaukset säilyvät.' : ''}` };
+        reset = true; touched = true;
+        return { hadOrder };
+      };
+      const freshStart = async (reply) => {
+        const done = await cancelCurrent();
+        if (done.status === 'error') { result = done; messages = [done.text]; return; }
+        result = { status: 'collecting', text: `${reply || 'Selvä, ostoslista on tyhjä ja aloitetaan alusta. Mitä tarvitset keittiöön?'}${done.hadOrder ? '\nAiemmin lähetetyt tilaukset säilyvät.' : ''}` };
         messages = [result.text];
       };
-      if (isFreshStart(text)) await freshStart();
+      const listNow = () => getShoppingList({ epoch: state.epoch || '' });
+      const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Helsinki' }).format(new Date(now()));
+      // Selainkorissa asiakas katsoo jo nykyistä koria: avoin kysymys vanhentuu.
+      if (inCart) delete state.staleCart;
+      // Vastaus kysymykseen "Lisätäänkö tämä vanhaan ostoskoriin?". Nollauspyyntö käsitellään alla tavalliseen tapaan.
+      if (state.staleCart && !isFreshStart(incoming) && !CANCEL_ALL.test(incoming.trim())) {
+        const pending = state.staleCart;
+        const choice = staleCartChoice(incoming);
+        // Vastauksen perässä tullut määrä ("1, ja 5 kg voita") kuuluu samaan viestiin, ei häviä.
+        const extra = incoming.replace(/^\s*[12][.)]?(?![\d,.])[,\s]*/u, '').trim();
+        const more = choice && /\d/u.test(extra) && !extra.includes('?') && /^\s*[12](?![\d,.])/u.test(incoming) ? extra : '';
+        const stored = [pending.text, more].filter(Boolean).join('\n').slice(0, 2000);
+        if (!choice) {
+          if (/\d/u.test(incoming) && !incoming.includes('?') && pending.text) pending.text = `${pending.text}\n${incoming}`.slice(0, 2000);
+          const list = listNow();
+          if (list?.lines?.length) {
+            messages = staleCartMessages(list, { today: today(), withText: !!pending.text, again: true });
+            result = { status: 'collecting', draftId: list.id, revision: list.revision, text: messages.join('\n\n') };
+          } else delete state.staleCart; // kori ehti kadota (esim. korisivulla): jatketaan tavallisesti
+        } else {
+          delete state.staleCart; touched = true;
+          if (choice === 'new') {
+            const done = await cancelCurrent();
+            if (done.status === 'error') { result = done; messages = [done.text]; }
+          }
+          lead = choice === 'new' ? 'Selvä, aloitetaan uusi tilaus.' : 'Selvä, jatketaan vanhaa ostoskoria.';
+          if (!result && stored) text = stored;
+          else if (!result && choice === 'new') { result = { status: 'collecting', text: `${lead} Mitä tarvitset keittiöön?` }; messages = [result.text]; lead = ''; }
+          else if (!result) {
+            const shown = await runOrder('näytä', { epoch: state.epoch || '', context: { history: state.history || [], lastReply: state.lastOrder?.text || '' } });
+            result = shown; messages = ask ? orderMessages(shown) : [shown.text]; state.lastOrder = shown;
+          }
+        }
+      }
+      let orderText = text;
+      // Tauon jälkeen kesken jäänyt kori: kysytään ennen kuin uusi viesti muuttaa sitä (staleCartMessages).
+      const staleList = !result && !lead && !inCart && staleAfterMs > 0 && cartIdle != null && cartIdle >= staleAfterMs && !CONTROL.test(text.trim())
+        && !PLAIN_ACK.test(text.trim()) && !DEADLINE_QUESTION.test(text) && !compareKind(text) && !RELIST.test(text) && !isFreshStart(text) && !CANCEL_ALL.test(text.trim())
+        ? listNow() : null;
+      const askStale = (withText) => {
+        messages = staleCartMessages(staleList, { today: today(), withText });
+        state.staleCart = { text: withText ? text.slice(0, 2000) : '', listId: staleList.id, revision: staleList.revision };
+        result = { status: 'collecting', draftId: staleList.id, revision: staleList.revision, text: messages.join('\n\n') };
+      };
+      if (staleList?.lines?.length && GREETING.test(text.trim())) askStale(false);
+      if (!result && isFreshStart(text)) await freshStart();
       // "unohda koko homma, ei tilata mitään": koko oma ostoslista tyhjennetään, vaikka viestissä on sana "ei".
-      else if (CANCEL_ALL.test(text.trim())) await freshStart('Selvä, tyhjensin ostoslistan, eikä mitään tilattu. Kirjoita, kun tarvitset jotain.');
+      else if (!result && CANCEL_ALL.test(text.trim())) await freshStart('Selvä, tyhjensin ostoslistan, eikä mitään tilattu. Kirjoita, kun tarvitset jotain.');
       // A partial removal must not hit the underlying engine's broad "tyhjennä ..." cancel command.
       if (!result) orderText = orderText.replace(/^(tyhjennä|tyhjää)\s+/iu, 'Poista ');
       const quantityText = normalizeOrderUnits(text.replace(/^(?:joo|kyllä|juu|jep|sopii)[,\s]+/iu, '').replace(/^(?:lisää|otetaan)\s+(?:se|sitä|tuota)\s*/iu, ''));
@@ -219,9 +314,13 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
       // Yhteystiedon puuttumista ei väitetä, kun tukiyhteys on määritetty; koodi liittää sen perään.
       if (plan?.text && support && SUPPORT_QUESTION.test(text)) plan = { ...plan, text: String(plan.text).split(/(?<=[.!?])\s+|\n+/u).filter((x) => x && !NO_CONTACT_CLAIM.test(x)).join(' ') };
       if (plan) plan = { ...plan, text: safeModelText(String(plan.text || '').trim().slice(0, 1200), plan.route === 'chat' ? undefined : '') };
+      // Muutos tauon jälkeen kesken jääneeseen koriin: ensin kysymys, viesti odottaa vastausta. Kysymys tuotteesta (chat) tai
+      // korin avaus (cart) jatkaa vanhaa koria kysymättä.
+      if (!result && !positive && staleList?.lines?.length && (!plan || plan.route === 'order')) askStale(true);
       if (!result && GREETING.test(text) && plan?.route !== 'chat') plan = { route: 'chat', text: 'Mitä tarvitset keittiöön? Voin auttaa ostoslistan kanssa.' };
       if (!result && plan?.route === 'reset' && !blocksReset(text)) await freshStart();
       if (!result && plan?.route === 'cart') {
+        touched = true;
         const list = getShoppingList({ epoch: state.epoch || '' });
         if (list && canOpenCart && list.status !== 'review') {
           // Keskeneräinen tilaus: ei linkkiä, vaan kerrotaan mitä puuttuu ja kysytään tilausmoottorin seuraava asia.
@@ -289,6 +388,7 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
         }
       }
       if (!result) {
+        touched = true;
         const previousList = getShoppingList({ epoch: state.epoch || '' });
         result = await runOrder(normalizeOrderUnits(orderText), { epoch: state.epoch || '', context: { history: state.history || [], lastReply: state.lastOrder?.text || '' } });
         messages = ask ? orderMessages(result) : [result.text];
@@ -302,7 +402,7 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
           else if (!answered) {
             // Valinnan jälkeen kerrotaan mitä otettiin, ei aina samaa "päivitin ostoskorin" -fraasia.
             const opening = selectionAcknowledgement({ previousList, shoppingList: current, status: result.status });
-            if (opening) messages.unshift(opening);
+            if (opening) messages.unshift(...opening);
           }
         }
         if (plan?.text?.trim() && !['error', 'rejected'].includes(result.status)) {
@@ -344,10 +444,16 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
       const wantsContact = (SUPPORT_QUESTION.test(text) && (!hadContact || asking)) || (hadContact && CONTACT_FOLLOWUP.test(text));
       if (support && messages?.length && wantsContact && !messages.join('\n').includes(support)) messages = [...messages, `Asiakaspalvelu: ${support}`];
       // Mallin oma tervehdys ei koskaan jää voimaan: oikea tervehdys alkuun tai ei tervehdystä kesken keskustelun.
+      if (messages?.length && lead) {
+        // "Selvä, jatketaan vanhaa ostoskoria." + "Selvä, kirjasin ylös!" ei toista sanaa: jälkimmäisen "Selvä" jää pois.
+        const rest = withGreeting(null, messages[0]).replace(/^Selvä[,!.]?\s+(?=\p{L})/u, '');
+        messages = [`${lead} ${rest.charAt(0).toLocaleUpperCase('fi-FI')}${rest.slice(1)}`, ...messages.slice(1)];
+      }
       if (messages?.length && !['error', 'rejected'].includes(result.status)) messages = [withGreeting(greeting, messages[0]), ...messages.slice(1)];
       let out = { ...result, messages, text: messages.join('\n\n'), ...(canOpenCart && plan?.openCart ? { cartRequested: true } : {}) };
       if (canOpenCart) out = withCartHandoffHint(out);
-      return save(binding, messageId, state, out, text, reset);
+      if (Number.isFinite(at)) { state.lastActivity = at; if (touched) state.cartActivity = at; }
+      return save(binding, messageId, state, out, incoming, reset);
     },
     prune() {
       db.prepare('DELETE FROM wa_dialogue WHERE updated<? OR binding NOT IN (SELECT binding FROM members)').run(now() - 7 * 86400_000);
@@ -356,12 +462,23 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
   };
 }
 
+/** WHATSAPP_STALE_CART_MINUTES: tauko minuutteina, jonka jälkeen kesken jääneestä korista kysytään. Oletus 120, 0 = ei kysytä. */
+export function staleCartMinutes(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return 120;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? n : 120;
+}
+
 export async function createConfiguredDialogue(store, { supportContact } = {}) {
   const [{ askAgent, agentEnabled }, { loadCatalog, publicProduct }, { clock }] = await Promise.all([import('../aimoAgent.mjs'), import('../catalog.mjs'), import('../gateway/clock.mjs')]);
   return createOrderingDialogue({ db: store.db, ask: agentEnabled() ? askAgent : null, now: () => clock.now().getTime(),
     // Kiinteällä demokellolla (DEMO_NOW) tervehdys seuraa demoaikaa. Kiertävä demokello (DEMO_NOW_LOOP_MINUTES)
     // pitää vain tilausrajat voimassa, joten tervehdys seuraa silloin oikeaa vastaanottohetkeä (ei "Huomenta!" illalla).
     timeOf: (receivedAt) => (clock.simulated && !clock.looping ? clock.now().getTime() : receivedAt || Date.now()),
+    // Tauko mitataan aina oikeasta ajasta (viestin lähetyshetki), koska demokello voi olla kiinnitetty tai kiertää.
+    activityAt: (receivedAt) => Number(receivedAt) || Date.now(),
+    staleAfterMs: staleCartMinutes(process.env.WHATSAPP_STALE_CART_MINUTES) * 60_000,
     lookup: async (query) => loadCatalog().search(query, { limit: 4 }).map((hit) => publicProduct(hit.product)),
     product: (id) => loadCatalog().get(String(id)) || null,
     // Sama tukiyhteys kuin kanavan tuki-komennossa (WHATSAPP_SUPPORT_CONTACT).

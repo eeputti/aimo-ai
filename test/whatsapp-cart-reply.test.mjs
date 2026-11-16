@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openWhatsAppStore } from '../server/whatsapp/store.mjs';
 import { createOrderingDialogue } from '../server/whatsapp/dialogue.mjs';
-import { FALLBACK_ACKNOWLEDGEMENT, groundedAcknowledgement, presentCollectingCart, selectionAcknowledgement } from '../server/whatsapp/cart-presentation.mjs';
+import { CHOOSE_TRANSITION, FALLBACK_ACKNOWLEDGEMENT, groundedAcknowledgement, presentCollectingCart, selectionAcknowledgement } from '../server/whatsapp/cart-presentation.mjs';
 
 const CAKE = 'tarvittisin 1000 littaa maitoo ja sitte kananmunii ja vaiks kermaa kans, teen kakkua keskiviikoks ni onnistuisko?';
 const line = (ref, productTerm, quantity = null, extra = {}) => ({ ref, productTerm, quantity, claims: [], excludeAllergens: [], selectedProductId: null, selectedName: null, ...extra });
@@ -58,17 +58,20 @@ test('an existing dialogue answer replaces the acknowledgement instead of stacki
 test('choosing and ready replies say what was just picked, added or moved, without a model', () => {
   const before = { id: 'd1', revision: 4, deliveryDate: '2026-11-18', lines: [line('L1', 'maito', { value: 1000, unit: 'L' }), line('L2', 'kananmuna', { value: 50, unit: 'PCS' })] };
   const picked = { ...before, revision: 5, lines: [line('L1', 'maito', { value: 1000, unit: 'L' }, { selectedProductId: 'P2', selectedName: 'Valio kevytmaito 1 l laktoositon UHT' }), before.lines[1]] };
-  assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: picked, status: 'choosing' }), 'Selvä, valitaan Valio kevytmaito 1 l laktoositon UHT.');
+  assert.deepEqual(selectionAcknowledgement({ previousList: before, shoppingList: picked, status: 'choosing' }), ['Selvä, valitaan Valio kevytmaito 1 l laktoositon UHT.']);
   const added = { ...before, revision: 6, lines: [...before.lines, line('L3', 'kerma', { value: 2, unit: 'L' })] };
-  assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: added, status: 'choosing' }), 'Listalle tuli kerma 2 l. Tässä vaihtoehdot:');
+  // Lisäyksen jälkeen siirtymä valintaan omana viestinään (Eelis 17.11.).
+  assert.deepEqual(selectionAcknowledgement({ previousList: before, shoppingList: added, status: 'choosing' }), ['Listalle tuli kerma 2 l.', CHOOSE_TRANSITION]);
   const moved = { ...before, revision: 7, deliveryDate: '2026-11-17' };
-  assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: moved, status: 'ready' }), 'Toimituspäivä nyt ti 17.11.');
+  assert.deepEqual(selectionAcknowledgement({ previousList: before, shoppingList: moved, status: 'ready' }), ['Toimituspäivä nyt ti 17.11.']);
   const claimOnly = { ...before, revision: 3, lines: [{ ...before.lines[0], claims: ['FREE_FROM_LACTOSE'] }, before.lines[1]] };
-  assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: claimOnly, status: 'choosing' }), 'Selvä! Tässä sopivat vaihtoehdot:');
+  assert.deepEqual(selectionAcknowledgement({ previousList: before, shoppingList: claimOnly, status: 'choosing' }), [CHOOSE_TRANSITION]);
+  // Jo valintavaiheessa ollut kori ei toista siirtymää.
+  assert.deepEqual(selectionAcknowledgement({ previousList: { ...before, status: 'needs_product_selection' }, shoppingList: claimOnly, status: 'choosing' }), ['Selvä! Tässä sopivat vaihtoehdot:']);
   assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: before, status: 'choosing' }), null);
   assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: picked, status: 'collecting' }), null);
   for (const text of [selectionAcknowledgement({ previousList: before, shoppingList: picked, status: 'choosing' }),
-    selectionAcknowledgement({ previousList: before, shoppingList: added, status: 'choosing' })]) assert.doesNotMatch(text, /päivitin|lisäsin/iu);
+    selectionAcknowledgement({ previousList: before, shoppingList: added, status: 'choosing' })]) assert.doesNotMatch(text.join(' '), /päivitin|lisäsin/iu);
 });
 
 test('selecting an option in WhatsApp names the chosen product before the next list instead of a fixed phrase', async (t) => {

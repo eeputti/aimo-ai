@@ -2,6 +2,29 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — kesken jäänyt ostoskori: tauon jälkeen kysytään "Lisätäänkö tämä vanhaan ostoskoriin?", No moikka ja siirtymäviesti ennen vaihtoehtoja (Claude Code, keskeneräinen kori -chat)
+
+- **Käyttäjän pyyntö:** botin pitää käsitellä kesken jäänyt ostoskori. Eelis ehdotti, että vanha kori unohdetaan päivän jälkeen tai kahden tunnin päästä tulevaan viestiin kysytään, lisätäänkö se vanhaan vai tehdäänkö uusi tilaus. Kysymyksen sanamuoto on Eeliksen: "Lisätäänkö tää vanhaan ostoskoriin?". Puhelinkuvassa (klo 0.04, pilvibotti) viesti "maito 10 l" meni vanhaan reseptikoriin, ja perään tulivat kanan fileesuikaleen vaihtoehdot. Eeliksen toivoma kulku: "No moikka! Listalle tuli maito 10 l.", sitten oma viesti "Nyt olisi aika valita vaihtoehtoja, niin käydään ostoskorisi pikaisesti läpi!" ja sen jälkeen vaihtoehdot.
+- **Päätös:** vanhaa koria ei unohdeta hiljaa, vaan siitä kysytään. Kesken jääneet luonnokset poistuvat edelleen vasta 7 päivän säilytyksen jälkeen. Kysymys tulee, kun koria ei ole käsitelty 2 tuntiin (`WHATSAPP_STALE_CART_MINUTES`, oletus 120, 0 = pois) ja uusi viesti muuttaisi koria (dialogimallin reitti order tai ei mallia). Tauko mitataan viestin oikeasta lähetysajasta eikä demokellosta, koska demokello voi kiertää. Tauko lasketaan viimeisestä korin käsittelystä, joten välissä kysytty tuotekysymys ei tee vanhasta korista tuoretta. Kysymystä ei esitetä tuotekysymyksestä (chat), korin avauksesta, vaihtoehdon numerosta, TILAA-, näytä-, kiitos- ja ok-viesteistä, tilausaikaraja- ja vertailukysymyksistä, nollauksesta eikä selainkorissa.
+- **Toteutus (`server/whatsapp/dialogue.mjs`):** apuri näyttää vanhan korin (enintään 8 riviä ja toimituspäivä) ja kysyy "Lisätäänkö tämä vanhaan ostoskoriin? 1) kyllä, lisätään vanhaan 2) ei, aloitetaan uusi tilaus". Pelkkään tervehdykseen kysymys on "Jatketaanko sitä vai aloitetaanko uusi tilaus?". Viesti odottaa tilassa `staleCart`, eikä mitään lisätä ennen vastausta.
+  - Vastaukset 1, kyllä, joo, vanhaan ja samaan jatkavat vanhaa koria, ja odottanut viesti käsitellään siinä ("Selvä, jatketaan vanhaa ostoskoria. Listalle tuli kerma 10 l.").
+  - Vastaukset 2, ei, uusi, aloitetaan ja poista vanha sulkevat vanhan korin samalla nollauksella kuin "aloita alusta", ja viesti menee uuteen koriin.
+  - Epäselvä vastaus kysyy uudelleen. Sen mukana tullut määrä säilyy odottavassa viestissä.
+  - Rento moro tai moikka saa vastauksen "No moikka!".
+- **Siirtymäviesti (`cart-presentation.mjs`):** kun listalle tulee tuote ja siirrytään valitsemaan vaihtoehtoja, "Tässä vaihtoehdot:" korvautuu omalla viestillä `CHOOSE_TRANSITION`. Myös uuden korin ensimmäiset rivit kerrotaan ("Listalle tuli maito 20 l ja voi 5 kg."). Valintavaiheen sisällä (esim. "näytä lisää") lyhyet fraasit pysyvät.
+- **Ydin (`order-conversation/index.mjs`):** jos jatketun luonnoksen toimituspäivä on jo mennyt, päivä tyhjennetään ja kysytään uudelleen ("Aiempi toimituspäivä pe 20.11. on jo mennyt, joten valitaan uusi päivä."). Tuotteet, määrät ja valinnat säilyvät, ja revisio kasvaa.
+- **Tarkistukset:**
+  - Uusi `test/whatsapp-stale-cart.test.mjs` 11/11 oikealla tilausmoottorilla, sääntötulkilla ja WhatsApp-sillalla.
+  - Päivitetty `whatsapp-cart-reply` (siirtymäviesti) ja `whatsapp-greeting-rush` (No moikka).
+  - WhatsApp-, tilauskeskustelu- ja Haiku-löydöstestit 256/256.
+  - Koko `npm test` 389/395. Kuusi kaatuvaa ovat libsql/Turso-testit (`@libsql/client` puuttuu yhteisestä `node_modules`ista), samat kuin aiemmin. `aimo:eval` 26/26.
+  - Oikea malli (Haiku `.env.whatsapp`:sta, muistikannat, simuloidut tuotetyökalut, ei Valiota, Metaa eikä tilauksia), 11 kutsua, 0 virhettä: "moro, 10 l kermaa" 3 h tauon jälkeen → No moikka + vanha kori + kysymys → "1" → kerma vanhaan koriin. Tuotekysymys ei kysynyt. "voisitko laittaa 3 kg juustoa" → kysymys → "uus tilaus" → uusi kori, jossa vain juusto. Korin tauon laskutapa muutettiin tämän ajon jälkeen, ja muutos testattiin vain automaattitesteillä.
+- **Rajat:**
+  - Käyttöönoton jälkeen ensimmäinen viesti ei kysy, koska vanhasta tilasta puuttuu aikaleima. Kysymys toimii toisesta viestistä alkaen.
+  - Reseptilinkin hyväksyntä tauon jälkeen kysyy saman kysymyksen ennen kuin ainekset menevät koriin.
+  - Kuvassa näkynyt "Kanan fileesuikale 100 kpl" → "100 kg, 899,00 €" on erillinen yksikkövika (kappalemäärä luettu painotuotteen myyntieriksi), eikä sitä korjattu tässä.
+- **Käyttöönotto kesken:** botti pyörii Vercelissä (sessio E). Muutos tulee puhelimeen vasta seuraavassa Vercel-julkaisussa (`docs/vercel.md`), jota ei tehty tässä chatissa.
+
 ## 17.11.2026 yö — WhatsApp-botti siirretty Verceliin ja Tursoon, Macia ei tarvita (Claude Code, sessio E pilvisiirto)
 
 - **Käyttäjän luvat:** Eelis hyväksyi vaihdon ("Kyllä, vaihda nyt") ja sen jälkeen ensimmäisen korjauserän ("Kyllä, ota käyttöön") sekä päätti, että julkinen tilausnäkymä näyttää kaikkien WhatsApp-testaajien tilausten julkiset kentät (B:n #13).

@@ -71,7 +71,14 @@ export function groundedAcknowledgement(value, { facts, userText = '' }) {
   return text;
 }
 
-/** Tuotevalinnan tai vaihtoehtolistan alku: kertoo koodissa, mitä juuri valittiin tai lisättiin, ilman mallia. */
+// Oma viesti ennen vaihtoehtolistaa, kun lisäyksen jälkeen siirrytään valitsemaan tuotteita (Eelis 17.11.): muuten
+// "Listalle tuli maito 10 l. Tässä vaihtoehdot:" ja perään toisen tuotteen vaihtoehdot näytti siltä, että maidon vaihtoehdot puuttuvat.
+export const CHOOSE_TRANSITION = 'Nyt olisi aika valita vaihtoehtoja, niin käydään ostoskorisi pikaisesti läpi!';
+
+/**
+ * Tuotevalinnan tai vaihtoehtolistan alku: kertoo koodissa, mitä juuri valittiin tai lisättiin, ilman mallia.
+ * Palauttaa erillisinä WhatsApp-viesteinä lähetettävät tekstit tai null.
+ */
 export function selectionAcknowledgement({ previousList, shoppingList, status }) {
   if (!shoppingList?.lines?.length || !['choosing', 'ready'].includes(status)) return null;
   if (previousList && previousList.id === shoppingList.id && previousList.revision === shoppingList.revision) return null;
@@ -84,13 +91,19 @@ export function selectionAcknowledgement({ previousList, shoppingList, status })
   const parts = [];
   if (picked.length) parts.push(`${rotate(['Selvä, otetaan', 'Hyvä, otetaan', 'Selvä, valitaan'])} ${join(picked.map((line) => line.selectedName))}.`);
   const label = (line) => [line.productTerm, quantityLabel(line.quantity)].filter(Boolean).join(' ');
-  if (added.length && previousList?.id === shoppingList.id) parts.push(`Listalle tuli ${join(added.map(label))}.`);
+  // Myös uuden korin ensimmäiset rivit kerrotaan ("No moikka! Listalle tuli maito 10 l.", Eelis 17.11.).
+  if (added.length) parts.push(`Listalle tuli ${join(added.map(label))}.`);
   else if (changed.length) parts.push(`Päivitetty: ${join(changed.map(label))}.`);
   if (previousList?.id === shoppingList.id && previousList.deliveryDate && shoppingList.deliveryDate
     && previousList.deliveryDate !== shoppingList.deliveryDate) parts.push(`Toimituspäivä nyt ${dateLabel(shoppingList.deliveryDate)}`);
-  if (!parts.length) parts.push(status === 'choosing' ? rotate(['Selvä! Tässä sopivat vaihtoehdot:', 'Hyvä, katsotaan vaihtoehdot:', 'Selvä, tässä vaihtoehdot:']) : 'Selvä!');
-  else if (status === 'choosing' && !picked.length) parts.push('Tässä vaihtoehdot:');
-  return parts.join(' ');
+  // Valintavaihe alkaa (uusi lista tai edellisellä kerralla puuttui vielä päivä, määrä tai tarkennus): siirtymä omana viestinään.
+  const entering = !previousList || previousList.id !== shoppingList.id || previousList.status !== 'needs_product_selection';
+  if (!parts.length) {
+    if (status !== 'choosing') return ['Selvä!'];
+    return [entering ? CHOOSE_TRANSITION : rotate(['Selvä! Tässä sopivat vaihtoehdot:', 'Hyvä, katsotaan vaihtoehdot:', 'Selvä, tässä vaihtoehdot:'])];
+  }
+  if (status === 'choosing' && !picked.length) return [parts.join(' '), CHOOSE_TRANSITION];
+  return [parts.join(' ')];
 }
 
 export const FALLBACK_ACKNOWLEDGEMENT = 'Selvä, kirjasin ylös!';

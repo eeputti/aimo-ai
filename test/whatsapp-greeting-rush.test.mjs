@@ -24,13 +24,13 @@ test('tervehdys seuraa Helsingin kellonaikaa, peilaa arkisen tervehdyksen eikä 
     assert.equal(greetingFor('hyvää päivää', at(hhmm)), word, hhmm);
   }
   assert.equal(greetingFor('Morjes, tarviis maitoa', at('23:30')), 'Morjes!');
-  assert.equal(greetingFor('moro', at('12:00')), 'Moro!');
+  assert.equal(greetingFor('moro', at('12:00')), 'No moikka!'); // rento moro saa iloisen vastauksen (Eelis 17.11.)
   // Neutraali moi/hei ei ole tyyli vaan tervehdys: kellonajan mukainen vastaus (pilotin X093–X100).
   assert.equal(greetingFor('Moi!', at('07:30')), 'Huomenta!');
   assert.equal(greetingFor('moi', at('14:00')), 'Päivää!');
   assert.equal(greetingFor('hei, tarviis tilata', at('19:30')), 'Iltaa!');
   assert.equal(greetingFor('moi', at('02:30')), 'Moi!');
-  assert.equal(greetingFor('moikka', at('12:00')), 'Moikka!');
+  assert.equal(greetingFor('moikka', at('12:00')), 'No moikka!');
   assert.equal(greetingFor('terve', at('08:00')), 'Terve!');
   // Palvelimen aikavyöhyke ei vaikuta: sama hetki UTC-merkinnällä.
   assert.equal(greetingFor('hyvää päivää', Date.parse('2026-11-15T03:30:00Z')), 'Huomenta!');

@@ -507,6 +507,14 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
     if (draft && (draft.customerId !== customer.customerId || draft.bindingVersion !== customer.bindingVersion)) { draft.state = 'cancelled'; store.save(conversationId, draft, `${messageId}:rebind`, {}); draft = null; }
     draft ||= newDraft(customer);
     draft.diet ||= { known: false, claims: [], excludeAllergens: [] };
+    // Tauon jälkeen jatkettu luonnos: mennyt toimituspäivä ei kelpaa tarjoukseen, joten päivä kysytään uudelleen.
+    // Tuotteet, määrät ja valinnat säilyvät; hinnat ja saatavuus tarkistetaan uudelle päivälle.
+    let pastDate = null;
+    if (draft.state === 'active' && validDate(draft.deliveryDate) && draft.deliveryDate < today) {
+      pastDate = draft.deliveryDate;
+      draft.deliveryDate = null; draft.offered = {}; draft.seen = {}; draft.quote = null; draft.pending = null; delete draft.earliest;
+      draft.revision += 1;
+    }
     let result;
     try {
       if (CANCEL.test(t) || CANCEL_ALL.test(t)) {
@@ -656,6 +664,10 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
     // vastaus "Luonnos on tyhjä" olisi väärä (pilotti X016: maito jäi listalle). Pelkän päivän tai ruokavalion
     // sisältävä luonnos säilyy, jotta niitä ei kysytä uudelleen (katselmus #11).
     if (!draft.lines.length && draft.state === 'active' && store.get(draft.id)?.lines?.length) draft.state = 'cancelled';
+    // Mennyt päivä kerrotaan, ellei asiakas antanut samassa viestissä uutta päivää.
+    if (pastDate && draft.state === 'active' && draft.lines.length && !draft.deliveryDate) {
+      result = { ...result, text: `Aiempi toimituspäivä ${dateLabel(pastDate)} on jo mennyt, joten valitaan uusi päivä.\n\n${result.text}` };
+    }
     const keep = draft.lines.length || draft.state !== 'active' || draft.deliveryDate || dietLabel(draft.diet) || draft.diet.known;
     const out = { text: result.text, status: result.status, draftId: draft.id, revision: draft.revision, ...(result.orderId ? { orderId: result.orderId } : {}),
       ...(result.removedNote ? { removedNote: result.removedNote } : {}) };
