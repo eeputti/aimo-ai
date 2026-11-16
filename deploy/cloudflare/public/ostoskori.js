@@ -1,15 +1,17 @@
-// Ostoskori-välilehti: avaa tämän selaimen keskustelun ostoskorin samalla sivustolla (/whatsapp/cart#…).
-const $ = (id) => document.getElementById(id);
-function show(title, detail) {
-  $('cart-title').textContent = title; $('cart-detail').textContent = detail; $('cart-actions').hidden = false;
-}
-async function init() {
+// Ostoskori-välilehti: sivu on aina Toimitustukun korin näköinen. Jos tämän selaimen keskustelussa (Keskustele-välilehti)
+// on jo kori, avataan se samalla sivustolla (/whatsapp/cart#…). Muuten näkyy tyhjä kori ja ohje tilata WhatsAppissa:
+// WhatsAppissa koottu kori aukeaa vain apurin lähettämästä Avaa ostoskori -linkistä, jota tämä sivu ei voi arvata.
+const CART = /^\/whatsapp\/cart#[A-Za-z0-9_.-]+$/;
+
+export async function browserChatCart(fetcher = fetch) {
   try {
-    const response = await fetch('/api/chat/cart', { cache: 'no-store', signal: AbortSignal.timeout(20_000) });
+    const response = await fetcher('/api/chat/cart', { cache: 'no-store', signal: AbortSignal.timeout(20_000) });
+    if (!response.ok) return null;
     const data = await response.json().catch(() => ({}));
-    if (response.ok && typeof data.url === 'string' && /^\/whatsapp\/cart#[A-Za-z0-9_.-]+$/.test(data.url)) { location.replace(data.url); return; }
-    if (!response.ok) return show('Ostoskori ei ole juuri nyt saatavilla.', data.error || 'Tilausapurin palvelin on tauolla. Yritä hetken päästä uudelleen.');
-    show('Ostoskori on vielä tyhjä.', 'Kerro tilausapurille, mitä keittiöön tarvitaan ja milloin. Ostoskori syntyy keskustelussa, ja näet sen täällä.');
-  } catch { show('Ostoskoria ei saatu haettua.', 'Tarkista yhteys ja lataa sivu uudelleen.'); }
+    return typeof data.url === 'string' && CART.test(data.url) ? data.url : null;
+  } catch { return null; }
 }
-void init();
+
+if (typeof document !== 'undefined') {
+  void browserChatCart().then((url) => { if (url) location.replace(url); });
+}
