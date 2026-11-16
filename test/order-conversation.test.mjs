@@ -46,7 +46,7 @@ const ready = {
   'maitoa 30': (d) => ({ intent: 'order', ops: [{ op: 'update', ref: ref(d, 'maito'), quantity: { value: 30, unit: 'L' } }] }),
 };
 
-test('päivä ensin yksin, sitten määrät, ruokavalintaa kysytään vasta relevanttien ehdokkaiden perusteella', async () => {
+test('päivä ensin ja puuttuvat määrät samassa viestissä, ruokavalintaa kysytään vasta relevanttien ehdokkaiden perusteella', async () => {
   const { say, calls, store } = setup({ script: {
     'maitoa ja kermaa': { intent: 'order', ops: [add('maito'), add('kerma')] },
     maanantaiksi: { intent: 'order', deliveryDate: '2026-11-16', ops: [] },
@@ -58,9 +58,11 @@ test('päivä ensin yksin, sitten määrät, ruokavalintaa kysytään vasta rele
   assert.match((await say('moi')).text, /tilausapuri/);
   const a = await say('maitoa ja kermaa');
   assert.equal(a.status, 'collecting');
-  assert.match(a.text, /\n\nMille päivälle toimitus\?[^\n]*$/);
-  assert.doesNotMatch(a.text, /Kuinka paljon|allergioita|gluteeniton|pähkinätön/);
-  assert.deepEqual(store.active('conv').pending, { kind: 'checklist', asks: ['date'], refs: [] });
+  assert.match(a.text, /\n\nMille päivälle toimitus\?[^\n]*\nKuinka paljon: maito, kerma\?$/);
+  assert.doesNotMatch(a.text, /allergioita|gluteeniton|pähkinätön/);
+  const asked = store.active('conv');
+  assert.deepEqual(asked.pending, { kind: 'checklist', asks: ['date', 'quantity'], refs: [ref(asked, 'maito'), ref(asked, 'kerma')] });
+  assert.equal(calls.suggest, 0); // tuotteita ei haeta ennen päivää
   const b = await say('maanantaiksi');
   assert.match(b.text, /Kuinka paljon: maito, kerma\?$/);
   assert.doesNotMatch(b.text, /Mille päivälle/);

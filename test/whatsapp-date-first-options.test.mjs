@@ -1,4 +1,4 @@
-// Eeliksen vaatimus 15.11.2026: toimituspäivä kysytään ensin ja yksin, tuotevaihtoehdot näytetään yksi rivi kerrallaan
+// Eeliksen vaatimus 15.11.2026: toimituspäivä kysytään ensin (16.11. alkaen samassa viestissä puuttuvat määrät), tuotevaihtoehdot näytetään yksi rivi kerrallaan
 // numeroituna (1, 2, 3) ja seuraava numero hakee lisää samalle päivälle toimitettavia vaihtoehtoja ilman toistoja.
 // Oikeat tuotetyökalut ja keskustelumoottori injektoidulla haulla ja käsikirjoitetulla tulkilla: ei mallia, katalogia tai verkkoa.
 import test, { after } from 'node:test';
@@ -34,7 +34,7 @@ const egg = ([id, brand, net], date) => ({ id, name: `${brand} M10 kananmuna`, b
   availability: { deliveryDate: date, stock: 100 }, quantityExplanation: { providedItems: 50, text: '5 rasiaa × 10 munaa = 50 munaa' } });
 const cream = ([id, brand, net], date) => ({ id, name: `${brand} kuohukerma 1 l`, brand, qty: 5, unitLabel: 'ltk', litres: 1, price: net / 5, labels: [], availability: { deliveryDate: date, stock: 40 } });
 
-function setup(script = {}) {
+function setup(script = {}, interpret = null) {
   let t = Date.parse('2026-11-14T08:00:00Z'); let n = 0;
   const calls = { search: [], interpret: [], quote: [] };
   const tools = createOrderingTools({
@@ -52,9 +52,10 @@ function setup(script = {}) {
     placeOrder: async () => ({ status: 'confirmed', orderId: 'AGW-1', deliveryDate: MONDAY, totals: { net: 20 }, reasons: [] }),
   });
   const store = openDraftStore(':memory:', () => t);
-  const handleTurn = createOrderingConversation({ store, tools, now: () => t, interpretTurn: async ({ text, draft }) => {
-    calls.interpret.push(text);
-    const r = script[text]; return typeof r === 'function' ? r(draft) : r || { intent: 'other', ops: [] };
+  const handleTurn = createOrderingConversation({ store, tools, now: () => t, interpretTurn: async (input) => {
+    calls.interpret.push(input.text);
+    if (interpret) return interpret(input);
+    const r = script[input.text]; return typeof r === 'function' ? r(input.draft) : r || { intent: 'other', ops: [] };
   } });
   const say = (text) => handleTurn({ messageId: `m${++n}`, conversationId: 'conv', customer, text, receivedAt: t });
   return { say, calls, store, tools };
@@ -87,7 +88,7 @@ test('suggest sivuttaa: halvin ensimmäisellä sivulla, seuraavat ilman toistoja
   assert.ok(two.lines[0].options.some((o) => o.productId === 'E6'));
 });
 
-test('päivä kysytään ensin yksin, sitten määrät, ja vaihtoehdot yksi rivi kerrallaan numeroituna lisähakuineen', async () => {
+test('päivä ja puuttuvat määrät kysytään ensin samassa viestissä, ja vaihtoehdot yksi rivi kerrallaan numeroituna lisähakuineen', async () => {
   const { say, calls, store } = setup({
     'tarvis 50 kananmunaa ja kermaa': { intent: 'order', ops: [eggs50, { op: 'add', productTerm: 'kerma', quantity: null, claims: [], excludeAllergens: [] }] },
     maanantaiksi: { intent: 'order', deliveryDate: MONDAY, ops: [] },
@@ -95,10 +96,10 @@ test('päivä kysytään ensin yksin, sitten määrät, ja vaihtoehdot yksi rivi
   });
   const first = await say('tarvis 50 kananmunaa ja kermaa');
   assert.equal(first.status, 'collecting');
-  assert.match(first.text, /^Luonnoksessa nyt:\n- kananmunat 50 kpl\n- kerma\n\nMille päivälle toimitus\?/);
-  assert.doesNotMatch(first.text, /Kuinka paljon|laktoos|allergi|\d\)/i); // ei määriä, ruokavaliota tai vaihtoehtoja ennen päivää
+  assert.match(first.text, /^Luonnoksessa nyt:\n- kananmunat 50 kpl\n- kerma\n\nMille päivälle toimitus\?[^\n]*\nKuinka paljon: kerma\?$/);
+  assert.doesNotMatch(first.text, /laktoos|allergi|\d\)/i); // ei ruokavaliota tai vaihtoehtoja ennen päivää
   assert.equal(calls.search.length, 0);
-  assert.deepEqual(store.active('conv').pending, { kind: 'checklist', asks: ['date'], refs: [] });
+  assert.deepEqual(store.active('conv').pending, { kind: 'checklist', asks: ['date', 'quantity'], refs: [refOf(store.active('conv'), 'kerma')] });
 
   const dated = await say('maanantaiksi');
   assert.match(dated.text, /Kuinka paljon: kerma\?/);
@@ -176,12 +177,17 @@ test('annettua päivää ei kysytä uudelleen ja päivän vaihto hakee vaihtoehd
   assert.equal(cheapest.status, 'ready');
 });
 
-test('WhatsApp kuittaa mainitut tuotteet ja kysyy ennen päivää vain päivän', async () => {
-  const text = 'Luonnoksessa nyt:\n- kananmunat 50 kpl\n- kerma\n\nMille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.';
+test('WhatsApp kuittaa mainitut tuotteet ja kysyy päivän ja puuttuvat määrät samassa lauseessa', async () => {
+  const text = 'Luonnoksessa nyt:\n- kananmunat 50 kpl\n- kerma\n\nMille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.\nKuinka paljon: kerma?';
   const shoppingList = { id: 'd1', revision: 2, deliveryDate: null, lines: [{ productTerm: 'kananmunat', quantity: { value: 50, unit: 'PCS' } }, { productTerm: 'kerma', quantity: null }] };
   const messages = await presentCollectingCart({ result: { status: 'collecting', draftId: 'd1', revision: 2, text }, shoppingList, previousList: null, ask: null, userText: 'tarvis 50 kananmunaa ja kermaa' });
   assert.deepEqual(messages, ['Selvä, kirjasin ylös!', 'Ostoskorissasi nyt:\n- kananmunat 50 kpl\n- kerma',
-    'Mille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.']);
+    'Mille päivälle tarvitset toimituksen, ja kuinka paljon laitetaan kermaa? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.']);
+  // Kun kaikilla riveillä on määrä, kysytään vain päivä kuten ennenkin.
+  const dateOnly = await presentCollectingCart({ result: { status: 'collecting', draftId: 'd1', revision: 2,
+    text: 'Luonnoksessa nyt:\n- kananmunat 50 kpl\n\nMille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.' },
+  shoppingList: { ...shoppingList, lines: [shoppingList.lines[0]] }, previousList: null, ask: null, userText: 'tarvis 50 kananmunaa' });
+  assert.equal(dateOnly.at(-1), 'Mille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.');
   // Päivän jälkeen sama esitys kysyy puuttuvan määrän tavalliseen tapaan.
   const after = await presentCollectingCart({ result: { status: 'collecting', draftId: 'd1', revision: 3, text: 'Luonnoksessa nyt:\n- kananmunat 50 kpl\n- kerma\n\nKuinka paljon: kerma?' },
     shoppingList: { ...shoppingList, revision: 3, deliveryDate: MONDAY }, previousList: shoppingList, ask: null, userText: 'maanantaiksi' });
@@ -317,4 +323,16 @@ test('vahvistus palauttaa rakenteisen tilaustunnuksen ja tilan, myös uusinnassa
   store.save('c', { id: 'WD-old', state: 'ordered', orderId: 'AGW-OLD', revision: 1, customerId: customer.customerId, bindingVersion: customer.bindingVersion, lines: [], diet: { known: true, claims: [], excludeAllergens: [] } }, 'seed', {});
   const legacy = await createOrderingConversation({ store, tools: {}, now: () => 0, interpretTurn: async () => ({ intent: 'order', ops: [] }) })({ messageId: 'x', conversationId: 'c', customer, text: 'TILAA', receivedAt: 0 });
   assert.equal(legacy.status, 'confirmed'); assert.equal(legacy.orderId, undefined);
+});
+
+test('yksi vastaus kattaa sekä päivän että määrän: "perjantaiks 5 kg" sääntötulkilla', async () => {
+  const { understand } = await import('../server/aimo/understand.mjs');
+  const { say, store, calls } = setup({}, createRuleInterpreter({ understand }));
+  const first = await say('tarviin voita');
+  assert.match(first.text, /^Luonnoksessa nyt:\n- voi\n\nMille päivälle toimitus\?[^\n]*\nKuinka paljon: voi\?$/);
+  assert.equal(calls.search.length, 0);
+  await say('perjantaiks 5 kg');
+  const draft = store.active('conv');
+  assert.equal(draft.deliveryDate, '2026-11-20');
+  assert.deepEqual(draft.lines.map((l) => [l.productTerm, l.quantity?.value, l.quantity?.unit]), [['voi', 5, 'KG']]);
 });

@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 — WhatsApp: rivit ajatusviivalla, päivä ja puuttuvat määrät samassa kysymyksessä (Claude Code, tilannechat)
+
+- **Käyttäjän pyynnöt:** Eelis kokeili puhelimella Haiku-bottia uuden tunnelin kautta. "moi tarviin voita" tuli perille klo 22.21, ja vastaus lähti kolmena osana, joilla kaikilla on Metan tunniste. Botti kysyi ensin päivän. Kuvakaappauksen perusteella WhatsApp näyttää rivin alun "- " luettelopallona, ja Eelis haluaa ranskalaiset viivat. Lisäksi, kun määrä puuttuu, sama kysymys kysyy päivän ja määrän ("mille päivälle tarviit toimituksen ja kuinka paljon laitetaan voita?"). Tämä muuttaa 15.11. päätöstä, jossa päivä kysyttiin yksin.
+- **Viivat:** `server/whatsapp/channel.mjs` `plainDashes` vaihtaa lähtevän Meta-viestin (teksti ja korilinkin painikkeen runko) rivin alun "- " ajatusviivaksi "– ". Moottorin teksti, tallennettu vastaus, `reply_parts` ja selainkeskustelu käyttävät edelleen "- ", joten korin esityksen jäsennys ei muutu. Keskellä riviä olevat viivat ja numeroidut vaihtoehdot ovat ennallaan.
+- **Päivä ja määrät:** `server/order-conversation/index.mjs` kysyy ilman päivää päivän ja puuttuvat määrät samassa viestissä (`pending.asks` `['date', 'quantity']`, refs puuttuvat rivit). Tuotteita ei edelleenkään haeta ennen päivää. `server/whatsapp/cart-presentation.mjs` yhdistää ne yhdeksi lauseeksi: "Mille päivälle tarvitset toimituksen, ja kuinka paljon laitetaan voita? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot." Kun kaikilla riveillä on määrä, kysymys on ennallaan. Sääntötulkki kohdistaa vastauksen "perjantaiks 5 kg" sekä päivään että puuttuvaan riviin.
+- **Tarkistukset:** uusi `test/whatsapp-list-dashes.test.mjs` (2), päivitetyt `whatsapp-date-first-options` (+1 yhdistetty vastaus sääntötulkilla), `order-conversation` ja `whatsapp-dialogue`. Koko `npm test` 310/310 worktreessä origin/main 76b1359:n päällä (node_modules 1585022-snapshotista, paketit samat). Syntaksi ja `git diff --check` läpi. Ei malli-, Meta- tai Valio-kutsuja. Ajatusviivan ja uuden kysymyksen näkymistä puhelimessa ei ole vielä nähty.
+- **Käyttöönotto kesken:** botti (PID 94487) ajaa yhä snapshotia 1585022, joten muutokset tulevat käyttöön vasta sovitussa restartissa; lupa kysytään käyttäjältä. Haikun kuittauslause "Katsotaan vielä muutama tarkentava tieto ennen kuin mennään eteenpäin" on kömpelö, mutta sitä ei muutettu.
+
 ## 16.11.2026 — WhatsApp-botille uusi julkinen tunneli (Claude Code, kustannuschat)
 
 - **Käyttäjän pyyntö:** Eelis hyväksyi uuden tunnelin, kun Haiku-vaihdon yhteydessä huomattiin, että edellinen pikatunneli oli kaatunut. Puhelimen WhatsApp-viestit ja Workerin selainkeskustelu eivät tavoittaneet bottia.

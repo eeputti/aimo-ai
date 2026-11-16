@@ -269,16 +269,19 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
     draft.pending = null;
     if (!draft.lines.length) return { status: 'collecting', text: `Luonnos on tyhjä. ${draft.deliveryDate ? HELP : START_QUESTION}` };
     const list = draft.lines.map((l) => `- ${lineLabel(l)}${l.selectedName ? `: ${l.selectedName}` : ''}`).join('\n');
-    // Toimituspäivä ensin ja yksin: saatavuus, hinnat ja vaihtoehdot riippuvat päivästä. Mainitut tuotteet säilyvät luonnoksessa.
+    const noQty = draft.lines.filter((l) => !l.quantity);
+    const quantityQuestion = `Kuinka paljon: ${noQty.map((l) => l.productTerm).join(', ')}?`;
+    // Toimituspäivä ensin: saatavuus, hinnat ja vaihtoehdot riippuvat päivästä. Puuttuvat määrät kysytään samassa viestissä
+    // (Eelis 16.11.), mutta tuotteita ei haeta ennen päivää. Mainitut tuotteet säilyvät luonnoksessa.
     if (!draft.deliveryDate) {
-      draft.pending = { kind: 'checklist', asks: ['date'], refs: [] };
-      return { status: 'collecting', text: `Luonnoksessa nyt:\n${list}\n\n${draft.rush ? RUSH_DATE_QUESTION : DATE_QUESTION}` };
+      draft.pending = { kind: 'checklist', asks: noQty.length ? ['date', 'quantity'] : ['date'], refs: noQty.map((l) => l.ref) };
+      const dateQuestion = draft.rush ? RUSH_DATE_QUESTION : DATE_QUESTION;
+      return { status: 'collecting', text: `Luonnoksessa nyt:\n${list}\n\n${dateQuestion}${noQty.length ? `\n${quantityQuestion}` : ''}` };
     }
     // Sitten määrät. Ruokavaliotarkennus kysytään vasta, kun oikeat tilattavat vaihtoehdot eroavat siinä;
     // asiakkaan itse ilmoittamat vaatimukset pätevät aina.
-    const noQty = draft.lines.filter((l) => !l.quantity);
     const questions = []; const asks = [];
-    if (noQty.length) { questions.push(`Kuinka paljon: ${noQty.map((l) => l.productTerm).join(', ')}?`); asks.push('quantity'); }
+    if (noQty.length) { questions.push(quantityQuestion); asks.push('quantity'); }
     if (asks.length) draft.pending = { kind: 'checklist', asks, refs: noQty.map((l) => l.ref) };
     if (!draft.deliverySiteId && customer.deliverySites?.length > 1 && !questions.length) {
       questions.push(`Mihin toimitetaan? ${customer.deliverySites.map((s, i) => `${i + 1}) ${s.label}`).join(' ')}`);

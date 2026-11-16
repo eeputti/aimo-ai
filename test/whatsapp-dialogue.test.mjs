@@ -224,8 +224,9 @@ test('a failed or ungrounded copy model cannot change rows, invent quantities or
     const result = await f.turn('50 l maitoa, kananmunia ja kermaa');
     assert.equal(result.messages[0], 'Selvä, kirjasin ylös!');
     assert.match(result.messages[1], /- maito 50 l\n- kananmuna\n- kerma$/);
-    assert.match(result.messages[2], /^Mille päivälle toimitus\?/); // ennen päivää ei kysytä määriä
-    assert.doesNotMatch(result.text, /Kuinka paljon/);
+    // Päivä ja puuttuvat määrät samassa lauseessa; mallin keksimä kysymys ei kelpaa, vaan käytetään vakiomuotoa.
+    assert.equal(result.messages[2], 'Mille päivälle tarvitset toimituksen, ja kuinka paljon laitetaan kananmunia ja kermaa? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.');
+    assert.doesNotMatch(result.text, /Kuinka paljon:/);
     assert.doesNotMatch(result.text, /kermaa 50|lähetetty|saatavilla/);
   }
 });

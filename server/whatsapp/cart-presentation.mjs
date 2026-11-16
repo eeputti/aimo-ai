@@ -1,6 +1,7 @@
 // The model supplies tone around a saved cart. The engine's rows and required checks stay intact.
 import { guardModelText } from './model-guard.mjs';
 const PRODUCTS = '{{products}}';
+const DATE_PREFIX = 'Mille päivälle toimitus?';
 // Canonical physical units before interpretation: the model must not turn 5 dl into 5 L
 // just because its output schema accepts only L/KG/PCS. This does not infer any missing amount.
 export function normalizeOrderUnits(text) {
@@ -104,9 +105,10 @@ export async function presentCollectingCart({ result, shoppingList, previousList
   const missing = shoppingList.lines.filter((line) => !line.quantity);
   const canonicalQuestion = `Kuinka paljon: ${missing.map((line) => line.productTerm).join(', ')}?`;
   const questions = blocks[1].split('\n');
-  // Toimituspäivä kysytään ensin ja yksin: puuttuvat määrät kysytään vasta päivän jälkeen.
+  // Ilman päivää kysytään toimituspäivä ja samassa lauseessa puuttuvat määrät (Eelis 16.11.).
   const asksQuantity = missing.length > 0 && questions.includes(canonicalQuestion);
-  const dateFirst = !shoppingList.deliveryDate && questions.length === 1 && questions[0].startsWith('Mille päivälle toimitus?');
+  const dateFirst = !shoppingList.deliveryDate && questions.length <= 2 && questions[0].startsWith(DATE_PREFIX)
+    && questions.slice(1).every((question) => question === canonicalQuestion);
   if (missing.length && !asksQuantity && !dateFirst) return null;
   const partitives = missing.map((line) => PARTITIVE[line.productTerm.toLocaleLowerCase('fi-FI')]);
   const productCase = partitives.every(Boolean) ? 'partitive' : 'labels';
@@ -130,7 +132,7 @@ export async function presentCollectingCart({ result, shoppingList, previousList
       const { json } = await ask({ purpose: 'whatsapp_cart_reply', tier: 'deep', system: SYSTEM, schema: SCHEMA,
         maxTokens: 1600, timeoutMs: 45000, retries: 0,
         user: JSON.stringify({ message: userText, changed, ...facts, recentReplies,
-          next: dateFirst ? 'date' : asksQuantity ? 'quantity' : 'other', productCase, missingQuantityCount: asksQuantity ? missing.length : 0 }) });
+          next: dateFirst ? (asksQuantity ? 'date+quantity' : 'date') : asksQuantity ? 'quantity' : 'other', productCase, missingQuantityCount: asksQuantity ? missing.length : 0 }) });
       const own = changed && !answered ? groundedAcknowledgement(json?.acknowledgement, { facts, userText }) : '';
       if (own) acknowledgement = own;
       const question = json?.quantityQuestion;
@@ -139,6 +141,12 @@ export async function presentCollectingCart({ result, shoppingList, previousList
   }
   const cart = blocks[0].replace('Luonnoksessa nyt:', deliveryDate ? `Ostoskorissasi nyt (toimitus ${deliveryDate}):` : 'Ostoskorissasi nyt:');
   const rest = questions.filter((question) => !asksQuantity || question !== canonicalQuestion);
-  const followUp = [...(asksQuantity ? [quantityQuestion.replace(PRODUCTS, () => quantityProducts)] : []), ...rest].join('\n');
+  let quantityText = asksQuantity ? quantityQuestion.replace(PRODUCTS, () => quantityProducts) : '';
+  if (dateFirst && quantityText) {
+    // "Mille päivälle tarvitset toimituksen, ja kuinka paljon laitetaan voita? Haen sen jälkeen ..."
+    rest[0] = rest[0].replace(DATE_PREFIX, () => `Mille päivälle tarvitset toimituksen, ja ${quantityText[0].toLocaleLowerCase('fi-FI')}${quantityText.slice(1)}`);
+    quantityText = '';
+  }
+  const followUp = [...(quantityText ? [quantityText] : []), ...rest].join('\n');
   return [...(acknowledgement ? [acknowledgement] : []), cart, ...(followUp ? [followUp] : [])];
 }

@@ -77,6 +77,12 @@ export function linkButton(text) {
   return { body, label, url };
 }
 
+// WhatsApp shows a line starting with "- " as a bullet point. An en dash (–) stays a visible dash, as Eelis asked
+// on 16.11. Only the outgoing Meta text changes: the engine, the stored reply and the browser chat keep "- ".
+export function plainDashes(text) {
+  return String(text ?? '').replace(/^([ \t]*)- (?=\S)/gm, '$1– ');
+}
+
 export function createMetaSender(settings, fetchImpl = fetch, { linkButtons = process.env.WHATSAPP_LINK_BUTTONS !== 'false' } = {}) {
   const post = (to, message) => fetchImpl(`https://graph.facebook.com/${settings.apiVersion}/${settings.phoneId}/messages`, {
     method: 'POST', signal: AbortSignal.timeout(20_000),
@@ -90,7 +96,8 @@ export function createMetaSender(settings, fetchImpl = fetch, { linkButtons = pr
     if (!data.messages?.[0]?.id) throw new Error('META_NO_MESSAGE_ID');
     return data.messages[0].id;
   };
-  return async (to, text) => {
+  return async (to, reply) => {
+    const text = plainDashes(reply);
     const button = linkButtons && linkButton(text);
     if (button) {
       const res = await post(to, { type: 'interactive', interactive: { type: 'cta_url', body: { text: button.body },
