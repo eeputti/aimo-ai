@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import worker from '../src/index.ts';
-import { publishOnce, pushOrderEvents } from '../publish-orders.mjs';
+import { publishOnce, pushOrderEvents, orderEventKey } from '../publish-orders.mjs';
 
 test('publisher → hosted order → demo payment → one confirmation, including cancellation and concurrent retries', async () => {
   const db = new DatabaseSync(':memory:');
@@ -26,7 +26,7 @@ test('publisher → hosted order → demo payment → one confirmation, includin
     const publish = () => pushOrderEvents({ url: origin, token, snapshot, known, email: { to: 'private@example.com', customerName: 'Private customer' }, fetcher });
     const pushed = await publish();
     assert.equal(pushed[0].email, 'awaiting_demo_payment');
-    assert.equal(known.has(order.orderId), true);
+    assert.equal(known.has(orderEventKey(order)), true); // tilauksen ilmentymä: numero + luontiaika (#24)
     assert.equal(sent.length, 0);
     assert.equal(db.prepare('SELECT email_attempts FROM order_events').get().email_attempts, 0);
     assert.deepEqual(await publish(), []);

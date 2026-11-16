@@ -8,15 +8,44 @@ import { clock } from './clock.mjs';
 
 // GATEWAY_DB: testiajo (npm run eval) käyttää omaa kantaansa, jotta demon tilaukset ja loki säilyvät.
 const db = openSqlite(process.env.GATEWAY_DB || path.join(ROOT, 'data', 'gateway.db'));
+// busy_timeout ensin: usea prosessi voi avata saman kannan yhtä aikaa (pilvi-instanssit, julkaisija, testit).
 db.exec(`
+  PRAGMA busy_timeout = 5000;
   PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS buyers (id TEXT PRIMARY KEY, api_key TEXT UNIQUE NOT NULL, json TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS quotes (id TEXT PRIMARY KEY, buyer_id TEXT NOT NULL, created_at TEXT NOT NULL, json TEXT NOT NULL);
   CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, buyer_id TEXT NOT NULL, idem_key TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, json TEXT NOT NULL, UNIQUE (buyer_id, idem_key));
   CREATE TABLE IF NOT EXISTS ledger (seq INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, actor TEXT NOT NULL, type TEXT NOT NULL, buyer_id TEXT, order_id TEXT, quote_id TEXT, payload TEXT NOT NULL, prev_hash TEXT NOT NULL, hash TEXT NOT NULL);
   CREATE INDEX IF NOT EXISTS ledger_order ON ledger (order_id);
+  CREATE TABLE IF NOT EXISTS counters (name TEXT PRIMARY KEY, value INTEGER NOT NULL);
 `);
 
+// Kirjoitustransaktio (BEGIN IMMEDIATE): lukeminen ja kirjoitus tehdään yhtenä, jotta kaksi samanaikaista tilausta
+// (sama prosessi await-kohdan jälkeen tai kaksi pilvi-instanssia samassa Turso-kannassa) eivät näe samaa tilannetta.
+// fn on synkroninen. Sisäkkäinen kutsu liittyy ulompaan. Lokin kuuntelijat saavat rivit vasta onnistuneen COMMITin jälkeen.
+let txDepth = 0;
+let committed = [];
+export function transaction(fn) {
+  if (txDepth > 0) { txDepth += 1; try { return fn(); } finally { txDepth -= 1; } }
+  db.exec('BEGIN IMMEDIATE');
+  txDepth = 1;
+  let result;
+  try {
+    result = fn();
+    if (typeof result?.then === 'function') throw new Error('transaction(): funktion on oltava synkroninen');
+    db.exec('COMMIT');
+  } catch (err) {
+    txDepth = 0; committed = [];
+    try { db.exec('ROLLBACK'); } catch { /* yhteys katkesi kesken, kanta perui itse */ }
+    throw err;
+  }
+  txDepth = 0;
+  const entries = committed; committed = [];
+  for (const entry of entries) for (const listen of listeners) { try { listen(entry); } catch (err) { console.error('[ledger listener]', err.message); } }
+  return result;
+}
+
+const MAX_ORDER_NUMBER = "SELECT COALESCE(MAX(CAST(substr(id, 14) AS INTEGER)), 0) FROM orders WHERE id LIKE 'AGW-%'";
 const q = {
   buyerByKey: db.prepare('SELECT json FROM buyers WHERE api_key = ?'),
   buyerById: db.prepare('SELECT json FROM buyers WHERE id = ?'),
@@ -25,11 +54,19 @@ const q = {
   quoteSave: db.prepare('INSERT INTO quotes (id, buyer_id, created_at, json) VALUES (?, ?, ?, ?)'),
   quoteGet: db.prepare('SELECT json FROM quotes WHERE id = ?'),
   orderSave: db.prepare('INSERT INTO orders (id, buyer_id, idem_key, status, created_at, json) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET status = excluded.status, json = excluded.json'),
+  // Uusi tilaus: ei ON CONFLICT -päivitystä, joten sama tilausnumero ei voi koskaan ylikirjoittaa toisen ostajan tilausta.
+  orderInsert: db.prepare('INSERT INTO orders (id, buyer_id, idem_key, status, created_at, json) VALUES (?, ?, ?, ?, ?, ?)'),
+  // Saman idempotenssiavaimen kaikki yritykset: ensimmäinen avaimella sellaisenaan, seuraavat muodossa "<avain>#<n>" ('#' < '$').
+  orderAttempts: db.prepare("SELECT json FROM orders WHERE buyer_id = ? AND (idem_key = ? OR (idem_key > ? AND idem_key < ?)) ORDER BY created_at, id"),
   orderGet: db.prepare('SELECT json FROM orders WHERE id = ?'),
   orderByIdem: db.prepare('SELECT json FROM orders WHERE buyer_id = ? AND idem_key = ?'),
   orderList: db.prepare('SELECT json FROM orders ORDER BY created_at DESC LIMIT ?'),
   orderListBuyer: db.prepare('SELECT json FROM orders WHERE buyer_id = ? ORDER BY created_at DESC LIMIT ?'),
-  orderCount: db.prepare('SELECT COUNT(*) AS n FROM orders'),
+  // Tilausnumero varataan yhdellä atomisella lauseella (ei COUNT(*)+1). Varaus jatkaa aina sekä laskurin että olemassa olevien
+  // numeroiden suurimmasta (myös vanhan koodin tai käsin tallennetut). Laskuri säilyy gatewayn nollauksen yli, joten
+  // nollauksen jälkeen numero ei toistu samassa kannassa.
+  orderNumber: db.prepare(`INSERT INTO counters (name, value) VALUES ('order', 1 + (${MAX_ORDER_NUMBER}))
+    ON CONFLICT(name) DO UPDATE SET value = 1 + MAX(counters.value, (${MAX_ORDER_NUMBER})) RETURNING value`),
   ledgerLast: db.prepare('SELECT seq, hash FROM ledger ORDER BY seq DESC LIMIT 1'),
   ledgerAdd: db.prepare('INSERT INTO ledger (ts, actor, type, buyer_id, order_id, quote_id, payload, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'),
   ledgerAll: db.prepare('SELECT * FROM ledger ORDER BY seq'),
@@ -48,11 +85,16 @@ export const quotes = {
   get: (id) => parse(q.quoteGet.get(id)),
 };
 export const orders = {
-  save(o) { q.orderSave.run(o.orderId, o.buyerId, o.idempotencyKey, o.status, o.createdAt, JSON.stringify(o)); return o; },
+  save(o) { q.orderSave.run(o.orderId, o.buyerId, o.idempotencySlot || o.idempotencyKey, o.status, o.createdAt, JSON.stringify(o)); return o; },
+  /** Uuden tilauksen tallennus. Heittää virheen, jos numero tai idempotenssipaikka on jo käytössä. */
+  insert(o) { q.orderInsert.run(o.orderId, o.buyerId, o.idempotencySlot || o.idempotencyKey, o.status, o.createdAt, JSON.stringify(o)); return o; },
   get: (id) => parse(q.orderGet.get(id)),
   byIdempotency: (buyerId, key) => parse(q.orderByIdem.get(buyerId, key)),
   list: (buyerId, limit = 50) => (buyerId ? q.orderListBuyer.all(buyerId, limit) : q.orderList.all(limit)).map(parse),
-  nextNumber: () => q.orderCount.get().n + 1,
+  /** Saman ostajan ja idempotenssiavaimen kaikki tilausyritykset vanhimmasta uusimpaan. */
+  attempts: (buyerId, key) => q.orderAttempts.all(buyerId, key, `${key}#`, `${key}$`).map(parse).filter((o) => o.idempotencyKey === key),
+  /** Seuraava vapaa tilausnumero. Numero ei toistu, vaikka kaksi tilausta varaisi sen yhtä aikaa. */
+  reserveNumber: () => Number(q.orderNumber.get().value),
 };
 
 const GENESIS = '0'.repeat(64);
@@ -64,14 +106,17 @@ export const onLedger = (fn) => { listeners.add(fn); return () => listeners.dele
 export const ledger = {
   /** actor: 'gateway' | 'policy' | 'agent:<buyerId>' | 'human:<nimi>' */
   append(actor, type, payload = {}, refs = {}) {
-    const last = q.ledgerLast.get();
-    const e = { ts: clock.now().toISOString(), actor, type, buyerId: refs.buyerId || null, orderId: refs.orderId || null, quoteId: refs.quoteId || null, payload: JSON.stringify(payload) };
-    const prev = last?.hash || GENESIS;
-    const hash = digest(prev, e);
-    const info = q.ledgerAdd.run(e.ts, e.actor, e.type, e.buyerId, e.orderId, e.quoteId, e.payload, prev, hash);
-    const entry = { seq: Number(info.lastInsertRowid), ...e, payload, prevHash: prev, hash };
-    for (const fn of listeners) fn(entry);
-    return entry;
+    // Edellisen rivin luku ja uuden kirjoitus samassa transaktiossa: kaksi kirjoittajaa ei haaroita ketjua.
+    return transaction(() => {
+      const last = q.ledgerLast.get();
+      const e = { ts: clock.now().toISOString(), actor, type, buyerId: refs.buyerId || null, orderId: refs.orderId || null, quoteId: refs.quoteId || null, payload: JSON.stringify(payload) };
+      const prev = last?.hash || GENESIS;
+      const hash = digest(prev, e);
+      const info = q.ledgerAdd.run(e.ts, e.actor, e.type, e.buyerId, e.orderId, e.quoteId, e.payload, prev, hash);
+      const entry = { seq: Number(info.lastInsertRowid), ...e, payload, prevHash: prev, hash };
+      committed.push(entry);
+      return entry;
+    });
   },
   /** Laskee koko ketjun uudelleen. brokenAt = ensimmäinen rivi, jonka hash ei täsmää. */
   verify() {
@@ -88,4 +133,5 @@ export const ledger = {
   recent: (limit = 60) => q.ledgerRecent.all(limit).map(rowToEntry),
 };
 
+// Laskuria (counters) ei nollata: nollauksen jälkeiset tilausnumerot jatkuvat eivätkä näytä Workerille vanhoilta tilauksilta.
 export function wipeGateway() { db.exec('DELETE FROM quotes; DELETE FROM orders; DELETE FROM ledger; DELETE FROM buyers;'); }

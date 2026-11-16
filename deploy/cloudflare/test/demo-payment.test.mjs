@@ -100,7 +100,9 @@ test('disabling new demo payments does not release an unpaid gate; old sent orde
     s.db.prepare("UPDATE order_events SET email_status='sent'").run();
     assert.equal(await registerDemoPayment(s.env, id, now), null);
     s.db.prepare("UPDATE order_events SET email_status='pending',json=?").run(JSON.stringify({ order: { ...order, net: null } }));
-    await assert.rejects(registerDemoPayment(s.env, id, now), /known total/);
+    // #25: puuttuva summa ei saa jumittaa reittiä: maksua ei luoda, eikä se estä vahvistusta.
+    assert.equal(await registerDemoPayment(s.env, id, now), null);
+    assert.equal(await demoPaymentEmailAllowed(s.env, id), true);
     s.db.prepare('UPDATE order_events SET json=?').run(JSON.stringify({ order }));
     await registerDemoPayment(s.env, id, now);
     s.env.DEMO_PAYMENTS_ENABLED = 'false';

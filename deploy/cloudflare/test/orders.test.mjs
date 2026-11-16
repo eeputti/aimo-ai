@@ -60,7 +60,7 @@ test('public callers cannot write or access pairing, gateway or chat routes; inv
   } finally { env.DB.db.close(); }
 });
 
-test('the local reader publishes only the selected demo customer; browser demo is explicit and both source databases remain unchanged', () => {
+test('the local reader publishes every WhatsApp member (#13), browser demo only explicitly, the old scope on request, and leaves both databases unchanged', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-public-orders-'));
   const gatewayFile = path.join(dir, 'gateway.db'), whatsappFile = path.join(dir, 'whatsapp.db');
   const db = new DatabaseSync(gatewayFile), members = new DatabaseSync(whatsappFile);
@@ -78,12 +78,13 @@ test('the local reader publishes only the selected demo customer; browser demo i
     }
     const files = [gatewayFile, whatsappFile].map(file => fs.readFileSync(file));
     const snapshot = readSnapshot({ gatewayFile, whatsappFile, phone: '+358401234567' });
-    assert.equal(snapshot.orders.length, 1);
-    assert.equal(snapshot.orders[0].orderId, 'AGW-20261114-0001');
-    assert.equal(snapshot.orders[0].channel, 'whatsapp');
+    // Jokainen vahvistettu WhatsApp-tilaus saa maksulinkin, joten myös muiden liittyneiden jäsenten tilaukset julkaistaan.
+    assert.deepEqual(snapshot.orders.map(o => [o.orderId, o.channel]).sort(), [['AGW-20261114-0001', 'whatsapp'], ['AGW-20261114-0002', 'whatsapp']]);
     assert.doesNotMatch(JSON.stringify(snapshot), /PRIVATE_|35840|selected|buyerId|apiKey|idempotency/);
+    const narrow = readSnapshot({ gatewayFile, whatsappFile, phone: '358401234567', onlyDemoPhone: true });
+    assert.deepEqual(narrow.orders.map(o => o.orderId), ['AGW-20261114-0001']);
     const withBrowser = readSnapshot({ gatewayFile, whatsappFile, phone: '358401234567', includeBrowserDemo: true });
-    assert.equal(withBrowser.orders.length, 2);
+    assert.equal(withBrowser.orders.length, 3);
     assert.equal(withBrowser.orders.find(o => o.orderId.endsWith('0003')).channel, 'browser-demo');
     [gatewayFile, whatsappFile].forEach((file, index) => assert.deepEqual(fs.readFileSync(file), files[index]));
     const prev = '0'.repeat(64), fields = ['2026-11-14', 'gateway', 'ORDER_CONFIRMED', null, null, null, '{}'];

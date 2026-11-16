@@ -5,12 +5,12 @@ import { unitSizeFor } from './quantity.mjs';
 // portin omalla kellolla (mock-rajapinta ei estä myöhästynyttä tilausta), ja jokaisesta päätöksestä jää rivi hash-ketjutettuun lokiin.
 import crypto from 'node:crypto';
 import { loadCatalog, unitLabel, stepOf, roundToStep, tokenize, stems } from '../catalog.mjs';
-import { fetchQuotes } from '../valioApi.mjs';
+import { fetchQuotes, describePriceSource, combinePriceSources } from '../valioApi.mjs';
 import { apiMode } from '../config.mjs';
 import { findSubstitutes } from '../substitutes.mjs';
 import { clock, parseApiTime, cutoffPassed, helsinkiLabel } from './clock.mjs';
 import { signOffer, verifyOffer } from './signing.mjs';
-import { quotes, orders, ledger, buyers } from './store.mjs';
+import { quotes, orders, ledger, buyers, transaction } from './store.mjs';
 import { evaluateMandate, productBlock, substitutionRules, publicMandate } from './mandate.mjs';
 import { reason, REASONS, PRODUCT_TYPES, CLAIM_PHRASES } from './contract.mjs';
 import { watchOrder, noteSearch } from './watch.mjs';
@@ -18,6 +18,8 @@ import { pickSubstitute, explainApproval } from './advisor.mjs';
 import { suggestFor } from './suggest.mjs';
 
 const OFFER_TTL_MS = 15 * 60_000;
+// Kiertävän demokellon kierros (sessio A, #16): 0 ilman kiertoa tai ennen kuin clock.cycle() on käytössä.
+const clockCycle = () => clock.cycle?.() ?? 0;
 const money = (n) => +(+n).toFixed(2);
 const id = (prefix) => `${prefix}-${Date.now().toString(36)}${crypto.randomBytes(3).toString('hex')}`;
 export class GatewayError extends Error { constructor(status, code, message, detail) { super(message); this.status = status; this.code = code; this.detail = detail; } }
@@ -116,6 +118,9 @@ function assess(p, quote, need, buyer, deliveryDate) {
   if (block) return { ok: false, productId: p.id, name: p.name, ...block, severity: 'excluded' };
   const price = quote?.price; const avail = quote?.avail;
   if (!price || price.error) return out('PRICE_UNAVAILABLE');
+  // Vanha tai viimeisin tunnettu hinta ei kelpaa hiljaa: liian vanha jää pois, ikärajan sisällä oleva merkitään riville ja tarjoukseen.
+  const priceInfo = describePriceSource(price);
+  if (priceInfo.tooOld) return out('PRICE_TOO_OLD', { priceSource: priceInfo.origin, priceFetchedAt: isoOrNull(priceInfo.fetchedAt) });
   if (!avail || avail.status === 'unknown') return out('AVAILABILITY_UNKNOWN', { note: avail?.note });
   if (avail.status === 'blocked') return out('SALES_BLOCK');
   if (avail.status === 'out') return out('NOT_DELIVERABLE');
@@ -124,15 +129,17 @@ function assess(p, quote, need, buyer, deliveryDate) {
   if (!size) return out('UNIT_NOT_CONVERTIBLE', { requestedUnit: need.quantity.unit, comparisonUnit: price.comparisonUnit });
   const qty = Math.max(stepOf(p), roundToStep(need.quantity.value / size.value, p, 'up'));
   return {
-    ok: true, p, price, avail, size, qty,
+    ok: true, p, price, priceInfo, avail, size, qty,
     stock: avail.amount ?? null, // null = ei rajaa tai ei tiedossa (Terminal)
     perUnit: +(price.net / size.value).toFixed(4),
     deliveryDate: avail.date && avail.date > deliveryDate ? avail.date : deliveryDate,
   };
 }
 
+const isoOrNull = (ms) => (Number.isFinite(ms) ? new Date(ms).toISOString() : null);
 function lineOf(a, qty, extra = {}) {
   const { p, price, avail, size } = a;
+  const info = a.priceInfo || describePriceSource(price);
   return {
     productId: p.id, gtin: p.gtin || null, name: p.name, brand: p.brand || null,
     quantity: qty, salesUnit: p.salesUnit, salesUnitLabel: unitLabel(p.salesUnit),
@@ -140,9 +147,11 @@ function lineOf(a, qty, extra = {}) {
     unitPriceNet: price.net, pricePerRequestedUnit: a.perUnit, lineNet: money(price.net * qty), vatRate: price.vatRate ?? 13.5,
     // Valion hintarajapinnan oma vertailuhinta (comparisonPrice): korisivu näyttää tämän, ei katalogin koosta laskettua.
     comparisonPrice: price.comparison > 0 ? price.comparison : null, comparisonUnit: price.comparison > 0 ? price.comparisonUnit || null : null,
-    availability: { logisticModel: avail.model, stock: avail.amount ?? null, stockKnown: avail.amount != null, deliveryDate: avail.date },
     closingTime: avail.closingTime || null, allergens: p.contains, deliveryReliability: p.reliability ?? null, co2PerKg: p.co2 ?? null,
-    priceSource: price.source, ...extra,
+    // priceSource: live | sim | stale | last-known. priceCurrent=false: hinta ei ole juuri nyt rajapinnasta (rajapintavirhe).
+    priceSource: info.origin, priceCurrent: info.current, priceFetchedAt: isoOrNull(info.fetchedAt),
+    availability: { logisticModel: avail.model, stock: avail.amount ?? null, stockKnown: avail.amount != null, deliveryDate: avail.date, source: avail.source || null },
+    ...extra,
   };
 }
 
@@ -158,6 +167,8 @@ function buildOption(buyer, need, kind, lines, ctx) {
   if (ctx.substitution) flags.push(ctx.substitution.withinPolicy ? 'SUBSTITUTION_WITHIN_POLICY' : 'SUBSTITUTION_OUTSIDE_POLICY');
   // Rajapinta palauttaa 999999 myös osalle Stock-tuotteista, ei vain Terminal-tuotteille: lippu seuraa saldotietoa, ei logistiikkamallia.
   if (lines.some((l) => !l.availability.stockKnown)) flags.push('STOCK_UNKNOWN');
+  const stalePrices = lines.filter((l) => l.priceCurrent === false);
+  if (stalePrices.length) flags.push('PRICE_NOT_LIVE');
   const covered = +lines.reduce((s, l) => s + l.covers, 0).toFixed(2);
   const draft = { lines, totals: { net }, deliveryDate, requestedDeliveryDate: ctx.deliveryDate, substitutions: ctx.substitution ? [ctx.substitution] : [] };
   const preview = evaluateMandate(buyer, draft);
@@ -165,16 +176,18 @@ function buildOption(buyer, need, kind, lines, ctx) {
   const exp = Math.min(now.getTime() + OFFER_TTL_MS, cutoffs[0] ? parseApiTime(cutoffs[0]).getTime() : Infinity);
   const offerId = id('OFR');
   const payload = {
-    iss: 'aimo-agent-gateway', aud: buyer.id, jti: offerId, iat: Math.floor(now.getTime() / 1000), exp: Math.floor(exp / 1000),
+    iss: 'aimo-agent-gateway', aud: buyer.id, jti: offerId, iat: Math.floor(now.getTime() / 1000), exp: Math.floor(exp / 1000), cyc: clockCycle(),
     quoteId: ctx.quoteId, needRef: need.ref || null, kind, currency: 'EUR', priceBasis: 'net, VAT excluded, fixed for the offer validity',
     requested: { quantity: need.quantity, deliveryDate: ctx.deliveryDate }, deliveryDate, cutoff: cutoffs[0] || null,
     lines: lines.map((l) => ({ productId: l.productId, gtin: l.gtin, quantity: l.quantity, salesUnit: l.salesUnit, unitPriceNet: l.unitPriceNet, vatRate: l.vatRate, lineNet: l.lineNet, substituteFor: l.substituteFor || null })),
-    totals: { net, vat, gross: money(net + vat) }, flags, substitution: ctx.substitution || null, priceSource: lines[0].priceSource,
+    totals: { net, vat, gross: money(net + vat) }, flags, substitution: ctx.substitution || null,
+    priceSource: combinePriceSources(lines.map((l) => l.priceSource)),
+    priceFetchedAt: stalePrices.map((l) => l.priceFetchedAt).filter(Boolean).sort()[0] || null, // vanhin ei-ajantasainen hinta
   };
   return {
     optionId: offerId, kind, lines, totals: payload.totals, covers: { value: covered, unit: need.quantity.unit },
     pricePerRequestedUnit: covered ? +(net / covered).toFixed(4) : null, deliveryDate, cutoff: payload.cutoff, cutoffLabel: helsinkiLabel(payload.cutoff),
-    flags, substitution: ctx.substitution || null,
+    flags, substitution: ctx.substitution || null, priceSource: payload.priceSource, priceFetchedAt: payload.priceFetchedAt,
     mandatePreview: { status: preview.status, reasons: preview.reasons }, // mitä tapahtuu, jos tämä tilataan
     expiresAt: new Date(exp).toISOString(), offer: signOffer(payload),
   };
@@ -271,15 +284,25 @@ export async function requestQuote(buyer, input = {}) {
   const ctx = { quoteId: id('Q'), deliveryDate, maxOptions: Math.min(5, Math.max(1, Number(input.maxOptions) || 3)) };
   const ids = [...new Set(input.needs.flatMap((n) => n.candidates.map(String)))];
   const live = await fetchQuotes(ids, deliveryDate); // vain nämä tuotteet, 2 rinnakkaista kutsua
-  ledger.append(`agent:${buyer.id}`, 'QUOTE_REQUESTED', { deliveryDate, needs: input.needs.map((n) => ({ ref: n.ref || null, quantity: n.quantity, candidates: n.candidates.length })), productsPriced: ids.length, priceSource: apiMode() }, { buyerId: buyer.id, quoteId: ctx.quoteId });
+  const fetchedSource = combinePriceSources([...live.values()].filter((v) => v.price && !v.price.error).map((v) => describePriceSource(v.price).origin)) || apiMode();
+  ledger.append(`agent:${buyer.id}`, 'QUOTE_REQUESTED', { deliveryDate, needs: input.needs.map((n) => ({ ref: n.ref || null, quantity: n.quantity, candidates: n.candidates.length })), productsPriced: ids.length, priceSource: fetchedSource }, { buyerId: buyer.id, quoteId: ctx.quoteId });
   const needs = [];
   for (const n of input.needs) needs.push(await quoteNeed(buyer, n, ctx, live));
   for (const n of needs) for (const o of n.options) ledger.append('gateway', 'OFFER_ISSUED', { offerId: o.optionId, kind: o.kind, net: o.totals.net, lines: o.lines.map((l) => `${l.productId} × ${l.quantity} ${l.salesUnitLabel}`), flags: o.flags, expiresAt: o.expiresAt }, { buyerId: buyer.id, quoteId: ctx.quoteId });
   for (const n of needs) if (Object.keys(n.excludedSummary).length) ledger.append('gateway', 'CANDIDATES_EXCLUDED', { ref: n.ref, summary: n.excludedSummary }, { buyerId: buyer.id, quoteId: ctx.quoteId });
   const quote = { quoteId: ctx.quoteId, buyerId: buyer.id, createdAt: clock.now().toISOString(), deliveryDate, needs };
   quotes.save(quote);
-  return { ...quote, clock: clock.info(), priceSource: apiMode() === 'live' ? 'Valio Aimo Junction API (live)' : 'SIMULOITU (VALIO_API_KEY puuttuu)', productsPriced: ids.length, ms: +(performance.now() - t0).toFixed(1) };
+  // Yleisotsikko kertoo tarjottujen rivien todellisen hintalähteen, ei pelkkää asetusta ("live" vaikka rivi olisi viimeisin tunnettu).
+  const offered = combinePriceSources(needs.flatMap((n) => n.options.flatMap((o) => o.lines.map((l) => l.priceSource))));
+  const priceOrigin = offered || fetchedSource;
+  return { ...quote, clock: clock.info(), priceSource: PRICE_SOURCE_TEXT[priceOrigin] || PRICE_SOURCE_TEXT[apiMode()], priceOrigin, productsPriced: ids.length, ms: +(performance.now() - t0).toFixed(1) };
 }
+const PRICE_SOURCE_TEXT = {
+  live: 'Valio Aimo Junction API (live)',
+  sim: 'SIMULOITU (VALIO_API_KEY puuttuu)',
+  stale: 'Vanha välimuistihinta: hintarajapinta ei vastannut',
+  'last-known': 'Viimeisin tunnettu hinta: hintarajapinta ei vastannut',
+};
 
 // ---------- place_order ----------
 // suggestions: mitä ostajan tavallisesta tilauksesta puuttuu (suggest.mjs). Lasketaan luettaessa, ei tallenneta tilaukselle.
@@ -313,15 +336,20 @@ function totalsOf(lines) {
 }
 
 /** Tarjousten todennus: allekirjoitus, vastaanottaja, voimassaolo, kertakäyttöisyys. Sama tarkistus tilaukselle ja lisäykselle. */
+/** Ostajan voimassa olevissa tilauksissa (ja odottavissa lisäyksissä) jo käytetyt tarjoukset. */
+const usedOfferIds = (buyerId) => new Set(orders.list(buyerId, 500).filter((o) => o.status !== 'rejected').flatMap((o) => [...(o.offers || []), ...(o.pendingAddition?.offers || [])].map((x) => x.offerId)));
+
 function verifyOffers(buyer, offers, now) {
   const payloads = []; const reasons = [];
-  const used = new Set(orders.list(buyer.id, 500).filter((o) => o.status !== 'rejected').flatMap((o) => [...(o.offers || []), ...(o.pendingAddition?.offers || [])].map((x) => x.offerId)));
+  const used = usedOfferIds(buyer.id);
   for (const jws of offers) {
     const v = verifyOffer(jws);
     if (!v.ok) { reasons.push(reason(v.code, 'block', { detail: v.detail })); continue; }
     const p = v.payload;
     if (p.aud !== buyer.id) { reasons.push(reason('OFFER_WRONG_BUYER', 'block', { offerId: p.jti })); continue; }
     if (p.exp * 1000 <= now.getTime()) { reasons.push(reason('OFFER_EXPIRED', 'block', { offerId: p.jti, expiredAt: new Date(p.exp * 1000).toISOString() })); continue; }
+    // Kiertävä kello palaa alkuun: edellisen kierroksen tarjous näyttäisi taas voimassa olevalta.
+    if (clock.looping && (p.cyc ?? 0) !== clockCycle()) { reasons.push(reason('OFFER_EXPIRED', 'block', { offerId: p.jti, clockCycle: p.cyc ?? 0 })); continue; }
     if (used.has(p.jti) || payloads.some((x) => x.jti === p.jti)) { reasons.push(reason('OFFER_ALREADY_USED', 'block', { offerId: p.jti })); continue; }
     payloads.push(p);
   }
@@ -335,35 +363,97 @@ async function liveRecheck(payloads, reasons) {
   const flat = payloads.flatMap((p) => p.lines.map((l) => ({ ...l, offerId: p.jti })));
   const live = await fetchQuotes(flat.map((l) => l.productId), requestedDeliveryDate, { fresh: true });
   const deliveryDates = new Map(payloads.map((p) => [p.jti, p.deliveryDate]));
-  const lines = [];
+  const lines = []; const origins = []; const oldest = [];
   for (const l of flat) {
     const p = cat.get(l.productId); const q = live.get(l.productId) || {};
+    // "Tuore" tarkistus voi rajapintavirheessä saada vanhan välimuistiarvon tai viimeisimmän tunnetun hinnan. Sitä ei hyväksytä
+    // hiljaa: liian vanha estää tilauksen, ikärajan sisällä oleva merkitään tilaukseen (priceSource, PRICE_NOT_LIVE).
+    const info = q.price && !q.price.error ? describePriceSource(q.price) : null;
+    if (info) { origins.push(info.origin); if (!info.current && info.fetchedAt != null) oldest.push(info.fetchedAt); }
     if (!q.price || q.price.error || Math.abs(q.price.net - l.unitPriceNet) > 0.004) reasons.push(reason('OFFER_STALE', 'block', { productId: l.productId, offered: l.unitPriceNet, current: q.price?.net ?? null }));
+    else if (info.tooOld) reasons.push(reason('PRICE_TOO_OLD', 'block', { productId: l.productId, priceSource: info.origin, priceFetchedAt: isoOrNull(info.fetchedAt) }));
     else if (!q.avail || ['out', 'blocked', 'unknown'].includes(q.avail.status)) reasons.push(reason('OFFER_STALE', 'block', { productId: l.productId, availability: q.avail?.status || 'unknown' }));
     else if (q.avail.date && q.avail.date > deliveryDates.get(l.offerId)) reasons.push(reason('OFFER_STALE', 'block', { productId: l.productId, offeredDeliveryDate: deliveryDates.get(l.offerId), earliestAvailableDate: q.avail.date }));
     else if (cutoffPassed(q.avail.closingTime)) reasons.push(reason('CUTOFF_PASSED', 'block', { productId: l.productId, closingTime: q.avail.closingTime, closingLabel: helsinkiLabel(q.avail.closingTime) }));
     else if (q.avail.amount != null && q.avail.amount < l.quantity) reasons.push(reason('INSUFFICIENT_STOCK', 'block', { productId: l.productId, available: q.avail.amount, needed: l.quantity }));
-    lines.push({ ...l, name: p?.name || l.productId, salesUnitLabel: unitLabel(l.salesUnit), allergens: p?.contains || [], closingTime: q.avail?.closingTime || null });
+    lines.push({ ...l, name: p?.name || l.productId, salesUnitLabel: unitLabel(l.salesUnit), allergens: p?.contains || [], closingTime: q.avail?.closingTime || null,
+      priceSource: info?.origin || null, priceCurrent: info ? info.current : null, priceFetchedAt: isoOrNull(info?.fetchedAt) });
   }
-  return { lines, deliveryDate: payloads.map((p) => p.deliveryDate).sort().at(-1), requestedDeliveryDate, cutoff: earliest(payloads.map((p) => p.cutoff)) };
+  const source = combinePriceSources(origins);
+  const price = { source, current: !!source && origins.every((o) => o === 'live' || o === 'sim'), oldestFetchedAt: isoOrNull(Math.min(...oldest)) };
+  return { lines, deliveryDate: payloads.map((p) => p.deliveryDate).sort().at(-1), requestedDeliveryDate, cutoff: earliest(payloads.map((p) => p.cutoff)), price };
 }
+
+/** Tilaukseen jäävä merkintä, kun hinta ei ollut tuoreessa tarkistuksessa juuri rajapinnasta (ikärajan sisällä). */
+const priceNotice = (price) => (price.source && !price.current
+  ? [reason('PRICE_NOT_LIVE', 'info', { priceSource: price.source, priceFetchedAt: price.oldestFetchedAt })] : []);
+
+/** Saman pyynnön sormenjälki: allekirjoitetut tarjoukset sellaisenaan. Sama avain + sama sisältö = sama tilaus. */
+const requestFingerprint = (offers) => crypto.createHash('sha256').update(JSON.stringify([...offers].map(String).sort())).digest('hex');
+
+/**
+ * Idempotenssi sidottuna sisältöön (#7). Saman avaimen yritykset:
+ * - sama sormenjälki (tai vanha tallenne ilman sormenjälkeä, joka ei ole hylätty) → sama tilaus, ei uutta,
+ * - eri sisältö ja aiempi yritys vahvistettu tai odottaa hyväksyntää → 409, ettei kadonneen vastauksen uusinta uudella
+ *   tarjouksella tilaa toista kertaa,
+ * - kaikki aiemmat yritykset hylätty → uusi yritys sallitaan (hylkäys ei sitonut mitään).
+ */
+function idempotencyState(buyerId, key, fingerprint) {
+  const attempts = orders.attempts(buyerId, key).map(refresh);
+  const same = attempts.find((o) => o.requestFingerprint === fingerprint) || attempts.find((o) => !o.requestFingerprint && o.status !== 'rejected');
+  if (same) return { duplicate: same };
+  const committed = attempts.find((o) => o.status !== 'rejected');
+  if (committed) return { conflict: committed };
+  return { attempt: attempts.length + 1 };
+}
+const keyReused = (o) => new GatewayError(409, 'IDEMPOTENCY_KEY_REUSED', `idempotencyKey on jo käytetty toisenlaiseen tilaukseen ${o.orderId} (${o.status}). Uusi tilaus tarvitsee uuden avaimen.`, { orderId: o.orderId, status: o.status });
 
 export async function placeOrder(buyer, input = {}, { baseUrl = '' } = {}) {
   const t0 = performance.now();
   const key = String(input.idempotencyKey || '');
   if (key.length < 8) throw new GatewayError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'idempotencyKey (vähintään 8 merkkiä) on pakollinen: sama avain palauttaa saman tilauksen');
   if (!Array.isArray(input.offers) || !input.offers.length) throw new GatewayError(400, 'OFFERS_REQUIRED', 'offers puuttuu: anna request_quote-vastauksen offer-kentät');
-  const existing = orders.byIdempotency(buyer.id, key);
-  if (existing) return { ...publicOrder(refresh(existing)), duplicate: true };
+  const fingerprint = requestFingerprint(input.offers);
+  // Nopea polku tavalliselle uusinnalle. Lopullinen tarkistus tehdään vielä sitoutumisen transaktiossa (commit alla).
+  const early = idempotencyState(buyer.id, key, fingerprint);
+  if (early.duplicate) return { ...publicOrder(early.duplicate), duplicate: true };
+  if (early.conflict) throw keyReused(early.conflict);
 
   const now = clock.now();
-  const orderId = `AGW-${clock.today().replaceAll('-', '')}-${String(orders.nextNumber()).padStart(4, '0')}`;
+  // Numero varataan atomisesti. Kesken jäänyt tai uusinnaksi osoittautunut yritys jättää numeroon aukon, ei kahta samaa.
+  const orderId = `AGW-${clock.today().replaceAll('-', '')}-${String(orders.reserveNumber()).padStart(4, '0')}`;
   const refs = { buyerId: buyer.id, orderId };
-  const base = { orderId, buyerId: buyer.id, buyerName: buyer.name, idempotencyKey: key, buyerReference: input.buyerReference || null, requestedBy: input.requestedBy || null, createdAt: now.toISOString(), history: [], notifications: [], commit: { simulated: true, note: 'Junction-mock-rajapinnassa ei ole tilausendpointia: sitoumus kirjataan portin omaan kantaan.' } };
-  const finish = (order) => {
-    order.history.push({ at: clock.now().toISOString(), status: order.status, by: 'gateway' });
-    orders.save(order);
-    ledger.append('gateway', { confirmed: 'ORDER_CONFIRMED', pending_approval: 'ORDER_PENDING_APPROVAL', rejected: 'ORDER_REJECTED' }[order.status], { net: order.totals?.net ?? null, reasons: order.reasons.map((r) => r.code) }, refs);
+  const base = { orderId, buyerId: buyer.id, buyerName: buyer.name, idempotencyKey: key, requestFingerprint: fingerprint, clockCycle: clockCycle(), buyerReference: input.buyerReference || null, requestedBy: input.requestedBy || null, createdAt: now.toISOString(), history: [], notifications: [], commit: { simulated: true, note: 'Junction-mock-rajapinnassa ei ole tilausendpointia: sitoumus kirjataan portin omaan kantaan.' } };
+
+  // Sitoutuminen yhdessä kirjoitustransaktiossa tuoreen tarkistuksen (await) jälkeen: idempotenssi, tarjousten kertakäyttö,
+  // mandaatin päiväkatto ja tallennus näkevät saman tilanteen, eikä samanaikainen tilaus voi ehtiä väliin (#6).
+  const commit = (build) => {
+    let out;
+    transaction(() => {
+      const state = idempotencyState(buyer.id, key, fingerprint);
+      if (state.duplicate || state.conflict) {
+        const other = state.duplicate || state.conflict;
+        ledger.append('gateway', 'ORDER_DISCARDED', { reason: state.duplicate ? 'duplicate_request' : 'idempotency_key_reused', orderId: other.orderId }, refs);
+        out = state; return;
+      }
+      const order = build();
+      order.idempotencySlot = state.attempt === 1 ? key : `${key}#${state.attempt}`;
+      order.history.push({ at: clock.now().toISOString(), status: order.status, by: 'gateway' });
+      orders.insert(order);
+      ledger.append('gateway', { confirmed: 'ORDER_CONFIRMED', pending_approval: 'ORDER_PENDING_APPROVAL', rejected: 'ORDER_REJECTED' }[order.status], { net: order.totals?.net ?? null, reasons: order.reasons.map((r) => r.code) }, refs);
+      out = { order };
+    });
+    if (out.duplicate) return { ...publicOrder(out.duplicate), duplicate: true };
+    if (out.conflict) throw keyReused(out.conflict);
+    const { order } = out;
+    if (order.status === 'pending_approval') {
+      // Selitys ihmiselle selkokielellä. Jos malli ei vastaa ajoissa, näkymä näyttää syykoodit kuten ennenkin.
+      // Ajetaan TAUSTALLA vasta tallennuksen jälkeen: agentti saa vastauksen heti, ja selitys ilmestyy tilaukselle parin sekunnin päästä.
+      explainApproval(structuredClone(order), buyer).then((explanation) => {
+        const fresh = explanation && orders.get(orderId);
+        if (fresh?.approval) { fresh.approval.explanation = explanation; orders.save(fresh); }
+      }).catch(() => {});
+    }
     return { ...publicOrder(order), ms: +(performance.now() - t0).toFixed(1) };
   };
 
@@ -371,52 +461,58 @@ export async function placeOrder(buyer, input = {}, { baseUrl = '' } = {}) {
   ledger.append(`agent:${buyer.id}`, 'ORDER_RECEIVED', { offers: input.offers.length, idempotencyKey: key, buyerReference: input.buyerReference || null }, refs);
   const { payloads, reasons } = verifyOffers(buyer, input.offers, now);
   ledger.append('gateway', reasons.length ? 'OFFER_VERIFICATION_FAILED' : 'OFFER_VERIFIED', { offers: payloads.map((p) => p.jti), failures: reasons.map((r) => r.code), algorithm: 'EdDSA (Ed25519)' }, refs);
-  if (reasons.length) return finish({ ...base, status: 'rejected', reasons, lines: [], totals: null, offers: payloads.map((p) => ({ offerId: p.jti, quoteId: p.quoteId })) });
+  if (reasons.length) return commit(() => ({ ...base, status: 'rejected', reasons, lines: [], totals: null, offers: payloads.map((p) => ({ offerId: p.jti, quoteId: p.quoteId })) }));
 
   // 2) Tuore tarkistus: hinta, saldo ja tilausaikaraja juuri nyt
-  const { lines, deliveryDate, requestedDeliveryDate, cutoff } = await liveRecheck(payloads, reasons);
+  const { lines, deliveryDate, requestedDeliveryDate, cutoff, price } = await liveRecheck(payloads, reasons);
   const totals = totalsOf(lines); const { net } = totals;
-  const order = { ...base, deliveryDate, requestedDeliveryDate, cutoff, cutoffLabel: helsinkiLabel(cutoff), lines, totals, offers: payloads.map(offerRef), requested: payloads.map((p) => ({ ref: p.needRef, ...p.requested })), substitutions: payloads.map((p) => p.substitution).filter(Boolean) };
-  ledger.append('gateway', 'LIVE_RECHECK', { products: lines.length, changed: reasons.map((r) => `${r.code}:${r.detail.productId}`), priceSource: apiMode() }, refs);
-  if (reasons.length) return finish({ ...order, status: 'rejected', reasons });
+  const draft = { ...base, deliveryDate, requestedDeliveryDate, cutoff, cutoffLabel: helsinkiLabel(cutoff), lines, totals, offers: payloads.map(offerRef), requested: payloads.map((p) => ({ ref: p.needRef, ...p.requested })), substitutions: payloads.map((p) => p.substitution).filter(Boolean),
+    priceSource: price.source, priceCheckedLive: price.current, priceFetchedAt: price.current ? null : price.oldestFetchedAt };
+  ledger.append('gateway', 'LIVE_RECHECK', { products: lines.length, changed: reasons.map((r) => `${r.code}:${r.detail.productId}`), priceSource: price.source || apiMode() }, refs);
+  if (reasons.length) return commit(() => ({ ...draft, status: 'rejected', reasons }));
 
-  // 3) Mandaatti päättää: vahvistus, ihmisen hyväksyntä vai hylkäys
   // Kielimallin perustelu korvaajalle ei ole allekirjoitetussa tarjouksessa (se ei ole sitova tieto), joten se haetaan tarjouspyynnöstä.
   for (const pl of payloads) {
     const note = pl.substitution && quotes.get(pl.quoteId)?.needs.flatMap((n) => n.options).find((o) => o.optionId === pl.jti)?.substitution;
-    const sub = note?.modelNote && order.substitutions.find((x) => x.byProductId === pl.substitution.byProductId);
+    const sub = note?.modelNote && draft.substitutions.find((x) => x.byProductId === pl.substitution.byProductId);
     if (sub) { sub.modelNote = note.modelNote; sub.chosenBy = note.chosenBy; }
   }
-  const verdict = evaluateMandate(buyer, { lines, totals: order.totals, deliveryDate, requestedDeliveryDate, substitutions: order.substitutions });
-  order.status = verdict.status;
-  order.reasons = verdict.reasons;
-  ledger.append('policy', 'MANDATE_EVALUATED', { approvalLevel: buyer.mandate.approval, outcome: verdict.status, reasons: verdict.reasons.map((r) => ({ code: r.code, severity: r.severity, detail: r.detail })) }, refs);
-  // 3b) Taustavahti vertaa tilausta ostajan omaan historiaan. Se voi vain tiukentaa: vahvistettu → ihmisen hyväksyntään.
-  if (order.status !== 'rejected') {
-    const watch = watchOrder(buyer, { lines, totals: order.totals });
-    order.reasons = [...order.reasons, ...watch.findings];
-    const escalated = order.status === 'confirmed' && watch.findings.length > 0;
-    if (escalated) order.status = 'pending_approval';
-    ledger.append('watch', 'WATCH_EVALUATED', { historyOrders: watch.historyOrders, outcome: escalated ? 'escalated_to_human' : watch.findings.length ? 'flagged' : 'no_findings', findings: watch.findings.map((r) => ({ code: r.code, severity: r.severity, message: r.message, detail: r.detail })) }, refs);
-  }
-  if (order.status === 'pending_approval') {
-    order.approval = { required: true, requestedAt: now.toISOString(), approver: buyer.approver || null, expiresAt: order.cutoff, url: `${baseUrl}/approve.html?order=${orderId}` };
-    order.notifications.push({ at: now.toISOString(), kind: 'approval_request', to: buyer.approver || 'ostaja', text: `Hyväksyntää odottaa tilaus ${orderId}: ${net.toFixed(2)} €, toimitus ${deliveryDate}.` });
-    ledger.append('gateway', 'APPROVAL_REQUESTED', { to: buyer.approver || 'ostaja', url: order.approval.url, expiresAt: order.cutoff }, refs);
-    // Selitys ihmiselle selkokielellä. Jos malli ei vastaa ajoissa, näkymä näyttää syykoodit kuten ennenkin.
-    // Ajetaan TAUSTALLA: agentti saa vastauksen heti, ja selitys ilmestyy tilaukselle parin sekunnin päästä (ihminen lukee sen myöhemmin).
-    explainApproval(structuredClone(order), buyer).then((explanation) => {
-      const fresh = explanation && orders.get(orderId);
-      if (fresh?.approval) { fresh.approval.explanation = explanation; orders.save(fresh); }
-    }).catch(() => {});
-  } else if (order.status === 'confirmed') {
-    const info = verdict.reasons.filter((r) => r.severity === 'info');
-    if (info.length) { // agentti päätti itse sääntöjen sisällä → ihminen saa ilmoituksen jälkikäteen
-      order.notifications.push({ at: now.toISOString(), kind: 'fyi', to: buyer.approver || 'ostaja', text: `Tilaus ${orderId} vahvistettu ilman kuittausta: ${info.map((r) => r.message).join('; ')}.` });
-      ledger.append('gateway', 'NOTIFICATION_SENT', { to: buyer.approver || 'ostaja', kind: 'fyi', about: info.map((r) => r.code) }, refs);
+
+  return commit(() => {
+    const order = structuredClone(draft);
+    // Samanaikainen tilaus on voinut käyttää saman tarjouksen tarkistuksen ja tämän hetken välissä.
+    const used = usedOfferIds(buyer.id);
+    const reused = payloads.filter((p) => used.has(p.jti));
+    if (reused.length) {
+      ledger.append('gateway', 'OFFER_VERIFICATION_FAILED', { offers: payloads.map((p) => p.jti), failures: reused.map(() => 'OFFER_ALREADY_USED'), stage: 'commit' }, refs);
+      return { ...order, status: 'rejected', reasons: reused.map((p) => reason('OFFER_ALREADY_USED', 'block', { offerId: p.jti })) };
     }
-  }
-  return finish(order);
+    // 3) Mandaatti päättää: vahvistus, ihmisen hyväksyntä vai hylkäys
+    const verdict = evaluateMandate(buyer, { lines, totals: order.totals, deliveryDate, requestedDeliveryDate, substitutions: order.substitutions });
+    order.status = verdict.status;
+    order.reasons = verdict.reasons;
+    ledger.append('policy', 'MANDATE_EVALUATED', { approvalLevel: buyer.mandate.approval, outcome: verdict.status, reasons: verdict.reasons.map((r) => ({ code: r.code, severity: r.severity, detail: r.detail })) }, refs);
+    // 3b) Taustavahti vertaa tilausta ostajan omaan historiaan. Se voi vain tiukentaa: vahvistettu → ihmisen hyväksyntään.
+    if (order.status !== 'rejected') {
+      const watch = watchOrder(buyer, { lines, totals: order.totals });
+      order.reasons = [...order.reasons, ...watch.findings, ...priceNotice(price)];
+      const escalated = order.status === 'confirmed' && watch.findings.length > 0;
+      if (escalated) order.status = 'pending_approval';
+      ledger.append('watch', 'WATCH_EVALUATED', { historyOrders: watch.historyOrders, outcome: escalated ? 'escalated_to_human' : watch.findings.length ? 'flagged' : 'no_findings', findings: watch.findings.map((r) => ({ code: r.code, severity: r.severity, message: r.message, detail: r.detail })) }, refs);
+    }
+    if (order.status === 'pending_approval') {
+      order.approval = { required: true, requestedAt: now.toISOString(), approver: buyer.approver || null, expiresAt: order.cutoff, url: `${baseUrl}/approve.html?order=${orderId}` };
+      order.notifications.push({ at: now.toISOString(), kind: 'approval_request', to: buyer.approver || 'ostaja', text: `Hyväksyntää odottaa tilaus ${orderId}: ${net.toFixed(2)} €, toimitus ${deliveryDate}.` });
+      ledger.append('gateway', 'APPROVAL_REQUESTED', { to: buyer.approver || 'ostaja', url: order.approval.url, expiresAt: order.cutoff }, refs);
+    } else if (order.status === 'confirmed') {
+      const info = order.reasons.filter((r) => r.severity === 'info');
+      if (info.length) { // agentti päätti itse sääntöjen sisällä → ihminen saa ilmoituksen jälkikäteen
+        order.notifications.push({ at: now.toISOString(), kind: 'fyi', to: buyer.approver || 'ostaja', text: `Tilaus ${orderId} vahvistettu ilman kuittausta: ${info.map((r) => r.message).join('; ')}.` });
+        ledger.append('gateway', 'NOTIFICATION_SENT', { to: buyer.approver || 'ostaja', kind: 'fyi', about: info.map((r) => r.code) }, refs);
+      }
+    }
+    return order;
+  });
 }
 
 // ---------- add_to_order ("ainii, unohtui kerma") ----------
@@ -467,7 +563,7 @@ export async function addToOrder(buyer, input = {}, { baseUrl = '' } = {}) {
   if (reasons.length) return done('rejected', reasons, 'ADDITION_REJECTED');
 
   const re = await liveRecheck(payloads, reasons);
-  ledger.append('gateway', 'LIVE_RECHECK', { products: re.lines.length, changed: reasons.map((r) => `${r.code}:${r.detail.productId}`), priceSource: apiMode() }, refs);
+  ledger.append('gateway', 'LIVE_RECHECK', { products: re.lines.length, changed: reasons.map((r) => `${r.code}:${r.detail.productId}`), priceSource: re.price.source || apiMode() }, refs);
   if (re.deliveryDate !== o.deliveryDate) reasons.push(reason('DELIVERY_DATE_MISMATCH', 'block', { orderDeliveryDate: o.deliveryDate, offerDeliveryDate: re.deliveryDate }));
   add.lines = re.lines.map((l) => ({ ...l, addedIn: additionId }));
   add.addedNet = totalsOf(add.lines).net;
@@ -482,7 +578,7 @@ export async function addToOrder(buyer, input = {}, { baseUrl = '' } = {}) {
   if (verdict.status === 'rejected') return done('rejected', verdict.reasons.filter((r) => r.severity === 'block'), 'ADDITION_REJECTED');
   // Taustavahti: koko tilaus uusilla määrillä ostajan historiaa vasten, havainnot vain lisätyistä tuotteista. Voi vain tiukentaa.
   const watch = watchOrder(buyer, { lines: allLines, totals: totalsOf(allLines) }, { excludeOrderId: o.orderId, focusProductIds: add.lines.map((l) => l.productId) });
-  verdict.reasons.push(...watch.findings);
+  verdict.reasons.push(...watch.findings, ...priceNotice(re.price));
   const escalated = verdict.status === 'confirmed' && watch.findings.length > 0;
   if (escalated) verdict.status = 'pending_approval';
   ledger.append('watch', 'WATCH_EVALUATED', { scope: 'addition', additionId, historyOrders: watch.historyOrders, outcome: escalated ? 'escalated_to_human' : watch.findings.length ? 'flagged' : 'no_findings', findings: watch.findings.map((r) => ({ code: r.code, severity: r.severity, message: r.message, detail: r.detail })) }, refs);

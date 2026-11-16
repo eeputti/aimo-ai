@@ -85,7 +85,8 @@ test('without a domain the order e-mail goes through Resend once, with its test 
     const { url, init } = calls[1];
     assert.equal(url, 'https://api.resend.com/emails');
     assert.equal(init.headers.authorization, `Bearer ${env.RESEND_API_KEY}`);
-    assert.equal(init.headers['idempotency-key'], 'order-confirmation/AGW-20261114-0001');
+    // Avain nimeää tilauksen ilmentymän (numero + luontiaika): nollattu gateway saa saman numeron uudelle tilaukselle oman viestin (#24).
+    assert.equal(init.headers['idempotency-key'], 'order-confirmation/AGW-20261114-0001/2026-11-14T12:00:00.000Z');
     const body = JSON.parse(init.body);
     assert.equal(body.from, 'Aimo tilausapuri <onboarding@resend.dev>');
     assert.equal(body.to, 'testi@example.com');

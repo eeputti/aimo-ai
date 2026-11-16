@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 ilta — tilausnumerot, idempotenssi, hintojen tuoreus, julkaisija ja Worker (Claude Code, sessio B)
+
+- **Pyyntö:** katselmoinnin #6, #7, #13, #15, #24 ja #25 (`docs/parallel/code-audit-2026-11-15-ilta.md`). Raportti `docs/parallel/audit-fixes-b.md`. Ei julkaisua, restarttia, D1-ajoja eikä oikeita Meta-, Valio- tai mallikutsuja.
+- **#6:** tilausnumero atomisesti `counters`-taulusta (ei `COUNT(*)+1`), tiukka INSERT, ja idempotenssi, tarjousten kertakäyttö, mandaatti ja tallennus yhdessä `BEGIN IMMEDIATE` -transaktiossa tuoreen hintatarkistuksen jälkeen. Myös Turso. Päätösketjun kirjoitus on transaktiossa, ja `busy_timeout` asetetaan ennen `journal_mode`a.
+- **#7:** idempotenssiavain sidottu allekirjoitettujen tarjousten sormenjälkeen. Hylkäyksen jälkeen sama avain uudella tarjouksella tekee uuden tilauksen, saman pyynnön uusinta ei tuplaa, ja vahvistetun avaimen uusi sisältö antaa 409. `order-conversation/index.mjs`:ään ei tarvittu muutosta.
+- **#15:** hinnan alkuperä (`live`, `sim`, `stale`, `last-known`) ja ikäraja `FALLBACK_PRICE_MAX_AGE_HOURS` (oletus 72 h). Rivi, tarjous (`PRICE_NOT_LIVE`, `priceSource`), yleisotsikko ja tilaus (`priceCheckedLive`, info-syy) kertovat totuuden. Liian vanha antaa `PRICE_TOO_OLD`. Tuore tarkistus merkitsee rajapintavirheen välimuistiarvon vanhaksi.
+- **#24:** laskuri ei nollaudu `wipeGateway()`ssa. Worker korvaa saman numeron tilauksen, jos `createdAt` eroaa ja välitys on uudempi, ja poistaa vanhan maksun ja jäljen. Resend-avain ja julkaisijan `known` ovat tilauksen ilmentymäkohtaisia.
+- **#25:** puuttuva summa ei luo maksua eikä jumita reittiä. Julkaisija eristää tilauskohtaiset virheet ja yrittää uudelleen viiveellä; pysyvä 4xx ei toistu.
+- **#13:** julkaisija ottaa oletuksena kaikkien WhatsApp-jäsenten ja `WHATSAPP_DEMO_BUYER_ID`:n WhatsApp-tilaukset (`--only-demo-phone` palauttaa vanhan). Tervehdysnimi vain demoasiakkaalle. **Päätettävä:** julkinen lista näyttää nyt muidenkin testaajien tilausten julkiset kentät.
+- **A:n pyynnöstä (#16):** `clockCycle` tilaukselle, `cyc` tarjoukseen ja edellisen kierroksen tarjouksen hylkäys, kun kello kiertää.
+- **Tarkistukset:** uudet `test/audit-fixes-b.test.mjs` 8/8 (myös kahden ostajan samanaikainen tilaus node:sqlite- ja libsql-kannalla sekä kolme prosessia samassa kannassa) ja `deploy/cloudflare/test/audit-fixes-b.test.mjs` 7/7. Sama gateway-testi vanhalla koodilla 8/8 epäonnistuu. Neljä vanhaa Worker-testiä päivitetty tarkoitettuun käytökseen. `npm test` 318/318, Worker 44/44, typecheck ja build.
+- **Käyttöönotto (E):** ei D1-migraatiota. Ensin Worker, sitten botti ja julkaisija. Ohjeet raportissa.
 ## 16.11.2026 — WhatsApp-botti Verceliin testinä, vaihto odottaa (Claude Code, sessio E pilvisiirto)
 
 - **Käyttäjän lupa:** Eelis hyväksyi asetusten ja salaisuuksien viennin Vercel-projektiin `aimo-whatsapp` testijulkaisuna (erilliset Turso-testikannat `aimo-t-*`, väärä Meta-token, ei yhteyttä Worker-sivustoon). Macin botti ja julkaisija ennallaan.

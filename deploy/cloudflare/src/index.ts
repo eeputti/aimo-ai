@@ -1,5 +1,5 @@
 import { MAX_BODY_BYTES, parseSnapshot } from "./protocol.ts";
-import { parseOrderEvent } from "./order-event.ts";
+import { parseOrderEvent, type OrderEvent } from "./order-event.ts";
 import { renderOrderEmail } from "./email.ts";
 import { registerDemoPayment, demoPaymentEmailAllowed, describeDemoPayment, handleDemoPayment, verifyDemoPaymentLink } from "./demo-payment.ts";
 import { TRACE_PREFIX, parseAgentTrace, storeAgentTrace, handleAgentTraceRead } from "./agent-trace.ts";
@@ -34,7 +34,8 @@ function mailSender(env: OrderEnv) {
   }
   if (env.RESEND_API_KEY) {
     const key = env.RESEND_API_KEY;
-    return { from: env.ORDER_EMAIL_FROM || RESEND_TEST_FROM, send: (mail: Mail, orderId: string) => sendViaResend(key, mail, `order-confirmation/${orderId}`) };
+    // The key names this order instance: a reset gateway that reuses an order id gets its own e-mail (#24).
+    return { from: env.ORDER_EMAIL_FROM || RESEND_TEST_FROM, send: (mail: Mail, instance: string) => sendViaResend(key, mail, `order-confirmation/${instance}`) };
   }
   return null;
 }
@@ -59,7 +60,7 @@ async function deliverEmail(env: OrderEnv, orderId: string, origin: string) {
   const event = JSON.parse(row.json);
   const mail = renderOrderEmail(event.order, event.email.customerName, origin);
   try {
-    const result = await sender.send({ from: sender.from, to: row.email_to!, subject: mail.subject, html: mail.html, text: mail.text }, orderId);
+    const result = await sender.send({ from: sender.from, to: row.email_to!, subject: mail.subject, html: mail.html, text: mail.text }, `${orderId}/${event.order.createdAt}`);
     await env.DB.prepare("UPDATE order_events SET email_status='sent',email_updated_at=?,email_message_id=? WHERE order_id=?").bind(Date.now(), String(result?.messageId || ""), orderId).run();
     return "sent";
   } catch {
@@ -74,6 +75,37 @@ async function deliverEmail(env: OrderEnv, orderId: string, origin: string) {
 
 const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" };
 const json = (value: unknown, status = 200) => Response.json(value, { status, headers });
+
+/**
+ * Store an order event once per order instance (#24). The same order id with the same creation time is the same order:
+ * a repeat is a duplicate. A different creation time means the gateway was reset and reused the number: the newer push
+ * replaces the old record, and the old order's demo payment and agent trace go with it, so the new customer never sees
+ * the old lines or total. An older push never replaces a newer one.
+ */
+async function storeOrderEvent(env: OrderEnv, event: OrderEvent, now: number) {
+  const id = event.order.orderId, json = JSON.stringify(event);
+  const status = event.email.to ? "pending" : "not_requested";
+  const stored = await env.DB.prepare("SELECT json FROM order_events WHERE order_id=?").bind(id).first<{ json: string }>();
+  if (!stored) {
+    const inserted = await env.DB.prepare(`INSERT INTO order_events(order_id,received_at,json,email_to,email_status,email_updated_at)
+      VALUES(?,?,?,?,?,?) ON CONFLICT(order_id) DO NOTHING`).bind(id, now, json, event.email.to, status, now).run();
+    return inserted.meta.changes > 0 ? "stored" : "duplicate";
+  }
+  const previous = JSON.parse(stored.json) as OrderEvent;
+  if (previous.order.createdAt === event.order.createdAt) return "duplicate";
+  if (!(event.observedAt > previous.observedAt)) return "superseded";
+  // Conditional on the row still holding the old event, so concurrent pushes replace it once.
+  const statements = [
+    env.DB.prepare(`UPDATE order_events SET received_at=?,json=?,email_to=?,email_status=?,email_attempts=0,email_updated_at=?,email_message_id=NULL
+      WHERE order_id=? AND json=?`).bind(now, json, event.email.to, status, now, id, stored.json),
+    env.DB.prepare("DELETE FROM demo_payments WHERE order_id=? AND (SELECT json FROM order_events WHERE order_id=?)=?").bind(id, id, json),
+    env.DB.prepare("DELETE FROM agent_traces WHERE order_id=? AND (SELECT json FROM order_events WHERE order_id=?)=?").bind(id, id, json),
+  ];
+  if (typeof env.DB.batch === "function") await env.DB.batch(statements);
+  else for (const statement of statements) await statement.run();
+  const after = await env.DB.prepare("SELECT json FROM order_events WHERE order_id=?").bind(id).first<{ json: string }>();
+  return after?.json === json ? "replaced" : "duplicate";
+}
 
 async function authorized(request: Request, token: string) {
   if (!token || token.length < 32) return false;
@@ -138,13 +170,13 @@ export default {
       try { event = parseOrderEvent(await readBody(request)); }
       catch { return json({ error: "Virheellinen tilaustapahtuma." }, 400); }
       try {
-        const now = Date.now();
-        const inserted = await env.DB.prepare(`INSERT INTO order_events(order_id,received_at,json,email_to,email_status,email_updated_at)
-          VALUES(?,?,?,?,?,?) ON CONFLICT(order_id) DO NOTHING`)
-          .bind(event.order.orderId, now, JSON.stringify(event), event.email.to, event.email.to ? "pending" : "not_requested", now).run();
+        const stored = await storeOrderEvent(env as OrderEnv, event, Date.now());
+        // A newer order already holds this id: acknowledge, so the publisher stops resending the older one.
+        if (stored === "superseded") return json({ ok: true, orderId: event.order.orderId, duplicate: true, superseded: true, email: "superseded" });
+        // An order without a known total cannot get a demo payment; it must not block the confirmation (#25).
         await registerDemoPayment(env as OrderEnv, event.order.orderId);
         const email = await deliverEmail(env as OrderEnv, event.order.orderId, url.origin);
-        return json({ ok: true, orderId: event.order.orderId, duplicate: inserted.meta.changes === 0, email });
+        return json({ ok: true, orderId: event.order.orderId, duplicate: stored === "duplicate", replaced: stored === "replaced", email });
       } catch { console.error(JSON.stringify({ event: "order_event_write_failed" })); return json({ error: "Tallennus ei onnistunut." }, 503); }
     }
     if (url.pathname === TRACE_PREFIX && request.method === "POST") {

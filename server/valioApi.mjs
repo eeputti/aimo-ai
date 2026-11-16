@@ -11,7 +11,7 @@ export const apiStats = { calls: 0, ids: 0, cacheHits: 0, errors: 0, lastMs: nul
 
 const cacheKey = (kind, date, id) => `${apiMode()}:${kind}:${date}:${id}`;
 
-function cacheRead(kind, date, id, { allowStale = false } = {}) {
+function cacheRead(kind, date, id, { allowStale = false, forceStale = false } = {}) {
   const key = cacheKey(kind, date, id);
   let hit = mem.get(key);
   if (!hit) {
@@ -20,8 +20,9 @@ function cacheRead(kind, date, id, { allowStale = false } = {}) {
   }
   if (!hit) return null;
   const fresh = Date.now() - hit.at < TTL[kind];
-  if (fresh) return hit.value;
-  return allowStale ? { ...hit.value, stale: true } : null;
+  if (fresh && !forceStale) return hit.value;
+  // Rajapintavirheessä palautettava vanha arvo kertoo hakuhetkensä, jotta käyttäjä voi rajata sen iän (describePriceSource).
+  return allowStale ? { ...hit.value, stale: true, fetchedAt: hit.at } : null;
 }
 function cacheWrite(kind, date, id, value) {
   const key = cacheKey(kind, date, id);
@@ -153,6 +154,24 @@ function serveLastKnown(kind, date, id, note) {
   return kind === 'avail' ? { status: 'unknown', source: 'last-known', note: note || 'Tuotteesta ei ole aiempaa saatavuustietoa.' } : { error: true, source: 'last-known' };
 }
 
+// ---------- Hinnan alkuperä ja ikä ----------
+// live = juuri haettu tai tuore välimuistiarvo, sim = simuloitu, stale = vanha välimuistiarvo rajapintavirheessä,
+// last-known = VALIO_FALLBACK=last-known. Vain live ja sim ovat ajantasaisia. Muut kelpaavat tarjoukseen ja tilaukseen
+// vain merkittyinä ja enintään FALLBACK_PRICE_MAX_AGE_HOURS tuntia vanhoina (oletus 72 h).
+export const fallbackPriceMaxAgeMs = () => (Number(process.env.FALLBACK_PRICE_MAX_AGE_HOURS) > 0 ? Number(process.env.FALLBACK_PRICE_MAX_AGE_HOURS) : 72) * 3600_000;
+export function describePriceSource(price, now = Date.now()) {
+  const origin = price?.source === 'sim' ? 'sim' : price?.source === 'last-known' ? 'last-known' : price?.stale ? 'stale' : 'live';
+  const fetchedAt = Number.isFinite(price?.fetchedAt) ? price.fetchedAt : null;
+  const current = origin === 'live' || origin === 'sim';
+  const ageMs = fetchedAt == null ? null : Math.max(0, now - fetchedAt);
+  return { origin, current, fetchedAt, ageMs, tooOld: !current && (ageMs == null || ageMs > fallbackPriceMaxAgeMs()) };
+}
+/** Usean rivin yhteinen alkuperä: heikoin ratkaisee (last-known > stale > sim > live). */
+export function combinePriceSources(origins) {
+  const set = new Set(origins.filter(Boolean));
+  return ['last-known', 'stale', 'sim', 'live'].find((o) => set.has(o)) || null;
+}
+
 /** Testejä varten: unohtaa edellisen rajapintavirheen. */
 export function resetApiBreaker() { apiDownUntil = 0; }
 
@@ -209,7 +228,8 @@ export async function fetchQuotes(ids, date, { fresh = false } = {}) {
           return;
         }
         for (const id of chunk) {
-          const stale = cacheRead(kind, date, id, { allowStale: true });
+          // fresh=true (tilauksen tuore tarkistus): välimuistiarvo ei ole juuri nyt tarkistettu, vaikka se olisi TTL:n sisällä.
+          const stale = cacheRead(kind, date, id, { allowStale: true, forceStale: fresh });
           if (stale) apiStats.staleServed += 1;
           out.get(id)[kind] = stale || (kind === 'avail' ? { status: 'unknown', source: 'live', note: apiStats.lastError } : { error: true, source: 'live' });
         }

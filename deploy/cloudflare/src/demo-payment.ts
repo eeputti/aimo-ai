@@ -45,7 +45,11 @@ export async function verifyDemoPaymentLink(env: DemoPaymentEnv, orderId: string
   return Boolean(row && await authenticate(request, env, row));
 }
 
-/** Call after storing the authenticated order event, before attempting e-mail delivery. */
+/**
+ * Call after storing the authenticated order event, before attempting e-mail delivery.
+ * Returns null when no payment gate applies. An order without a known, valid total gets no demo payment: its
+ * confirmation e-mail is then sent without one, and the order route and the publisher are not blocked (#25).
+ */
 export async function registerDemoPayment(env: DemoPaymentEnv, orderId: string, now = Date.now()) {
   if (!enabled(env)) return null;
   const event = await eventRow(env, orderId);
@@ -54,11 +58,12 @@ export async function registerDemoPayment(env: DemoPaymentEnv, orderId: string, 
   const existing = await paymentRow(env, orderId);
   if (existing || event.email_status === "sent") return existing;
   const order = (JSON.parse(event.json) as { order: PublicOrder }).order;
-  if (order.orderId !== orderId || order.status !== "confirmed" || !Number.isFinite(order.net) || order.net === null || order.net < 0) {
-    throw new Error("A confirmed order with a known total is required");
+  if (order.orderId !== orderId || order.status !== "confirmed") throw new Error("A confirmed order is required");
+  const cents = typeof order.net === "number" && Number.isFinite(order.net) && order.net >= 0 ? Math.round(order.net * 100) : NaN;
+  if (!Number.isSafeInteger(cents)) {
+    console.error(JSON.stringify({ event: "demo_payment_unavailable", orderId, reason: "total_missing" }));
+    return null;
   }
-  const cents = Math.round(order.net * 100);
-  if (!Number.isSafeInteger(cents)) throw new Error("Invalid amount");
   await env.DB.prepare(`INSERT INTO demo_payments(order_id,status,amount_net_cents,created_at,expires_at)
     VALUES(?,'pending',?,?,?) ON CONFLICT(order_id) DO NOTHING`).bind(orderId, cents, now, now + TTL).run();
   return paymentRow(env, orderId);
