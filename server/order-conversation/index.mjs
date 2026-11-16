@@ -41,7 +41,8 @@ const CHEAPEST = /^(?:(?:otetaan|ota|laita|valitse|se|joo)\s+)*(?:halvin|halvint
 // eikä valitse mitään (itsepeli V017, V020, V025: malli vastasi "en näe hintoja"). "Se halvin" ilman kysymystä on valinta.
 const COMPARE = {
   co2: /hiilijalanj|hiilidioksid|ympäristöystävällis|ilmastoystävällis|ekologisi|(?<![\p{L}\d])co2|co₂|päästö/iu,
-  reliability: /toimitusvarm|varmimmin\s+(?:toimit|perill)|varmin\s+toimitus|luotettavi\p{L}*\s+toimit/iu,
+  // Kumpi tahansa sanajärjestys: "toimitetaan varmimmin" jäi tunnistamatta ja malli vastasi "en pysty arvioimaan" (Haiku-mittaus V023).
+  reliability: /toimitusvarm|varmimmin\s+(?:toimit|perill)|(?:toimit|perill)\p{L}*\s+(?:\p{L}+\s+)?(?:varmimmin|luotettavimmin)|varmin\s+toimitus|luotettavi\p{L}*\s+toimit/iu,
   price: /halvi\p{L}*|edullisi\p{L}*|halvemp\p{L}*|edullisemp\p{L}*|hintoineen|hintavertailu/iu,
 };
 const ASKS = /\?|(?:^|[\s,.!])(?:mikä|mitkä|kumpi|onko|onks|onkos|oikeesti|oikeasti|vertaa\p{L}*|listaa|hintoineen)(?=$|[\s,.!?])/iu;

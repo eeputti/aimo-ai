@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — Haiku-mittauksen V023: toimitusvarmuuskysymys tunnistetaan molemmissa sanajärjestyksissä (Claude Code, sessio C)
+
+- **Käyttäjän pyyntö:** Eelis hyväksyi F:n lisälöydöksen V023 korjaamisen. "Mikä näistä toimitetaan varmimmin?" ei tunnistunut vertailukysymykseksi, ja malli vastasi 2/4 ajossa "En pysty itse arvioimaan".
+- **Muutos:** `compareKind` tunnistaa myös järjestykset "toimitetaan varmimmin", "perille varmimmin" ja "toimitetaan luotettavimmin" (`server/order-conversation/index.mjs`, yksi rivi). Raportin lisäys `docs/parallel/haiku-findings-c.md`.
+- **Tarkistukset:** regressiotesti (kaatui ennen korjausta), vertailutestit 14/14, koko `npm test` 396/396 3b51b3d:n päällä. Käyttöön botin seuraavassa sovitussa restartissa (sessio E).
+
 ## 17.11.2026 — kesken jäänyt ostoskori: tauon jälkeen kysytään "Lisätäänkö tämä vanhaan ostoskoriin?", No moikka ja siirtymäviesti ennen vaihtoehtoja (Claude Code, keskeneräinen kori -chat)
 
 - **Käyttäjän pyyntö:** botin pitää käsitellä kesken jäänyt ostoskori. Eelis ehdotti, että vanha kori unohdetaan päivän jälkeen tai kahden tunnin päästä tulevaan viestiin kysytään, lisätäänkö se vanhaan vai tehdäänkö uusi tilaus. Kysymyksen sanamuoto on Eeliksen: "Lisätäänkö tää vanhaan ostoskoriin?". Puhelinkuvassa (klo 0.04, pilvibotti) viesti "maito 10 l" meni vanhaan reseptikoriin, ja perään tulivat kanan fileesuikaleen vaihtoehdot. Eeliksen toivoma kulku: "No moikka! Listalle tuli maito 10 l.", sitten oma viesti "Nyt olisi aika valita vaihtoehtoja, niin käydään ostoskorisi pikaisesti läpi!" ja sen jälkeen vaihtoehdot.

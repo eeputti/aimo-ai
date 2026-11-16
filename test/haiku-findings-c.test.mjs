@@ -172,3 +172,16 @@ test('C7: mallin lupaus palata asiaan myöhemmin pudotetaan', () => {
   }
   assert.equal(groundedAcknowledgement(v025, { facts: { lines: [{ term: 'maito', quantity: '20 l' }], date: '18.11.' }, userText: '20 l maitoa keskiviikoks' }), '');
 });
+
+test('V023: toimitusvarmuuskysymys tunnistetaan molemmissa sanajärjestyksissä, ja koodi vastaa vaihtoehtojen tiedoista', async () => {
+  const { compareKind } = await import('../server/order-conversation/index.mjs');
+  for (const q of ['Mikä näistä toimitetaan varmimmin?', 'mikä näistä toimitetaan varmimmin', 'mikä näistä varmimmin toimitetaan?', 'mikä tulee varmimmin perille?',
+    'mikä tulee perille varmimmin?', 'kumpi toimitetaan luotettavimmin?', 'mikä on toimitusvarmin?']) assert.equal(compareKind(q), 'reliability', q);
+  for (const q of ['toimitus varmasti maanantaina', 'onko varmasti laktoositon?', '5 kg voita perjantaiksi']) assert.equal(compareKind(q), null, q);
+  const { say } = engine({ script: { maito: add('maito', { value: 20, unit: 'L' }, '2026-11-18', ['FREE_FROM_LACTOSE']) },
+    options: (l) => [1, 2, 3].map((i) => option(l.productTerm, i, { deliveryReliability: [0.9, 0.99, 0.95][i - 1] })) });
+  await say('maito');
+  const reply = await say('Mikä näistä toimitetaan varmimmin?');
+  assert.equal(reply.status, 'choosing');
+  assert.match(reply.text, /^Toimitusvarmuus: 1\) 90 %, 2\) 99 %, 3\) 95 %\. Paras: 2\) maito 2\./);
+});

@@ -12,6 +12,10 @@
 | C6 | Irrallinen "Iltaa!", "Huomenta!" tai "Moi!" kesken keskustelun, kun viesti alkoi "Hei" (S003, X004, X056, X079). | Tervehdys vain keskustelun alussa (ei aiempaa keskustelua tai yli kahden tunnin tauko) tai pelkkään tervehdykseen. Mallin oma tervehdys poistetaan kuten ennen. | `server/whatsapp/dialogue.mjs` |
 | C7 | Lupaus "palaan siihen sitten" (V025). Lisälistan toisto oli C1:n ohjetekstiä. | Mallin tekstistä pudotetaan lupaus palata, ottaa yhteyttä tai ilmoittaa myöhemmin. Koskee dialogin vastauksia ja korikuittausta (`groundedAcknowledgement`). | `server/whatsapp/model-guard.mjs` |
 
+## Lisäys: V023 (17.11.2026)
+
+F:n täydennys (`docs/parallel/haiku-quality-2026-11-16.md`, 63b9c55): "Mikä näistä toimitetaan varmimmin?" sai 2/4 ajossa vastauksen "En pysty itse arvioimaan", koska toimitusvarmuuskysymyksen tunnistus tunsi vain järjestyksen "varmimmin toimitetaan". Nyt kumpikin järjestys ja "luotettavimmin" tunnistetaan (`compareKind`, `server/order-conversation/index.mjs`), ja koodi vastaa näytettyjen vaihtoehtojen toimitusvarmuustiedoista. Regressiotesti `test/haiku-findings-c.test.mjs` (V023), koko `npm test` 396/396.
+
 ## Testit
 
 - Uusi `test/haiku-findings-c.test.mjs` (7) itsepelien vuoroista testityökaluilla. Ennen korjausta C1–C6 kaatuivat odotetusti, C7 läpäisi jo vartijan lisäyksen jälkeen.
