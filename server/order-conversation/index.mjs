@@ -26,6 +26,7 @@ const HELP = 'Kirjoita tuotteet ja määrät, esim. "20 l laktoositonta maitoa j
 // Ilman tuotteita ja päivää kysytään silti ensin päivä (itsepeli X044 "60", S030 "sitä samaa ku viimeks").
 const START_QUESTION = 'Mille päivälle toimitus, ja mitä tarvitset? Esim. "20 l laktoositonta maitoa ja 5 kg voita maanantaiksi".';
 // "Sitä samaa ku viimeks": edellisen tilauksen rivit uuteen luonnokseen, päivä kysytään uudelleen.
+const REPEAT_FILLER = /(?<![\p{L}\d])(?:sitä|se|ne|niitä|joo|ok|okei|kiitos|vaan|vain|nyt|taas|uudestaan|uudelleen|mut|mutta|ja|tilaa|laita|otetaan|please)(?![\p{L}\d])/giu;
 export const REPEAT_LAST = /(?:sama\p{L}*|samanlai\p{L}*)\s+(?:tilaus\s+)?(?:kuin|ku|ko|kun)\s+(?:viimeks\p{L}*|viime\s+kerra\p{L}*|viimeksi|edelli\p{L}*|viimeisin\p{L}*|viime\s+viiko\p{L}*)|(?:toista|tilaa\s+uudelleen|uusi)\s+(?:viime\p{L}*|edelli\p{L}*|viimeisin)\s+tilau\p{L}*/iu;
 // Toimituspäivä kysytään ensin ja yksin: saatavuus ja vaihtoehdot riippuvat päivästä.
 const DATE_QUESTION = 'Mille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.';
@@ -83,7 +84,10 @@ const dateLabel = (iso) => new Intl.DateTimeFormat('fi-FI', { timeZone: 'UTC', w
 const validDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && new Date(`${d}T12:00:00Z`).toISOString().slice(0, 10) === d;
 const validQuantity = (q) => q && Number.isFinite(q.value) && q.value > 0 && q.value <= 100000 && ['L', 'KG', 'PCS'].includes(q.unit);
 const cleanQuantity = (q) => ({ value: q.value, unit: q.unit, ...(q.unit === 'PCS' && ['items', 'sales'].includes(q.basis) ? { basis: q.basis } : {}) });
-const lineLabel = (l) => `${l.productTerm}${l.quantity ? ` ${qty(l.quantity)}` : ''}${[...l.claims.map((c) => CLAIM_FI[c]), ...(l.excludeAllergens.length ? [`ei allergeeneja ${l.excludeAllergens.join(', ')}`] : [])].filter(Boolean).map((x) => ` (${x})`).join('')}`;
+// Gatewayn tilauksesta kopioitu määrä on myyntieriä: näytetään pakkaussanalla ("4 laatikkoa"), ei "4 kpl", niin kauan kuin
+// sama tuote on valittuna.
+const lineQty = (l) => (l.packLabel && l.packFor === l.selectedProductId && l.quantity?.basis === 'sales' ? `${num(l.quantity.value)} ${packWord(l.quantity.value, l.packLabel)}` : qty(l.quantity));
+const lineLabel = (l) => `${l.productTerm}${l.quantity ? ` ${lineQty(l)}` : ''}${[...l.claims.map((c) => CLAIM_FI[c]), ...(l.excludeAllergens.length ? [`ei allergeeneja ${l.excludeAllergens.join(', ')}`] : [])].filter(Boolean).map((x) => ` (${x})`).join('')}`;
 // Sisältö, jonka muutos kasvattaa revisiota ja mitätöi tarjouksen ja hyväksynnän.
 const content = (d) => JSON.stringify([d.deliveryDate, d.deliverySiteId, d.diet.claims, d.diet.excludeAllergens, d.lines.map((l) => [l.ref, l.productTerm, l.quantity, l.claims, l.excludeAllergens, l.selectedProductId || null, l.answeredClaims || []])]);
 
@@ -245,7 +249,31 @@ const timeWishNote = (draft) => `Toivoit toimitusta "${draft.timeWish}": kellona
  * @param {(input: {text: string, draft: object, today: string, now: number}) => Promise<{intent: string, deliveryDate?: string, ops: object[]}>} o.interpretTurn
  * @param {() => number} [o.now]
  */
-export function createOrderingConversation({ store, tools, interpretTurn, now = Date.now }) {
+/**
+ * Gatewayn viimeisin vahvistettu tilaus luonnosriveiksi "sama kuin viime kerralla" -pyyntöä varten. Valittu tuote ja
+ * myyntierämäärä säilyvät, päivää ei kopioida: hinta ja saatavuus tarkistetaan uudelle päivälle tarjouksessa.
+ * @param {object[]} orders saman ostajan tilaukset uusin ensin (gatewayn orders.list)
+ * @param {(name: string) => {productTerm?: string, claims?: string[]}} [termOf] lyhyt hakusana tuotenimestä
+ */
+export function lastConfirmedOrder(orders, termOf = () => ({})) {
+  const order = (orders || []).find((o) => o?.status === 'confirmed' && o.lines?.length);
+  if (!order) return null;
+  const byProduct = new Map();
+  for (const l of order.lines) {
+    const id = String(l.productId || ''); const qty = Number(l.quantity);
+    if (!id || !(qty > 0)) continue;
+    const prior = byProduct.get(id);
+    if (prior) { prior.quantity.value += qty; continue; }
+    const name = String(l.name || id).slice(0, 120); const term = termOf(name) || {};
+    byProduct.set(id, { productTerm: String(term.productTerm || name).slice(0, 60), quantity: { value: qty, unit: 'PCS', basis: 'sales' },
+      claims: term.claims || [], excludeAllergens: [], selectedProductId: id, selectedName: name, selectedWarning: null,
+      ...(l.salesUnitLabel ? { packLabel: String(l.salesUnitLabel).slice(0, 12), packFor: id } : {}) });
+  }
+  const lines = [...byProduct.values()].slice(0, 20);
+  return lines.length ? { orderId: order.orderId, lines } : null;
+}
+
+export function createOrderingConversation({ store, tools, interpretTurn, now = Date.now, lastOrder = null }) {
   // Tilausaikaraja verrataan keskustelun omaan kelloon (tuotannossa portin kello, testeissä kiinnitetty aika).
   const cutoffPassed = (closingTime) => { const t = parseApiTime(closingTime); return t ? t.getTime() <= now() : null; };
   // Aikaisin vielä voimassa oleva raja näytetyistä vaihtoehdoista. Mennyttä rajaa ei luvata; jos kaikki ovat menneet, se sanotaan.
@@ -483,20 +511,32 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
           : wantsMore || askOnly ? { intent: 'order', ops: [] }
           : picked ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: picked }] }
             : cheapest ? { intent: 'order', ops: [{ op: 'select', ref: choosing.refs[0], option: cheapest }] } : null;
-        // Edellinen tilaus uuteen tyhjään luonnokseen: tuotteet, määrät, valinnat ja ruokavalio, ei päivää.
-        const last = !draft.lines.length && REPEAT_LAST.test(t) ? store.lastOrdered(conversationId) : null;
+        // Edellinen tilaus uuteen tyhjään luonnokseen: tuotteet, määrät, valinnat ja ruokavalio, ei päivää. Ensisijaisesti
+        // gatewayn viimeisin vahvistettu tilaus samalle ostajalle (toimii myös nollauksen ja korisivun vahvistuksen jälkeen);
+        // jos se on tämän keskustelun oma tilaus, käytetään keskustelun rivejä hakusanoineen ja ruokavalioineen.
+        const repeat = !draft.lines.length && REPEAT_LAST.test(t);
+        const own = repeat ? store.lastOrdered(conversationId) : null;
+        let confirmed = null;
+        if (repeat && lastOrder) { try { confirmed = await lastOrder(customer); } catch { confirmed = null; } }
+        const last = confirmed?.lines?.length && own?.orderId !== confirmed.orderId ? confirmed : own;
         if (last?.lines?.length) {
           for (const l of last.lines.slice(0, 20)) {
             draft.lines.push({ ref: `L${++draft.seq}`, productTerm: l.productTerm, quantity: l.quantity, claims: l.claims || [], excludeAllergens: l.excludeAllergens || [],
-              selectedProductId: l.selectedProductId || null, selectedName: l.selectedName || null, selectedWarning: l.selectedWarning || null });
+              selectedProductId: l.selectedProductId || null, selectedName: l.selectedName || null, selectedWarning: l.selectedWarning || null,
+              ...(l.packLabel ? { packLabel: l.packLabel, packFor: l.packFor } : {}) });
           }
           if (last.diet) draft.diet = { known: !!last.diet.known, claims: last.diet.claims || [], excludeAllergens: last.diet.excludeAllergens || [] };
         }
-        const repeatNote = last?.lines?.length ? `Kopioin edellisen tilauksen${last.orderId ? ` ${last.orderId}` : ''} tuotteet.` : '';
+        // Toistopyyntö ei ole tuote: sääntötulkki teki fraasista "sitä samaa ku viimeks" rivin "sima". Tulkille annetaan vain
+        // muu osa viestistä ("sama ku viimeks, mut 10 l maitoa lisää" → "mut 10 l maitoa lisää"); pelkkä toisto ei tulkita.
+        const toInterpret = repeat ? t.replace(REPEAT_LAST, ' ') : t;
+        const onlyRepeat = repeat && !/\p{L}{2}/u.test(toInterpret.replace(REPEAT_FILLER, ' '));
+        const repeatNote = last?.lines?.length ? `Kopioin edellisen tilauksen${last.orderId ? ` ${last.orderId}` : ''} tuotteet. Hinnat ja saatavuus tarkistetaan uudelle toimituspäivälle.` : '';
         // Tulkki ajetaan silti: samassa viestissä voi olla lisäyksiä ("sama ku viimeks, mut 10 l maitoa lisää").
         const interpreted = dateAnswer || choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
           ? { op: 'update', ref, addClaims: [draft.pending.claim] } : { op: 'no_preference', ref }) }
-          : await interpretTurn({ text: withoutClockWords(t), draft: structuredClone(draft), today, now: now(), receivedAt, context }));
+          : onlyRepeat ? { intent: 'order', ops: [] }
+          : await interpretTurn({ text: withoutClockWords(toInterpret), draft: structuredClone(draft), today, now: now(), receivedAt, context }));
         // Pelkkä kysymys (tilausaikaraja, hintavertailu, vaihtoehdot uudelleen) ei lisää tuoterivejä: sääntötulkki teki
         // jutustelusta rivejä "mirin pit tila" ja "half" (katselmus #21). Määrä viestissä tarkoittaa tilausmuutosta.
         const questionOnly = interpreted !== dateAnswer && interpreted !== choice && (DEADLINE_QUESTION.test(t) || compareKind(t) || RELIST.test(t)) && !/\d/.test(t);

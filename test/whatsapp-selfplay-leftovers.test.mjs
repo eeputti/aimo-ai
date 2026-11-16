@@ -50,7 +50,7 @@ test('ilman tuotteita ensimmäinen vastaus kysyy päivän, ja "sama ku viimeks" 
   assert.equal((await say('TILAA')).status, 'confirmed');
   const again = await say('sitä samaa ku viimeks');
   assert.equal(again.status, 'collecting');
-  assert.match(again.text, /^Kopioin edellisen tilauksen AGW-7 tuotteet\.\nLuonnoksessa nyt:\n- maito 20 l \(laktoositon\): maito 1\n\nMille päivälle toimitus\?/);
+  assert.match(again.text, /^Kopioin edellisen tilauksen AGW-7 tuotteet\. Hinnat ja saatavuus tarkistetaan uudelle toimituspäivälle\.\nLuonnoksessa nyt:\n- maito 20 l \(laktoositon\): maito 1\n\nMille päivälle toimitus\?/);
   assert.equal(store.active('c').lines[0].selectedProductId, 'maito-1');
   for (const text of ['sama ku viimeks', 'samat kuin viime kerralla', 'samanlainen tilaus kuin edellinen', 'toista viime tilaus']) assert.ok(REPEAT_LAST.test(text), text);
   for (const text of ['20 l maitoa', 'sama määrä maitoa', 'samaa maitoa 20 l']) assert.ok(!REPEAT_LAST.test(text), text);

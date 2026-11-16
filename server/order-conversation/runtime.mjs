@@ -3,7 +3,7 @@
 import { storefrontCartProjection } from '../storefront-whatsapp-sync.mjs';
 import { shoppingListView } from '../shopping-list/index.mjs';
 import { openDraftStore } from './store.mjs';
-import { createOrderingConversation } from './index.mjs';
+import { createOrderingConversation, lastConfirmedOrder } from './index.mjs';
 import { createRuleInterpreter, createModelInterpreter } from './interpret.mjs';
 import { createOrderingTools } from '../order-tools/index.mjs';
 
@@ -36,7 +36,13 @@ export async function createConfiguredOrdering({ draftDb = ':memory:', quoteDb =
   const tools = createOrderingTools({ dbPath: quoteDb, now: time, ...(permissions ? { permissions } : {}) });
   const rules = createRuleInterpreter({ understand });
   const interpretTurn = agentEnabled() ? createModelInterpreter({ ask: askAgent, fallback: rules }) : rules;
-  const handleTurn = createOrderingConversation({ store, tools, interpretTurn, now: time });
+  // "Sama kuin viime kerralla": saman ostajan viimeisin vahvistettu tilaus gatewaysta, hakusana tuotenimestä.
+  const termOf = (name) => { const item = understand(name).items[0]; return item ? { productTerm: item.productTerm, claims: item.claims || [] } : {}; };
+  const lastOrder = async (customer) => {
+    const { orders } = await import('../gateway/store.mjs');
+    return lastConfirmedOrder(orders.list(customer.buyerId, 20), termOf);
+  };
+  const handleTurn = createOrderingConversation({ store, tools, interpretTurn, now: time, lastOrder });
   const cachedExport = createExportCache({ now: time });
   return { handleTurn,
     async getStorefrontCart({ conversationId, customer }) {

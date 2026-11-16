@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 — WhatsApp: kuvat ostoslistasta ja lähetteestä, ääniviestit vaihdettavalla litteroinnilla, "sama kuin viime kerralla" gatewaysta (Claude Code, sessio H)
+
+- **Käyttäjän pyyntö:** Eelis pyysi tekemään kaikki jäljellä olevat työt rinnakkain; tavoite on DM Champin kaltainen apuri Valion datalla, virallisella Cloud API:lla. Sessio H: kuva ostoslistasta, lähetteestä tai hyllystä, ääniviestit ja "sama kuin viime kerralla".
+- **Kuvat (1c49398):** `server/whatsapp/media.mjs`. Webhookin kuva (myös kuvana lähetetty tiedosto) jonoon tunnisteena, käsittelyssä vain luku Metan media-API:sta (avain vain Metan HTTPS-palvelimille, ei uudelleenohjauksia, 5 Mt, tiedoston alun tyyppitarkistus). Claude (`FAST_MODEL`) palauttaa rakenteisen listan; koodi suodattaa ohjaussanat ja kirjoittaa tavallisen tilausviestin samaan keskusteluun. Asiakas saa ensin viestin siitä, mitä luettiin. Kuvan teksti on dataa, päivää ei lueta kuvasta. Tulos tallessa taulussa `wa_media_reads` viestitunnisteella (uusinta ei lue uudelleen), poistuu jonon mukana. `WHATSAPP_MEDIA=false` ottaa pois.
+- **Ääniviestit (1c49398):** `server/whatsapp/transcribe.mjs`, vaihtoehdot none (oletus), groq, openai ja paikallinen command. Oletuksena botti kiittää ja pyytää kirjoittamaan, eikä ääntä ladata. Pelkkä "tilaa" tai "peru" ääniviestinä ei mene tilausmoottorille. Hintavertailu raportissa; suositus Groq whisper-large-v3-turbo (noin 0,0007 USD/min, suomi, ei säilytystä). **Palvelua tai avainta ei lisätty: valinta on Eeliksen.** OpenAI:n whisper-1 ja gpt-4o-*-transcribe poistuvat 26.2.2027, oletusmalli gpt-transcribe.
+- **Sama kuin viime kerralla:** C:n vapautettua `order-conversation/index.mjs`:n. Tyhjään luonnokseen kopioidaan gatewayn viimeisin vahvistettu tilaus samalle ostajalle (toimii myös nollauksen ja korisivun vahvistuksen jälkeen), tuote ja myyntierämäärä säilyvät, päivä kysytään ensin ja tarjous haetaan uudelle päivälle. Jos tilaus on saman keskustelun, käytetään keskustelun rivejä hakusanoineen. Korjattu samalla vanha sääntötulkin virhe: "sitä samaa ku viimeks" teki rivin "sima".
+- **Tarkistukset:** `test/whatsapp-media.test.mjs` 9/9, `test/whatsapp-reorder.test.mjs` 2/2, `npm test` 330/330 `origin/main` 5d6ae75:n päällä. Oikea mallikoe kahdella itse tehdyllä kuvalla (käsin kirjoitettu lista kuvaan kirjoitetulla käskyllä ja yliviivatulla rivillä, tulostettu lähete) väliaikaisilla kannoilla, simuloiduilla hinnoilla ja simuloidulla Metalla: 7 ja 5 riviä oikein samaan luonnokseen, käsky ja yliviivattu rivi pois, "ltk" luettiin ensin litroiksi ja kehote korjattiin. 8 mallikutsua ajoa kohden, 0 virhettä, noin 0,006 USD, 0 tilausta. Raportti `docs/parallel/whatsapp-media-reorder.md`.
+- **Rajat ja jatko:** ei restarttia, Meta-lähetyksiä eikä Valion API-kutsuja. Käyttöönotto E:lle (taulu #292): kuvat toimivat restartin jälkeen nykyisillä avaimilla, Metan webhookiin ei muutoksia. Metan media-API on kokeiltu vain simuloituna; ensimmäinen oikea kuva ja ääniviesti kannattaa kokeilla puhelimella. D sai `channel.mjs`:n työjonomuutoksiinsa.
+
 ## 16.11.2026 ilta — tilausnumerot, idempotenssi, hintojen tuoreus, julkaisija ja Worker (Claude Code, sessio B)
 
 - **Pyyntö:** katselmoinnin #6, #7, #13, #15, #24 ja #25 (`docs/parallel/code-audit-2026-11-15-ilta.md`). Raportti `docs/parallel/audit-fixes-b.md`. Ei julkaisua, restarttia, D1-ajoja eikä oikeita Meta-, Valio- tai mallikutsuja.
@@ -14,6 +23,7 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 - **A:n pyynnöstä (#16):** `clockCycle` tilaukselle, `cyc` tarjoukseen ja edellisen kierroksen tarjouksen hylkäys, kun kello kiertää.
 - **Tarkistukset:** uudet `test/audit-fixes-b.test.mjs` 8/8 (myös kahden ostajan samanaikainen tilaus node:sqlite- ja libsql-kannalla sekä kolme prosessia samassa kannassa) ja `deploy/cloudflare/test/audit-fixes-b.test.mjs` 7/7. Sama gateway-testi vanhalla koodilla 8/8 epäonnistuu. Neljä vanhaa Worker-testiä päivitetty tarkoitettuun käytökseen. `npm test` 318/318, Worker 44/44, typecheck ja build.
 - **Käyttöönotto (E):** ei D1-migraatiota. Ensin Worker, sitten botti ja julkaisija. Ohjeet raportissa.
+
 ## 16.11.2026 — WhatsApp-botti Verceliin testinä, vaihto odottaa (Claude Code, sessio E pilvisiirto)
 
 - **Käyttäjän lupa:** Eelis hyväksyi asetusten ja salaisuuksien viennin Vercel-projektiin `aimo-whatsapp` testijulkaisuna (erilliset Turso-testikannat `aimo-t-*`, väärä Meta-token, ei yhteyttä Worker-sivustoon). Macin botti ja julkaisija ennallaan.

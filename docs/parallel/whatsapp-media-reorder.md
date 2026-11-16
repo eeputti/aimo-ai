@@ -52,14 +52,21 @@ Paikallinen vaihtoehto (ilmainen, vain Mac): `brew install whisper-cpp ffmpeg`, 
 
 ## 3. "Sama kuin viime kerralla"
 
-Odottaa: muutos on `server/order-conversation/index.mjs`:ssä, jonka sessio C omistaa (taulun tehtävä d142b2ef). Nykyinen toteutus kopioi saman keskustelujakson edellisen `ordered`-luonnoksen; tavoite on gatewayn viimeisin vahvistettu tilaus samalle ostajalle (toimii myös "tyhjää kaikki" -nollauksen ja korisivulla vahvistetun tilauksen jälkeen), päivä kysytään ensin ja hinnat sekä saatavuus haetaan uudelleen. Tehdään, kun C on pushannut ja vapauttanut tiedoston.
+Kun luonnos on tyhjä ja asiakas kirjoittaa esimerkiksi "sitä samaa ku viimeks" (`REPEAT_LAST`), uusi luonnos kootaan **gatewayn viimeisimmästä vahvistetusta tilauksesta samalle ostajalle** (`lastConfirmedOrder` `order-conversation/index.mjs`:ssä, kytkentä `runtime.mjs`:ssä). Siksi kopiointi toimii myös "tyhjää kaikki" -nollauksen jälkeen (uusi keskustelujakso) ja korisivulla vahvistetun tilauksen jälkeen. Odottavat ja hylätyt tilaukset ohitetaan. Jos gatewayn tilaus on tämän keskustelun oma, käytetään keskustelun rivejä hakusanoineen ja ruokavalioineen (ennallaan); jos vahvistettua tilausta ei ole, käytetään keskustelun omaa edellistä tilausta kuten ennen.
+
+- Rivit: sama tuote (valittu tuotenumero) ja sama määrä myyntierinä, saman tuotteen rivit yhdistettynä, enintään 20. Lyhyt hakusana ja ruokavaliomerkintä luetaan tuotenimestä Aimon jäsentimellä. Määrä näytetään pakkaussanalla ("4 laatikkoa"), ei "4 kpl", niin kauan kuin sama tuote on valittuna.
+- Toimituspäivää ei kopioida: vastaus on "Kopioin edellisen tilauksen AGW-... tuotteet. Hinnat ja saatavuus tarkistetaan uudelle toimituspäivälle." ja päiväkysymys. Päivän jälkeen tarjous haetaan uudelle päivälle samoille tuotteille; jos tuote ei ole tilattavissa, valinta puretaan ja tilalle näytetään vaihtoehdot (olemassa oleva tarjouspolku). Tilausta ei tehdä ilman TILAA- tai korivahvistusta.
+- Korjattu samalla: sääntötulkki teki fraasista "sitä samaa ku viimeks" tuoterivin "sima". Toistofraasi poistetaan ennen tulkintaa; muu osa viestistä tulkitaan ("sitä samaa ku viimeks ja 5 kg voita" lisää voin).
+
+Testattu oikeilla moduuleilla (`test/whatsapp-reorder.test.mjs`): tilaus WhatsAppissa, "tyhjää kaikki", "sitä samaa ku viimeks ja 5 kg voita" → kopioitu tilaus + voi, päiväkysymys ilman hintoja → "keskiviikoksi" → voin vaihtoehdot → yhteenveto ke 18.11. uusilla hinnoilla, gatewayssa edelleen yksi tilaus. Mallikoetta tälle kohdalle ei ajettu: polku on koodissa, ja mallitulkki saa saman toistofraasista puhdistetun tekstin.
 
 ## Tarkistukset
 
 - `test/whatsapp-media.test.mjs` 9/9: webhookin tyypit, media-API:n rajat ja avaimen rajaus, tuoterivien suodatus, kuvanlukijan välimuisti ja virheet, ääniviesti ilman ja palvelun kanssa, litterointipalvelun valinta (Groq-kutsun muoto, OpenAI-oletusmalli, paikallinen ohjelma), kanavan läpi kulkeva kuva ja ääni, uusinnat ja oikea tilausmoottori kuvasta luonnokseen (simuloidut hinnat, ei tilausta).
-- `npm test` 319/319 tämän worktreen `origin/main` 671b9a1 + tämä työ.
+- `test/whatsapp-reorder.test.mjs` 2/2 ja `test/whatsapp-selfplay-leftovers.test.mjs` 5/5 (viestin odotus päivitetty uuteen lauseeseen).
+- `npm test` 319/319 kohdille 1–2 (`origin/main` 671b9a1 + työ) ja 330/330 kohdan 3 jälkeen (`origin/main` 5d6ae75 + työ).
 - Ei oikeita Meta-lähetyksiä, ei Valion API-kutsuja, ei restarttia. Käyttöönotto sessiolle E.
 
 ## Käyttöönotto (E)
 
-Botti tarvitsee tämän commitin ja uudelleenkäynnistyksen. Kuvat toimivat heti tilaustilassa nykyisellä `WHATSAPP_ACCESS_TOKEN`illa ja `ANTHROPIC_API_KEY`:llä, eikä Metan webhookiin tarvita muutoksia. Ääniviestit pysyvät "kirjoita tekstinä" -tilassa, kunnes Eelis valitsee palvelun. Tarkista restartin jälkeen oikealla puhelimella: yksi kuva ostoslistasta ja yksi ääniviesti. Metan media-API:a ei ole kokeiltu oikealla numerolla (vain simuloituna dokumentaation mukaisesti); jos lataus epäonnistuu, botti vastaa "En saanut kuvaa ladattua".
+Botti tarvitsee commitit 1c49398 (kuvat ja äänet) ja kohdan 3 commitin sekä uudelleenkäynnistyksen. Kuvat toimivat heti tilaustilassa nykyisellä `WHATSAPP_ACCESS_TOKEN`illa ja `ANTHROPIC_API_KEY`:llä, eikä Metan webhookiin tarvita muutoksia. Ääniviestit pysyvät "kirjoita tekstinä" -tilassa, kunnes Eelis valitsee palvelun. Tarkista restartin jälkeen oikealla puhelimella: yksi kuva ostoslistasta ja yksi ääniviesti. Metan media-API:a ei ole kokeiltu oikealla numerolla (vain simuloituna dokumentaation mukaisesti); jos lataus epäonnistuu, botti vastaa "En saanut kuvaa ladattua".
