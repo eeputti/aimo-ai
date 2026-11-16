@@ -165,6 +165,12 @@ function apply(draft, turn, customer, today) {
       const option = draft.offered[line.ref]?.[o.option - 1];
       if (!option) { notes.push(`Valitse numero näytetyistä vaihtoehdoista: ${line.productTerm}.`); continue; }
       line.selectedProductId = option.productId; line.selectedName = option.name; line.selectedWarning = option.warning || null;
+      // Vastaava tuote saatavuudeltaan tuntemattoman tilalle: rivin tuote vaihtuu, ja eri mittayksikössä määrä kysytään uudelleen.
+      if (option.replaceTerm) {
+        line.productTerm = String(option.replaceTerm).slice(0, 80); delete line.noExact; line.answeredClaims = [];
+        if (option.askQuantity) line.quantity = null;
+        draft.unknownNoted = null;
+      }
     } else if (o.op === 'no_preference') {
       if (draft.pending?.kind === 'preference') {
         for (const ref of draft.pending.refs) {
@@ -380,17 +386,22 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
           if (s.issues.some((i) => i.code === 'NO_MORE_OPTIONS')) opts = { again: { ...opts.again, more: false } };
         }
       }
-      if (!x && again) { x = { ref: again.ref, options: draft.offered[again.ref], more: opts.again.more === true, exact: opts.again.exact }; line = again; }
+      if (!x && again) { x = { ref: again.ref, options: draft.offered[again.ref], more: opts.again.more === true, exact: opts.again.exact, ...(opts.again.unknown ? { availabilityUnknown: true } : {}) }; line = again; }
       // Kiireellinen päivä (tänään, huomenna tai kiireeksi sanottu): jos pyydetylle päivälle ei ehdi, haetaan aikaisin
       // päivä, jolle sama tuote on tilattavissa, ja kysytään päivän vaihtoa. Ostajan hylkäämää vaihtoa ei tarjota uudestaan.
       const today = helsinki(now());
       const urgent = draft.rush || draft.deliveryDate <= addDays(today, 1);
+      // Saatavuutta ei saatu tarkistettua (rajapinta alhaalla, tuotteesta ei aiempaa tietoa): sama koskee kaikkia päiviä.
+      const unknownTerms = []; let blocked = 0;
       if (!x) {
         for (const l of open) {
           const s = await tools.suggest({ customer, draft: { ...draft, lines: [l] } });
           if (s.lines[0]?.options?.length) { problems.push(...s.issues.map((i) => i.message)); x = s.lines[0]; line = l; draft.seen[l.ref] = x.options.map((o) => o.productId); break; }
           const none = s.issues.find((i) => i.code === 'NO_ORDERABLE_PRODUCT' && i.ref === l.ref);
-          if (none && urgent && !(draft.keptDates || []).includes(draft.deliveryDate)) {
+          if (none) blocked += 1;
+          if (none?.availabilityUnknown) unknownTerms.push(l.productTerm);
+          // Tuntematonta saatavuutta ei kannata kokeilla seuraaville päiville: tieto puuttuu niiltäkin.
+          if (none && !none.availabilityUnknown && urgent && !(draft.keptDates || []).includes(draft.deliveryDate)) {
             let earliest = none.nextDeliveryDate && none.nextDeliveryDate > draft.deliveryDate ? none.nextDeliveryDate : null;
             for (let k = 1; !earliest && k <= 5; k += 1) {
               const probe = await tools.suggest({ customer, draft: { ...draft, deliveryDate: addDays(draft.deliveryDate, k), lines: [l] } });
@@ -410,6 +421,17 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       }
       if (!x) {
         const e = draft.earliest?.from === draft.deliveryDate ? draft.earliest : null;
+        // Vain tuntematon saatavuus estää: toinen päivä ei auta, eikä samaa pitkää viestiä toisteta joka vuorolla
+        // (selainkokeilu 17.11.: jäätelö keskiviikolle, perjantaille ja "millo saa jäätelöö?" sai saman vastauksen).
+        if (!e && unknownTerms.length && unknownTerms.length === blocked) {
+          const what = joinFi(unknownTerms); const key = unknownTerms.join('|');
+          const repeat = draft.unknownNoted === key;
+          draft.unknownNoted = key;
+          const how = `Voit vaihtaa tuotteen toiseen tai poistaa sen kirjoittamalla "poista ${unknownTerms[0]}".`;
+          return { status: 'collecting', text: repeat
+            ? `Saatavuutta ei vieläkään saada tarkistettua: ${what}. Se puuttuu kaikilta päiviltä, joten päivän vaihto ei auta. ${how} Tilausta ei ole tehty.`
+            : `${problems.join('\n')}\nToinen päivä ei auta, koska tieto puuttuu kaikilta päiviltä, enkä löytänyt vastaavaa tuotetta, jonka saatavuus olisi tiedossa. ${how} Tilausta ei ole tehty.` };
+        }
         const hint = e ? `Aikaisin toimitettava päivä on ${dateLabel(e.date)}. Kirjoita "${dateLabel(e.date)}", jos se käy.` : 'Kokeile toista päivää tai tarkenna tuotetta.';
         return { status: 'collecting', text: `${problems.join('\n')}\n${hint} Tilausta ei ole tehty.` };
       }
@@ -457,7 +479,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         return { ...next, text: [...problems, `Valitsin ensimmäisen sopivan vaihtoehdon: ${cap(lineLabel(line))}: ${optionLabel(o, line)}.`, next.text].join('\n\n') };
       }
       const moreNo = x.more ? x.options.length + 1 : null;
-      draft.pending = { kind: 'choose', refs: [x.ref], options: x.options.length, more: moreNo, ...(x.exact === false ? { exact: false } : {}) };
+      draft.pending = { kind: 'choose', refs: [x.ref], options: x.options.length, more: moreNo, ...(x.exact === false ? { exact: false } : {}), ...(x.availabilityUnknown ? { unknown: true } : {}) };
       // Lisävaihtoehtojen numero kuuluu ohjeeseen, kun se näkyy listassa (C1: "Vastaa 1, 2 tai 3" ja rivi 4).
       const numbers = [...x.options.map((_, i) => String(i + 1)), ...(moreNo ? [String(moreNo)] : [])];
       const how = numbers.length === 1 ? 'Vastaa 1.' : `Vastaa ${numbers.slice(0, -1).join(', ')} tai ${numbers.at(-1)}.`;
@@ -467,14 +489,19 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       const covered = x.options.filter((o) => o.covers?.unit === line.quantity.unit).map((o) => o.covers.value);
       const smallest = covered.length ? Math.min(...covered) : null;
       const notes = [...(smallest > line.quantity.value ? [`Tarve on ${qty(line.quantity)}; pienin näistä myyntieristä kattaa ${qty({ value: smallest, unit: line.quantity.unit })}.`] : []),
-        ...(!line.claims.includes('EU_ORGANIC_FARMING') && x.options.every((o) => o.labels?.includes('EU_ORGANIC_FARMING')) ? ['Näytetyt vaihtoehdot ovat luomua.'] : [])];
+        ...(!line.claims.includes('EU_ORGANIC_FARMING') && x.options.every((o) => o.labels?.includes('EU_ORGANIC_FARMING')) ? ['Näytetyt vaihtoehdot ovat luomua.'] : []),
+        // Vastaavat tuotteet toisessa mittayksikössä (1000 l jäätelöä → leivokset): hinta on yhdestä myyntierästä, määrä kysytään.
+        ...(x.options.some((o) => o.askQuantity) ? [`${x.options.every((o) => o.askQuantity) ? 'Hinnat ovat' : 'Määrää vailla olevien hinta on'} yhdestä myyntierästä: tarve ${qty(line.quantity)} ei muunnu ${x.options.every((o) => o.askQuantity) ? 'näihin tuotteisiin' : 'kaikkiin näistä'}, joten määrä kysytään valinnan jälkeen.`] : []),
+        ...(x.availabilityUnknown ? [`Jos mikään näistä ei käy, kirjoita "poista ${line.productTerm}".`] : [])];
       // Kiireessä tilausaikaraja näkyy jo vaihtoehdoissa (aikaisin näytetyistä, työkalujen tiedoista). Kellonaikaa ei luvata.
       const cutoffs = urgent ? x.options.map((o) => o.cutoff).filter((c) => parseApiTime(c)).sort((a, b) => parseApiTime(a) - parseApiTime(b)) : [];
       const day = draft.deliveryDate === today ? 'Tämän päivän toimitukseen' : draft.deliveryDate === addDays(today, 1) ? 'Huomiselle' : `Päivälle ${dateLabel(draft.deliveryDate)}`;
       if (cutoffs.length) notes.push(cutoffNote(day, cutoffs));
       if (draft.timeWish && !draft.timeWishNoted) { notes.push(timeWishNote(draft)); draft.timeWishNoted = true; }
       const block = [`Toimitus ${dateLabel(draft.deliveryDate)}, hinnat alv 0 %.${diet ? ` Huomioitu: ${diet}.` : ''}`,
-        ...(x.exact === false ? [`Tarkkaa osumaa ei löytynyt: ${line.productTerm}. Lähimmät tilattavat vaihtoehdot:`] : []),
+        ...(x.exact === false ? [x.availabilityUnknown
+          ? `En saa nyt tarkistettua saatavuutta: ${line.productTerm}, joten en voi luvata sitä millekään päivälle. Näiden vastaavien tuotteiden saatavuus on tiedossa:`
+          : `Tarkkaa osumaa ei löytynyt: ${line.productTerm}. Lähimmät tilattavat vaihtoehdot:`] : []),
         `*${cap(lineLabel(line))}:*`, ...x.options.map((o, i) => `${i + 1}) ${optionLabel(o, line)}`),
         ...(moreNo ? [`${moreNo}) Näytä lisää vaihtoehtoja`] : []), ...notes,
         `${how}${later.length ? ` Sen jälkeen valitaan ${joinFi(later)}.` : ''}`].join('\n');
@@ -666,7 +693,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         if (!result) {
           const asksDeadline = DEADLINE_QUESTION.test(t);
           // Muuttumaton luonnos: sama lista uudelleen (virheellinen numero) tai seuraavat vaihtoehdot ilman uutta alkuhakua.
-          const next = await advance(draft, customer, 0, choosing && unchanged ? { again: { ref: choosing.refs[0], more: choosing.more != null, exact: choosing.exact }, more: moreAsked }
+          const next = await advance(draft, customer, 0, choosing && unchanged ? { again: { ref: choosing.refs[0], more: choosing.more != null, exact: choosing.exact, unknown: choosing.unknown }, more: moreAsked }
             : reopened && draft.offered[reopened.ref]?.length ? { again: { ref: reopened.ref, more: true } } : {});
           // Vertailu näytetyistä vaihtoehdoista. Jos lista tulee vasta tarkennuksen jälkeen, kysymys muistetaan siihen asti.
           const kind = compare || draft.compare || null;

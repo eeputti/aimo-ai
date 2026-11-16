@@ -19,6 +19,7 @@ const cacheGet = db.prepare('SELECT fetched_at, json FROM api_cache WHERE key = 
 const cacheSet = db.prepare('INSERT INTO api_cache (key, fetched_at, json) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET fetched_at = excluded.fetched_at, json = excluded.json');
 // Avaimet ovat muotoa <tila>:<laji>:<päivä>:<tuote>, esim. live:price:2026-11-16:464201. Tuotetunnus on numeerinen.
 const cacheLatest = db.prepare('SELECT key, fetched_at, json FROM api_cache WHERE key LIKE ? ORDER BY fetched_at DESC LIMIT 1');
+const cacheAll = db.prepare('SELECT key, fetched_at, json FROM api_cache WHERE key LIKE ?');
 export const apiCache = {
   get(key) { const row = cacheGet.get(key); return row ? { fetchedAt: row.fetched_at, value: JSON.parse(row.json) } : null; },
   set(key, value) { cacheSet.run(key, Date.now(), JSON.stringify(value)); },
@@ -27,6 +28,16 @@ export const apiCache = {
     if (!/^\d{1,20}$/.test(String(id))) return null;
     const row = cacheLatest.get(`${prefix}:%:${id}`);
     return row ? { key: row.key, fetchedAt: row.fetched_at, value: JSON.parse(row.json) } : null;
+  },
+  /** Jokaisen tuotteen uusin arvo yhdellä kyselyllä: Map(tuote -> {key, fetchedAt, value}). Pilvessä yksi kantakutsu. */
+  latestAll(prefix) {
+    const out = new Map();
+    for (const row of cacheAll.all(`${prefix}:%`)) {
+      const id = row.key.split(':').at(-1);
+      if (!/^\d{1,20}$/.test(id) || (out.get(id)?.fetchedAt ?? -1) > row.fetched_at) continue;
+      try { out.set(id, { key: row.key, fetchedAt: row.fetched_at, value: JSON.parse(row.json) }); } catch { /* rikkinäinen rivi ohitetaan */ }
+    }
+    return out;
   },
 };
 export function wipeApiCache() { db.exec('DELETE FROM api_cache;'); }

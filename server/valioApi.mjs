@@ -141,6 +141,19 @@ export function lastKnownAvailability(id, date) {
   return base; // out, blocked tai unknown: ei tilattavissa
 }
 
+// Tuotteet, joiden viimeisin oikea saatavuusvastaus oli "ok": niille viimeisin tunnettu arvo antaa toimituksen pyydettynä
+// päivänä. Käytetään vain ehdokasjoukkona, kun pyydetyn tuotteen saatavuutta ei saada; varsinainen tilattavuus tarkistetaan
+// tavallisella fetchQuotes-kutsulla. Lista luetaan yhdellä kyselyllä ja pidetään muistissa 5 minuuttia.
+let okIds = { at: 0, ids: null };
+export function lastKnownOkIds() {
+  if (okIds.ids && Date.now() - okIds.at < 5 * 60_000) return okIds.ids;
+  const ids = [];
+  for (const [id, row] of apiCache.latestAll('live:avail')) if (row.value?.status === 'ok') ids.push(id);
+  okIds = { at: Date.now(), ids };
+  return ids;
+}
+export function resetLastKnownOkIds() { okIds = { at: 0, ids: null }; }
+
 export function lastKnownPrice(id) {
   const row = apiCache.latest('live:price', id);
   if (!row || row.value.error) return null;

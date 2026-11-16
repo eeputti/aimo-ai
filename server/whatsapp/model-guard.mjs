@@ -27,6 +27,9 @@ const CLAIMS = [
   // (Haiku-mittaus V025: "palaan siihen sitten", eikä vastausta tullut).
   re('<B>palaa(?:n|mme)\\s+(?:siihen|asiaan|tähän|sinulle|teille|myöhemmin|pian|heti|kun|sitten)<E>|<B>(?:otan|otamme)\\s+(?:sinuun\\s+|teihin\\s+)?yhteyttä<E>|<B>(?:ilmoitan|ilmoitamme|kerron|kerromme|lähetän|lähetämme|vastaan)\\s+(?:sinulle\\s+|teille\\s+)?(?:myöhemmin|heti kun|sitten kun|kun saan)<E>'),
 ];
+// Sisäinen nimitys, jota asiakas ei ymmärrä ("Jäätelön saatavuus selviää tilausmoottorista", selainkokeilu 17.11.):
+// dialogin ohje käyttää sanaa, joten malli toisti sen. Virke pudotetaan; tilausmoottorin oma vastaus tulee perään.
+const JARGON = re('<B>tilausmoottor\\p{L}*');
 // Sisäisen ohjeen tai rakenteen vuoto: koko vastaus korvataan, ei vain virkettä.
 const LEAK = re('<B>(?:route|lookupQuery|suggestionTerm|openCart|capabilities|cartLink|shoppingList|lastOrderReply|pendingSuggestion|addQuestion|pendingQuestion|productTerm|quantityValue|excludeAllergens)<E>|<B>Olet Valio Aimon<E>|<B>Route (?:order|chat|cart|reset)<E>|<B>järjestelmä(?:kehote|kehotteen|kehotteesi|ohje|ohjeet|ohjeeni|prompt)\\p{L}*|<B>system prompt<E>|<B>minun ohjeeni<E>|<B>ohjeeni (?:ovat|kuuluvat)<E>');
 
@@ -48,6 +51,7 @@ export function guardModelText(value) {
       if (LINK.test(sentence)) { blocked.push('link'); return false; }
       if (LONG_NUMBER.test(sentence)) { blocked.push('number'); return false; }
       if (CLAIMS.some((re) => re.test(sentence))) { blocked.push('claim'); return false; }
+      if (JARGON.test(sentence)) { blocked.push('jargon'); return false; }
       return true;
     });
     if (ok.length) kept.push(ok.join(' '));

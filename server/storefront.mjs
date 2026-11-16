@@ -127,12 +127,15 @@ export async function availableStorefront(r, opts = {}) {
       const { tier, requested } = info.get(p);
       if (tier != null) { p.match = guessed ? TIER.NONE : tier; p.requested = !guessed && requested; }
     });
+    // Pyydetyt tuotteet, joiden saatavuutta ei saatu: tilausapuri hakee niiden lähelle tuotteita, joiden saatavuus tunnetaan.
+    const unknownIds = (wanted.length ? wanted : card.list).filter(unknownOf).slice(0, 10).map((p) => String(p.id));
     card.list = exact.length ? exact : substitutes;
     card.top = card.list.slice(0, 3); card.total = card.list.length;
     card.status = card.total ? 'ok' : 'no_match';
     card.notInCatalog = catalogMiss && !card.total;
     card.availabilityUnknown = unknownData && !card.total;
     card.requestedUnknown = !guessed && wantedUnknown && !exact.some((p) => p.requested !== false);
+    if ((card.availabilityUnknown || card.requestedUnknown) && unknownIds.length) card.unknownIds = unknownIds;
     // Katalogin suodatinten lukumäärät eivät kuvaa tämän päivän saatavuutta.
     card.chips = card.chips.map(({ matches, ...chip }) => chip);
     if (!card.total) card.reason = nextDeliveryDate
@@ -141,6 +144,55 @@ export async function availableStorefront(r, opts = {}) {
   }
   r.gateway = { ...r.gateway, requestQuote: null };
   return r;
+}
+
+// ---------- Vastaavat tuotteet, kun pyydetyn tuotteen saatavuutta ei saada ----------
+// Valion rajapinta ei vastaa, eikä pyydetystä tuotteesta (jäätelö) ole aiempaa tietoa. Toinen päivä ei auta, joten
+// tarjotaan tuotteita, joiden saatavuus tunnetaan ja jotka sopivat samaan käyttöön. Ehdokkaat ovat vain tuotteita,
+// joiden viimeisin oikea saatavuus oli "ok"; ruokavalio- ja allergeeniehdot pätevät. Valitsija (malli) saa vain nimet
+// ja palauttaa tunnisteita listasta, ja tilattavuus tarkistetaan valinnan jälkeen tavallisella ehdolla.
+// Ilman valitsijaa kelpaavat vain saman tuotealaryhmän tuotteet (neljä ensimmäistä numeroa samat).
+const NON_FOOD = /^6/; // siivous-, pakkaus- ja kertakäyttötarvikkeet
+const sharedDigits = (a, b) => { let n = 0; while (n < Math.min(a.length, b.length) && a[n] === b[n]) n += 1; return n; };
+const fitsDiet = (p, item) => (item.claims || []).every((c) => p.labels?.includes(c)) && verifiedFree(item.excludeAllergens, p);
+
+export async function knownAlternatives(item, date, { unknownIds = [], knownIds, pick = null, limit = 3, pool = 150 } = {}) {
+  const cat = loadCatalog();
+  const { lastKnownOkIds } = await import('./valioApi.mjs');
+  const refs = unknownIds.map((id) => cat.get(String(id))).filter(Boolean);
+  const skip = new Set(unknownIds.map(String));
+  const refCats = refs.map((p) => String(p.category || ''));
+  const temps = refs.map((p) => p.temp).filter(Boolean);
+  const temp = temps.sort((a, b) => temps.filter((t) => t === b).length - temps.filter((t) => t === a).length)[0] || null;
+  const scored = (knownIds || lastKnownOkIds()).flatMap((id) => {
+    const p = cat.get(String(id));
+    if (!p || skip.has(String(p.id)) || NON_FOOD.test(String(p.category || '')) || !fitsDiet(p, item)) return [];
+    const near = refCats.length ? Math.max(...refCats.map((c) => sharedDigits(c, String(p.category || '')))) : 0;
+    return [{ p, near, sameTemp: temp && p.temp === temp ? 1 : 0 }];
+  }).sort((a, b) => b.near - a.near || b.sameTemp - a.sameTemp || a.p.name.localeCompare(b.p.name, 'fi'));
+  const candidates = scored.slice(0, pool);
+  if (!candidates.length) return [];
+  let picks;
+  if (pick) {
+    try {
+      const ids = new Set(candidates.map((c) => String(c.p.id)));
+      const r = await pick({ term: item.productTerm, quantity: item.quantity || null, candidates: candidates.map((c) => ({ id: String(c.p.id), name: c.p.name })) });
+      // Valitsija saa ehdottaa muutaman enemmän: osa voi pudota tilattavuustarkistuksessa (tilausaika, hinta, saldo).
+      picks = (Array.isArray(r) ? r : []).filter((x) => x && ids.has(String(x.id))).slice(0, limit + 2)
+        .map((x) => ({ id: String(x.id), term: typeof x.term === 'string' && x.term.trim() ? x.term.trim().slice(0, 60) : null, why: typeof x.reason === 'string' ? x.reason.trim().slice(0, 120) : null }));
+    } catch { picks = null; }
+  }
+  if (!picks) picks = candidates.filter((c) => c.near >= 4).slice(0, limit).map((c) => ({ id: String(c.p.id), term: null, why: null }));
+  if (!picks.length) return [];
+  const quotes = await fetchQuotes(picks.map((x) => x.id), date);
+  return picks.flatMap((x) => {
+    const p = cat.get(x.id);
+    let a = orderableProduct(p, quotes.get(x.id), date, item.quantity);
+    // Eri mittayksikkö (1000 l jäätelöä → leivokset kappaleina): hinta yhdestä myyntierästä, määrä kysytään valinnan jälkeen.
+    const askQuantity = !a.ok && a.code === 'UNIT_NOT_CONVERTIBLE';
+    if (askQuantity) a = orderableProduct(p, quotes.get(x.id), date, { value: 1, unit: 'PCS' });
+    return a.ok ? [{ ...a.product, alternativeFor: item.productTerm, alternativeTerm: x.term, askQuantity, why: x.why }] : [];
+  }).slice(0, limit);
 }
 
 export async function reviewStorefront(rows, date) {

@@ -102,10 +102,11 @@ export function scoreOptions(found, line) {
 }
 
 async function defaultDeps() {
-  const [storefront, service, gwStore, catalog] = await Promise.all([
-    import('../storefront.mjs'), import('../gateway/service.mjs'), import('../gateway/store.mjs'), import('../catalog.mjs'),
+  const [storefront, service, gwStore, catalog, nearbyPicker] = await Promise.all([
+    import('../storefront.mjs'), import('../gateway/service.mjs'), import('../gateway/store.mjs'), import('../catalog.mjs'), import('./nearby.mjs'),
   ]);
   const cat = catalog.loadCatalog();
+  const picker = nearbyPicker.createNearbyPicker();
   return {
     // Säännöt ilman mallikutsua: luonnoksen rivi on jo rakenteinen.
     search: async (line, deliveryDate) => {
@@ -116,8 +117,11 @@ async function defaultDeps() {
       list.notInCatalog = r.cards[0]?.notInCatalog === true;
       list.availabilityUnknown = r.cards[0]?.availabilityUnknown === true;
       list.requestedUnknown = r.cards[0]?.requestedUnknown === true;
+      list.unknownIds = r.cards[0]?.unknownIds || [];
       return list;
     },
+    // Vastaavat tilattavat tuotteet, kun pyydetyn tuotteen saatavuutta ei saada (nearby.mjs valitsee, storefront tarkistaa).
+    nearby: (item, deliveryDate, unknownIds) => storefront.knownAlternatives(item, deliveryDate, { unknownIds, pick: picker }),
     product: (id) => cat.get(String(id)),
     buyer: (buyerId) => gwStore.buyers.byId(buyerId),
     requestQuote: service.requestQuote,
@@ -160,7 +164,7 @@ export function createOrderingTools(deps = {}) {
     if (!validDate(draft.deliveryDate)) issues.push(issue('DELIVERY_DATE_MISSING', 'Toimituspäivä puuttuu.'));
     for (const l of draft.lines) if (!validQuantity(l.quantity)) issues.push(issue('QUANTITY_MISSING', `Määrä puuttuu: ${l.productTerm}.`, { ref: l.ref }));
     if (issues.length) return { lines: [], issues };
-    const { search, product } = await d();
+    const { search, product, nearby } = await d();
     const lines = [];
     // Koko tilauksen ruokavalio (draft.diet): allergeenia sisältävä tuote putoaa aina pois. Tuote, jolta allergeenitieto puuttuu
     // (esim. tuoreet kasvikset), näytetään varoituksen kanssa, ja merkintää vailla olevat näytetään vain, jos merkittyjä ei ole.
@@ -189,12 +193,36 @@ export function createOrderingTools(deps = {}) {
       let scored = scoreOptions(fit, line);
       // nextDeliveryDate: aikaisin päivä, jolle haku löytää tilattavaa, kun haku sen tietää (muuten null).
       // Valikoimassa ei ole pyydettyä tuotetta lainkaan (tuore tryffeli): sanotaan se, ei toimituspäivän ongelmaksi.
+      // Pyydetyn tuotteen saatavuutta ei saatu (rajapinta alhaalla, ei aiempaa tietoa): toinen päivä ei auta, joten tarjotaan
+      // tuotteita, joiden saatavuus tunnetaan ja jotka sopivat samaan käyttöön. Ostaja valitsee itse; mitään ei vaihdeta hiljaa.
+      const unknownAvail = !scored.length && !found.length && !found.notInCatalog && (found.availabilityUnknown || found.requestedUnknown);
+      if (unknownAvail && nearby && !Object.keys(exclude).length) {
+        let alts = [];
+        try {
+          alts = await nearby({ productTerm: line.productTerm, quantity: line.quantity, claims: [...new Set([...(line.claims || []), ...diet.claims])],
+            excludeAllergens: [...new Set([...(line.excludeAllergens || []), ...diet.excludeAllergens])] }, draft.deliveryDate, found.unknownIds || []);
+        } catch { alts = []; }
+        if (alts.length) {
+          lines.push({ ref: line.ref, total: alts.length, more: false, shownBefore: 0, exact: false, availabilityUnknown: true, alternatives: true, clarify: [],
+            options: alts.map((o) => ({
+              productId: String(o.id), name: o.name, brand: o.brand || null, salesUnits: o.qty, salesUnitLabel: o.unitLabel,
+              covers: o.askQuantity ? null : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
+              unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
+              cutoff: o.availability?.closingTime || null, stock: o.availability?.stock ?? null, labels: o.labels || [], note: null,
+              co2PerKg: Number.isFinite(product(o.id)?.co2) ? product(o.id).co2 : null,
+              deliveryReliability: Number.isFinite(product(o.id)?.reliability) ? product(o.id).reliability : null,
+              // Valinta vaihtaa rivin tuotteen (replaceTerm). Eri mittayksikössä määrä kysytään uudelleen (askQuantity).
+              why: o.why || null, replaceTerm: o.alternativeTerm || o.name, askQuantity: o.askQuantity === true, warning: null,
+            })) });
+          continue;
+        }
+      }
       if (!scored.length) {
         issues.push(found.notInCatalog
           ? issue('NO_ORDERABLE_PRODUCT', `Pyydettyä tuotetta ei ole valikoimassa: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: null, notInCatalog: true })
           // Saatavuustietoa ei saatu (rajapinta alhaalla, ei välimuistissa): sanotaan se, ei väitetä tuotetta saatavuudettomaksi.
           : !found.length && (found.availabilityUnknown || found.requestedUnknown)
-            ? issue('NO_ORDERABLE_PRODUCT', `Saatavuutta ei saatu nyt tarkistettua päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: null, availabilityUnknown: true })
+            ? issue('NO_ORDERABLE_PRODUCT', `En saa nyt tarkistettua saatavuutta: ${line.productTerm}. Siksi en voi luvata sitä millekään päivälle.`, { ref: line.ref, nextDeliveryDate: null, availabilityUnknown: true })
           : issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: found.nextDeliveryDate || null }));
         continue;
       }

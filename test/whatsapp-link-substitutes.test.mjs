@@ -174,7 +174,7 @@ test('order tools report unknown availability as unknown, not as unavailable', a
   const deps = { product: () => ({ hasAllergenData: true, contains: [] }), buyer: () => ({}), requestQuote: async () => ({}), placeOrder: async () => ({}) };
   const draft = { id: 'd', deliveryDate: '2026-11-20', diet: { claims: [], excludeAllergens: [] }, lines: [{ ref: 'r', productTerm: 'tagliatelle', quantity: { value: 2, unit: 'KG' }, claims: [] }] };
   const unknown = await createOrderingTools({ ...deps, search: async () => Object.assign([], { availabilityUnknown: true }) }).suggest({ customer, draft });
-  assert.equal(unknown.issues[0].availabilityUnknown, true); assert.match(unknown.issues[0].message, /^Saatavuutta ei saatu nyt tarkistettua päivälle pe 20\.11\.: tagliatelle\.$/);
+  assert.equal(unknown.issues[0].availabilityUnknown, true); assert.match(unknown.issues[0].message, /^En saa nyt tarkistettua saatavuutta: tagliatelle\. Siksi en voi luvata sitä millekään päivälle\.$/);
   const near = [{ id: 'f', name: 'Spaghetti 1 kg', qty: 2, price: 3, unit: 'KG', kg: 1, requested: false }];
   const closest = await createOrderingTools({ ...deps, search: async () => Object.assign(near.slice(), { requestedUnknown: true }) }).suggest({ customer, draft });
   assert.equal(closest.lines[0].exact, false); assert.equal(closest.lines[0].availabilityUnknown, true);
