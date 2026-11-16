@@ -120,6 +120,25 @@ Nopeus ja tokenit (samat 10 persoonaa, 38–41 vuoroa per malli, kohinaa): vuoro
 - Kustannusarviosta puuttuu välimuistiin kirjoitus, ja Anthropicin Console-käyttöä ei verrattu arvioon.
 - Lähde 671b9a1: myöhemmät commitit (esimerkiksi f848556 audit-korjaukset, 4bb1385 uusintatilaus, 1c49398 kuva- ja ääniviestit) eivät ole mukana.
 
+## Lisäys 17.11.2026: sessio A:n korjausten mittaus
+
+Sessio A korjasi löydökset A1–A3 ja V019 (f7b779b, `docs/parallel/haiku-fixes-a.md`) ja ehdotti V-joukon uudelleenmittausta. Ajettiin V001–V035 sekä S003 ja S047 Haikulla lähteellä f7b779b (kello kiinnitetty, 37 persoonaa, 291 kutsua, 0 virhettä, 0 tilausta, noin 0,10 USD).
+
+| | ennen (671b9a1) | jälkeen (f7b779b) |
+|---|---|---|
+| V-joukko perus läpi | 25/35 | **31/35** |
+| uusi vaatimus (37 persoonaa) | | 37/37 |
+| S047 (jauhis) | virhe | läpi |
+| V004 (APPELSIINI JAFFA), V007–V012 (allergeeni- ja tuotefaktakysymykset) | virhe | kaikki läpi |
+
+Jäljellä neljä V-virhettä, joista yksikään ei liity A:n korjauksiin:
+- **V019:** vastaus on nyt oikein ("Arvo on sama niillä, joilta tieto löytyy"), mutta V-tarkistin ei lue riviä väitteeksi, koska siinä lukee "ei tietoa". Tarkistimen rajoite, ei apurin virhe.
+- **V020 (uusi):** simuloitu asiakas sekoitti yksiköt ("3 kpl eli 3 l"), ja apuri jatkoi "ruokakerma 3 kpl" -rivillä (0,6 l:n vaihtoehto näkyi). Läpäisi ensimmäisellä ajolla, joten todennäköisesti satunnaista.
+- **V023:** apuri sanoo yhä "En pysty itse arvioimaan, mikä toimii varmimmin", vaikka katalogissa on toimitusvarmuus. Virhe 2/4 ajossa (läpi Haikun uusinnassa ja Opuksella), eli C:n vaihtoehtovertailun ("varmimmin") tunnistus on epäluotettava.
+- **V026:** simuloitu asiakas valitsee vaihtoehdon 3, vaikka apuri sanoi edullisimmaksi 1 (asiakaspuolen virhe).
+
+Päätelmä: A1–A3-korjaukset toimivat Haikulla, ja V-joukon Haiku-tulos 31/35 on nyt samaa luokkaa kuin S ja X. Lähes kaikki V-virheet olivat koodia eivätkä mallia, kuten raportissa arvioitiin. Kulu tähän lisämittaukseen noin 0,10 USD (yhteensä noin 3,8 USD, noin 4,2 USD välimuistikirjoituksineen).
+
 ## Toisto
 
 Raakadata (Gitin ulkopuolella, session väliaikaishakemisto): `runs/haiku-all241.json`, `runs/{sonnet,opus}-*`, `judge-sample10.json`. Analyysi- ja arvioijaskriptit eivät ole repossa. Tarkistukset: `node --test test/whatsapp-personas.test.mjs` 16/16.

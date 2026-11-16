@@ -60,6 +60,12 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 - **Tarkistukset:** `test/audit-fixes-b.test.mjs` 25 ajoa peräkkäin ilman virheitä, `npm test` 365/365, Worker 59/59. D:n rinnakkainen jono (14dddf8) tarkistettu: 6a764ce kattaa sen, audit-fixes-b ja -d yhdessä 15/15.
 - **Käyttöönotto:** sama kuin 6a764ce (E), ei lisävaiheita.
 
+## 17.11.2026 — sessio A:n Haiku-korjaukset mitattu: V-joukko 25/35 → 31/35 (Claude Code, Haiku-laatumittaus F)
+
+- **Pyyntö:** sessio A korjasi löydökset A1–A3 ja V019 (f7b779b) ja ehdotti uudelleenmittausta. Ajettu V001–V035 sekä S003 ja S047 Haikulla lähteellä f7b779b, kello kiinnitetty, eristetyt kannat, simuloidut hinnat, 37 persoonaa, 0 tilausta, noin 0,10 USD.
+- **Tulos:** V-joukko perus 25/35 → 31/35, uusi vaatimus 37/37, S047 (jauhis) läpi, V004 ja V007–V012 läpi. Jäljellä V019 (tarkistin ei lue "ei tietoa" -riviä väitteeksi, vastaus oikein), V020 (simuloidun asiakkaan yksikkösekoilu, läpäisi aiemmin), V023 (apuri sanoo yhä ettei voi vertailla toimitusvarmuutta, 2/4 ajossa, C:n alue) ja V026 (asiakas valitsi väärin).
+- Ei sovelluskoodin muutoksia. Raportin lisäys `docs/parallel/haiku-quality-2026-11-16.md`:ssä. Yhteensä mittauksen kulu noin 3,8 USD (noin 4,2 USD välimuistikirjoituksineen).
+
 ## 16.11.2026 ilta — WhatsApp-apurin laatu Haikulla mitattu: Haiku riittää (Claude Code, Haiku-laatumittaus F)
 
 - **Käyttäjän kysymys:** botin syvä malli vaihdettiin Opuksesta Haikuun kustannusten vuoksi, mutta itsekeskustelun 96–99/100 mitattiin Opuksella. Mittaus nykykoodilla (origin/main 671b9a1, kiinnitetty kaikissa ajoissa), eristetyt kannat, simuloidut hinnat ja Meta, ei Valion API:a, 0 tilausta. Mallin avain luettiin yhteisen kansion `.env`:stä kopioimatta sitä.
