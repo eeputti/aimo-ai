@@ -76,7 +76,7 @@
 .live .code-state{margin-left:0}
 .live-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
 .live .code-lines{font-size:13px;line-height:1.65}
-@container (max-width:640px){.live .code-file{display:none}}
+@container (max-width:560px){.live .code-file{display:none}}
 @media (max-width:900px){
   .chat-aside{display:none}
   .notice-wa{display:block}
