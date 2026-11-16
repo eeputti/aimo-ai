@@ -8,6 +8,7 @@ import { unitSizeFor } from './gateway/quantity.mjs';
 import { PRODUCT_TYPES } from './gateway/contract.mjs';
 import { explainItemQuantity } from './itemQuantities.mjs';
 import { typeInfo, compareKeys, TIER } from './aimo/match.mjs';
+import { verifiedFree } from './allergens.mjs';
 
 export function validDeliveryDate(date) {
   if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
@@ -47,7 +48,7 @@ function fits(p, item) {
     (item.attributes?.state !== 'frozen' || p.temp === 'frozen') &&
     (item.attributes?.treatment !== 'uht' || /uht/i.test(p.name)) &&
     (item.claims || []).every((c) => p.labels?.includes(c)) &&
-    !(item.excludeAllergens || []).some((a) => !p.hasAllergenData || p.contains.includes(a) || p.mayContain?.includes(a));
+    verifiedFree(item.excludeAllergens, p); // alakoodit: pähkinätön ei saa mantelia (katselmus 15.11. #2)
 }
 async function alternatives(original, qty, date, item, cat) {
   const r = await findSubstitutes(original, qty, date, { subSameAllergens: true, bannedAllergens: item.excludeAllergens || [], subMaxPriceIncreasePct: 10 }, { limit: 8, recipeRequired: !!item.pinned });

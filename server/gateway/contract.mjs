@@ -114,6 +114,8 @@ export const REASONS = {
   UNIT_NOT_CONVERTIBLE: { fi: 'Määrää ei voi muuntaa tämän tuotteen myyntiyksiköiksi', en: 'Quantity cannot be converted to this product\'s sales units' },
   // mandaatti
   ALLERGEN_BANNED: { fi: 'Sisältää ostajan kieltämän allergeenin', en: 'Contains an allergen banned by the buyer mandate' },
+  ALLERGEN_MAY_CONTAIN: { fi: 'Voi sisältää ostajan kieltämää allergeenia: ihminen päättää', en: 'May contain an allergen banned by the buyer mandate: a human decides' },
+  ALLERGEN_DATA_MISSING: { fi: 'Tuotteen allergeenitieto puuttuu, eikä kiellon täyttymistä voi todentaa: ihminen päättää', en: 'Allergen data is missing, so the allergen ban cannot be verified: a human decides' },
   REQUIRED_CLAIM_MISSING: { fi: 'Ostajan vaatima väittämä puuttuu', en: 'A claim required by the buyer mandate is missing' },
   CATEGORY_NOT_ALLOWED: { fi: 'Tuoteryhmä ei kuulu mandaattiin', en: 'Category is outside the buyer mandate' },
   APPROVAL_ALWAYS: { fi: 'Mandaatti vaatii ihmisen hyväksynnän jokaiselle tilaukselle', en: 'Mandate requires human approval for every order' },

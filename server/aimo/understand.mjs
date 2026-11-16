@@ -7,7 +7,7 @@
 //  - jokainen kenttä on tyypitetty ja validoitu (määrä, yksikkö, päivä), kelpaamaton arvo hylätään eikä arvata
 //  - oletukset kirjataan näkyviin, ihmiseltä ei kysytä avoimia kysymyksiä
 import { normalize } from '../catalog.mjs';
-import { quantityBasisFor } from '../itemQuantities.mjs';
+import { quantityBasisFor, EGGS_PER_TRAY } from '../itemQuantities.mjs';
 import { conceptOf, brandAt, variants, loadLexicon, recognize } from './lexicon.mjs';
 import { synonymOf, learnedOf, SHELVES } from './synonyms.mjs';
 
@@ -26,7 +26,7 @@ try { ({ clock } = await import('../gateway/clock.mjs')); } catch { /* oikea kel
 const UNITS = [ // [regex, portin yksikkö, kerroin]
   [/^(l|ltr|lit(er|re)s?|litra\w*)$/, 'L', 1], [/^(dl|desi\w*)$/, 'L', 0.1], [/^cl$/, 'L', 0.01], [/^ml$/, 'L', 0.001],
   [/^(kg|kgs|kilo\w*|kilogram\w*)$/, 'KG', 1], [/^(g|gr|gram\w*|gramma\w*)$/, 'KG', 0.001],
-  [/^(kpl|kappale\w*|pcs|pc|pieces?|units?|ltk|laatik\w*|box(es)?|cases?|crates?|cartons?|tölk\w*|purk\w*|pussi\w*|pss|pkt|paket\w*|packs?|packets?|bags?|bottles?|pullo\w*|cans?|säk\w*|sacks?|rasia\w*|ras|prk|sk|pl)$/, 'PCS', 1],
+  [/^(kpl|kappale\w*|pcs|pc|pieces?|units?|ltk|laatik\w*|box(es)?|cases?|crates?|cartons?|tölk\w*|purk\w*|pussi\w*|pss|pkt|paket\w*|packs?|packets?|bags?|bottles?|pullo\w*|cans?|säk\w*|sacks?|rasia\w*|ras|prk|sk|pl|kenno\w*)$/, 'PCS', 1],
 ];
 const NUMBER_WORDS = { yksi: 1, kaksi: 2, kolme: 3, neljä: 4, viisi: 5, kuusi: 6, seitsemän: 7, kahdeksan: 8, yhdeksän: 9, kymmenen: 10, kaksikymmentä: 20, viisikymmentä: 50, sata: 100, sataa: 100, tuhat: 1000, tuhatta: 1000, pari: 2, tusina: 12, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twenty: 20, fifty: 50, hundred: 100, thousand: 1000, dozen: 12, couple: 2 };
 const MULTIPLIERS = { sata: 100, sataa: 100, tuhat: 1000, tuhatta: 1000, hundred: 100, thousand: 1000, dozen: 12, tusinaa: 12 };
@@ -43,8 +43,10 @@ const CLAIMS = [
   [/\b(fair[- ]?trade|reilun kaupan)\b/, 'FAIR_TRADE_MARK'],
 ];
 const ORIGIN_FI = /\b(kotimai\w+|suomalai\w+|finnish|domestic|from finland|suomesta)\b/;
-// Allergeenit, joita tuote ei saa sisältää (GS1-koodit): "nut-free", "ilman pähkinää", "no soy".
-const ALLERGEN_WORDS = [[/nut|pähkin/, 'AN'], [/peanut|maapähkin/, 'AP'], [/soy|soija/, 'AY'], [/egg|kananmun|muna/, 'AE'], [/fish|kala/, 'AF'], [/sesam|seesam/, 'AS'], [/milk|dairy|maido|maito/, 'AM'], [/wheat|vehnä/, 'UW'], [/celery|selleri/, 'BC'], [/mustard|sinap/, 'BM']];
+// Allergeenit, joita tuote ei saa sisältää (GS1-koodit): "nut-free", "ilman pähkinää", "no soy". Ensimmäinen osuma voittaa, joten
+// tarkempi sana ensin: "maapähkinätön" on maapähkinä (AP), ei yleinen pähkinä (katselmus 15.11. #3). Pelkkä "pähkinätön" on
+// EU:n allergeenijaon mukaan pähkinät (AN), kuten aimo:eval määrittelee ("nut-free cookies").
+const ALLERGEN_WORDS = [[/peanut|maapähkin/, ['AP']], [/nut|pähkin/, ['AN']], [/soy|soija/, ['AY']], [/egg|kananmun|muna/, ['AE']], [/fish|kala/, ['AF']], [/sesam|seesam/, ['AS']], [/milk|dairy|maido|maito/, ['AM']], [/wheat|vehnä/, ['UW']], [/celery|selleri/, ['BC']], [/mustard|sinap/, ['BM']]];
 const EXCLUDE = /\b(?:no|without|free of|ilman|ei)\s+([a-zåäö]+)|\b([a-zåäö]+?)[- ]free\b|\b([a-zåäö]+?)t[oö]n(?:ta|tä|t)?\b/g;
 
 // Attribuutit, jotka rajaavat tuotetyypin sisällä. Arvo on nimestä haettava säännöllinen lauseke.
@@ -81,16 +83,35 @@ function extractDate(text, now) {
   let m;
   const out = (date, phrase, note) => ({ date, phrase, note, rest: text.replace(phrase, ' ') });
   if ((m = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/))) return out(m[0], m[0]);
-  if ((m = text.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})?(?=\s|$|,)/))) {
-    let y = m[3] ? +m[3] : today.y;
-    if (!m[3] && (+m[2] < today.m || (+m[2] === today.m && +m[1] < today.d))) y += 1;
-    return out(`${y}-${pad(+m[2])}-${pad(+m[1])}`, m[0]);
+  // Päivämäärä "16.11.", "16.11.2026" tai ilman loppupistettä "16.11" ja "ma 16.11" (katselmus 15.11. #19). Ilman loppupistettä
+  // luku voi olla myös desimaali tai kellonaika, joten se on päivä vain, kun kuukausi on kirjoitettu kahdella numerolla tai edessä
+  // on viikonpäivä, eikä perässä ole yksikköä ("1.10 l") eikä edessä kelloa ("klo 11.10"). Desimaalipilkku ("2,5") ei ole päivä.
+  const reDate = /(?:\b([a-zåäö]+)\s+)?\b(\d{1,2})\.(\d{1,2})(\.(\d{4})?)?(?!\d|,\d)/g;
+  while ((m = reDate.exec(text))) {
+    const [all, pre, dd, mm, dot, yyyy] = m;
+    const day = +dd; const month = +mm;
+    if (month < 1 || month > 12 || day < 1 || day > 31) continue;
+    const wd = pre && WEEKDAYS.find(([r]) => r.test(pre));
+    if (!dot) {
+      const next = (text.slice(m.index + all.length).trim().split(/\s+/)[0] || '').replace(/[,.;:!?]+$/, '');
+      if (/^(klo|kello|kl)$/.test(pre || '') || /^(%|x|×)/.test(next) || UNITS.some(([r]) => r.test(next))) continue;
+      if (!wd && mm.length < 2) continue;
+    }
+    let y = yyyy ? +yyyy : today.y;
+    if (!yyyy && (month < today.m || (month === today.m && day < today.d))) y += 1;
+    const date = `${y}-${pad(month)}-${pad(day)}`;
+    const phrase = wd ? all : all.slice(all.length - `${dd}.${mm}${dot || ''}`.length);
+    const start = m.index + all.length - phrase.length;
+    const actual = new Date(`${date}T12:00:00Z`).getUTCDay();
+    const note = wd && wd[1] !== actual ? { code: 'DATE_WEEKDAY_MISMATCH', fi: `${pre} ja ${day}.${month}. eivät ole sama päivä: käytetään päivämäärää ${day}.${month}.`, en: `Weekday and date disagree: using the date ${day}.${month}.` } : undefined;
+    return { date, phrase, note, rest: `${text.slice(0, start)} ${text.slice(start + phrase.length)}` };
   }
   if ((m = text.match(/\b(day after tomorrow|ylihuomi\w*)\b/))) return out(addDays(today, 2), m[0]);
   if ((m = text.match(/\b(tomorrow|huomi\w+|huomenna)\b/))) return out(addDays(today, 1), m[0]);
   if ((m = text.match(/\b(today|tänään|täksi päiväksi)\b/))) return out(addDays(today, 0), m[0]);
   // viikonpäivä: "by Monday", "maanantaiksi", "ensi viikon tiistaina", "next Friday"
-  const re = /\b(?:(by|on|for|before|until|next|ensi|ensi viikon|tulevaksi|tulevan)\s+)?([a-zåäö]+)\b/g;
+  // Pidempi etuliite ensin: "ensi viikon tiistaina" ei saa jäädä muotoon "ensi" + "viikon" (katselmus 15.11. #19).
+  const re = /\b(?:(by|on|for|before|until|next|ensi viikon|tulevan viikon|ensi|tulevaksi|tulevan)\s+)?([a-zåäö]+)\b/g;
   while ((m = re.exec(text))) {
     const word = m[2];
     // "ma", "to", "la" ovat päiviä vain etuliitteen kanssa, tai kun lyhenne on viestin viimeinen sana ("1.000 l maitoa ma").
@@ -100,17 +121,22 @@ function extractDate(text, now) {
     if (!wd || /^(sun|sat|wed|mon|to|la|ti|ke|pe|su|ma)$/.test(word) && !m[1] && word.length < 3 && !lastWord) continue;
     let delta = (wd[1] - today.dow + 7) % 7;
     if (delta === 0) delta = 7; // "maanantaiksi" maanantaina = ensi viikon maanantai
-    if (/next|ensi viikon/.test(m[1] || '') && delta < 7 - today.dow) delta += 7; // "ensi viikon tiistai" on aina ensi viikolla
+    // "Ensi viikon tiistai" on maanantaista alkavan seuraavan viikon tiistai: sunnuntaina 15.11. se on ti 17.11., maanantaina 16.11. ti 24.11.
+    if (/(ensi|tulevan) viikon/.test(m[1] || '')) delta = ((8 - today.dow) % 7 || 7) + ((wd[1] + 6) % 7);
+    else if (/next/.test(m[1] || '') && delta < 7 - today.dow) delta += 7;
     // Poistetaan täsmälleen osuman kohta: pelkkä replace('ma') osuisi sanaan "maitoa".
     return { date: addDays(today, delta), phrase: m[0], note: undefined, rest: `${text.slice(0, m.index)} ${text.slice(m.index + m[0].length)}` };
   }
   return { date: null, phrase: null, rest: text };
 }
 
-/** "1,000" / "1 000" / "1.000" → 1000, mutta "1,5" pysyy desimaalina. */
-function normalizeNumbers(text) {
+/**
+ * "1 000" / "1.000" → 1000 ja englanniksi myös "1,000" → 1000, mutta "1,5" pysyy desimaalina.
+ * Suomeksi pilkku on aina desimaali, ja nolla alussa ei ole koskaan tuhansia: "0,125 kg" on 0,125 kg eikä 125 kg (katselmus 15.11. #5).
+ */
+function normalizeNumbers(text, lang = 'fi') {
   return text
-    .replace(/(\d{1,3})((?:[ ,. ]\d{3})+)(?![\d])/g, (all, a, rest) => a + rest.replace(/[ ,. ]/g, ''))
+    .replace(/(\d{1,3})((?:[ ,. ]\d{3})+)(?![\d])/g, (all, a, rest) => (a === '0' || (lang === 'fi' && rest.includes(',')) ? all : a + rest.replace(/[ ,. ]/g, '')))
     .replace(/(\d),(\d)/g, '$1.$2')
     .replace(/(\d)\s*(?:x|×)\s*(\d)/g, '$1 x $2');
 }
@@ -198,7 +224,7 @@ function parseItem(raw, lang) {
     const w = a || b || c;
     const hit = ALLERGEN_WORDS.find(([re]) => re.test(w));
     if (!hit || /^(rasva|fat|suola|salt|sokeri|sugar)/.test(w)) return all; // "rasvaton" on attribuutti, ei allergeeni
-    if (!item.excludeAllergens.includes(hit[1])) item.excludeAllergens.push(hit[1]);
+    for (const code of hit[1]) if (!item.excludeAllergens.includes(code)) item.excludeAllergens.push(code);
     return ' ';
   });
   for (const [key, value, re] of ATTRIBUTES) if (re.test(text) && !item.attributes[key]) { item.attributes[key] = value; if (key !== 'fat' || !/kevytmai|täysmai/.test(text)) text = text.replace(new RegExp(re.source, 'g'), ' '); }
@@ -277,7 +303,13 @@ function parseItem(raw, lang) {
     if (shelf) { item.shelf = shelf.must ? { names: shelf.names, must: shelf.must } : { names: shelf.names }; item.category = null; item.categories = shelf.categories; item.categoryLabel = shelf.label; }
     if (!shelf && !head.type && head.concept.top[0].share < 0.5 && head.concept.top[1]) notes.push({ code: 'CATEGORY_AMBIGUOUS', fi: `"${head.concept.word}" esiintyy useassa tuoteryhmässä (${head.concept.top.slice(0, 3).map((t) => t.label).join(' / ')}): haetaan kaikista`, en: `"${head.concept.word}" appears in several product groups: searching all of them` });
   }
-  const basis = quantityBasisFor(item, q?.unitWord);
+  // "3 kennoa kananmunia" on 90 munaa: kenno on noin 30 munaa, ei kolme munaa (katselmus 15.11. #22).
+  const tray = q && /^kenno\w*$/.test(q.unitWord || '') ? q.unitWord : null;
+  if (tray && quantityBasisFor({ ...item, quantity: { ...item.quantity, basis: undefined } }, null) === 'items') {
+    item.quantity = { value: item.quantity.value * EGGS_PER_TRAY, unit: 'PCS', basis: 'items' };
+    notes.push({ code: 'EGG_TRAY', fi: `${q.quantity.value} kennoa = ${item.quantity.value} kananmunaa (kenno on ${EGGS_PER_TRAY} munaa)`, en: `${q.quantity.value} trays = ${item.quantity.value} eggs (${EGGS_PER_TRAY} eggs per tray)` });
+  }
+  const basis = tray ? item.quantity?.basis : quantityBasisFor(item, q?.unitWord);
   if (basis === 'items') {
     item.quantity.basis = basis;
     const assumed = notes.findIndex((n) => n.code === 'UNIT_ASSUMED');
@@ -297,14 +329,16 @@ export function understand(text, opts = {}) {
   const t0 = performance.now();
   const now = opts.now || clock.now();
   const original = String(text || '').trim();
-  let s = normalizeNumbers(original.toLowerCase().replace(/[‐-―]/g, '-').replace(/[’'`"“”!?]/g, ' ').replace(/\s+/g, ' '));
+  // Kieli ja päivämäärä luetaan ennen lukujen yhdistämistä: kieli ratkaisee pilkun merkityksen, ja "16.11 100 l" ei saa
+  // muuttua luvuksi 16.11100.
+  let s = original.toLowerCase().replace(/[‐-―]/g, '-').replace(/[’'`"“”!?]/g, ' ').replace(/\s+/g, ' ');
   const fiHits = (s.match(/\b(ja|tarvit\w+|tilaa\w*|maanantai\w*|tiistai\w*|keskiviik\w*|torstai\w*|perjantai\w*|lauantai\w*|sunnuntai\w*|litra\w*|kiloa?|kpl|laktoosit\w+|huomi\w+|mennessä|haluan|onko|löytyykö|ilman)\b|[äö]/g) || []).length;
   const enHits = (s.match(/\b(the|and|need|order|please|by|for|of|litres?|liters?|free|want|would|some|have|with|without|tomorrow|next)\b/g) || []).length;
   const language = fiHits >= enHits ? 'fi' : 'en';
   const intent = (INTENT.find(([re]) => re.test(s)) || [null, 'order'])[1];
 
   const d = extractDate(s, now);
-  s = d.rest;
+  s = normalizeNumbers(d.rest, language);
   const parts = s.split(/\s*(?:;|\n|\+|,(?!\d)|\s(?:and|ja|sekä|plus|as well as)\s)\s*/).map((p) => p.trim()).filter((p) => p && /[a-zåäö]{2}/.test(p));
   const items = []; const assumptions = []; const unparsed = [];
   let carry = null; // "laktoositonta maitoa 100 l ja kermaa 20 l": väittämä EI periydy, mutta pelkkä "ja 20 l" perii tuotteen
@@ -312,8 +346,13 @@ export function understand(text, opts = {}) {
     const r = parseItem(part, language);
     if (!r.item.productTerm && !r.item.brand) {
       if (r.item.quantity && carry && !carry.quantity) { carry.quantity = r.item.quantity; continue; }
-      if (items.length && (r.item.claims.length || r.item.countryOfOrigin)) { // "…, kaikki luomuna": koskee edellisiä rivejä
-        for (const it of items) { for (const c of r.item.claims) if (!it.claims.includes(c)) it.claims.push(c); it.countryOfOrigin ||= r.item.countryOfOrigin; }
+      // "…, kaikki luomuna" ja "…, ei maapähkinöitä": koskee edellisiä rivejä. Allergeenikielto ei saa kadota (katselmus 15.11. #3).
+      if (items.length && (r.item.claims.length || r.item.countryOfOrigin || r.item.excludeAllergens.length)) {
+        for (const it of items) {
+          for (const c of r.item.claims) if (!it.claims.includes(c)) it.claims.push(c);
+          for (const a of r.item.excludeAllergens) if (!it.excludeAllergens.includes(a)) it.excludeAllergens.push(a);
+          it.countryOfOrigin ||= r.item.countryOfOrigin;
+        }
         continue;
       }
       unparsed.push(...r.unparsed.filter((w) => w.length > 2));
@@ -323,6 +362,7 @@ export function understand(text, opts = {}) {
     for (const n of r.notes) assumptions.push({ ...n, item: items.length - 1 });
     unparsed.push(...r.unparsed);
   }
+  if (d.note) assumptions.push(d.note);
   if (d.date && d.date < addDays(helsinkiParts(now), 0)) assumptions.push({ code: 'DATE_IN_PAST', fi: `Päivä ${d.date} on jo mennyt`, en: `Date ${d.date} is in the past` });
   if (!d.date && intent === 'order' && items.length) assumptions.push({ code: 'DATE_MISSING', fi: 'Toimituspäivää ei annettu: käytetään aikaisinta mahdollista', en: 'No delivery date given: earliest possible is used' });
   for (const [i, it] of items.entries()) {

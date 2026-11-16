@@ -111,7 +111,10 @@ export function typeInfo(product, item) {
   const group = tier <= TIER.CORE ? 0 : tier === TIER.SPLIT ? 1 : tier === TIER.HEAD ? (strict ? 1 : 0) : tier === TIER.PART ? 2 : 3;
   const shelf = item.shelf ? at(item.categories, product.category) : 0;
   const raw = RAW_INGREDIENT.test(product.category || '') ? 0 : 1;
-  return { key: [shelf, raw, group], tier, requested: group === 0 || tier === TIER.SPLIT };
+  // Sana elää usealla hyllyllä (understand: CATEGORY_AMBIGUOUS), ja ryhmät ovat yleisyysjärjestyksessä: saman tyyppiryhmän sisällä
+  // sanan yleisin hylly ensin. "Merisuola" on suolaa ennen kuin perunalastujen makua (katselmus 15.11. #17).
+  const spread = !item.shelf && item.categories?.length > 1 ? at(item.categories, product.category) : 0;
+  return { key: [shelf, raw, group, spread], tier, requested: group === 0 || tier === TIER.SPLIT };
 }
 export const typeKey = (product, item) => typeInfo(product, item).key;
 export const compareKeys = (a, b) => { for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i]; return 0; };

@@ -8,6 +8,7 @@ import { buyers, orders } from './store.mjs';
 import { clock, helsinkiDate } from './clock.mjs';
 import { reason } from './contract.mjs';
 import { loadCatalog, allergenName } from '../catalog.mjs';
+import { allergenStatus } from '../allergens.mjs';
 
 export const DEFAULT_MANDATE = {
   approval: 'always', // 'always' | 'exceptions' | 'autonomous'
@@ -34,13 +35,27 @@ export function seedBuyers({ force = false } = {}) {
 export const substitutionRules = (m) => ({ bannedAllergens: m.bannedAllergens, blockedVendors: [], subSameAllergens: true, preferDomestic: false, minReliability: m.substitution.minReliability, subMaxPriceIncreasePct: m.substitution.maxUnitPriceIncreasePct });
 
 /** Staattiset tuotekohtaiset esteet. Palauttaa syyn tai null. Näitä ei voi ohittaa hyväksynnällä. */
+// Kielto katsoo koodihierarkian (allergens.mjs): pähkinäkielto (AN) osuu myös mantelin (SA) koodiin ja viljakielto (AW) vehnän (UW).
 export function productBlock(mandate, p) {
-  const banned = (mandate.bannedAllergens || []).filter((a) => p.contains.includes(a));
+  const banned = allergenStatus(mandate.bannedAllergens, p).contains;
   if (banned.length) return reason('ALLERGEN_BANNED', 'block', { productId: p.id, allergens: banned, names: banned.map(allergenName) });
   const missing = (mandate.requiredClaims || []).filter((c) => !p.labels?.includes(c));
   if (missing.length) return reason('REQUIRED_CLAIM_MISSING', 'block', { productId: p.id, claims: missing });
   if (mandate.allowedCategories && !mandate.allowedCategories.includes(p.category)) return reason('CATEGORY_NOT_ALLOWED', 'block', { productId: p.id, category: p.category });
   return null;
+}
+
+/**
+ * Allergeenikielto, jota tuotteen tiedot eivät todista täytetyksi: "voi sisältää" kiellettyä allergeenia tai allergeenitieto
+ * puuttuu kokonaan (noin 10 300 tuotteella 17 546:sta). Näitä ei vahvisteta automaattisesti millään mandaatin tasolla:
+ * ihminen päättää (katselmus 15.11. #4). Este (productBlock) ratkaistaan ennen tätä.
+ */
+export function productAllergenReview(mandate, p) {
+  const s = allergenStatus(mandate.bannedAllergens, p);
+  const out = [];
+  if (s.mayContain.length) out.push(reason('ALLERGEN_MAY_CONTAIN', 'approval', { productId: p.id, allergens: s.mayContain, names: s.mayContain.map(allergenName) }));
+  if (s.unknown) out.push(reason('ALLERGEN_DATA_MISSING', 'approval', { productId: p.id, banned: [...new Set(mandate.bannedAllergens)], names: [...new Set(mandate.bannedAllergens)].map(allergenName) }));
+  return out;
 }
 
 const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000);
@@ -60,12 +75,18 @@ export function evaluateMandate(buyer, draft, { excludeOrderId } = {}) {
     const p = cat.get(line.productId);
     const block = p ? productBlock(m, p) : reason('UNKNOWN_PRODUCT', 'block', { productId: line.productId });
     if (block) reasons.push(block);
+    else reasons.push(...productAllergenReview(m, p));
   }
   const net = draft.totals.net;
   if (m.maxOrderNet != null && net > m.maxOrderNet + 0.004) reasons.push(reason('SPEND_CAP_ORDER', 'approval', { orderNet: net, cap: m.maxOrderNet, overBy: +(net - m.maxOrderNet).toFixed(2), currency: 'EUR' }));
   if (m.maxDayNet != null) {
     const today = clock.today();
-    const spent = orders.list(buyer.id, 500).filter((o) => o.orderId !== excludeOrderId && ['confirmed', 'pending_approval'].includes(o.status) && helsinkiDate(new Date(o.createdAt)) === today).reduce((s, o) => s + o.totals.net, 0);
+    // Kiertävällä demokellolla jokainen tilaus syntyy samalle demopäivälle, joten päiväraja kertyi kierroksesta toiseen ja lopulta
+    // kaikki jäi odottamaan hyväksyntää (katselmus 15.11. #16). Kierros on demon "päivä": vain saman kierroksen tilaukset lasketaan.
+    // Tilaus ilman kierrostietoa on tehty ennen tätä korjausta, eli jollain aiemmalla kierroksella.
+    const cycle = clock.cycle();
+    const sameDay = (o) => helsinkiDate(new Date(o.createdAt)) === today && (!clock.looping || o.clockCycle === cycle);
+    const spent = orders.list(buyer.id, 500).filter((o) => o.orderId !== excludeOrderId && ['confirmed', 'pending_approval'].includes(o.status) && sameDay(o)).reduce((s, o) => s + o.totals.net, 0);
     if (spent + net > m.maxDayNet + 0.004) reasons.push(reason('SPEND_CAP_DAY', 'approval', { spentToday: +spent.toFixed(2), orderNet: net, cap: m.maxDayNet, currency: 'EUR' }));
   }
   for (const s of draft.substitutions || []) {

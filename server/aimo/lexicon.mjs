@@ -9,7 +9,9 @@ import { loadCatalog, tokenize, stems } from '../catalog.mjs';
 const NOT_A_PRODUCT = /^(pakaste\w*|kypsä\w*|laktoosi\w*|gluteeni\w*|luomu\w*|vegaani\w*|suomi|suomesta|suomalainen|kotimainen|uht|esl|kpl|ltk|pkt|noin|iso|pieni|mini|maxi|original|classic|frozen|free|lactose|gluten|organic|with|and|the|for|pcs|box|bag|finland|finnish|vähälaktoosinen|approx|apx|new|uusi|kausituote|seasonal|rasvaton|kevyt|vähärasvainen|skimmed|semi|light|pro|professional|food|service)$/;
 
 // Taivutusmuodot: katalogin kevyt stemmaus + muutama suomen vartalonvaihtelu, joita se ei kata.
-const EXTRA = [[/ia$/, 'a'], [/iä$/, 'ä'], [/ia$/, 'i'], [/iä$/, 'i'], [/hta$/, 'hi'], [/ttä$/, 'si'], [/tta$/, 'si'], [/kkeja$/, 'ke'], [/ies$/, 'y'], [/oes$/, 'o']];
+// -mi- ja -ni-sanojen partitiivi ja genetiivi: liemi → lientä/liemen, sieni → sientä (katselmus 15.11. #17: "kasvilientä").
+const EXTRA = [[/ia$/, 'a'], [/iä$/, 'ä'], [/ia$/, 'i'], [/iä$/, 'i'], [/hta$/, 'hi'], [/ttä$/, 'si'], [/tta$/, 'si'], [/kkeja$/, 'ke'], [/ies$/, 'y'], [/oes$/, 'o'],
+  [/ntä$/, 'mi'], [/nta$/, 'mi'], [/ntä$/, 'ni'], [/nta$/, 'ni'], [/men$/, 'mi']];
 export function variants(token) {
   const out = new Set(stems(token));
   for (const [re, rep] of EXTRA) if (re.test(token)) out.add(token.replace(re, rep));
@@ -199,7 +201,9 @@ export function recognize(token) {
   // Kirjoitusvirhe: lähin sanaston sana. Ensimmäisen kirjaimen pitää täsmätä, ja ehdokkaan pitää olla oikea tuotesana
   // (vähintään 3 tuotetta), jotta harvinainen sana ei kaappaa virhettä.
   lex.fuzzyKeys ||= [...concepts].filter(([w, e]) => w.length >= 4 && e.total >= 3 && !/\d/.test(w)).map(([w, e]) => [w, e.total]);
-  const tries = [...new Set([token, ...forms, ...stems(token)])].filter((v) => v.length >= 4);
+  // Myös taivutuksen perusmuoto (variants): "kasvilientä" → "kasviliemi" → kasvisliemi. Ilman sitä loppuosa "ilien"
+  // (tekst|iilien) kaappasi sanan ja haku antoi tekstiilien huuhteluaineita (katselmus 15.11. #17).
+  const tries = [...new Set([token, ...forms, ...stems(token), ...variants(token)])].filter((v) => v.length >= 4);
   let hit = null;
   for (const form of tries) {
     const max = form.length >= 8 ? 2 : 1;

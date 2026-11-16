@@ -48,6 +48,11 @@ export const clock = {
     const elapsed = Math.max(0, Date.now() - bootReal);
     return new Date(demoStart + (loopMs ? elapsed % loopMs : elapsed));
   },
+  /**
+   * Kiertävän demokellon kierroksen numero oikeasta ajasta (0 ilman kiertoa). Demoaika palaa joka kierroksella alkuun, joten
+   * aikaleimasta ei voi päätellä kierrosta: päiväraja ja tarjousten voimassaolo sidotaan tähän (katselmus 15.11. #16).
+   */
+  cycle() { return loopMs ? Math.floor(Math.max(0, Date.now() - bootReal) / loopMs) : 0; },
   /** Päivämäärä Helsingin ajassa muodossa YYYY-MM-DD. */
   today() { return helsinkiDate(this.now()); },
   info() { return { now: this.now().toISOString(), simulated: this.simulated, ...(loopMs ? { loopMinutes: loopMs / 60000 } : {}), timezone: 'Europe/Helsinki', note: this.simulated ? `DEMO_NOW on asetettu: portin kello on simuloitu${loopMs ? ' ja kiertää' : ''}` : undefined }; },

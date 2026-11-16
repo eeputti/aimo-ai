@@ -5,6 +5,7 @@
 import crypto from 'node:crypto';
 import { openSqlite } from '../sqlite.mjs';
 import { clock } from '../gateway/clock.mjs';
+import { touchesBanned, verifiedFree, bannedHits } from '../allergens.mjs';
 
 const CLAIM_WORD = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
 const UNIT_WORD = { L: 'l', KG: 'kg', PCS: 'kpl' };
@@ -44,7 +45,18 @@ const FLAVOUR = /sipul|yrtt|chili|pippur|tilli|basilik|curry|pesto|tomaat|herkku
 const stemsOf = (line) => words(line.productTerm).map((w) => (w.length > 4 ? w.slice(0, -1) : w));
 /** Ostaja pyysi nimenomaan maustamatonta: maustetut eivät kelpaa vaihtoehdoiksi lainkaan. */
 export const wantsPlain = (line) => /maustamat|ilman\s+mau|luonnollinen|natural|plain/i.test(line.productTerm || '');
-export const flavoured = (o, line) => { const term = stemsOf(line); return words(o.name).some((w) => FLAVOUR.test(w) && !term.some((t) => w.includes(t))); };
+// Pyydetty sana yhdyssanan lopussa ei tee tuotteesta pyydettyä, jos alkuosa on maku tai mausteseos: yrtti|suola ja
+// ranskanperunamauste|suola eivät ole suolaa (katselmus 15.11. #17), mansikka|jogurtti on maustettu jogurtti.
+const SEASONING = /mauste|selleri|tryffel/i;
+export const flavoured = (o, line) => {
+  const term = stemsOf(line);
+  return words(o.name).some((w) => {
+    const t = term.find((x) => w.includes(x));
+    if (!t) return FLAVOUR.test(w);
+    const head = w.slice(0, w.indexOf(t));
+    return head.length >= 3 && (FLAVOUR.test(head) || SEASONING.test(head)) && !term.some((x) => head.includes(x));
+  });
+};
 export function rankOptions(found, line) { return scoreOptions(found, line).map((x) => x.o); }
 /**
  * Järjestetyt vaihtoehdot. regular = paras tuotetyyppiryhmä, ei maustettu eikä hintapoikkeama, eli kelpaa halvimman
@@ -129,8 +141,8 @@ export function createOrderingTools(deps = {}) {
   function unsafe(product, line) {
     const banned = line.excludeAllergens || [];
     if (!banned.length) return false;
-    // Puuttuva allergeenitieto ei ole todiste sopivuudesta.
-    return !product || !product.hasAllergenData || banned.some((a) => product.contains?.includes(a) || product.mayContain?.includes(a));
+    // Puuttuva allergeenitieto ei ole todiste sopivuudesta. Kielto katsoo koodihierarkian: pähkinä (AN) kattaa mantelin (SA).
+    return !verifiedFree(banned, product);
   }
 
   /**
@@ -169,7 +181,7 @@ export function createOrderingTools(deps = {}) {
       } catch { issues.push(issue('SEARCH_FAILED', `Tuotehaku ei onnistunut: ${line.productTerm}. Hintoja tai saatavuutta ei näytetä.`, { ref: line.ref })); continue; }
       let fit = found.filter((o) => !unsafe(product(o.id), line));
       if (diet.excludeAllergens.length) {
-        const has = (o) => diet.excludeAllergens.some((a) => product(o.id)?.contains?.includes(a) || product(o.id)?.mayContain?.includes(a));
+        const has = (o) => touchesBanned(diet.excludeAllergens, product(o.id));
         fit = fit.filter((o) => !has(o));
       }
       let scored = scoreOptions(fit, line);
@@ -196,7 +208,7 @@ export function createOrderingTools(deps = {}) {
       // Tiedon pitää kuitenkin kattaa vähintään puolet vaihtoehdoista: tuoreella perunalla sitä ei ole, ja kaksi tunnettua
       // jalostettua perunatuotetta (yksi maitoa) kysyi laktoosia 25 kilon perunasta (itsepeli X022, peruna 2/23 tunnettu).
       const known = base.filter((o) => product(o.id)?.hasAllergenData);
-      const ingredientShare = (allergen) => (known.length ? known.filter((o) => product(o.id).contains?.includes(allergen)).length / known.length : 0);
+      const ingredientShare = (allergen) => (known.length ? known.filter((o) => bannedHits([allergen], product(o.id).contains).length).length / known.length : 0);
       const mostlyContains = (allergen) => known.length >= base.length / 2 && ingredientShare(allergen) >= 0.5;
       const clarify = CLARIFY.filter((c) => !(line.claims || []).includes(c.claim) && (!c.needsAllergen || mostlyContains(c.needsAllergen)))
         .map((c) => ({ claim: c.claim, share: base.filter((o) => o.labels?.includes(c.claim)).length / base.length, ...c }))
@@ -264,7 +276,7 @@ export function createOrderingTools(deps = {}) {
     const b = buyer(customer.buyerId);
     if (!b) return fail(issue('BUYER_UNKNOWN', 'Asiakkuutta ei löydy tilausjärjestelmästä.'));
     const dietBan = draft.diet?.excludeAllergens || [];
-    const bad = draft.lines.filter((l) => unsafe(product(l.selectedProductId), l) || dietBan.some((a) => product(l.selectedProductId)?.contains?.includes(a) || product(l.selectedProductId)?.mayContain?.includes(a)));
+    const bad = draft.lines.filter((l) => unsafe(product(l.selectedProductId), l) || touchesBanned(dietBan, product(l.selectedProductId)));
     if (bad.length) return fail(...bad.map((l) => issue('ALLERGEN_CONFLICT', `Valittu tuote ei täytä allergiavaatimusta: ${l.productTerm}.`, { ref: l.ref })));
     let q;
     try {
@@ -303,7 +315,8 @@ export function createOrderingTools(deps = {}) {
       return reject('APPROVAL_MISMATCH', 'Hyväksyntä ei koske tätä luonnosversiota. Tarkista yhteenveto uudelleen.');
     if (q.hash !== draftHash(customer, draft)) return reject('DRAFT_CHANGED', 'Luonnos on muuttunut tarjouksen jälkeen. Tarkista yhteenveto uudelleen.');
     if (q.result) return reject('QUOTE_ALREADY_USED', 'Tarjous on jo käytetty.');
-    if (q.expires <= now()) return reject('QUOTE_EXPIRED', 'Tarjous on vanhentunut. Tarkista hinnat uudelleen.');
+    // Kiertävä demokello palaa alkuun: myöhemmin tallennettu tarjous kuin nyt tarkoittaa edellistä kierrosta (katselmus 15.11. #16).
+    if (q.expires <= now() || q.created > now()) return reject('QUOTE_EXPIRED', 'Tarjous on vanhentunut. Tarkista hinnat uudelleen.');
     const { buyer, placeOrder } = await d();
     const b = buyer(customer.buyerId);
     if (!b) return reject('BUYER_UNKNOWN', 'Asiakkuutta ei löydy tilausjärjestelmästä.');

@@ -9,6 +9,7 @@ import { fetchQuotes, describePriceSource, combinePriceSources } from '../valioA
 import { apiMode } from '../config.mjs';
 import { findSubstitutes } from '../substitutes.mjs';
 import { clock, parseApiTime, cutoffPassed, helsinkiLabel } from './clock.mjs';
+import { verifiedFree } from '../allergens.mjs';
 import { signOffer, verifyOffer } from './signing.mjs';
 import { quotes, orders, ledger, buyers, transaction } from './store.mjs';
 import { evaluateMandate, productBlock, substitutionRules, publicMandate } from './mandate.mjs';
@@ -75,9 +76,10 @@ export function searchProducts(buyer, input = {}) {
   const maxCo2 = bound(input.maxCo2PerKg, 'maxCo2PerKg', 1000);
   if (minReliability != null) it.assumptions.push(`Vain tuotteet, joiden toimitusvarmuus on vähintään ${Math.round(minReliability * 100)} %. Tuotteet ilman toimitusvarmuustietoa on jätetty pois.`);
   if (maxCo2 != null) it.assumptions.push(`Vain tuotteet, joiden hiilijalanjälki on enintään ${maxCo2} kg CO2e/kg. Tuotteet ilman hiilijalanjälkitietoa on jätetty pois.`);
+  if (exclude.size) it.assumptions.push('Allergeenirajaus katsoo myös alakoodit (esim. manteli on pähkinä) ja "voi sisältää" -tiedon. Tuotteet ilman allergeenitietoa on jätetty pois.');
   const passes = (p) => {
     if (it.claims.some((c) => !p.labels?.includes(c))) return false;
-    if ([...exclude].some((a) => p.contains.includes(a))) return false;
+    if (!verifiedFree([...exclude], p)) return false; // alakoodit, "voi sisältää" ja puuttuva tieto (katselmus 15.11. #2)
     if (input.countryOfOrigin && p.country !== String(input.countryOfOrigin).toLowerCase()) return false;
     if (input.brand && !(p.brand || '').toLowerCase().includes(String(input.brand).toLowerCase())) return false;
     if (minReliability != null && !(p.reliability >= minReliability)) return false; // puuttuva tieto ei läpäise suodatinta

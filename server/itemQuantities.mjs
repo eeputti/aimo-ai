@@ -1,7 +1,12 @@
 // Tuotteen kappaleet ja tilattavat myyntipakkaukset ovat eri suureita.
 // Lukumäärä luetaan ilmoitetusta pakkaustiedosta, ei tuotteen painosta.
 const positiveInteger = (n) => Number.isSafeInteger(n) && n > 0;
-const egg = (p) => /kananmun|\beggs?\b/i.test(p.productTerm || p.name || '') || p.productType === 'eggs';
+// Kananmuna: myös "Vapaan kanan muna M10" ja munaosasto (10590), muuten Vapaan kanan munia ei koskaan ehdotettu munamäärälle
+// (katselmus 15.11. #22). Munakoiso, munkki ja muut muna-alkuiset sanat eivät ole munia.
+const EGG_CATEGORY = '10590';
+const egg = (p) => /kananmun|kanan\s+mun(a|at|ia|ien)?\b|\beggs?\b/i.test(p.productTerm || p.name || '') || p.productType === 'eggs' || p.category === EGG_CATEGORY;
+/** Munakenno on 30 munaa (6 × 5). Kenno on kananmunien määrän sana, ei myyntipakkaus. */
+export const EGGS_PER_TRAY = 30;
 
 export function itemsPerSalesUnit(p) {
   if (!p || p.salesUnit === 'KG') return null;

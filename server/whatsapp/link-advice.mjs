@@ -1,6 +1,7 @@
 // A page supplies evidence for suggestions, never instructions or order authority.
 import { messageLinks, readPublicPage } from './link-reader.mjs';
 import { safeModelText } from './model-guard.mjs';
+import { verifiedFree } from '../allergens.mjs';
 
 const SCHEMA = { type: 'object', additionalProperties: false, required: ['summary', 'servings', 'servingsEvidence', 'ingredients'], properties: {
   summary: { type: 'string' }, servings: { type: 'number' }, servingsEvidence: { type: 'string' },
@@ -53,8 +54,8 @@ function restrictions(text, list) {
   for (const [pattern, codes] of [[/maidot/iu, ['AM']], [/pähkinät/iu, ['AN', 'AP']], [/munat(?:on|to)/iu, ['AE']], [/kalat(?:on|to)/iu, ['AF']], [/soijat/iu, ['AY']]]) if (pattern.test(text)) codes.forEach((c) => allergens.add(c));
   return { claims: [...claims], allergens: [...allergens] };
 }
-const fits = (p, rules) => rules.claims.every((c) => p.labels?.includes(c)) && (!rules.allergens.length || p.hasAllergenData === true
-  && rules.allergens.every((a) => !p.contains?.includes(a) && !p.mayContain?.includes(a)));
+// Allergeenikielto katsoo koodihierarkian (allergens.mjs): pähkinätön ei saa mantelia, gluteeniton ei vehnää.
+const fits = (p, rules) => rules.claims.every((c) => p.labels?.includes(c)) && verifiedFree(rules.allergens, p);
 
 // A short "ok" answers the recipe question before it can acknowledge an older cart.
 export function hasLinkAdviceReply(db, binding, text, now = Date.now()) {

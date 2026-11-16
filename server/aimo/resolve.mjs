@@ -4,6 +4,7 @@
 import { loadCatalog } from '../catalog.mjs';
 import { loadLexicon, variants, conceptOf } from './lexicon.mjs';
 import { RAW_INGREDIENT, typeKey, compareKeys } from './match.mjs';
+import { verifiedFree } from '../allergens.mjs';
 
 /** Esiintyykö sana (missä tahansa taivutusmuodossa) tuotteen suomen- tai englanninkielisessä nimessä? */
 const nameHas = (p, term) => { const en = (p.nameEn || '').toLowerCase(); return variants(term).some((v) => p._tokens.some((t) => t.includes(v)) || en.includes(v)); };
@@ -30,7 +31,8 @@ function filterSteps(item) {
   // Hyllyn tarkennus: "kanafilee" on broilerin fileetä, ei mitä tahansa broileria.
   if (item.shelf?.must?.length) steps.push(['shelfMust', (p) => { const n = p.name.toLowerCase(); return item.shelf.must.some((x) => n.includes(x)); }]);
   for (const c of item.claims) steps.push([`claim:${c}`, (p) => p.labels?.includes(c)]);
-  for (const a of item.excludeAllergens) steps.push([`excludeAllergen:${a}`, (p) => p.hasAllergenData && !p.contains.includes(a) && !(p.mayContain || []).includes(a)]);
+  // Koodihierarkia (allergens.mjs): pähkinätön (AN) ei tarjoa mantelia (SA), Tobleronea eikä Daimia.
+  for (const a of item.excludeAllergens) steps.push([`excludeAllergen:${a}`, (p) => verifiedFree([a], p)]);
   if (item.countryOfOrigin) steps.push(['countryOfOrigin', (p) => p.country === item.countryOfOrigin]);
   if (item.brand) steps.push(['brand', (p) => (p.brand || '').trim().toLowerCase() === item.brand.trim().toLowerCase()]);
   if (item.attributes.fat) steps.push(['fat', (p) => FAT_RE[item.attributes.fat].test(p.name)]);
@@ -49,6 +51,23 @@ function filterSteps(item) {
  * @returns {{status: 'ok'|'no_match', candidates: object[], total: number, funnel: object[], chips: object[], search: object}}
  */
 export function resolveItem(item, opts = {}) {
+  const r = resolveOnce(item, opts);
+  // Litra- tai kilotarve, jota pääryhmän yksikään tuote ei kata samassa yksikössä: "5 l kanalientä" osui vain liemijauheisiin
+  // (kg), vaikka valmiit 1 l liemet ovat valikoimassa toisessa ryhmässä (katselmus 15.11. #17). Silloin haetaan sanan muistakin
+  // ryhmistä (vähintään 10 % sanan esiintymistä). Pääryhmä pysyy järjestyksessä edellä (match.mjs), ja mitään ei pudoteta.
+  const measure = { L: 'litres', KG: 'kg' }[item.quantity?.unit];
+  if (!measure || item.productType || item.shelf || !(item.category || item.categories?.length) || r.candidates.some((c) => c[measure] != null)) return r;
+  const head = (item.productTerm || '').split(' ').filter(Boolean).at(-1);
+  const wider = (conceptOf(head || '')?.top || []).filter((t) => t.share >= 0.1).map((t) => t.category);
+  const current = new Set(item.categories?.length ? item.categories : [item.category]);
+  if (!wider.some((c) => !current.has(c))) return r;
+  const categories = [...current, ...wider.filter((c) => !current.has(c))];
+  const w = resolveOnce({ ...item, category: null, categories }, opts);
+  if (!w.candidates.some((c) => c[measure] != null)) return r;
+  return { ...w, funnel: [{ filter: 'widenedForMeasure', categories, remaining: w.total }, ...w.funnel] };
+}
+
+function resolveOnce(item, opts = {}) {
   const cat = loadCatalog();
   const limit = opts.limit ?? 40;
   const { steps, type, terms } = filterSteps(item);

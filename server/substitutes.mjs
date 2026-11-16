@@ -3,6 +3,7 @@
 import { loadCatalog, tokenize, stems, allergenName, unitLabel, stepOf, roundToStep } from './catalog.mjs';
 import { fetchQuotes } from './valioApi.mjs';
 import { cutoffPassed } from './gateway/clock.mjs';
+import { touchesBanned } from './allergens.mjs';
 
 const DIET_LABELS = ['FREE_FROM_LACTOSE', 'FREE_FROM_GLUTEN', 'VEGAN', 'EU_ORGANIC_FARMING'];
 const DIET_NAME = { FREE_FROM_LACTOSE: 'laktoositon', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', EU_ORGANIC_FARMING: 'luomu' };
@@ -35,7 +36,7 @@ function staticCandidates(original, rules, relaxed = false) {
   for (const c of pool.values()) {
     const p = c.product;
     if (original.temp && p.temp && p.temp !== original.temp) continue; // kylmäketju ei vaihdu
-    if ((rules.bannedAllergens || []).some((a) => p.contains.includes(a))) continue;
+    if (touchesBanned(rules.bannedAllergens, p)) continue; // alakoodit ja "voi sisältää" (katselmus 15.11. #2)
     if ((rules.blockedVendors || []).includes(p.vendor)) continue;
     const newAllergens = p.contains.filter((a) => !original.contains.includes(a));
     if (rules.subSameAllergens && newAllergens.length) continue; // ei uusia allergeeneja
