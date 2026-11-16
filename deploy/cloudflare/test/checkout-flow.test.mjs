@@ -4,6 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import worker from '../src/index.ts';
 import { publishOnce, pushOrderEvents, orderEventKey } from '../publish-orders.mjs';
+import { orderLinkToken } from '../src/demo-payment.ts';
 
 test('publisher → hosted order → demo payment → one confirmation, including cancellation and concurrent retries', async () => {
   const db = new DatabaseSync(':memory:');
@@ -14,7 +15,7 @@ test('publisher → hosted order → demo payment → one confirmation, includin
       async run() { await null; return { meta: { changes: db.prepare(sql).run(...params).changes } }; } };
   } };
   const sent = [], origin = 'https://demo.example', token = 'isolated-checkout-' + 'a'.repeat(40);
-  const env = { DB, SYNC_TOKEN: token, DEMO_PAYMENTS_ENABLED: 'true', ORDER_EMAIL_FROM: 'orders@demo.example',
+  const env = { DB, SYNC_TOKEN: token, WEBCHAT_SECRET: 'isolated-webchat-' + 'w'.repeat(40), DEMO_PAYMENTS_ENABLED: 'true', ORDER_EMAIL_FROM: 'orders@demo.example',
     EMAIL: { async send(message) { await null; sent.push(message); return { messageId: 'confirmation-1' }; } } };
   const fetcher = (url, init) => worker.fetch(new Request(url, init), env);
   const order = { orderId: 'AGW-20261115-0001', status: 'confirmed', channel: 'whatsapp', createdAt: new Date().toISOString(),
@@ -32,8 +33,14 @@ test('publisher → hosted order → demo payment → one confirmation, includin
     assert.deepEqual(await publish(), []);
 
     const publicText = await (await fetcher(`${origin}/api/orders`)).text();
-    assert.doesNotMatch(publicText, /private@example|Private customer|email_to|SYNC_TOKEN/);
-    const hosted = JSON.parse(publicText).orders[0];
+    assert.doesNotMatch(publicText, /private@example|Private customer|email_to|SYNC_TOKEN|AGW-/);
+    // Botti antoi tilaajalle oman linkin; vain sillä tilaus löytyy omista tilauksista.
+    const own = await orderLinkToken(env, order.orderId, order.createdAt);
+    const mine = (links) => fetcher(`${origin}/api/my-orders`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ links }) }).then((r) => r.json());
+    assert.deepEqual((await mine([{ orderId: order.orderId, token: 'A'.repeat(43) }])).orders, []);
+    const ownText = JSON.stringify(await mine([{ orderId: order.orderId, token: own }]));
+    assert.doesNotMatch(ownText, /private@example|Private customer|email_to/);
+    const hosted = JSON.parse(ownText).orders[0];
     assert.equal(hosted.demoPayment.status, 'pending');
     const link = new URL(hosted.demoPayment.url), [id, capability] = link.hash.slice(1).split('.');
     assert.equal(id, order.orderId);
@@ -54,7 +61,7 @@ test('publisher → hosted order → demo payment → one confirmation, includin
     assert.equal(db.prepare('SELECT paid_at FROM demo_payments').get().paid_at, paidAt);
     assert.equal(db.prepare('SELECT count(*) n FROM order_events').get().n, 1);
     assert.equal(db.prepare('SELECT count(*) n FROM demo_payments').get().n, 1);
-    assert.equal((await (await fetcher(`${origin}/api/orders`)).json()).orders[0].demoPayment.status, 'paid');
+    assert.equal((await mine([{ orderId: order.orderId, token: own }])).orders[0].demoPayment.status, 'paid');
     assert.equal(sent.length, 1);
   } finally { db.close(); }
 });

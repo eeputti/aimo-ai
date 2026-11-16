@@ -36,7 +36,9 @@ export function createConfiguredWhatsApp() {
       draftDb: process.env.WHATSAPP_DRAFT_DB || fileURLToPath(new URL('../../data/whatsapp-drafts.db', import.meta.url)),
       quoteDb: process.env.WHATSAPP_QUOTE_DB || fileURLToPath(new URL('../../data/whatsapp-quotes.db', import.meta.url)),
     });
-    ordering = withDemoCheckout(ordering, { baseUrl: process.env.CLOUDFLARE_DEMO_URL });
+    // Maksulinkki on tilauksen oma: sen tunniste lasketaan tilauksen luontiajasta (gatewayn kanta, sama prosessi).
+    ordering = withDemoCheckout(ordering, { baseUrl: process.env.CLOUDFLARE_DEMO_URL, secret: process.env.WEBCHAT_SECRET?.trim(),
+      orderCreatedAt: async (orderId) => (await import('../gateway/store.mjs')).orders.get(orderId)?.createdAt || null });
   }
   const cartLink = ordering ? createCartLink({ store, ordering, baseUrl: process.env.WHATSAPP_PUBLIC_URL, secret: settings.appSecret }) : null;
   // Korilinkin sivu kaupan ostoskorin ulkoasulla. Vain staattiset tiedostot; API pysyy cartLinkissä.

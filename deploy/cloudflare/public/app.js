@@ -17,12 +17,12 @@ function render() {
   const key = JSON.stringify([data.orders, data.totalOrders, filter]);
   if (key === lastRendered) return;
   lastRendered = key;
-  $('order-count').textContent = data.totalOrders > data.orders.length ? `${data.totalOrders} tilausta, näytetään ${data.orders.length} uusinta` : `${data.totalOrders} ${data.totalOrders === 1 ? 'tilaus' : 'tilausta'}, päivittyy automaattisesti`;
+  $('order-count').textContent = `${data.totalOrders} ${data.totalOrders === 1 ? 'oma tilaus' : 'omaa tilausta'} tässä selaimessa`;
   const orders = data.orders.filter(order => filter === 'all' || order.channel === filter);
   $('orders').replaceChildren();
   if (!orders.length) {
     const empty = element('div', undefined, 'empty');
-    empty.append(element('div', '↘', 'empty-icon'), element('h3', 'Odotetaan ensimmäistä tilausta'), element('p', 'Lähetä tilaus WhatsAppissa ja hyväksy yhteenveto. Vastaanotettu demotilaus ilmestyy tähän automaattisesti.'));
+    empty.append(element('div', '↘', 'empty-icon'), element('h3', 'Tässä selaimessa ei ole vielä tilauksia'), element('p', 'Tilaukset näkyvät vain tilaajalle. Vahvista tilaus ostoskorissa ja avaa Siirry demomaksuun: tilaus tallentuu tähän selaimeen.'));
     $('orders').append(empty); return;
   }
   for (const order of orders) {
@@ -60,15 +60,18 @@ function render() {
     article.append(head, body); $('orders').append(article);
   }
 }
+// Vain tämän selaimen omat tilaukset: maksusivu tallentaa avatun tilauslinkin (numero ja tunniste) tähän selaimeen.
+const ownLinks = () => { try { return JSON.parse(localStorage.getItem('aimo.ownOrders.v1') || '[]').filter(l => l && /^AGW-\d{8}-\d{4,12}$/.test(l.orderId) && /^[A-Za-z0-9_-]{43}$/.test(l.token)).slice(0, 50); } catch { return []; } };
 async function refresh() {
   if (loading || document.hidden) return;
   loading = true;
   try {
-    const response = await fetch('/api/orders', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+    const response = await fetch('/api/my-orders', { method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(8000),
+      headers: { 'content-type': 'application/json' }, body: JSON.stringify({ links: ownLinks() }) });
     if (!response.ok) throw new Error('Päivitys epäonnistui');
     const next = await response.json();
     if (!Array.isArray(next.orders) || !Number.isFinite(next.serverTime)) throw new Error('Virheellinen vastaus');
-    data = next; serverOffset = next.serverTime - Date.now(); failed = false; render();
+    data = { ...next, totalOrders: next.orders.length }; serverOffset = next.serverTime - Date.now(); failed = false; render();
   } catch { failed = true; if (!data) $('order-count').textContent = 'Tilausyhteyttä valmistellaan'; }
   finally { loading = false; connection(); }
 }
@@ -76,11 +79,6 @@ for (const button of document.querySelectorAll('[data-filter]')) button.addEvent
   filter = button.dataset.filter;
   for (const item of document.querySelectorAll('[data-filter]')) item.setAttribute('aria-pressed', String(item === button));
   render();
-});
-$('share').addEventListener('click', async () => {
-  try { await navigator.clipboard.writeText(location.origin); $('share').textContent = 'Linkki kopioitu ✓'; }
-  catch { $('share').textContent = 'Kopioi osoite selaimen osoiteriviltä'; }
-  setTimeout(() => { $('share').textContent = 'Kopioi näkymän linkki ↗'; }, 2500);
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 await refresh();

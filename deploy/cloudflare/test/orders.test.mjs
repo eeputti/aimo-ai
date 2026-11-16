@@ -31,14 +31,15 @@ test('the authenticated publisher reaches the public endpoint; retries preserve 
     assert.equal((await publishOnce({ url: 'https://demo.example', token, snapshot, fetcher })).updated, false);
     const old = sample(now - 1); old.orders[0].status = 'rejected';
     assert.equal((await (await worker.fetch(req(old), env)).json()).updated, false);
-    let current = await (await worker.fetch(new Request('https://demo.example/api/orders'), env)).json();
-    assert.equal(current.orders[0].orderId, snapshot.orders[0].orderId);
-    assert.equal(current.orders[0].status, 'confirmed');
+    // Tilannekuva tallentuu, mutta julkinen lista ei näytä kenenkään tilauksia: kukin näkee vain omansa (/api/my-orders).
+    const stored = () => JSON.parse(env.DB.db.prepare('SELECT json FROM demo_snapshot').get().json);
+    const current = await (await worker.fetch(new Request('https://demo.example/api/orders'), env)).json();
+    assert.deepEqual(current.orders, []); assert.equal(current.personal, true); assert.ok(current.receivedAt);
+    assert.equal(stored().orders[0].status, 'confirmed');
     assert.equal(env.DB.db.prepare('SELECT count(*) n FROM demo_snapshot').get().n, 1);
     const updated = sample(now + 1); updated.orders[0].status = 'pending_approval';
     await worker.fetch(req(updated), env);
-    current = await (await worker.fetch(new Request('https://demo.example/api/orders'), env)).json();
-    assert.equal(current.orders[0].status, 'pending_approval');
+    assert.equal(stored().orders[0].status, 'pending_approval');
   } finally { env.DB.db.close(); }
 });
 

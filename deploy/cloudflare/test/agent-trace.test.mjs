@@ -8,6 +8,7 @@ import worker from '../src/index.ts';
 import { parseAgentTrace } from '../src/agent-trace.ts';
 import { readAgentTrace, redact } from '../trace-reader.mjs';
 import { publishOnce, pushOrderEvents, pushAgentTraces } from '../publish-orders.mjs';
+import { orderLinkToken } from '../src/demo-payment.ts';
 
 const ORDER_ID = 'AGW-20261115-0042', BINDING = '0d0cfd68-702b-4f72-a5eb-b6085df8cbd5', PHONE = '358401234567', DRAFT = 'WD-41ca9bd5-8d55-4daa-b93f-e2ea5e0002bb';
 const CONVERSATION = `1445585741976990:whatsapp-demo-${BINDING}`;
@@ -148,7 +149,7 @@ test('publisher → order → demo payment link → "Katso, mitä agentti näki"
       async run() { await null; return { meta: { changes: db.prepare(sql).run(...params).changes } }; } };
   } };
   const origin = 'https://demo.example', token = 'isolated-trace-' + 'a'.repeat(40);
-  const env = { DB, SYNC_TOKEN: token, DEMO_PAYMENTS_ENABLED: 'true' };
+  const env = { DB, SYNC_TOKEN: token, WEBCHAT_SECRET: 'isolated-webchat-' + 'w'.repeat(40), DEMO_PAYMENTS_ENABLED: 'true' };
   const fetcher = (url, init) => worker.fetch(new Request(url, init), env);
   try {
     const files = fixture(dir, { orderCreatedAt: new Date(Date.now() - 60_000).toISOString() });
@@ -170,8 +171,9 @@ test('publisher → order → demo payment link → "Katso, mitä agentti näki"
     await assert.rejects(pushAgentTraces({ url: origin, token: 'wrong-token-'.repeat(4), snapshot, known: new Set(), read, fetcher }), /HTTP 401/);
 
     const publicOrders = await (await fetcher(`${origin}/api/orders`)).text();
-    assert.doesNotMatch(publicOrders, /no terve|turns|ostoskorisivulla/);
-    const [id, capability] = new URL(JSON.parse(publicOrders).orders.find((o) => o.orderId === ORDER_ID).demoPayment.url).hash.slice(1).split('.');
+    assert.doesNotMatch(publicOrders, /no terve|turns|ostoskorisivulla|AGW-/);
+    // Tilaajan oma linkki avaa myös agentin jäljen.
+    const id = ORDER_ID, capability = await orderLinkToken(env, ORDER_ID, order.createdAt);
     const traceRead = (auth) => fetcher(`${origin}/api/agent-traces/${id}`, { headers: auth ? { authorization: `Bearer ${auth}` } : {} });
     assert.equal((await traceRead()).status, 404);
     assert.equal((await traceRead('A'.repeat(43))).status, 404);

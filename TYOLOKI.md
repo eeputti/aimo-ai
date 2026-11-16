@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 yö — tilaukset näkyvät vain tilaajalle henkilökohtaisella tilauslinkillä (Claude Code, sessio B)
+
+- **Käyttäjän pyyntö:** Eelis kysyi, voisiko demon tilaukset näkyä selain- tai puhelinnumerokohtaisesti, ja pyysi toteuttamaan sen ("Kyllä, tee se"). Raportti `docs/parallel/personal-orders.md`.
+- **Muutos:** botti antaa vahvistetulle tilaukselle linkin `demo-payment.html#<numero>.<tunniste>`, jossa tunniste on HMAC(`WEBCHAT_SECRET`, tilausnumero ja luontiaika). Worker tarkistaa saman tunnisteen demomaksulle, agentin jäljelle ja uudelle `POST /api/my-orders`-reitille. Julkinen `/api/orders` ei enää näytä kenenkään tilauksia. Maksusivu avautuu vain omasta linkistä ja muistaa sen selaimessa, ja Tilaukset-sivu näyttää vain tämän selaimen tilaukset. B:n #13 (kaikkien jäsenten tilaukset Workeriin) on nyt yksityinen.
+- **Miksi WEBCHAT_SECRET:** se on jo sekä botilla että Workerilla; julkaisijan avain ei ole botin `.env.whatsapp`:ssa. Uutta salaisuutta ei tarvita.
+- **Tarkistukset:** uusi `deploy/cloudflare/test/personal-orders.test.mjs` 3/3 (botin ja Workerin tunniste sama, toisen linkki, väärennetty tunniste ja pelkkä numero eivät avaa, julkinen lista tyhjä, vanha linkki ei avaa samalla numerolla tullutta uutta tilausta), päivitetyt checkout-, tilaus- ja jälkitestit. `npm test` 408/408 origin/mainin 3636605 päällä, Worker 62/62, typecheck ja build. Selaimessa paikallinen palvelin oikealla Worker-koodilla: tyhjä selain ei näe tilauksia, asiakas A:n linkki avasi A:n maksusivun, ja Tilaukset näytti sen jälkeen vain A:n tilauksen.
+- **Käyttöönotto (E):** ei D1-migraatiota. Worker ja botti julkaistaan samassa ikkunassa, koska vanhat pelkän numeron linkit lakkaavat toimimasta ja uudet linkit vaativat uuden Workerin. `WEBCHAT_SECRET` pysyy samana molemmissa.
+- **Rajat:** tilaus näkyy Tilaukset-sivulla vasta, kun sen maksulinkki on avattu siinä selaimessa. Vain vahvistettu tilaus saa linkin.
+
 ## 17.11.2026 — kiloina myytävä tuote ja kappalemäärä: ei enää "100 kpl → 100 kg, 899 €", vaan botti kysyy kilot (Claude Code, keskeneräinen kori -chat)
 
 - **Käyttäjän pyyntö ("Korjaa se"):** Eeliksen puhelinkuvassa rivi "Kanan fileesuikale 100 kpl" näytti vaihtoehdot "maustamaton 2 kg, 100 kg (100 kg), 899,00 €".

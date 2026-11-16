@@ -1,7 +1,7 @@
 import { MAX_BODY_BYTES, parseSnapshot } from "./protocol.ts";
 import { parseOrderEvent, type OrderEvent } from "./order-event.ts";
 import { renderOrderEmail } from "./email.ts";
-import { registerDemoPayment, demoPaymentEmailAllowed, describeDemoPayment, handleDemoPayment, verifyDemoPaymentLink } from "./demo-payment.ts";
+import { registerDemoPayment, demoPaymentEmailAllowed, handleDemoPayment, verifyDemoPaymentLink, ownOrders } from "./demo-payment.ts";
 import { TRACE_PREFIX, parseAgentTrace, storeAgentTrace, handleAgentTraceRead } from "./agent-trace.ts";
 import { handleSignup } from "./signup.ts";
 import { handleWebChat, type WebChatEnv } from "./web-chat.ts";
@@ -9,11 +9,12 @@ import { handleWebChat, type WebChatEnv } from "./web-chat.ts";
 // A sender is optional: without one orders are stored and e-mail waits. Either the Cloudflare
 // send_email binding EMAIL with ORDER_EMAIL_FROM (needs an onboarded domain), or RESEND_API_KEY.
 // Resend without ORDER_EMAIL_FROM uses its test sender, which only delivers to the Resend account's own address.
-type OrderEnv = Env & { EMAIL?: SendEmail; ORDER_EMAIL_FROM?: string; RESEND_API_KEY?: string; DEMO_PAYMENTS_ENABLED?: string };
+type OrderEnv = Env & { EMAIL?: SendEmail; ORDER_EMAIL_FROM?: string; RESEND_API_KEY?: string; DEMO_PAYMENTS_ENABLED?: string; WEBCHAT_SECRET?: string };
 type Mail = { from: string; to: string; subject: string; html: string; text: string };
 export const MAX_EMAIL_ATTEMPTS = 3;
 export const RESEND_TEST_FROM = "Aimo tilausapuri <onboarding@resend.dev>";
 const SEND_LEASE_MS = 60000;
+export const MAX_OWN_LINKS = 50;
 
 async function sendViaResend(apiKey: string, mail: Mail, idempotencyKey: string) {
   const response = await fetch("https://api.resend.com/emails", {
@@ -137,16 +138,29 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/healthz" && request.method === "GET") return json({ ok: true, mode: "public-order-demo", readOnly: false, demoPayments: true });
+    // Tilaukset eivät ole julkisia: kukin näkee vain ne, joiden oman linkin hänen selaimensa tuntee (/api/my-orders).
+    // Vanha julkinen lista vastaa yhä, mutta ilman tilauksia, jotta vanhat sivut ja tarkistukset eivät kaadu.
     if (url.pathname === "/api/orders" && request.method === "GET") {
       try {
-        const row = await env.DB.prepare("SELECT received_at, json FROM demo_snapshot WHERE id=1").first<{ received_at: number; json: string }>();
-        if (!row) return json({ orders: [], totalOrders: 0, receivedAt: null, serverTime: Date.now() });
-        const snapshot = JSON.parse(row.json);
-        const orders = await Promise.all(snapshot.orders.map(async (order: { orderId: string }) => {
-          const demoPayment = await describeDemoPayment(env, order.orderId, url.origin);
-          return demoPayment ? { ...order, demoPayment } : order;
-        }));
-        return json({ ...snapshot, orders, receivedAt: row.received_at, serverTime: Date.now() });
+        const row = await env.DB.prepare("SELECT received_at FROM demo_snapshot WHERE id=1").first<{ received_at: number }>();
+        return json({ orders: [], totalOrders: 0, personal: true, receivedAt: row?.received_at ?? null, serverTime: Date.now() });
+      } catch { return json({ error: "Tilausyhteyttä valmistellaan." }, 503); }
+    }
+    if (url.pathname === "/api/my-orders" && request.method === "POST") {
+      if (!/^application\/json\b/.test(request.headers.get("content-type") || "")) return json({ error: "JSON vaaditaan." }, 415);
+      let links: { orderId: string; token: string }[];
+      try {
+        const body = await readBody(request) as { links?: unknown };
+        if (!Array.isArray(body?.links) || body.links.length > MAX_OWN_LINKS) throw new Error("links");
+        links = body.links.map((l) => {
+          const { orderId, token } = (l || {}) as Record<string, unknown>;
+          if (typeof orderId !== "string" || typeof token !== "string" || orderId.length > 64 || token.length > 64) throw new Error("link");
+          return { orderId, token };
+        });
+      } catch { return json({ error: "Virheellinen pyyntö." }, 400); }
+      try {
+        const row = await env.DB.prepare("SELECT received_at FROM demo_snapshot WHERE id=1").first<{ received_at: number }>();
+        return json({ orders: await ownOrders(env as OrderEnv, links, url.origin), receivedAt: row?.received_at ?? null, serverTime: Date.now() });
       } catch { return json({ error: "Tilausyhteyttä valmistellaan." }, 503); }
     }
     if (url.pathname === "/api/sync" && request.method === "POST") {

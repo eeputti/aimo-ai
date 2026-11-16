@@ -6,7 +6,7 @@ export function showDemoCheckout(result, { container, document: doc = globalThis
     if (result?.status !== 'confirmed' || result.checkout.mode !== 'demo'
         || !/^AGW-\d{8}-\d{4,12}$/.test(result.orderId || '')
         || url.protocol !== 'https:' || url.username || url.password || url.search
-        || url.pathname !== '/demo-payment.html' || url.hash !== `#${result.orderId}`) return false;
+        || url.pathname !== '/demo-payment.html' || !new RegExp(`^#${result.orderId}\\.[A-Za-z0-9_-]{43}$`).test(url.hash)) return false;
   } catch { return false; }
   container ||= doc.getElementById('demo-checkout');
   if (!container) {

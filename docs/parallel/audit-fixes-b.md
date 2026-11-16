@@ -46,7 +46,7 @@ Sessio B (Claude Code), taulun tehtävät adaf1c4d ja 312988a4. Korjatut kohdat 
 - `WHATSAPP_DEMO_BUYER_ID` (esim. kahvila-aalto) otetaan mukaan, mutta vain tilaukset, joiden `buyerReference` alkaa `whatsapp:`. Saman ostajan kauppa- ja MCP-tilaukset eivät tule mukaan.
 - Selaindemo ja selainkeskustelu vain lipuilla kuten ennen. `--only-demo-phone` (ja `onlyDemoPhone: true`) palauttaa vanhan rajauksen.
 - Sähköposti lähtee kaikista `ORDER_EMAIL_TO`-osoitteeseen. Tervehdysnimi (`ORDER_EMAIL_CUSTOMER_NAME`) vain demonumeron ja kiinnitetyn ostajan tilauksiin, muille neutraali tervehdys. Jäsenten nimiä ei lähetetä Workerille.
-- **Yksityisyys, päätettävä ennen käyttöönottoa:** julkinen tilauslista näyttää nyt myös muiden testaajien tilausten julkiset kentät (tuotteet, määrät, summa, tila, numero). Nimiä ja numeroita ei näy. Aiemmin käyttäjä hyväksyi julkiseksi vain yhden testiasiakkaan tilaukset.
+- **Yksityisyys (päivitetty 17.11.):** tämän muutoksen jälkeen julkinen lista olisi näyttänyt myös muiden testaajien tilausten julkiset kentät. Henkilökohtainen tilauslinkki (`personal-orders.md`) poisti julkisen listan: `/api/orders` ei näytä kenenkään tilauksia, ja kukin näkee vain ne, joiden oma linkki hänellä on. Kaikkien jäsenten tilausten julkaisu Workeriin on siis nyt yksityinen.
 
 ### Syykoodit
 

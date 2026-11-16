@@ -30,8 +30,26 @@ function completed(email) {
   $('trace').href = `/agentti.html#${match[1]}.${match[2]}`;
   $('trace').hidden = false;
 }
+// Tämän selaimen omat tilaukset (Tilaukset-sivu). Vain avattujen, voimassa olevien linkkien numero ja tunniste.
+const OWN = 'aimo.ownOrders.v1';
+function remember(orderId, token) {
+  try {
+    const list = JSON.parse(localStorage.getItem(OWN) || '[]').filter(l => l && l.orderId !== orderId);
+    localStorage.setItem(OWN, JSON.stringify([{ orderId, token }, ...list].slice(0, 50)));
+  } catch { /* Tallennus voi olla estetty; maksusivu toimii silti linkistä. */ }
+}
 async function load() {
-  const data = await request();
+  // Juuri vahvistettu tilaus siirtyy tänne muutamassa sekunnissa: odotetaan hetki ennen kuin linkkiä pidetään virheellisenä.
+  let data;
+  for (let attempt = 0; ; attempt++) {
+    try { data = await request(); break; }
+    catch (error) {
+      if (attempt >= 7) throw error;
+      $('status').textContent = 'Odotetaan tilauksen siirtymistä maksusivulle…';
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+  }
+  remember(match[1], match[2]);
   $('order-id').textContent = data.order.orderId;
   $('delivery').textContent = data.order.deliveryDate ? new Intl.DateTimeFormat('fi-FI', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(`${data.order.deliveryDate}T12:00:00Z`)) : 'Toimituspäivä puuttuu';
   $('amount').textContent = money(data.payment.amountNetCents);
@@ -60,28 +78,11 @@ $('cancel').addEventListener('click', () => { void act('cancel'); });
 // A second link to this same page can change only the fragment; restart its read
 // so the previous order's summary and action handlers cannot remain on screen.
 window.addEventListener('hashchange', () => location.reload());
-async function init() {
-  const orderId = location.hash.slice(1);
-  if (!match && /^AGW-\d{8}-\d{4,12}$/.test(orderId)) {
-    // The WhatsApp cart can hand off only its order id. Resolve its published demo
-    // capability here without exposing the publisher secret to that browser.
-    $('status').textContent = 'Odotetaan tilauksen siirtymistä maksusivulle…';
-    for (let attempt = 0; attempt < 8; attempt++) {
-      const response = await fetch('/api/orders', { cache: 'no-store', signal: AbortSignal.timeout(8000) });
-      if (!response.ok) throw new Error('Tilausyhteys ei juuri nyt vastaa. Lataa sivu hetken kuluttua uudelleen.');
-      const data = await response.json();
-      const payment = data.orders?.find(order => order.orderId === orderId)?.demoPayment;
-      if (payment?.mode === 'demo' && payment.url) {
-        const url = new URL(payment.url, location.origin);
-        const candidate = linkPattern.exec(url.hash.slice(1));
-        if (url.origin !== location.origin || url.pathname !== '/demo-payment.html' || !candidate || candidate[1] !== orderId) throw new Error('Demomaksulinkki on virheellinen.');
-        match = candidate; history.replaceState(null, '', url.hash); break;
-      }
-      if (attempt < 7) await new Promise(resolve => setTimeout(resolve, 1500));
-    }
-    if (!match) throw new Error('Tilausta vielä julkaistaan tai sillä ei ole demomaksua. Lataa sivu hetken kuluttua uudelleen.');
-  }
-  if (match) await load();
-  else $('status').textContent = 'Avaa demomaksu tilauksen omasta maksulinkistä.';
+function init() {
+  if (match) return load();
+  // Pelkällä tilausnumerolla ei avaudu mitään: tilaus näkyy vain sen omasta linkistä.
+  $('status').textContent = /^AGW-\d{8}-\d{4,12}$/.test(location.hash.slice(1))
+    ? 'Avaa demomaksu tilauksen omasta linkistä (ostoskorin Siirry demomaksuun -painike).'
+    : 'Avaa demomaksu tilauksen omasta maksulinkistä.';
 }
-void init().catch(error => { $('status').textContent = error.message; });
+void Promise.resolve().then(init).catch(error => { $('status').textContent = error.message; });

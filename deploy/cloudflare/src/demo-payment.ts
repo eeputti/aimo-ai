@@ -1,7 +1,7 @@
 // A demo-only payment gate. No card details, payment provider, or money transfer.
 import type { PublicOrder } from "./protocol.ts";
 
-export type DemoPaymentEnv = Pick<Env, "DB" | "SYNC_TOKEN"> & { DEMO_PAYMENTS_ENABLED?: string };
+export type DemoPaymentEnv = Pick<Env, "DB" | "SYNC_TOKEN"> & { DEMO_PAYMENTS_ENABLED?: string; WEBCHAT_SECRET?: string };
 type PaymentRow = { order_id: string; status: "pending" | "paid"; amount_net_cents: number; created_at: number; expires_at: number; paid_at: number | null };
 type EventRow = { json: string; email_status: string };
 type SendConfirmation = (orderId: string) => Promise<string>;
@@ -30,19 +30,64 @@ async function linkToken(env: DemoPaymentEnv, row: PaymentRow) {
   const bytes = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
+const bearer = (request: Request) => /^Bearer ([A-Za-z0-9_-]{43})$/.exec(request.headers.get("authorization") || "")?.[1] || null;
+const fromBase64Url = (token: string) => Uint8Array.from(atob(token.replace(/-/g, "+").replace(/_/g, "/") + "="), c => c.charCodeAt(0));
+const toBase64Url = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 async function authenticate(request: Request, env: DemoPaymentEnv, row: PaymentRow) {
-  const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(request.headers.get("authorization") || "")?.[1];
+  const token = bearer(request);
   if (!token) return false;
-  const bytes = Uint8Array.from(atob(token.replace(/-/g, "+").replace(/_/g, "/") + "="), c => c.charCodeAt(0));
   const { key, data } = await signature(env, row);
-  return crypto.subtle.verify("HMAC", key, bytes, data);
+  return crypto.subtle.verify("HMAC", key, fromBase64Url(token), data);
 }
 
-/** True when the request carries this order's demo payment link capability. Other pages of the same order reuse it. */
+// ---------- Henkilökohtainen tilauslinkki ----------
+// Botti antaa vahvistetulle tilaukselle linkin demo-payment.html#<numero>.<tunniste>, jossa tunniste on
+// HMAC(WEBCHAT_SECRET, "aimo-order-link-v1\0<numero>\0<luontiaika>") (server/whatsapp/checkout.mjs). Vain linkin saanut
+// puhelinnumero tai selain avaa tilauksen, sen demomaksun ja agentin jäljen. Julkista tilauslistaa ei ole.
+async function orderLinkKey(env: DemoPaymentEnv) {
+  if (!env.WEBCHAT_SECRET || env.WEBCHAT_SECRET.length < 32) return null;
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(env.WEBCHAT_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+}
+const orderLinkData = (orderId: string, createdAt: string) => new TextEncoder().encode(`aimo-order-link-v1\0${orderId}\0${createdAt}`);
+/** Same value as the bot computes. Exported for tests and for building the owner's own link. */
+export async function orderLinkToken(env: DemoPaymentEnv, orderId: string, createdAt: string) {
+  const key = await orderLinkKey(env);
+  if (!key) return null;
+  return toBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, orderLinkData(orderId, createdAt))));
+}
+/** The stored public order when `token` is this order's own link, else null. */
+export async function verifyOrderLinkToken(env: DemoPaymentEnv, orderId: string, token: string | null) {
+  if (!ORDER_ID.test(orderId) || !token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+  const key = await orderLinkKey(env);
+  const event = key && await eventRow(env, orderId);
+  if (!event) return null;
+  const order = (JSON.parse(event.json) as { order: PublicOrder }).order;
+  const ok = order.orderId === orderId && await crypto.subtle.verify("HMAC", key, fromBase64Url(token), orderLinkData(orderId, order.createdAt));
+  return ok ? order : null;
+}
+
+/** True when the request carries this order's demo payment capability or its owner's link. Other pages of the same order reuse it. */
 export async function verifyDemoPaymentLink(env: DemoPaymentEnv, orderId: string, request: Request) {
   if (!ORDER_ID.test(orderId)) return false;
   const row = await paymentRow(env, orderId);
-  return Boolean(row && await authenticate(request, env, row));
+  if (row && await authenticate(request, env, row)) return true;
+  return Boolean(await verifyOrderLinkToken(env, orderId, bearer(request)));
+}
+
+/**
+ * "Omat tilaukset": only orders whose own links this browser holds. Each link is checked; unknown or forged ones are
+ * left out without saying why. The returned link is the same personal link, never the payment capability.
+ */
+export async function ownOrders(env: DemoPaymentEnv, links: { orderId: string; token: string }[], origin: string) {
+  const orders = [];
+  for (const { orderId, token } of links) {
+    const order = await verifyOrderLinkToken(env, orderId, token);
+    if (!order) continue;
+    const row = await paymentRow(env, orderId);
+    const url = `${origin}/demo-payment.html#${orderId}.${token}`;
+    orders.push({ ...order, demoPayment: row ? { mode: "demo" as const, status: row.status, expiresAt: row.expires_at, url } : null, link: url });
+  }
+  return orders.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
 /**
@@ -111,7 +156,10 @@ export async function handleDemoPayment(request: Request, env: DemoPaymentEnv, s
   if (!["GET", "POST"].includes(request.method)) return json({ error: "Menetelmä ei ole sallittu." }, 405);
   try {
     const row = await paymentRow(env, orderId);
-    if (!row || !await authenticate(request, env, row)) return json({ error: "Demomaksulinkki ei ole voimassa." }, 404);
+    // Either the payment capability or the owner's personal order link opens the same demo payment.
+    const allowed = (row && await authenticate(request, env, row)) || await verifyOrderLinkToken(env, orderId, bearer(request));
+    if (!allowed) return json({ error: "Demomaksulinkki ei ole voimassa." }, 404);
+    if (!row) return json({ error: "Tällä tilauksella ei ole demomaksua." }, 404);
     if (row.status !== "paid" && row.expires_at <= now) return json({ error: "Demomaksulinkki vanhentui. Ota yhteys demon ylläpitäjään." }, 410);
     const event = await eventRow(env, orderId);
     if (!event) return json({ error: "Tilausta ei löydy." }, 404);
