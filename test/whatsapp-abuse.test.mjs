@@ -119,7 +119,7 @@ async function fixture(t, { ask = null, interpretTurn = null, chatSpy = null } =
 }
 const linkToken = (reply) => new URL(reply.match(/https:\/\/cart\.example\.test\/whatsapp\/cart#[\w.-]+/)[0]).hash.slice(1);
 const version = (list) => (list ? { id: list.id, revision: list.revision } : null);
-const cartInput = (list, text) => ({ text, messageId: crypto.randomUUID(), expectedList: version(list) });
+const cartInput = (list, text) => ({ text, messageId: crypto.randomUUID(), expectedList: version(list), ...(text === 'TILAA' ? { confirm: true } : {}) });
 async function readyCart(f, phone = PHONE) {
   const member = f.wa.member(phone);
   await f.bridge.chat({ member, messageId: crypto.randomUUID(), receivedAt: f.now(), messages: [{ role: 'user', content: '20 l maitoa maanantaiksi' }] });

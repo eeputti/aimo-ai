@@ -3,7 +3,7 @@
 // mutta jokainen muutos tarkistetaan ja toteutetaan täällä, ja kaikki vastaustekstit hintoineen kootaan koodissa
 // työkalujen palauttamista tiedoista. Tilaus lähtee vain, kun ostaja vastaa TILAA juuri näytettyyn yhteenvetoon.
 import crypto from 'node:crypto';
-import { CLAIMS } from './interpret.mjs';
+import { CLAIMS, DEADLINE_QUESTION } from './interpret.mjs';
 import { helsinkiLabel, parseApiTime } from '../gateway/clock.mjs';
 
 const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
@@ -11,14 +11,15 @@ const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoos
 const ALLERGEN_FI = { AM: 'maidoton', AW: 'ei gluteeniviljoja', AE: 'munaton', AN: 'pähkinätön', AP: 'ei maapähkinää', AF: 'kalaton', AY: 'soijaton', AC: 'ei äyriäisiä', AS: 'ei seesamia', BC: 'ei selleriä', BM: 'ei sinappia' };
 // Gluteeniton-merkintä ja gluteeniviljojen kielto ovat ostajalle sama asia: näytetään kerran.
 const dietLabel = (d) => [...d.claims.map((c) => CLAIM_FI[c]), ...d.excludeAllergens.filter((a) => !(a === 'AW' && d.claims.includes('FREE_FROM_GLUTEN'))).map((a) => ALLERGEN_FI[a] || `ei allergeenia ${a}`)].filter(Boolean).join(', ');
-// Vahvistus tunnistetaan koodissa, ei mallilla. Pelkkä "joo" ei ole tilauslupa.
-const CONFIRM = /^(tilaa|vahvista|vahvistan|hyväksy|hyväksyn|(kyllä|joo|ok|okei)[,\s]+(tilaa|vahvista|vahvistan))[\s.!]*$/iu;
+// Vahvistus tunnistetaan koodissa, ei mallilla. Pelkkä "joo" ei ole tilauslupa. Korisivu sallii vahvistuksen vain
+// vihreästä painikkeesta (cart-link.mjs), ei muutoskenttään kirjoitettuna (katselmus #10).
+export const CONFIRM = /^(tilaa|vahvista|vahvistan|hyväksy|hyväksyn|(kyllä|joo|ok|okei)[,\s]+(tilaa|vahvista|vahvistan))[\s.!]*$/iu;
 const VAGUE_YES = /^(joo|kyllä|ok|okei|jep|juu|selvä|hyvä|sopii)[\s.!]*$/iu;
 const CANCEL = /^(peru|peruuta|tyhjennä|aloita alusta)\b/iu;
 // Koko luonnoksen vapaa peruminen ("unohda koko homma, ei tilata mitään"). Kielto ("älä peru") ei peru mitään.
 export const CANCEL_ALL = /^(?:(?:no|ok|okei|joo|ei|ai)[,\s]+)?(?:unohda\s+(?:koko\s+)?(?:homma|juttu|tilaus|lista|ostoslista|kaikki)|ei\s+(?:tilata|tilatakaan)(?:\s+(?:mitään|sittenkään))+|en\s+(?:tilaa|tilaakaan)(?:\s+(?:mitään|sittenkään))+|peru(?:ta|taan)?\s+(?:koko\s+)?(?:tilaus|homma|ostoslista|lista))(?:[,.\s]+(?:ei\s+tilata\s+mitään|en\s+tilaa\s+mitään|kiitos|sittenkään|ei\s+tarvi\p{L}*))*[.!\s]*$/iu;
-// Kysymys tilausaikarajasta. Vastaus tulee työkalujen tiedoista, ei mallilta.
-export const DEADLINE_QUESTION = /(?:mihin|mihi|mihkä)\s+(?:asti|mennessä|saakka)[^?.!]*(?:tila|ehti)|(?:tila\p{L}*|ehti\p{L}*)[^?.!]*(?:mihin|mihi|mihkä)\s+(?:asti|mennessä|saakka)|takaraja|aikaraja|tilausaika(?!toive)|jättöai\p{L}*|viimeinen\s+tilaus\p{L}*|milloin\s+(?:pitää|täytyy|pitäis\p{L}*|viimeistään)\s+(?:olla\s+)?tila|ehti\p{L}*\s+(?:vielä\s+)?tilata/iu;
+// Kysymys tilausaikarajasta (interpret.mjs). Vastaus tulee työkalujen tiedoista, ei mallilta.
+export { DEADLINE_QUESTION };
 // Pelkkä kiitos ei muuta luonnosta eikä tulosta koko listaa uudelleen.
 const THANKS = /^(kiitos|kiitti|kiitoksia|kiitän|thx|thanks|tack)(\s+(paljon|tosi paljon|kovasti|avusta))?[\s.!]*$/iu;
 const HELP = 'Kirjoita tuotteet ja määrät, esim. "20 l laktoositonta maitoa ja 5 kg voita maanantaiksi".';
@@ -61,6 +62,11 @@ const TIME_WISH = /(?:ennen|viimeistään)\s+(?:klo|kello)\s*\d{1,2}(?:[.:]\d{2}
 const CLOCK_WORDS = /(?<![\p{L}\d])(?:(?:ennen|viimeistään)\s+)?(?:klo|kello)\s*\d{1,2}(?:[.:]\d{2})?(?:\s*(?:mennessä|asti|aikaan))?(?![\p{L}\d])|(?<![\p{L}\d])(?:aamu(?:lla|ks(?:i|een)?|päivällä|seitsemäksi|seitsemään)?|aamuun|iltapäivällä|nyt\s+heti|heti|kiire(?:esti|ellä|ellisesti|ellinen|ellistä|ellisenä)?|asap|pikaisesti|pikana|mahd(?:ollisimman)?\.?\s+pian)(?![\p{L}\d])[,!]?/giu;
 export const withoutClockWords = (text) => { const cleaned = String(text || '').replace(CLOCK_WORDS, ' ').replace(/\s{2,}/g, ' ').replace(/\s+([,.!?])/g, '$1').trim(); return cleaned || String(text || ''); };
 const RUSH_DATE_QUESTION = 'Mille päivälle toimitus? Jos on kiire, kirjoita esim. "huomenna", niin katson aikaisimman päivän, jolle ehtii.';
+// Vastaus tuotekohtaiseen laktoosikysymykseen "haluatko laktoositonta vai käykö tavallinen?" (katselmus #20).
+// "joo" ja "kyllä" vastaavat ensimmäiseen kysymykseen (laktoositon). "sopii", "ok", "hyvä" ja "käy" vastaavat viimeiseen
+// ("käykö tavallinen?"), joten ne eivät lisää vaatimusta eivätkä toista kysymystä.
+const PREF_YES = /^(?:1[.)]?|laktoosit(?:tomana|tomina|onta|on)|joo|kyllä|juu|jep|selvä)(?:[,\s]+kiitos)?[.!\s]*$/iu;
+const PREF_NO = /^(?:2[.)]?|ei|ei väliä|ei tarvitse|ei tarvi|tavallinen|tavallista|tavalliset|ihan tavallista|ihan tavalliset|normaali|normaalia|ihan normi|kumpikin käy|kaikki käy|(?:(?:joo|juu|kyllä|no)[,\s]+)?(?:ok|okei|okay|hyvä|sopii|käy|kelpaa)(?:[,\s]+(?:hyvin|se|kiitos|tavallinen|vaan|vain))*)[.!\s]*$/iu;
 const DATE_YES = /^(?:1[.)]?|kyllä|joo|juu|jep|ok|okei|sopii|vaihda|vaihdetaan|käy)(?:[,\s]+(?:kiitos|vaan|vain|sopii|käy|vaihda|vaihdetaan|se))*[.!\s]*$/iu;
 const DATE_NO = /^(?:2[.)]?|ei|ei kiitos|pidetään|pidä|ei käy)(?:[,\s]+(?:kiitos|pidetään|pidä|se|sama|päivä))*[.!\s]*$/iu;
 const addDays = (iso, n) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -223,7 +229,10 @@ function summary(draft, q, customer) {
   const warn = (ref) => { const w = draft.lines.find((l) => l.ref === ref)?.selectedWarning; return w ? `\n   Huom: ${w}` : ''; };
   const rows = q.lines.map((l, i) => `${i + 1}. ${l.name}: ${num(l.salesUnits)} ${l.salesUnitLabel}${l.covers && !(l.covers.unit === 'PCS' && l.covers.value === l.salesUnits) ? ` (${qty(l.covers)})` : ''}, ${eur(l.lineNet)}${warn(l.ref)}`);
   const diet = dietLabel(draft.diet);
-  const cutoff = q.lines.map((l) => l.cutoffLabel).filter(Boolean)[0];
+  // Tarjous vanhenee aikaisimpaan tilausaikarajaan, joten se näytetään, ei ensimmäisen rivin rajaa (katselmus #18).
+  const cutoffAt = (l) => parseApiTime(l.cutoff)?.getTime() ?? Infinity;
+  const first = q.lines.filter((l) => l.cutoffLabel || parseApiTime(l.cutoff)).sort((a, b) => cutoffAt(a) - cutoffAt(b))[0];
+  const cutoff = first ? (Number.isFinite(cutoffAt(first)) ? helsinkiLabel(first.cutoff) : first.cutoffLabel) : null;
   return [`*Tilausluonnos*, toimitus ${dateLabel(draft.deliveryDate)}${site ? `, ${site.label}` : ''}`, ...(diet ? [`Huomioitu: ${diet}`] : []), ...rows, `Yhteensä ${eur(q.totals.net)} (alv 0 %)`,
     ...(cutoff ? [`Tilattava viimeistään ${cutoff}.`] : []), ...(draft.timeWish ? [timeWishNote(draft)] : []), '', `Vahvista vastaamalla *TILAA*. ${changeHint(draft)}`].join('\n');
 }
@@ -267,7 +276,16 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
   /** opts.again = { ref, more } näyttää saman rivin listan uudelleen, opts.more hakee sille seuraavat vaihtoehdot. */
   async function advance(draft, customer, depth = 0, opts = {}) {
     draft.pending = null;
-    if (!draft.lines.length) return { status: 'collecting', text: `Luonnos on tyhjä. ${draft.deliveryDate ? HELP : START_QUESTION}` };
+    if (!draft.lines.length) {
+      // Päivä tai ruokavalio ennen tuotteita säilyy luonnoksessa (katselmus #11): kuitataan ja kysytään tuotteet.
+      const diet = dietLabel(draft.diet);
+      if (draft.state === 'active' && (draft.deliveryDate || diet)) {
+        // dateLabel päättyy jo pisteeseen ("pe 20.11.").
+        const known = [...(draft.deliveryDate ? [`Toimitus ${dateLabel(draft.deliveryDate)}`] : []), ...(diet ? [`Huomioitu: ${diet}.`] : [])].join(' ');
+        return { status: 'collecting', text: `${known} Mitä tarvitset? Kirjoita tuotteet ja määrät, esim. "20 l maitoa ja 5 kg voita"${draft.deliveryDate ? '' : ' maanantaiksi'}.` };
+      }
+      return { status: 'collecting', text: `Luonnos on tyhjä. ${draft.deliveryDate ? HELP : START_QUESTION}` };
+    }
     const list = draft.lines.map((l) => `- ${lineLabel(l)}${l.selectedName ? `: ${l.selectedName}` : ''}`).join('\n');
     const noQty = draft.lines.filter((l) => !l.quantity);
     const quantityQuestion = `Kuinka paljon: ${noQty.map((l) => l.productTerm).join(', ')}?`;
@@ -439,8 +457,8 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       } else {
         const before = content(draft);
         // Tarkennus on numeroitu kuten vaihtoehdot: 1 = laktoositon, 2 = tavallinen käy.
-        const preferenceYes = draft.pending?.kind === 'preference' && (VAGUE_YES.test(t) || /^(?:1[.)]?|laktoosit(?:tomana|tomina|onta|on))[.!\s]*$/iu.test(t));
-        const preferenceNo = draft.pending?.kind === 'preference' && /^(?:2[.)]?|ei|ei väliä|ei tarvitse|ei tarvi|tavallinen|tavallista|tavalliset|ihan tavallista|ihan tavalliset|normaali|normaalia|ihan normi|kumpikin käy|kaikki käy)[.!\s]*$/iu.test(t);
+        const preferenceNo = draft.pending?.kind === 'preference' && PREF_NO.test(t);
+        const preferenceYes = draft.pending?.kind === 'preference' && !preferenceNo && PREF_YES.test(t);
         // Kiire ja kellonaikatoive kirjataan viestistä; ne eivät muuta luonnoksen sisältöä eivätkä ole lupaus.
         const wish = t.match(TIME_WISH)?.[0];
         if (wish) { draft.timeWish = wish.slice(0, 40); draft.timeWishNoted = false; }
@@ -476,15 +494,21 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         }
         const repeatNote = last?.lines?.length ? `Kopioin edellisen tilauksen${last.orderId ? ` ${last.orderId}` : ''} tuotteet.` : '';
         // Tulkki ajetaan silti: samassa viestissä voi olla lisäyksiä ("sama ku viimeks, mut 10 l maitoa lisää").
-        const turn = dateAnswer || choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
+        const interpreted = dateAnswer || choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
           ? { op: 'update', ref, addClaims: [draft.pending.claim] } : { op: 'no_preference', ref }) }
           : await interpretTurn({ text: withoutClockWords(t), draft: structuredClone(draft), today, now: now(), receivedAt, context }));
+        // Pelkkä kysymys (tilausaikaraja, hintavertailu, vaihtoehdot uudelleen) ei lisää tuoterivejä: sääntötulkki teki
+        // jutustelusta rivejä "mirin pit tila" ja "half" (katselmus #21). Määrä viestissä tarkoittaa tilausmuutosta.
+        const questionOnly = interpreted !== dateAnswer && interpreted !== choice && (DEADLINE_QUESTION.test(t) || compareKind(t) || RELIST.test(t)) && !/\d/.test(t);
+        const turn = questionOnly ? { ...interpreted, ops: (interpreted.ops || []).filter((o) => o.op !== 'add') } : interpreted;
         const moreAsked = wantsMore || Boolean(choosing && (turn.ops || []).some((o) => o.op === 'more' && (!o.ref || o.ref === choosing.refs[0])));
         const selectedBefore = new Map(draft.lines.map((l) => [l.ref, l.selectedProductId]));
         const linesBefore = draft.lines.map((l) => ({ ref: l.ref, term: l.productTerm, noExact: !!l.noExact }));
         const notes = apply(draft, turn, customer, today);
         const removed = linesBefore.filter((b) => !draft.lines.some((l) => l.ref === b.ref));
         if (removed.length && draft.lines.length) notes.unshift(removedNote(removed));
+        // Kaikki rivit poistettu: luonnos suljetaan, myös sen päivä (pilotti X016).
+        if (linesBefore.length && !draft.lines.length) draft.state = 'cancelled';
         if (repeatNote) notes.unshift(repeatNote);
         // Pyyntö näyttää tai vertailla vaihtoehtoja jo valitulle riville: valinta avataan ja sama lista näytetään uudelleen,
         // ostaja valitsee numerolla (V025: "listaa vaihtoehdot hintoineen" toisti valitun yhteenvedon neljästi).
@@ -525,11 +549,13 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       return { ...result, draftId: draft.id, revision: draft.revision };
     }
     // Kun ostaja poistaa kaikki rivit, aiemmin tallennettu luonnos suljetaan. Muuten vanha luonnos jäisi kantaan ja
-    // vastaus "Luonnos on tyhjä" olisi väärä (pilotti X016: maito jäi listalle).
-    if (!draft.lines.length && draft.state === 'active' && store.get(draft.id)) draft.state = 'cancelled';
+    // vastaus "Luonnos on tyhjä" olisi väärä (pilotti X016: maito jäi listalle). Pelkän päivän tai ruokavalion
+    // sisältävä luonnos säilyy, jotta niitä ei kysytä uudelleen (katselmus #11).
+    if (!draft.lines.length && draft.state === 'active' && store.get(draft.id)?.lines?.length) draft.state = 'cancelled';
+    const keep = draft.lines.length || draft.state !== 'active' || draft.deliveryDate || dietLabel(draft.diet) || draft.diet.known;
     const out = { text: result.text, status: result.status, draftId: draft.id, revision: draft.revision, ...(result.orderId ? { orderId: result.orderId } : {}),
       ...(result.removedNote ? { removedNote: result.removedNote } : {}) };
-    store.save(conversationId, draft.lines.length || draft.state !== 'active' ? draft : null, messageId, out);
+    store.save(conversationId, keep ? draft : null, messageId, out);
     return out;
   };
 }

@@ -45,10 +45,11 @@ async function load() {
   const data = await request(); render(data.shoppingList);
   $('status').textContent = pending ? 'Aiemman pyynnön tulos on vielä tarkistettava. Yritä samaa pyyntöä uudelleen.' : 'WhatsAppissa kokoamasi ostoskori on ajan tasalla.';
 }
-async function send(text, review = false) {
+// confirm = vahvistuspainike. Palvelin hylkää muutoskenttään kirjoitetun vahvistuksen ("hyväksyn", "tilaa").
+async function send(text, review = false, confirm = false) {
   if (busy || (!list && !pending)) return;
   if (!pending) {
-    pending = { text, messageId: crypto.randomUUID(), expectedList: { id: list.id, revision: list.revision }, review };
+    pending = { text, messageId: crypto.randomUUID(), expectedList: { id: list.id, revision: list.revision }, review, ...(confirm ? { confirm: true } : {}) };
     try { sessionStorage.setItem(storageKey, JSON.stringify(pending)); }
     catch { pending = null; $('status').textContent = 'Salli selaimen istuntotallennus ennen tilauksen muuttamista tai vahvistamista.'; return; }
   }
@@ -80,7 +81,7 @@ async function send(text, review = false) {
   } finally { busy = false; controls(); }
 }
 $('review').addEventListener('click', () => { void send('näytä', true); });
-$('confirm').addEventListener('click', () => { if (reviewed) void send('TILAA'); });
+$('confirm').addEventListener('click', () => { if (reviewed) void send('TILAA', false, true); });
 $('retry').addEventListener('click', () => { if (pending) void send(pending.text, pending.review); });
 $('edit-form').addEventListener('submit', (event) => { event.preventDefault(); const text = $('message').value.trim(); if (text && !pending) void send(text); });
 if (token) load().catch((error) => {

@@ -17,12 +17,18 @@ const bareQuantity = (text) => {
   const unit = m && UNIT.find(([re]) => re.test(m[2]))?.[1];
   return unit ? { value: Number(m[1].replace(',', '.')), unit } : null;
 };
+// Kysymys tilausaikarajasta. Vastaus tulee työkalujen tiedoista, ei mallilta.
+export const DEADLINE_QUESTION = /(?:mihin|mihi|mihkä)\s+(?:asti|mennessä|saakka)[^?.!]*(?:tila|ehti)|(?:tila\p{L}*|ehti\p{L}*)[^?.!]*(?:mihin|mihi|mihkä)\s+(?:asti|mennessä|saakka)|takaraja|aikaraja|tilausaika(?!toive)|jättöai\p{L}*|viimeinen\s+tilaus\p{L}*|milloin\s+(?:pitää|täytyy|pitäis\p{L}*|viimeistään)(?:\s+(?:viimeistään|olla))*\s+tila|ehti\p{L}*\s+(?:vielä\s+)?tilata/iu;
+// Tilausaikarajan kysymyssanat eivät ole tuotteita: ilman tätä "mihin mennessä pitää tilata?" luettiin riviksi "mirin pit tila"
+// (katselmus #21). Sanat poistetaan vain kysymyksestä; samassa viestissä olevat tuotteet ja päivä säilyvät.
+const DEADLINE_WORDS = /(?<![\p{L}\d])(?:mihin|mihi|mihkä|mennessä|asti|saakka|milloin|viimeistään|pitää|pitäis\p{L}*|täytyy|vielä|tila(?:ta|taa|taan|tava|ttava)?|ehti\p{L}*|takaraja\p{L}*|aikaraja\p{L}*|tilausaika\p{L}*|jättöai\p{L}*|viimeinen|tilauspäivä\p{L}*)(?![\p{L}\d])/giu;
+export const withoutDeadlineWords = (text) => (DEADLINE_QUESTION.test(text) ? text.replace(DEADLINE_WORDS, ' ').replace(/\s{2,}/g, ' ').trim() : text);
 const sameTerm = (a, b) => a && b && (a.toLowerCase() === b.toLowerCase());
 
 /** @param {{understand: (text: string, opts?: object) => object}} deps Aimo-jäsennin (server/aimo/understand.mjs) */
 export function createRuleInterpreter({ understand }) {
   return async function interpretTurn({ text, draft, now }) {
-    const t = text.trim(); const pending = draft.pending; const ops = [];
+    const t = withoutDeadlineWords(text.trim()); const pending = draft.pending; const ops = [];
     if (/^(näytä|tilanne|luonnos|kori|yhteenveto)\b/i.test(t)) return { intent: 'show', deliveryDate: null, ops };
     if (pending?.kind === 'choose' && /^\d(?:[\s,]+\d)*$/.test(t)) {
       t.split(/[\s,]+/).forEach((n, i) => { if (pending.refs[i]) ops.push({ op: 'select', ref: pending.refs[i], option: Number(n) }); });

@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 — katselmuksen keskustelu- ja korisivuviat #9 #10 #11 #18 #20 #21 #23 korjattu (Claude Code, sessio C)
+
+- **Tehtävä:** koordinaattorisession jako, katselmus `docs/parallel/code-audit-2026-11-15-ilta.md`. Raportti `docs/parallel/audit-fixes-c.md`.
+- **Muutokset:** korisivun sisäiset linkit eivät enää riko korilinkkiä (#9). Kirjoitettu "hyväksyn" tai "tilaa" korisivulla ei tee tilausta, vahvistus vain vihreästä painikkeesta lipulla `confirm: true` (#10). Päivä ja ruokavalio säilyvät ilman tuotteita (#11). Yhteenveto näyttää aikaisimman tilausaikarajan (#18). "sopii", "ok", "hyvä" ja "käy" laktoosikysymykseen tarkoittavat tavallista (#20). Sääntötulkki ei tee tilausaikaraja- tai vertailukysymyksistä rivejä (#21). Hintojen vientiin 30/min-raja ja 64 paikan välimuisti (#23).
+- **Tarkistukset:** uudet testit 9/9 (ennen korjausta #11 #18 #20 #21 kaatuvat), koko `npm test` 319/319 ennen rebasea. Selainkoe eristetyllä palvelimella 1280 ja 375 px: linkit, "hyväksyn"-esto ja vahvistus toimivat, ei vaakaylivuotoa eikä JavaScript-virheitä.
+- **Avoinna:** käyttöön vasta botin restartissa (sessio E). Eeliksen uusi pyyntö toisesta chatista (yksi SIIRRY MAKSAMAAN -nappi, joka tilaa suoraan) ei sisälly tähän; se muuttaa tätä vahvistuspolkua ja jäi pyytäneelle sessiolle.
+
 ## 16.11.2026 ilta — Ostoskori-välilehti aina Toimitustukun korin näköisenä, tyhjänä ohje WhatsAppiin (Claude Code, korisivu-chat)
 
 - **Käyttäjän pyyntö:** Workers-sivuston Ostoskori-välilehdellä näkyy aina sama Valion kaupan korisivu kuin botin korilinkillä (`/whatsapp/cart`), ei erillistä "Ostoskori on vielä tyhjä" -korttia. Tyhjänä se neuvoo siirtymään tilaamaan WhatsAppissa ja kertoo, että tämä on demo: kori ilmestyy tänne vasta, kun WhatsAppissa klikataan apurin linkkiä Avaa ostoskori.

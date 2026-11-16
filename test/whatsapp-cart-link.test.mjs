@@ -98,7 +98,8 @@ async function openWhenComplete(f) {
   return linkToken(await f.whatsapp('avaa kori'));
 }
 async function startCart(f, text) { await f.whatsapp(text); return openWhenComplete(f); }
-const input = (list, text) => ({ text, messageId: crypto.randomUUID(), expectedList: version(list) });
+// Kuten korisivun vihreä painike: TILAA lähtee vahvistuslipun kanssa (katselmus #10).
+const input = (list, text) => ({ text, messageId: crypto.randomUUID(), expectedList: version(list), ...(text === 'TILAA' ? { confirm: true } : {}) });
 
 test('WhatsApp link opens the same saved basket without copying, quoting or ordering on GET; edits stay shared', async (t) => {
   const f = await fixture(t);

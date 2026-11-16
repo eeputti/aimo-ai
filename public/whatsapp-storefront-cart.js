@@ -143,10 +143,11 @@ async function load({ keepReview = false } = {}) {
 const tidy = (text, review) => text.replace(/(?:Vahvista(?: valmis)?(?: tilaus)? vastaamalla|vastaa)\s+\*?TILAA\*?(?:,\s*kun haluat tilata)?[.!]?/giu,
   review ? 'Vahvista tilaus alla olevasta vihreästä painikkeesta.' : 'Paina TARKISTA JA TILAA, kun haluat vahvistaa tilauksen.');
 const formatted = (text) => esc(text).replace(/\*([^*\n]+)\*/g, '<strong>$1</strong>');
-async function send(text, review = false) {
+// confirm = vihreä vahvistuspainike. Palvelin hylkää muutoskenttään kirjoitetun vahvistuksen ("hyväksyn", "tilaa").
+async function send(text, review = false, confirm = false) {
   if (busy || done || (!list && !pending)) return;
   if (!pending) {
-    pending = { text, messageId: crypto.randomUUID(), expectedList: { id: list.id, revision: list.revision }, review };
+    pending = { text, messageId: crypto.randomUUID(), expectedList: { id: list.id, revision: list.revision }, review, ...(confirm ? { confirm: true } : {}) };
     try { sessionStorage.setItem(storageKey, JSON.stringify(pending)); }
     catch { pending = null; tell('Salli selaimen istuntotallennus ennen tilauksen muuttamista tai vahvistamista.'); return; }
   }
@@ -212,11 +213,30 @@ document.addEventListener('error', (ev) => {
   if (img instanceof HTMLImageElement && img.closest('.cart-picture')) { img.hidden = true; img.closest('.cart-picture').classList.add('wa-noimg'); }
 }, true);
 $('wa-review').addEventListener('click', () => { void send('näytä', true); });
-$('wa-confirm').addEventListener('click', () => { if (reviewed) void send('TILAA'); });
-$('wa-retry').addEventListener('click', () => { if (pending) void send(pending.text, pending.review); });
+$('wa-confirm').addEventListener('click', () => { if (reviewed) void send('TILAA', false, true); });
+$('wa-retry').addEventListener('click', () => { if (pending) void send(pending.text, pending.review, pending.confirm === true); });
 $('wa-edit-form').addEventListener('submit', (ev) => { ev.preventDefault(); const text = $('wa-message').value.trim(); if (text && !pending) void send(text); });
-// Uusi korilinkki samassa välilehdessä vaihtaa vain fragmentin: ladataan sivu uuden linkin oikeuksilla.
-window.addEventListener('hashchange', () => location.reload());
+// Sivun sisäiset linkit (yläpalkin Ostoskori ja Toimituspäivä, ohituslinkki) vierittävät kohteeseen vaihtamatta
+// fragmenttia: siinä on korilinkin tunniste, ja sen katoaminen avasi "Korilinkki on vanhentunut" (katselmus #9).
+const keepToken = () => { if (token && location.hash.slice(1) !== token) history.replaceState(history.state, '', `${location.pathname}${location.search}#${token}`); };
+function jumpTo(id) {
+  const target = id && document.getElementById(id); if (!target) return false;
+  target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  if (!target.matches('a, button, input, select, textarea, [tabindex]')) target.setAttribute('tabindex', '-1');
+  target.focus({ preventScroll: true }); return true;
+}
+document.addEventListener('click', (ev) => {
+  const a = ev.target.closest('a[href^="#"]'); if (!a || ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+  ev.preventDefault(); jumpTo(decodeURIComponent(a.getAttribute('href').slice(1)));
+});
+// Uusi korilinkki samassa välilehdessä vaihtaa vain fragmentin: ladataan sivu uuden linkin oikeuksilla. Sivun oman
+// elementin tunniste (ei korilinkki) palauttaa nykyisen linkin osoiteriville ja vierittää kohteeseen ilman uudelleenlatausta.
+window.addEventListener('hashchange', () => {
+  const next = location.hash.slice(1);
+  if (next === token) return;
+  if (token && (!next || !next.includes('.') || document.getElementById(decodeURIComponent(next)))) { const id = decodeURIComponent(next); keepToken(); jumpTo(id); return; }
+  location.reload();
+});
 // WhatsAppista palatessa kori päivitetään. Hyväksyntä säilyy vain, jos luonnos ei muuttunut.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && token && !busy && !pending && !done) load({ keepReview: true }).catch(() => {});

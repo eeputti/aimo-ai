@@ -7,6 +7,27 @@ import { createOrderingConversation } from './index.mjs';
 import { createRuleInterpreter, createModelInterpreter } from './interpret.mjs';
 import { createOrderingTools } from '../order-tools/index.mjs';
 
+// Hintojen vienti korisivulle ja kaupan synkronoinnille: useampi välimuistipaikka, jotta eri asiakkaat ja korin versiot
+// eivät syrjäytä toisiaan, ja saman avaimen samanaikaiset pyynnöt odottavat yhtä tarjousta. Arvo on voimassa enintään
+// ttl-ajan tai tarjouksen voimassaolon loppuun. Vanhentuneet poistetaan, ja koko on rajattu (katselmus #23).
+export function createExportCache({ now = Date.now, slots = 64, ttl = 30000 } = {}) {
+  const values = new Map(); const inflight = new Map();
+  return async function cached(key, compute) {
+    const hit = values.get(key);
+    if (hit?.until > now()) return hit.value;
+    if (inflight.has(key)) return inflight.get(key);
+    const pending = (async () => {
+      const { value, expiresAt } = await compute();
+      for (const [k, v] of values) if (v.until <= now()) values.delete(k);
+      values.delete(key); values.set(key, { value, until: Math.min(now() + ttl, Number.isFinite(expiresAt) ? expiresAt : now()) });
+      while (values.size > slots) values.delete(values.keys().next().value);
+      return value;
+    })();
+    inflight.set(key, pending);
+    try { return await pending; } finally { inflight.delete(key); }
+  };
+}
+
 /** @param {{draftDb?: string, quoteDb?: string, permissions?: Function, now?: () => number}} [o] */
 export async function createConfiguredOrdering({ draftDb = ':memory:', quoteDb = ':memory:', permissions, now } = {}) {
   const [{ understand }, { askAgent, agentEnabled }, { clock }] = await Promise.all([import('../aimo/understand.mjs'), import('../aimoAgent.mjs'), import('../gateway/clock.mjs')]);
@@ -16,18 +37,16 @@ export async function createConfiguredOrdering({ draftDb = ':memory:', quoteDb =
   const rules = createRuleInterpreter({ understand });
   const interpretTurn = agentEnabled() ? createModelInterpreter({ ask: askAgent, fallback: rules }) : rules;
   const handleTurn = createOrderingConversation({ store, tools, interpretTurn, now: time });
-  const exports = new Map();
+  const cachedExport = createExportCache({ now: time });
   return { handleTurn,
     async getStorefrontCart({ conversationId, customer }) {
       const draft = store.active(conversationId); const list = shoppingListView(draft, customer);
       if (!list) return { source: `whatsapp:${customer.buyerId}`, state: 'empty', lines: [] };
       if (list.status !== 'review') return storefrontCartProjection(list, null);
-      const key = `${list.id}:${list.revision}`; const previous = exports.get(key);
-      if (previous?.until > time()) return previous.value;
-      const quote = await tools.quote({ customer, draft });
-      const value = storefrontCartProjection(list, quote);
-      exports.clear(); exports.set(key, { value, until: Math.min(time() + 30000, Date.parse(quote.expiresAt) || time()) });
-      return value;
+      return cachedExport(`${customer.customerId}:${customer.bindingVersion}:${list.id}:${list.revision}`, async () => {
+        const quote = await tools.quote({ customer, draft });
+        return { value: storefrontCartProjection(list, quote), expiresAt: Date.parse(quote.expiresAt) };
+      });
     },
     getShoppingList({ conversationId, customer }) { return shoppingListView(store.active(conversationId), customer); },
     hasTurnResult({ messageId, customer }) {

@@ -184,7 +184,7 @@ test('the WhatsApp cart link opens the storefront cart through the tunnel, price
 
   const chat = async (text, expectedList, messageId = crypto.randomUUID()) => {
     const res = await fetch(`${base}/whatsapp/cart/api/chat`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ text, messageId, expectedList }) });
+      body: JSON.stringify({ text, messageId, expectedList, ...(text === 'TILAA' ? { confirm: true } : {}) }) });
     return { status: res.status, data: await res.json(), messageId };
   };
   const review = await chat('näytä', { id: shoppingList.id, revision: shoppingList.revision });

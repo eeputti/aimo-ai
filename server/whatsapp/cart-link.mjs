@@ -4,11 +4,16 @@ import fs from 'node:fs';
 import { isDirectCartRequest, replyWithCartLink, withCartHandoffHint } from './cart-handoff.mjs';
 import { incompleteNote } from './dialogue.mjs';
 import { hasLinkAdviceReply } from './link-advice.mjs';
+import { CONFIRM } from '../order-conversation/index.mjs';
 
 const PAGE = '/whatsapp/cart';
 const API = `${PAGE}/api`;
 const TTL = 24 * 3600_000;
 export const CHAT_PER_DAY = 200;
+// Hintojen vienti tekee välimuistin ohi uuden tarjouksen (Valion hinta- ja saatavuuskutsut): raja per korilinkin
+// asiakassidos, jotta vuorotellen päivittyvät tai toistuvasti haetut korit eivät aiheuta 429-virheitä (katselmus #23).
+export const EXPORT_PER_MINUTE = 30;
+const CONFIRM_ONLY_FROM_BUTTON = 'Tilausta ei tehty. Vahvista tilaus painamalla TARKISTA JA TILAA ja sen jälkeen vihreää VAHVISTA DEMOTILAUS -painiketta.';
 const fail = (status, message) => Object.assign(new Error(message), { status });
 const unavailable = () => fail(410, 'Korilinkki on vanhentunut tai ostoskori on suljettu. Pyydä WhatsAppissa uusi linkki.');
 const assets = new Map([
@@ -44,7 +49,7 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
     throw new Error('WHATSAPP_PUBLIC_URL tarvitsee julkisen HTTPS-alkuperän ilman polkua.');
   }
   const sign = (payload) => crypto.createHmac('sha256', secret).update(`whatsapp-cart-v1\0${payload}`).digest('base64url');
-  const requests = new Map(); const daily = new Map();
+  const requests = new Map(); const daily = new Map(); const exportsPerMinute = new Map();
   const issue = (member, list) => {
     const payload = Buffer.from(JSON.stringify({ binding: member.binding, draft: list.id, expires: now() + TTL })).toString('base64url');
     return `${base.origin}${PAGE}#${payload}.${sign(payload)}`;
@@ -114,6 +119,10 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
         }
         const { member, draftId } = authenticate(req);
         if (req.method === 'GET' && url.pathname === `${API}/export`) {
+          for (const [binding, window] of exportsPerMinute) if (window.until <= now()) exportsPerMinute.delete(binding);
+          const window = exportsPerMinute.get(member.binding) || { until: now() + 60_000, count: 0 };
+          if (window.count >= EXPORT_PER_MINUTE) throw fail(429, 'Liian monta hintatarkistusta. Odota minuutti ja yritä uudelleen.');
+          window.count++; exportsPerMinute.set(member.binding, window);
           const cart = await ordering.getStorefrontCart(member, draftId);
           if (cart.id && cart.id !== draftId) throw unavailable();
           json(res, 200, cart); return true;
@@ -128,9 +137,14 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
         const input = await body(req);
         if (typeof input?.text !== 'string' || !input.text.trim() || input.text.length > 4000
             || typeof input.messageId !== 'string' || !/^[a-f0-9-]{36}$/i.test(input.messageId)
-            || input.expectedList?.id !== draftId || !Number.isSafeInteger(input.expectedList?.revision) || input.expectedList.revision < 0) {
+            || input.expectedList?.id !== draftId || !Number.isSafeInteger(input.expectedList?.revision) || input.expectedList.revision < 0
+            || (input.confirm !== undefined && typeof input.confirm !== 'boolean')) {
           throw fail(400, 'Tarkista viesti ja ostoskorin versio.');
         }
+        // Tilauksen vahvistus vain vihreästä VAHVISTA DEMOTILAUS -painikkeesta, joka näkyy TARKISTA JA TILAA -vaiheen jälkeen.
+        // Muutoskenttään kirjoitettu "hyväksyn" tai "tilaa" ei tee tilausta (katselmus #10), ja painike lähettää vain vahvistuksen.
+        const confirming = CONFIRM.test(input.text.trim());
+        if (confirming !== (input.confirm === true)) throw fail(400, confirming ? CONFIRM_ONLY_FROM_BUTTON : 'Vahvistuspainike lähettää vain tilauksen vahvistuksen.');
         const recent = requests.get(member.binding);
         const limit = recent && recent.until > now() ? recent : { until: now() + 60_000, count: 0 };
         if (limit.count >= 10) throw fail(429, 'Liian monta pyyntöä. Odota minuutti ja yritä uudelleen.');
