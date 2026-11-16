@@ -30,12 +30,12 @@ export function createExportCache({ now = Date.now, slots = 64, ttl = 30000 } = 
 
 /** @param {{draftDb?: string, quoteDb?: string, permissions?: Function, now?: () => number}} [o] */
 export async function createConfiguredOrdering({ draftDb = ':memory:', quoteDb = ':memory:', permissions, now } = {}) {
-  const [{ understand }, { askAgent, agentEnabled }, { clock }] = await Promise.all([import('../aimo/understand.mjs'), import('../aimoAgent.mjs'), import('../gateway/clock.mjs')]);
+  const [{ understand, deliveryDatesIn }, { askAgent, agentEnabled }, { clock }] = await Promise.all([import('../aimo/understand.mjs'), import('../aimoAgent.mjs'), import('../gateway/clock.mjs')]);
   const time = now || (() => clock.now().getTime());
   const store = openDraftStore(draftDb, time);
   const tools = createOrderingTools({ dbPath: quoteDb, now: time, ...(permissions ? { permissions } : {}) });
   const rules = createRuleInterpreter({ understand });
-  const interpretTurn = agentEnabled() ? createModelInterpreter({ ask: askAgent, fallback: rules }) : rules;
+  const interpretTurn = agentEnabled() ? createModelInterpreter({ ask: askAgent, fallback: rules, datesIn: deliveryDatesIn }) : rules;
   // "Sama kuin viime kerralla": saman ostajan viimeisin vahvistettu tilaus gatewaysta, hakusana tuotenimestä.
   const termOf = (name) => { const item = understand(name).items[0]; return item ? { productTerm: item.productTerm, claims: item.claims || [] } : {}; };
   const lastOrder = async (customer) => {

@@ -131,6 +131,23 @@ function extractDate(text, now) {
 }
 
 /**
+ * Kaikki viestissä mainitut toimituspäivät järjestyksessä samalla tulkinnalla kuin understand(): "huomenna", "perjantaiksi",
+ * "ma 23.11". Mallitulkki tarkistaa näillä oman päivänsä (order-conversation/interpret.mjs).
+ */
+export function deliveryDatesIn(text, opts = {}) {
+  const now = opts.now || clock.now();
+  let s = String(text || '').toLowerCase().replace(/[‐-―]/g, '-').replace(/[’'`"“”!?]/g, ' ').replace(/\s+/g, ' ');
+  const dates = [];
+  for (let i = 0; i < 5; i += 1) {
+    const d = extractDate(s, now);
+    if (!d.date) break;
+    if (!dates.includes(d.date)) dates.push(d.date);
+    s = d.rest;
+  }
+  return dates;
+}
+
+/**
  * "1 000" / "1.000" → 1000 ja englanniksi myös "1,000" → 1000, mutta "1,5" pysyy desimaalina.
  * Suomeksi pilkku on aina desimaali, ja nolla alussa ei ole koskaan tuhansia: "0,125 kg" on 0,125 kg eikä 125 kg (katselmus 15.11. #5).
  */

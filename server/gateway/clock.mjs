@@ -61,6 +61,20 @@ export const clock = {
 export function helsinkiDate(date) {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Helsinki', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
+/**
+ * Tämä päivä ja seuraavat päivät viikonpäivineen Helsingin ajassa, esim. "2026-11-18 keskiviikko huomenna".
+ * Kielimalli lukee päivät tästä eikä laske viikonpäiviä itse: pelkästä päivämäärästä se päätteli "perjantaiksi" väärin.
+ */
+export function helsinkiCalendar(now = clock.now(), days = 14) {
+  const start = helsinkiDate(now instanceof Date ? now : new Date(now));
+  const relative = ['tänään', 'huomenna', 'ylihuomenna'];
+  return Array.from({ length: days }, (_, i) => {
+    const t = new Date(`${start}T12:00:00Z`);
+    t.setUTCDate(t.getUTCDate() + i);
+    const weekday = new Intl.DateTimeFormat('fi-FI', { timeZone: 'UTC', weekday: 'long' }).format(t);
+    return [t.toISOString().slice(0, 10), weekday, relative[i]].filter(Boolean).join(' ');
+  });
+}
 export function helsinkiLabel(value) {
   const d = value instanceof Date ? value : parseApiTime(value);
   if (!d) return null;
