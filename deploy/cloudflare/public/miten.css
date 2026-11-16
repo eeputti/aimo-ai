@@ -1,0 +1,27 @@
+/* Näin se toimii: lyhyt kehotus keskustelemaan ja esimerkkiajo koodina (agent-code.css). */
+.miten-sprite{position:absolute;width:0;height:0;overflow:hidden}
+.site-main.miten{max-width:960px}
+.miten .site-lead{margin-bottom:16px;font-size:20px;color:#18354b}
+.miten-cta{display:inline-flex;align-items:center;gap:12px;padding:16px 24px;border-radius:999px;background:#1fa855;color:#fff;font-size:17px;font-weight:700;text-decoration:none;
+  box-shadow:0 10px 24px rgba(31,168,85,.28);transition:transform .15s ease,background .15s ease}
+.miten-cta:hover{background:#128c4a;transform:translateY(-1px)}
+.miten-cta:focus-visible,.miten-more:focus-visible{outline:2px solid #1668e3;outline-offset:3px}
+.miten-cta svg{width:20px;height:20px;flex-shrink:0}
+.miten-code{margin-top:48px}
+.miten-code h2{margin:0 0 4px;font-size:21px;color:#003c75}
+.miten-sub{margin:0 0 16px;font-size:14px;line-height:1.5;color:#5f7283}
+.miten-status{margin:0;padding:14px 16px;background:#fff;border-left:3px solid #1668e3;border-radius:8px;font-size:14px;line-height:1.6}
+.miten-status[hidden]{display:none}
+.code[hidden]{display:none}
+.legend{list-style:none;margin:16px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.legend li{display:flex;flex-direction:column;gap:6px;padding:14px;background:#fff;border:1px solid #dbe4eb;border-radius:14px}
+.legend code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:#24292f;overflow-wrap:anywhere}
+.legend li>span{font-size:13px;line-height:1.45;color:#5f7283}
+.legend .t-obj{color:#9a6700}
+.legend .t-fn{color:#0969da}
+.legend .t-str{color:#116329}
+.miten-more{display:inline-block;margin-top:16px;font-size:14px;font-weight:700;color:#003c75}
+@media (max-width:760px){
+  .legend{grid-template-columns:1fr}
+  .miten-code .code .code-lines{font-size:12.5px}
+}

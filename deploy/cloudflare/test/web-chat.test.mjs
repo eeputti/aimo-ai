@@ -128,7 +128,7 @@ test('the cart page is served on this site with the site tabs, and its API calls
     const html = await page.text();
     assert.equal(page.headers.get('set-cookie'), null);
     assert.equal(page.headers.get('content-security-policy'), "default-src 'none'");
-    assert.match(html, /<link rel="stylesheet" href="\/site\.css"><\/head>/);
+    assert.match(html, /<link rel="stylesheet" href="\/site\.css"><script src="\/mobile-gate\.js"><\/script><\/head>/);
     assert.match(html, /<body class="cart"><header class="site-header">.*<a href="\/ostoskori" aria-current="page">Ostoskori<\/a>.*<\/header><main>kori<\/main>/);
     const ok = await w.call('/whatsapp/cart/api/chat', { method: 'POST', headers: { origin: ORIGIN, 'content-type': 'application/json', authorization: 'Bearer cap.sig' }, body: '{"text":"näytä"}' });
     assert.equal(ok.status, 200);

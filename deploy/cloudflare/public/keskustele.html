@@ -9,7 +9,10 @@
   <title>Keskustele | Aimo-tilausapuri</title>
   <link rel="icon" href="/aimo-logo.png">
   <link rel="stylesheet" href="/site.css">
+  <script src="/mobile-gate.js"></script>
+  <link rel="stylesheet" href="/agent-code.css">
   <link rel="stylesheet" href="/keskustele.css">
+  <script type="module" src="/keskustele-live.js"></script>
   <script type="module" src="/keskustele.js"></script>
 </head>
 <body class="site-body chat-page">
@@ -42,11 +45,27 @@
    </div>
   </main>
 
-  <aside class="chat-aside" aria-labelledby="aside-title">
-    <span class="aside-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 3.5A12.4 12.4 0 0 0 5.3 22.2L3.6 28.4l6.4-1.7A12.4 12.4 0 1 0 16 3.5Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M11.6 9.6c.4 0 .8 0 1 .6l1.2 2.8c.1.3 0 .6-.1.9l-.8 1c-.2.2-.2.5 0 .8.7 1.2 2.2 2.8 3.9 3.6.3.1.6.1.8-.1l1-1.2c.2-.3.5-.3.8-.2l2.7 1.3c.3.1.5.4.5.7 0 1.4-1.3 2.6-2.7 2.6-4.6-.4-9.3-4.9-9.7-9.6 0-1.4 1-3.2 1.4-3.2Z" fill="#fff"/></svg></span>
-    <h2 id="aside-title">Kokeile WhatsAppissa</h2>
-    <p>Sama tilausapuri toimii oikeassa WhatsAppissa omalla puhelimellasi.</p>
-    <a class="aside-button" href="/#whatsapp">Kokeile WhatsAppissa täältä<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  <aside class="chat-aside" aria-label="Oikea WhatsApp ja agentin live-näkymä">
+    <div class="aside-wa">
+      <span class="aside-icon" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 3.5A12.4 12.4 0 0 0 5.3 22.2L3.6 28.4l6.4-1.7A12.4 12.4 0 1 0 16 3.5Z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="M11.6 9.6c.4 0 .8 0 1 .6l1.2 2.8c.1.3 0 .6-.1.9l-.8 1c-.2.2-.2.5 0 .8.7 1.2 2.2 2.8 3.9 3.6.3.1.6.1.8-.1l1-1.2c.2-.3.5-.3.8-.2l2.7 1.3c.3.1.5.4.5.7 0 1.4-1.3 2.6-2.7 2.6-4.6-.4-9.3-4.9-9.7-9.6 0-1.4 1-3.2 1.4-3.2Z" fill="#fff"/></svg></span>
+      <div class="aside-text">
+        <h2 id="aside-title">Kokeile oikeassa WhatsAppissa</h2>
+        <p>Sama tilausapuri toimii omalla puhelimellasi.</p>
+      </div>
+      <a class="aside-button" href="/#whatsapp">Kokeile WhatsAppissa<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+    </div>
+
+    <figure id="live" class="code live" aria-labelledby="live-title">
+      <div class="code-bar">
+        <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span id="live-title" class="code-file">tilausapuri/keskustelusi.js</span>
+        <span class="code-help">Mitä nämä tarkoittavat? <a href="/miten#koodi">Katso, miten agentti toimii</a></span>
+        <span id="live-state" class="code-state idle">ODOTTAA</span>
+      </div>
+      <div id="live-scroll" class="live-scroll">
+        <ol id="live-lines" class="code-lines" aria-label="Mitä agentti ymmärsi keskustelustasi. Päivittyy jokaisen viestin jälkeen."></ol>
+      </div>
+    </figure>
   </aside>
   </div>
 </body>

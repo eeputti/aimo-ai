@@ -57,3 +57,26 @@ header.site-header .site-tabs a:focus-visible,header.site-header .site-logo:focu
   .site-grid{grid-template-columns:1fr}
   .site-main{padding:24px 16px 40px}
 }
+
+/* Puhelimella: "Käytäthän tätä tietokoneella" kaikilla sivuilla (mobile-gate.js lisää html.phone-gate-luokan jo <head>-osassa). */
+html.phone-gate,html.phone-gate body{overflow:hidden!important}
+html.phone-gate body>*:not(.gate){visibility:hidden}
+.gate{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:24px 20px;overflow-y:auto;
+  background:linear-gradient(165deg,#e6eff8 0%,#f3f7f5 70%);font-family:Matter,Arial,Helvetica,sans-serif;color:#18354b;text-align:center}
+.gate *{box-sizing:border-box}
+.gate-card{width:100%;max-width:380px}
+.gate-art{display:block;width:min(270px,76vw);height:auto;margin:0 auto 14px;overflow:visible}
+.gate h2{margin:0 0 12px;font-family:National,Matter,Arial,sans-serif;font-weight:400;font-size:42px;line-height:.98;text-transform:uppercase;color:#003c75}
+.gate p{margin:0 0 24px;font-size:16px;line-height:1.55;color:#5f7283}
+.gate-call{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px 18px;border-radius:999px;background:#1fa855;color:#fff;
+  font-size:16px;font-weight:700;text-decoration:none;box-shadow:0 10px 22px rgba(31,168,85,.3)}
+.gate-call svg{width:20px;height:20px;flex-shrink:0}
+.gate-home{display:block;margin-top:10px;padding:12px;color:#003c75;font-size:15px;font-weight:700}
+.gate-call:focus-visible,.gate-home:focus-visible{outline:2px solid #1668e3;outline-offset:3px}
+.gate-laptop{transform-box:fill-box;animation:gate-bob 3.2s ease-in-out infinite}
+.gate-bubble{transform-box:fill-box;transform-origin:20% 100%;animation:gate-pop 3.2s ease-in-out infinite}
+.gate-phone{transform-box:fill-box;transform-origin:50% 100%;animation:gate-tilt 3.2s ease-in-out infinite}
+@keyframes gate-bob{50%{transform:translateY(-5px)}}
+@keyframes gate-pop{0%,100%{transform:scale(1)}50%{transform:scale(1.08) rotate(-3deg)}}
+@keyframes gate-tilt{0%,100%{transform:rotate(0)}50%{transform:rotate(6deg)}}
+@media (prefers-reduced-motion:reduce){.gate-laptop,.gate-bubble,.gate-phone{animation:none}}

@@ -9,34 +9,50 @@
   <title>Näin se toimii | Aimo-tilausapuri</title>
   <link rel="icon" href="/aimo-logo.png">
   <link rel="stylesheet" href="/site.css">
+  <script src="/mobile-gate.js"></script>
+  <link rel="stylesheet" href="/agent-code.css">
+  <link rel="stylesheet" href="/miten.css">
+  <script type="module" src="/miten.js"></script>
 </head>
 <body class="site-body">
+  <svg class="miten-sprite" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19 8a7.5 7.5 0 1 0 .8 6.5M19 3.5V8h-4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </svg>
   <header class="site-header"><a class="site-logo" href="/" aria-label="Aimo-tilausapurin etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="120" height="42"></a><nav class="site-tabs" aria-label="Sivut"><a href="/">Etusivu</a><a href="/keskustele">Keskustele</a><a href="/ostoskori">Ostoskori</a><a href="/miten" aria-current="page">Näin se toimii</a></nav></header>
-  <main class="site-main">
-    <p class="site-eyebrow">TILAUSAPURI</p>
-    <h1 class="site-title">Näin tilausapuri toimii.</h1>
-    <p class="site-lead">Kokki kirjoittaa omin sanoin WhatsAppissa tai tällä sivulla. Tilausapuri kokoaa ostoskorin Valion oikeista tuotteista, ja kokki vahvistaa sen itse.</p>
-    <ol class="site-steps">
-      <li><span class="n wa">1</span><strong>Viesti</strong><span>"20 litraa laktoositonta maitoa perjantaiksi", reseptilinkki tai kiiretilaus.</span></li>
-      <li><span class="n">2</span><strong>Tulkinta</strong><span>Kielimalli poimii tuotteet, määrät, toimituspäivän ja ruokavalion. Puuttuvat asiat se kysyy.</span></li>
-      <li><span class="n">3</span><strong>Tuotehaku</strong><span>Valion rajapinnasta vain toimituspäivälle tilattavat vaihtoehdot hintoineen. Kokki valitsee numerolla.</span></li>
-      <li><span class="n">4</span><strong>Ostoskori</strong><span>Sama kori näkyy kaupan ostoskorin näköisenä. Kokki tarkistaa ja vahvistaa sen itse.</span></li>
-      <li><span class="n ok">5</span><strong>Portti</strong><span>Allekirjoitettu tarjous, ostovaltuus ja päätösketju. Vasta sitten tilaus kirjataan.</span></li>
-    </ol>
-    <div class="site-grid">
-      <div class="site-card">
-        <h2>Malli ei päätä tilausta</h2>
-        <p>Kielimalli tulkitsee viestin, mutta tuotteet, hinnat, saatavuus ja tilausajat tulevat Valion rajapinnasta. Tilaus lähtee vain kokin omalla vahvistuksella ja asiakkaan ostovaltuuden rajoissa.</p>
-      </div>
-      <div class="site-card">
-        <h2>Jokainen vaihe on jäljitettävissä</h2>
-        <p>Tilausportti kirjaa tarjouspyynnöt, allekirjoitetut tarjoukset, uusintatarkistukset ja päätökset ketjuksi. Demomaksun jälkeen näet tilauksen koko jäljen.</p>
-      </div>
-    </div>
-    <div class="site-actions">
-      <a class="site-button" href="/agentti#esimerkki">Katso oikean tilauksen jälki</a>
-      <a class="site-button green" href="/keskustele">Kokeile itse</a>
-    </div>
+  <main class="site-main miten">
+    <p class="site-eyebrow">NÄIN SE TOIMII</p>
+    <h1 class="site-title">Ei varmaan tarvitse selitellä.</h1>
+    <p class="site-lead">Juttele itse täältä:</p>
+    <a class="miten-cta" href="/keskustele">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+      Keskustele tilausapurin kanssa
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+
+    <section id="koodi" class="miten-code" aria-labelledby="code-title">
+      <h2 id="code-title">Agentin ajo, rivi riviltä</h2>
+      <p class="miten-sub">Esimerkki oikeasta demotilauksesta. Keskustele-sivulla sama näkymä päivittyy omasta keskustelustasi.</p>
+      <figure id="code" class="code" hidden>
+        <div class="code-bar">
+          <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span id="code-file" class="code-file">tilausapuri/esimerkki.js</span>
+          <span id="code-state" class="code-state">VALMIS</span>
+          <button id="code-replay" class="code-replay" type="button" aria-label="Toista koodin kirjoitus alusta"><svg aria-hidden="true"><use href="#i-refresh"/></svg></button>
+        </div>
+        <ol id="code-lines" class="code-lines" aria-label="Agentin kutsut esimerkkitilauksen aikana"></ol>
+      </figure>
+      <p id="status" class="miten-status" role="status" aria-live="polite">Haetaan esimerkkiä…</p>
+
+      <ol class="legend" aria-label="Mitä rivit tarkoittavat">
+        <li><code><span class="t-obj">whatsapp</span>.<span class="t-fn">vastaanota</span>()</code><span>Kokin viestit WhatsAppista tai Keskustele-sivulta.</span></li>
+        <li><code><span class="t-obj">tulkki</span>.<span class="t-fn">ymmärrä</span>()</code><span>Kielimalli poimii tuotteet, määrät, päivän ja ruokavalion. Puuttuvat se kysyy.</span></li>
+        <li><code><span class="t-obj">tuotteet</span>.<span class="t-fn">hae</span>()</code><span>Vain toimituspäivälle tilattavat tuotteet. Kokki valitsee numerolla.</span></li>
+        <li><code><span class="t-obj">valio</span>.<span class="t-fn">post</span>()</code><span>Hinnat ja saatavuus suoraan Valion rajapinnasta.</span></li>
+        <li><code><span class="t-obj">portti</span>.<span class="t-fn">post</span>(<span class="t-str">"/v1/quotes"</span>)</code><span>Allekirjoitettu tarjous lukitsee tuotteet ja hinnat.</span></li>
+        <li><code><span class="t-obj">portti</span>.<span class="t-fn">post</span>(<span class="t-str">"/v1/orders"</span>)</code><span>Ostovaltuus ja päätösketju. Vasta sitten tilaus kirjataan.</span></li>
+      </ol>
+      <a class="miten-more" href="/agentti#esimerkki">Katso esimerkkitilauksen koko jälki</a>
+    </section>
     <p class="site-note">Demo: tilaukset eivät ole oikeita Valio-tilauksia eikä maksu veloita rahaa.</p>
   </main>
 </body>

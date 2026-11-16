@@ -4,6 +4,8 @@ const log = $('log');
 const CART = /(?:https?:\/\/[^\s/]+)?(\/whatsapp\/cart#[A-Za-z0-9_.-]+)/;
 const time = (ms = Date.now()) => new Intl.DateTimeFormat('fi-FI', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Helsinki' }).format(new Date(ms));
 let busy = false;
+// Live-näkymä (keskustele-live.js) kuuntelee nämä tapahtumat: lähetetty viesti, vastaus, virhe ja palautettu historia.
+const emit = (type, detail = {}) => document.dispatchEvent(new CustomEvent(`aimo-chat:${type}`, { detail }));
 
 function richText(text) {
   const p = document.createElement('p');
@@ -55,6 +57,7 @@ async function send(text) {
   if (!text || busy) return;
   busy = true; $('send').disabled = true; $('offline').hidden = true;
   bubble(text, true);
+  emit('sent', { text });
   $('text').value = ''; resize();
   typing(true);
   try {
@@ -65,12 +68,15 @@ async function send(text) {
     if (!response.ok) {
       if (data.code === 'offline' || data.code === 'limit') offline(data.error);
       else bubble(data.error || 'Viestin käsittely ei onnistunut. Yritä uudelleen.', false, Date.now(), 'error');
+      emit('error', { offline: data.code === 'offline' });
       return;
     }
     for (const part of data.parts || []) bubble(part, false);
+    emit('reply', { parts: data.parts || [] });
   } catch {
     typing(false);
     bubble('Yhteys katkesi. Luonnos säilyy: lähetä viesti uudelleen.', false, Date.now(), 'error');
+    emit('error', {});
   } finally { busy = false; $('send').disabled = false; $('text').focus(); }
 }
 
@@ -93,8 +99,9 @@ async function init() {
       bubble(m.text, true, m.at);
       for (const part of m.parts || []) bubble(part, false, m.at);
     }
+    emit('history', { available: data.available !== false, messages: data.messages || [] });
     if (!(data.messages || []).length) bubble('Moi! Olen Valio Aimon tilausapuri. Kerro omin sanoin, mitä keittiöön tarvitaan ja milloin, tai lähetä reseptilinkki. Kokoan ostoskorin, ja sinä vahvistat sen itse.', false);
-  } catch { offline('Tilausapuriin ei saatu yhteyttä.'); }
+  } catch { offline('Tilausapuriin ei saatu yhteyttä.'); emit('history', { available: false, messages: [] }); }
   $('text').focus();
 }
 // Puhelinkehyksen tilarivin kello (piilossa kapealla näytöllä, jossa oikea puhelin näyttää omansa).
