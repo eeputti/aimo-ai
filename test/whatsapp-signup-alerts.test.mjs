@@ -17,6 +17,9 @@ test('only one email is prepared per number while waiting, including repeat form
     const alert = scan.notifications[0];
     assert.equal(alert.to, recipient);
     assert.match(alert.text, /\+358401234567/);
+    // The number joins only with its own WhatsApp code message (audit #14); the mail says so.
+    assert.match(alert.text, /YHDISTA-koodi/);
+    assert.match(alert.html, /YHDISTA-koodi/);
     assert.equal(store.scan([{ ...signup, createdAt: 3000 }], recipient).notifications[0].key, alert.key);
     store.reserve(alert.key);
     assert.throws(() => store.reserve(alert.key), /jo varattu/);

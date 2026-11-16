@@ -124,14 +124,27 @@ export function createMetaTypingIndicator(settings, fetchImpl = fetch) {
   };
 }
 
-export function createWhatsAppChannel({ settings, store, chat, send, typing, media = null, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now, onPrune = () => {} }) {
+// Montako eri asiakasta käsitellään yhtä aikaa (audit #12). Saman numeron viestit kulkevat aina järjestyksessä.
+export function workerCount(env = process.env) {
+  const n = Number.parseInt(env.WHATSAPP_CONCURRENCY ?? '', 10);
+  return Number.isInteger(n) && n >= 1 ? Math.min(n, 16) : 4;
+}
+// A landing page code can arrive before the watcher has turned it into an invitation (cloud tick once a
+// minute): such a message is retried a few times before it is answered as unknown.
+export const SIGNUP_ATTEMPTS = 4;
+
+export function createWhatsAppChannel({ settings, store, chat, send, typing, media = null, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now, onPrune = () => {},
+  concurrency = workerCount(), typingRefreshMs = 20_000 }) {
   store.db.exec('CREATE TABLE IF NOT EXISTS wa_link_progress (message_id TEXT PRIMARY KEY, created INTEGER NOT NULL)');
-  let busy = false; let stopped = false; let timer; let active = Promise.resolve();
+  // One slow customer no longer stops the others (audit #12): up to `concurrency` jobs run at once. The store
+  // claims one job at a time atomically and never a second job of a number whose earlier job is still open.
+  let inFlight = 0; let claims = 0; let stopped = false; let timer;
+  const active = new Set(); const activePhones = new Map();
   const typingUpdates = new Map();
   const updateTyping = (id, force = false) => {
     if (!typing || stopped) return Promise.resolve();
     const prior = typingUpdates.get(id);
-    if (!force && prior && now() - prior.at < 20_000) return prior.work;
+    if (!force && prior && now() - prior.at < typingRefreshMs) return prior.work;
     let work;
     try { work = Promise.resolve(typing(id)).catch(() => {}); } catch { work = Promise.resolve(); }
     typingUpdates.set(id, { at: now(), work });
@@ -139,15 +152,26 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
     if (typingUpdates.size > 1000) typingUpdates.delete(typingUpdates.keys().next().value);
     return work;
   };
-  let lastPrune = now();
+  let lastPrune = now(); let lastWaiting = 0;
   const support = `Asiakaspalvelu: ${settings.supportContact}`;
+  // A message waiting behind a full worker pool keeps showing "typing" to its sender. A number whose
+  // earlier message is being answered already shows it from that job.
+  function refreshWaiting() {
+    if (!typing || stopped || now() - lastWaiting < Math.min(5000, typingRefreshMs)) return;
+    lastWaiting = now();
+    const busyPhones = new Set(activePhones.values());
+    for (const job of store.waiting(now() - 5 * 60_000)) {
+      if (!busyPhones.has(job.phone) && now() - job.sent_at < 23 * 3600_000) updateTyping(job.id);
+    }
+  }
   async function processNext() {
-    if (busy || stopped) return false;
-    busy = true;
+    if (stopped || inFlight >= concurrency) return false;
+    inFlight += 1;
     let job; let typingTimer; let typingUpdate = Promise.resolve();
     try {
       job = store.next();
       if (!job) return false;
+      claims += 1; activePhones.set(job.id, job.phone);
       if (now() - job.sent_at >= 23 * 3600_000) { store.finish(job.id, 'expired'); return true; }
       let reply = job.reply;
       const member = store.member(job.phone);
@@ -161,15 +185,26 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
         };
         indicate();
         // Meta clears typing on reply or after 25 seconds. Refresh only while this job is active.
-        typingTimer = setInterval(indicate, 20_000); typingTimer.unref?.();
+        typingTimer = setInterval(indicate, typingRefreshMs); typingTimer.unref?.();
       }
       if (!reply) {
         let historyBinding; let historyText; let parts;
-        if (job.kind === 'pair') {
+        if (job.kind === 'pair' || job.kind === 'signup') {
+          // The message itself comes from the number, so a code that matches this number's invitation proves it (audit #14).
           const paired = store.pair(job.phone, job.text, job.id);
+          const howTo = settings.orderingDemo ? 'Kerro tuotteet ja määrät, niin kokoan demotilausluonnoksen. Oikeaa Valio-tilausta ei lähetetä.' : 'Voit kysyä tuotteita, hintoja ja toimitusaikoja. Tämä testiversio ei tee tilauksia.';
           if (paired) job.binding = paired.binding;
-          reply = paired ? `Testiyhteys yhdistetty: ${paired.person}, ${paired.company}. ${settings.orderingDemo ? 'Kerro tuotteet ja määrät, niin kokoan demotilausluonnoksen. Oikeaa Valio-tilausta ei lähetetä.' : 'Voit kysyä tuotteita, hintoja ja toimitusaikoja. Tämä testiversio ei tee tilauksia.'}\n${support}`
-            : 'Yhdistämiskoodi on virheellinen, käytetty tai vanhentunut, tai yrityksiä on liikaa. Pyydä ylläpitäjältä uusi koodi ja tarvittaessa odota 15 minuuttia.';
+          if (!paired && job.kind === 'signup' && member) {
+            // A new sign-up of a number that already talks to the assistant: its own binding stays.
+            reply = `Numerosi on jo yhdistetty: ${member.person}, ${member.company}. ${howTo}\n${support}`;
+          } else if (!paired && job.kind === 'signup' && job.attempts < SIGNUP_ATTEMPTS) {
+            throw Object.assign(new Error('SIGNUP_NOT_READY'), { code: 'SIGNUP_NOT_READY' });
+          } else {
+            reply = paired ? `Testiyhteys yhdistetty: ${paired.person}, ${paired.company}. ${howTo}\n${support}`
+              : job.kind === 'signup'
+                ? `Yhdistämiskoodia ei löytynyt tälle numerolle. Koodi toimii vain siitä numerosta, jolla ilmoittauduit, ja vain kerran. Ilmoittaudu tarvittaessa uudelleen.\n${support}`
+                : 'Yhdistämiskoodi on virheellinen, käytetty tai vanhentunut, tai yrityksiä on liikaa. Pyydä ylläpitäjältä uusi koodi ja tarvittaessa odota 15 minuuttia.';
+          }
         } else if (!member || !job.binding) {
           reply = `Numeroasi ei ole yhdistetty asiakastiliin. Pyydä yrityksesi ylläpitäjältä yhdistämiskoodi ja lähetä: YHDISTA koodi\n${support}`;
         } else if (job.kind === 'unsupported' || ((job.kind === 'image' || job.kind === 'audio') && !media)) {
@@ -239,24 +274,46 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
       store.finish(job.id, 'done', replyId);
       return true;
     } catch (err) {
-      if (job) store.retry(job, /^META_HTTP_\d+$/.test(err.message) ? err.message : 'PROCESSING_OR_DELIVERY_ERROR');
+      if (job) {
+        if (err.code === 'SIGNUP_NOT_READY') store.retry(job, 'SIGNUP_NOT_READY', SIGNUP_ATTEMPTS);
+        else store.retry(job, /^META_HTTP_\d+$/.test(err.message) ? err.message : 'PROCESSING_OR_DELIVERY_ERROR');
+      }
       return false;
-    } finally { clearInterval(typingTimer); if (job) typingUpdates.delete(job.id); busy = false; }
+    } finally { clearInterval(typingTimer); if (job) { typingUpdates.delete(job.id); activePhones.delete(job.id); } inFlight -= 1; }
+  }
+  // Fill the free worker slots. processNext claims its job before its first await, so `claims` tells at once
+  // whether there was anything to take. A finished job wakes the pool, so the same number's next message
+  // starts without waiting for the timer.
+  function pump() {
+    while (!stopped && inFlight < concurrency) {
+      const before = claims;
+      const work = processNext();
+      // Nothing to take: that call already returned. Re-waking here would poll the database in a tight loop.
+      if (claims === before) break;
+      active.add(work);
+      work.finally(() => { active.delete(work); if (timer && !stopped) setImmediate(pump); });
+    }
   }
   return {
     processNext,
+    // Cloud: work the queue in parallel until it is empty or the time is used. Several drains in one instance share the slots.
+    async drain(budgetMs) {
+      const until = now() + budgetMs; let processed = 0;
+      const loop = async () => { while (!stopped && now() < until && await processNext()) processed += 1; };
+      await Promise.all(Array.from({ length: concurrency }, loop));
+      return processed;
+    },
     start() {
       if (timer) return;
       store.recover(); store.prune(); onPrune();
       timer = setInterval(() => {
-        if (!busy) {
-          if (now() - lastPrune >= 3600_000) { store.prune(); onPrune(); lastPrune = now(); }
-          active = processNext();
-        }
+        if (now() - lastPrune >= 3600_000) { store.prune(); onPrune(); lastPrune = now(); }
+        refreshWaiting();
+        pump();
       }, 500);
       timer.unref();
     },
-    async stop() { stopped = true; clearInterval(timer); await active; await Promise.all([...typingUpdates.values()].map((v) => v.work)); typingUpdates.clear(); },
+    async stop() { stopped = true; clearInterval(timer); await Promise.all([...active]); await Promise.all([...typingUpdates.values()].map((v) => v.work)); typingUpdates.clear(); },
     async handle(req, res, url = new URL(req.url, 'http://localhost')) {
       if (url.pathname !== '/webhooks/whatsapp') return false;
       try {
@@ -278,7 +335,7 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
         // Even if another conversation is being processed, acknowledge the new sender immediately.
         for (const id of accepted) updateTyping(id);
         // Wake a running worker immediately instead of waiting for its next 500 ms polling tick.
-        if (accepted.length && timer) setImmediate(() => { if (!busy && !stopped) active = processNext(); });
+        if (accepted.length && timer) setImmediate(() => { if (!stopped) pump(); });
         return true;
       } catch (err) { json(res, err.status || 500, { error: 'Webhook processing failed' }); return true; }
     },

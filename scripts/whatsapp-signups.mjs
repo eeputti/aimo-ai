@@ -5,11 +5,13 @@
 //     scripts/whatsapp-signups.mjs [watch | list | approve --phone +358… | remove --phone +358…]
 //
 // With Meta's test number every new number must also be added as a test recipient in Meta by hand.
-// "watch" links the number and waits; "approve" tells the landing page that WhatsApp is ready.
+// "watch" prepares an invitation for each sign-up's link code and waits; "approve" tells the landing page
+// that WhatsApp is ready. The number becomes a customer only when a WhatsApp message "YHDISTA <code>"
+// arrives from that same number (audit #14): a form alone never proves who owns a number.
 // Set WHATSAPP_SIGNUP_AUTO_READY=true once the assistant has its own registered number.
 import { execFile } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { openWhatsAppStore, codeHash, phoneNumber } from '../server/whatsapp/store.mjs';
+import { openWhatsAppStore, phoneNumber } from '../server/whatsapp/store.mjs';
 
 export const START_TEXT = 'Moi! Opeta mua tilaamaan tämän kautta.';
 export const COMMAND = 'node --env-file-if-exists=.env --env-file-if-exists=.env.whatsapp --env-file=deploy/cloudflare/.env.publisher scripts/whatsapp-signups.mjs';
@@ -29,6 +31,9 @@ export function createSignupApi({ baseUrl, token, fetch = globalThis.fetch }) {
   return {
     list: (status = 'pending') => call(`/api/signups?status=${status}`).then(b => b.signups),
     report: (phone, status, chatUrl) => call('/api/signups/result', { method: 'POST', body: JSON.stringify({ phone, status, ...(chatUrl ? { chatUrl } : {}) }) }),
+    // Link code hashes not yet turned into invitations. null = a Worker from before audit #14 without the route.
+    invites: () => call('/api/signups/invites').then(b => b.invites, err => { if (/^Worker 404/.test(err.message)) return null; throw err; }),
+    markInvited: ids => call('/api/signups/invites', { method: 'POST', body: JSON.stringify({ ids }) }),
   };
 }
 
@@ -54,40 +59,66 @@ export async function resolveChatUrl(env = process.env, fetch = globalThis.fetch
 }
 
 export function createSignupLinker({ store, api, chatUrl, autoReady = false, log = console.log, notify = () => {}, now = Date.now }) {
-  // Numbers linked from the landing page, and whether the presenter has approved them in Meta.
-  // A number paired earlier with YHDISTA is not here: it already talks to the assistant.
+  // Numbers seen from the landing page, whether the presenter has approved them in Meta, and whether the
+  // Worker has been told that the number is verified (it sent its code, or Meta verified it for the presenter).
   store.db.exec('CREATE TABLE IF NOT EXISTS landing_signups (phone TEXT PRIMARY KEY, linked_at INTEGER NOT NULL, approved_at INTEGER)');
+  if (!store.db.prepare('PRAGMA table_info(landing_signups)').all().some(c => c.name === 'verified_at')) store.db.exec('ALTER TABLE landing_signups ADD COLUMN verified_at INTEGER');
   const landing = phone => store.db.prepare('SELECT * FROM landing_signups WHERE phone=?').get(phone);
+  const remember = (phone, approved) => store.db.prepare('INSERT INTO landing_signups(phone,linked_at,approved_at) VALUES(?,?,?) ON CONFLICT(phone) DO NOTHING').run(phone, now(), approved ? now() : null);
+  // A member has proven the number when it paired with a landing code, or when the presenter approved it in Meta
+  // (Meta's code goes to that number's WhatsApp). Before audit #14 the watcher paired numbers straight from the
+  // form; those members stay as they are but are not reported as verified until the presenter approves them.
+  const proven = phone => {
+    const member = store.member(phone);
+    if (!member) return false;
+    const row = landing(phone);
+    return store.memberSource(member.binding) === 'landing' || !row || !!row.approved_at;
+  };
   const time = () => new Date(now()).toLocaleTimeString('fi-FI');
   const shownCodes = new Map();
   const announced = new Map();
+  let warnedOldWorker = false;
+  const repeats = signup => signup.signups > 1
+    ? `\n  Huom: numerolla on ${signup.signups} ilmoittautumista eri selaimista. Nimi on ensimmäisen. Varmista puhelussa, kenen numero on.` : '';
   const announce = (signup, phone) => {
     if (announced.has(phone) && announced.get(phone) === signup.createdAt) return;
     announced.set(phone, signup.createdAt);
-    log(`\n[${time()}] Odottaa Meta-vahvistusta: ${signup.name} (${signup.company}) +${phone}\n`
+    log(`\n[${time()}] Odottaa Meta-vahvistusta: ${signup.name} (${signup.company}) +${phone}${repeats(signup)}\n`
       + '  Lomake ei lähetä vahvistuskoodia. Käynnistä se itse Metassa:\n'
       + '  1. Step 1. Try it out → Recipient → Manage phone number list → Add phone number.\n'
       + '  2. Kokeilija saa koodin WhatsAppiin ja kirjoittaa sen sivulle. Syötä koodi Metaan.\n'
-      + `  3. Kun numero näkyy Metassa hyväksyttynä: ${COMMAND} approve --phone +${phone}`);
+      + `  3. Kun numero näkyy Metassa hyväksyttynä: ${COMMAND} approve --phone +${phone}\n`
+      + '  4. Numero liittyy apuriin vasta, kun kokeilija lähettää WhatsAppissa valmiin viestin, jonka lopussa on YHDISTA-koodi.');
     notify(`Demokokeilija +${phone} odottaa: käynnistä vahvistus Metassa.`);
   };
   return {
     // One pass over the waiting sign-ups. Reporting again is harmless, so a lost report is simply retried.
     async tick() {
       const results = [];
+      // Every browser's own link code becomes an invitation for that number. No member is created here.
+      const invites = await api.invites();
+      if (invites === null && !warnedOldWorker) {
+        warnedOldWorker = true;
+        log('Workerin ilmoittautumisreitti on vanha (ei /api/signups/invites): aja deploy/cloudflare/signup-verify.sql ja julkaise Worker. Uusia numeroita ei liitetä ennen sitä.');
+      }
+      const done = [];
+      for (const invite of invites || []) {
+        try {
+          const phone = phoneNumber(invite.phone);
+          // A number that is already a member keeps its binding: a new sign-up cannot replace it.
+          if (!store.member(phone)) store.inviteLanding(phone, invite.company || DEFAULT_COMPANY, invite.name, invite.codeHash, invite.expiresAt);
+        } catch { /* a malformed row is acknowledged and dropped */ }
+        done.push(invite.id);
+      }
+      if (done.length) await api.markInvited(done);
       for (const signup of await api.list('pending')) {
         let phone;
         try { phone = phoneNumber(signup.phone); } catch { await api.report(signup.phone, 'failed'); results.push({ phone: signup.phone, status: 'failed' }); continue; }
-        const known = landing(phone);
-        let status;
-        if (known) status = known.approved_at ? 'ready' : 'linked';
-        else if (store.member(phone)) status = 'ready';
-        else {
-          const invitation = store.invite(phone, signup.company || DEFAULT_COMPANY, signup.name);
-          if (!store.pair(phone, codeHash(invitation.code))) { await api.report(phone, 'failed'); results.push({ phone, status: 'failed' }); continue; }
-          store.db.prepare('INSERT INTO landing_signups VALUES(?,?,?)').run(phone, now(), autoReady ? now() : null);
-          status = autoReady ? 'ready' : 'linked';
-        }
+        // Without the invitation route a new number could never prove itself, so it keeps waiting.
+        if (!invites && !store.member(phone)) continue;
+        // A number that already talks to the assistant is ready at once and keeps its cart and history.
+        remember(phone, autoReady || !!store.member(phone));
+        const status = landing(phone).approved_at ? 'ready' : 'linked';
         await api.report(phone, status, status === 'ready' ? chatUrl : undefined);
         results.push({ phone, status, name: signup.name, company: signup.company });
         if (status === 'linked') announce(signup, phone);
@@ -97,7 +128,7 @@ export function createSignupLinker({ store, api, chatUrl, autoReady = false, log
       for (const signup of await api.list('linked')) {
         const phone = phoneNumber(signup.phone);
         // Recover an approval whose Worker report failed, including after a watcher restart.
-        if (landing(phone)?.approved_at && store.member(phone)) {
+        if (landing(phone)?.approved_at) {
           await api.report(phone, 'ready', chatUrl);
           results.push({ phone, status: 'ready' });
           continue;
@@ -106,19 +137,29 @@ export function createSignupLinker({ store, api, chatUrl, autoReady = false, log
         if (!signup.code) { announce(signup, phone); continue; }
         if (!signup.code || shownCodes.get(signup.phone) === signup.codeAt) continue;
         shownCodes.set(signup.phone, signup.codeAt);
-        log(`\n[${time()}] Metan vahvistuskoodi ${signup.phone} (${signup.name}): ${signup.code}\n`
+        const several = signup.codeSignups > 1 ? `\n  Huom: ${signup.codeSignups} selainta kirjoitti koodin tälle numerolle. Tämä on uusin; varmista puhelussa.` : '';
+        log(`\n[${time()}] Metan vahvistuskoodi ${signup.phone} (${signup.name}): ${signup.code}${several}\n`
           + '  Syötä koodi Metan Manage phone number list -ikkunaan. Kun numero näkyy vahvistettuna:\n'
           + `  ${COMMAND} approve --phone ${signup.phone}`);
         notify(`Koodi ${signup.code} numerolle ${signup.phone}: syötä Metaan ja hyväksy.`);
         results.push({ phone: signup.phone, status: 'code', code: signup.code });
       }
+      // The number has proven itself: the landing page can say so, and new sign-ups need no code.
+      if (invites) for (const { phone } of store.db.prepare('SELECT phone FROM landing_signups WHERE verified_at IS NULL').all()) {
+        if (!proven(phone)) continue;
+        await api.report(phone, 'verified');
+        store.db.prepare('UPDATE landing_signups SET verified_at=? WHERE phone=?').run(now(), phone);
+        results.push({ phone, status: 'verified' });
+        log(`[${time()}] +${phone}: yhdistetty WhatsAppissa`);
+      }
       return results;
     },
     // Only after the number is a verified Meta test recipient: the landing page then shows "Avaa WhatsApp".
+    // The number still becomes a customer only with its own YHDISTA message.
     async approve(value) {
       const phone = typed(value);
-      if (!store.member(phone)) throw new Error(`+${phone} ei ole testiasiakas. Odota, että watch liittää sen, tai tarkista numero.`);
-      store.db.prepare('INSERT INTO landing_signups VALUES(?,?,?) ON CONFLICT(phone) DO UPDATE SET approved_at=excluded.approved_at').run(phone, now(), now());
+      if (!landing(phone) && !store.member(phone)) throw new Error(`+${phone} ei ole ilmoittautunut eikä testiasiakas. Odota, että watch näkee ilmoittautumisen, tai tarkista numero.`);
+      store.db.prepare('INSERT INTO landing_signups(phone,linked_at,approved_at) VALUES(?,?,?) ON CONFLICT(phone) DO UPDATE SET approved_at=excluded.approved_at').run(phone, now(), now());
       const result = await api.report(phone, 'ready', chatUrl);
       return { phone, updated: result.updated };
     },
@@ -152,7 +193,11 @@ async function main() {
       for (const status of ['pending', 'linked', 'ready']) {
         const rows = await api.list(status);
         console.log(`${status}: ${rows.length ? '' : '-'}`);
-        for (const r of rows) console.log(`  ${r.phone}  ${r.name}, ${r.company}${r.code ? `  koodi ${r.code}` : ''}${store.member(r.phone.replace(/^\+/, '')) ? '' : '  (ei vielä testiasiakas)'}`);
+        for (const r of rows) {
+          const member = store.member(r.phone.replace(/^\+/, ''));
+          const state = !member ? '  (ei vielä testiasiakas: odottaa YHDISTA-viestiä)' : r.verified ? '' : '  (testiasiakas ilman WhatsApp-vahvistusta)';
+          console.log(`  ${r.phone}  ${r.name}, ${r.company}${r.signups > 1 ? `  ${r.signups} ilmoittautumista` : ''}${r.code ? `  koodi ${r.code}` : ''}${state}`);
+        }
       }
       return;
     }

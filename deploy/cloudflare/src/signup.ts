@@ -1,19 +1,31 @@
 // WhatsApp demo sign-up for the landing page (Meta test number phase).
-// The browser posts a phone number and gets a status token. The WhatsApp server machine polls the
-// sign-ups with the publisher token, links each number to a test customer and reports the result.
+// The browser posts a phone number and gets a status token and a one-time link code. The WhatsApp server
+// machine polls the sign-ups with the publisher token, prepares an invitation for each code and reports the
+// result. The number becomes a customer only when a WhatsApp message "YHDISTA <code>" arrives from that same
+// number: the form alone never proves who owns a number (audit #14).
 // The Worker never calls that machine. A sign-up's phone number is never returned to a browser.
 
 export type SignupEnv = Pick<Env, "DB" | "SYNC_TOKEN">;
 type Status = "pending" | "linked" | "ready" | "failed";
-type Row = { id: string; token_hash: string; phone: string; name: string; company: string; status: Status; chat_url: string | null; meta_code: string | null; code_attempts: number; created_at: number };
+type Row = { id: string; token_hash: string; phone: string; name: string; company: string; status: Status; chat_url: string | null; meta_code: string | null; code_attempts: number;
+  link_code: string | null; verified_at: number | null; created_at: number };
 
 const PATH = "/api/signups";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const STATUS_PATH = /^\/api\/signups\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/code)?$/;
 export const CODE_ATTEMPTS = 5;
 export const RETENTION_MS = 7 * 24 * 3600_000;
 export const IP_WINDOW_MS = 3600_000;
 export const IP_LIMIT = 5;
+// One number can be tried only a few times an hour, so a stranger cannot flood someone else's number.
+export const PHONE_WINDOW_MS = 3600_000;
+export const PHONE_LIMIT = 3;
 export const PENDING_LIMIT = 50;
+// The link code works only from the number it was made for, so it may stay valid as long as the sign-up row.
+export const LINK_CODE_TTL_MS = RETENTION_MS;
+// No I, L, O, 0 or 1: the code is easy to read aloud and to type. 31 symbols, 8 of them.
+export const LINK_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+export const LINK_COMMAND = "YHDISTA";
 const MAX_BODY = 2048;
 const DEFAULT_COMPANY = "Demokeittiö";
 const headers = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "referrer-policy": "no-referrer" };
@@ -28,6 +40,19 @@ export function normalizePhone(value: unknown): string | null {
   return /^\+[1-9]\d{6,14}$/.test(phone) ? phone.slice(1) : null;
 }
 
+// "abcd-efgh", "ABCD EFGH" and "ABCDEFGH" are the same code. The WhatsApp server uses the same rule.
+export function normalizeLinkCode(value: unknown): string | null {
+  const code = String(value ?? "").replace(/[\s-]/g, "").toUpperCase();
+  return /^[A-HJKMNP-Z2-9]{8}$/.test(code) ? code : null;
+}
+export const displayLinkCode = (code: string) => `${code.slice(0, 4)}-${code.slice(4)}`;
+function newLinkCode() {
+  let code = "";
+  // Rejection sampling: 248 is the largest multiple of 31 below 256, so every symbol is equally likely.
+  while (code.length < 8) for (const b of crypto.getRandomValues(new Uint8Array(16))) if (b < 248 && code.length < 8) code += LINK_ALPHABET[b % 31];
+  return code;
+}
+
 function cleanText(value: unknown, max: number) {
   const text = String(value ?? "").replace(/[\u0000-\u001f\u007f<>]/g, " ").replace(/\s+/g, " ").trim();
   return text.length <= max ? text : null;
@@ -40,6 +65,18 @@ export function validChatUrl(value: unknown) {
     const url = new URL(value);
     return url.protocol === "https:" && (url.hostname === "wa.me" || url.hostname === "api.whatsapp.com") ? url.href : null;
   } catch { return null; }
+}
+
+// The chat link keeps the agreed first message and adds the link code on its own last line, so the very
+// first message proves the number. Spaces stay %20: WhatsApp would show a "+" literally.
+export function chatUrlWithCode(chatUrl: string | null, code: string | null) {
+  if (!chatUrl || !code) return chatUrl;
+  const url = new URL(chatUrl);
+  const text = url.searchParams.get("text") || "";
+  const params = [...url.searchParams].filter(([key]) => key !== "text").map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
+  params.push(`text=${encodeURIComponent(`${text ? text + "\n" : ""}${LINK_COMMAND} ${displayLinkCode(code)}`)}`);
+  url.search = "?" + params.join("&");
+  return validChatUrl(url.href);
 }
 
 async function sha256(text: string) {
@@ -86,8 +123,13 @@ async function readJson(request: Request) {
   return value as Record<string, unknown>;
 }
 
-const view = (row: Pick<Row, "id" | "status" | "chat_url"> & { meta_code?: string | null }) =>
-  ({ id: row.id, status: row.status, chatUrl: row.status === "ready" ? row.chat_url : null, codeSent: row.status === "linked" && !!row.meta_code });
+// The code belongs to this browser's own sign-up; once the number is verified it is no longer needed.
+function view(row: Pick<Row, "id" | "status" | "chat_url"> & { meta_code?: string | null; link_code?: string | null; verified_at?: number | null }) {
+  const verified = !!row.verified_at;
+  const code = !verified && row.link_code ? row.link_code : null;
+  return { id: row.id, status: row.status, chatUrl: row.status === "ready" ? chatUrlWithCode(row.chat_url, code) : null,
+    codeSent: row.status === "linked" && !!row.meta_code, verified, linkCode: code ? displayLinkCode(code) : null };
+}
 
 // "+358 50 123 4567" for a Finnish mobile number, otherwise "+" and the digits as they are.
 export function displayPhone(digits: string) {
@@ -123,27 +165,41 @@ async function create(request: Request, env: SignupEnv, url: URL, now: number) {
 
   await env.DB.prepare("DELETE FROM signups WHERE created_at<?").bind(now - RETENTION_MS).run();
   const ip = await ipHash(env, request.headers.get("cf-connecting-ip") || "unknown");
-  const recent = await env.DB.prepare("SELECT count(*) AS n FROM signups WHERE ip_hash=? AND created_at>=?").bind(ip, now - IP_WINDOW_MS).first<{ n: number }>();
-  if ((recent?.n || 0) >= IP_LIMIT) return json({ error: "Liian monta ilmoittautumista. Yritä hetken päästä uudelleen." }, 429);
-  const waiting = await env.DB.prepare("SELECT count(*) AS n FROM signups WHERE status='pending'").first<{ n: number }>();
-  if ((waiting?.n || 0) >= PENDING_LIMIT) return json({ error: "Demo on juuri nyt täynnä. Yritä myöhemmin uudelleen." }, 503);
 
   // A number that is already approved opens WhatsApp at once; one that is linked keeps waiting for approval.
   const known = await env.DB.prepare(`SELECT status,chat_url FROM signups WHERE phone=? AND status IN ('ready','linked')
     ORDER BY CASE status WHEN 'ready' THEN 0 ELSE 1 END, updated_at DESC LIMIT 1`).bind(phone).first<{ status: Status; chat_url: string | null }>();
+  // A number that has already sent its code from WhatsApp needs no new code.
+  const verifiedAt = (await env.DB.prepare("SELECT max(verified_at) AS v FROM signups WHERE phone=?").bind(phone).first<{ v: number | null }>())?.v ?? null;
   const status: Status = known?.status === "ready" && known.chat_url ? "ready" : known ? "linked" : "pending";
   const chatUrl = status === "ready" ? known!.chat_url : null;
   const id = crypto.randomUUID();
   const token = randomToken();
-  await env.DB.prepare(`INSERT INTO signups(id,token_hash,phone,name,company,status,chat_url,ip_hash,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)`)
-    .bind(id, await sha256(token), phone, name, company || DEFAULT_COMPANY, status, chatUrl, ip, now, now).run();
-  return json({ ...view({ id, status, chat_url: chatUrl }), ...await presenterCall(env, status), token }, 201);
+  const code = verifiedAt ? null : newLinkCode();
+  // The limits are checked inside the same statement that adds the row: parallel requests cannot all pass
+  // a count taken before any of them was written (audit #14).
+  const inserted = await env.DB.prepare(`INSERT INTO signups(id,token_hash,phone,name,company,status,chat_url,ip_hash,link_code,link_hash,link_expires,verified_at,created_at,updated_at)
+    SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?
+    WHERE (SELECT count(*) FROM signups WHERE ip_hash=? AND created_at>=?) < ?
+      AND (SELECT count(*) FROM signups WHERE phone=? AND created_at>=?) < ?
+      AND (SELECT count(*) FROM signups WHERE status='pending') < ?`)
+    .bind(id, await sha256(token), phone, name, company || DEFAULT_COMPANY, status, chatUrl, ip,
+      code, code ? await sha256(code) : null, code ? now + LINK_CODE_TTL_MS : null, verifiedAt, now, now,
+      ip, now - IP_WINDOW_MS, IP_LIMIT, phone, now - PHONE_WINDOW_MS, PHONE_LIMIT, PENDING_LIMIT).run();
+  if (!inserted.meta.changes) {
+    const waiting = await env.DB.prepare("SELECT count(*) AS n FROM signups WHERE status='pending'").first<{ n: number }>();
+    const recent = await env.DB.prepare("SELECT count(*) AS n FROM signups WHERE ip_hash=? AND created_at>=?").bind(ip, now - IP_WINDOW_MS).first<{ n: number }>();
+    if ((waiting?.n || 0) >= PENDING_LIMIT && (recent?.n || 0) < IP_LIMIT) return json({ error: "Demo on juuri nyt täynnä. Yritä myöhemmin uudelleen." }, 503);
+    // The same answer for the address limit and the number limit: the page does not reveal who tried a number.
+    return json({ error: "Liian monta ilmoittautumista. Yritä hetken päästä uudelleen." }, 429);
+  }
+  return json({ ...view({ id, status, chat_url: chatUrl, link_code: code, verified_at: verifiedAt }), ...await presenterCall(env, status), token }, 201);
 }
 
 // The same answer for an unknown id and a wrong token: the routes do not reveal which sign-ups exist.
 async function own(request: Request, env: SignupEnv, id: string) {
   const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(request.headers.get("authorization") || "")?.[1];
-  const row = token ? await env.DB.prepare("SELECT id,token_hash,status,chat_url,meta_code,code_attempts FROM signups WHERE id=?").bind(id).first<Row>() : null;
+  const row = token ? await env.DB.prepare("SELECT id,token_hash,status,chat_url,meta_code,code_attempts,link_code,verified_at FROM signups WHERE id=?").bind(id).first<Row>() : null;
   return row && row.token_hash === await sha256(token!) ? row : null;
 }
 const notFound = () => json({ error: "Ilmoittautumista ei löytynyt." }, 404);
@@ -174,13 +230,43 @@ async function list(request: Request, env: SignupEnv, url: URL) {
   if (!await publisher(request, env)) return json({ error: "Ei julkaisuoikeutta." }, 401);
   const wanted = url.searchParams.get("status") || "pending";
   if (!["pending", "linked", "ready", "failed"].includes(wanted)) return json({ error: "Tuntematon tila." }, 400);
-  const rows = await env.DB.prepare(`SELECT phone,name,company,status,max(created_at) AS created_at,
+  // One row per number. The name is the first sign-up's, so a later sign-up of the same number cannot rename
+  // it in the presenter's list; "signups" and "codeSignups" show when several browsers used the same number.
+  // Newest first, so old leftover rows cannot hide new sign-ups behind the limit.
+  const rows = await env.DB.prepare(`SELECT s.phone,s.status,max(s.created_at) AS created_at,count(*) AS signups,max(s.verified_at) AS verified_at,
+    (SELECT f.name FROM signups f WHERE f.phone=s.phone AND f.status=s.status ORDER BY f.created_at,f.id LIMIT 1) AS name,
+    (SELECT f.company FROM signups f WHERE f.phone=s.phone AND f.status=s.status ORDER BY f.created_at,f.id LIMIT 1) AS company,
     (SELECT c.meta_code FROM signups c WHERE c.phone=s.phone AND c.status='linked' AND c.meta_code IS NOT NULL ORDER BY c.code_at DESC LIMIT 1) AS code,
-    (SELECT max(c.code_at) FROM signups c WHERE c.phone=s.phone AND c.status='linked') AS code_at
-    FROM signups s WHERE status=? GROUP BY phone ORDER BY created_at LIMIT 100`).bind(wanted)
-    .all<{ phone: string; name: string; company: string; status: Status; created_at: number; code: string | null; code_at: number | null }>();
+    (SELECT max(c.code_at) FROM signups c WHERE c.phone=s.phone AND c.status='linked') AS code_at,
+    (SELECT count(*) FROM signups c WHERE c.phone=s.phone AND c.status='linked' AND c.meta_code IS NOT NULL) AS code_signups
+    FROM signups s WHERE s.status=? GROUP BY s.phone ORDER BY created_at DESC LIMIT 100`).bind(wanted)
+    .all<{ phone: string; name: string; company: string; status: Status; created_at: number; signups: number; verified_at: number | null; code: string | null; code_at: number | null; code_signups: number }>();
   return json({ signups: (rows.results || []).map(r => ({ phone: "+" + r.phone, name: r.name, company: r.company, status: r.status, createdAt: r.created_at,
-    ...(r.status === "linked" && r.code ? { code: r.code, codeAt: r.code_at } : {}) })) });
+    signups: r.signups, verified: !!r.verified_at,
+    ...(r.status === "linked" && r.code ? { code: r.code, codeAt: r.code_at, codeSignups: r.code_signups } : {}) })) });
+}
+
+// Link codes the WhatsApp machine has not turned into invitations yet. Only the code's hash leaves the Worker;
+// the machine stores it and accepts "YHDISTA <code>" only from the same number.
+async function invites(request: Request, env: SignupEnv, now: number) {
+  if (!await publisher(request, env)) return json({ error: "Ei julkaisuoikeutta." }, 401);
+  const rows = await env.DB.prepare(`SELECT id,phone,name,company,link_hash,link_expires,created_at FROM signups
+    WHERE invited_at IS NULL AND verified_at IS NULL AND link_hash IS NOT NULL AND link_expires>? AND status<>'failed'
+    ORDER BY created_at LIMIT 100`).bind(now)
+    .all<{ id: string; phone: string; name: string; company: string; link_hash: string; link_expires: number; created_at: number }>();
+  return json({ invites: (rows.results || []).map(r => ({ id: r.id, phone: "+" + r.phone, name: r.name, company: r.company,
+    codeHash: r.link_hash, expiresAt: r.link_expires, createdAt: r.created_at })) });
+}
+
+async function invited(request: Request, env: SignupEnv, now: number) {
+  if (!await publisher(request, env)) return json({ error: "Ei julkaisuoikeutta." }, 401);
+  let body;
+  try { body = await readJson(request); } catch { return json({ error: "Virheellinen pyyntö." }, 400); }
+  const ids = Array.isArray(body.ids) ? body.ids.filter((id): id is string => typeof id === "string" && UUID.test(id)) : [];
+  if (!ids.length || ids.length > 100 || ids.length !== (body.ids as unknown[]).length) return json({ error: "Virheelliset tunnisteet." }, 400);
+  const changed = await env.DB.prepare(`UPDATE signups SET invited_at=?,updated_at=? WHERE invited_at IS NULL AND id IN (${ids.map(() => "?").join(",")})`)
+    .bind(now, now, ...ids).run();
+  return json({ ok: true, updated: changed.meta.changes });
 }
 
 async function result(request: Request, env: SignupEnv, now: number) {
@@ -195,6 +281,11 @@ async function result(request: Request, env: SignupEnv, now: number) {
     return json({ ok: true, updated: removed.meta.changes });
   }
   // Linked never undoes an approval and a failure only ends a sign-up that is still waiting.
+  // Verified: the number sent its link code from WhatsApp. The code is no longer needed anywhere.
+  if (body.status === "verified") {
+    const verified = await env.DB.prepare("UPDATE signups SET verified_at=?,link_code=NULL,link_hash=NULL,updated_at=? WHERE phone=? AND verified_at IS NULL").bind(now, now, phone).run();
+    return json({ ok: true, updated: verified.meta.changes });
+  }
   const statements: Record<string, string> = {
     ready: "UPDATE signups SET status='ready',chat_url=?,meta_code=NULL,updated_at=? WHERE phone=?",
     linked: "UPDATE signups SET status='linked',chat_url=NULL,updated_at=? WHERE phone=? AND status IN ('pending','failed')",
@@ -219,6 +310,8 @@ export async function handleSignup(request: Request, env: SignupEnv, now = Date.
     if (url.pathname === PATH && request.method === "POST") return await create(request, env, url, now);
     if (url.pathname === PATH && request.method === "GET") return await list(request, env, url);
     if (url.pathname === PATH + "/result" && request.method === "POST") return await result(request, env, now);
+    if (url.pathname === PATH + "/invites" && request.method === "GET") return await invites(request, env, now);
+    if (url.pathname === PATH + "/invites" && request.method === "POST") return await invited(request, env, now);
     const match = STATUS_PATH.exec(url.pathname);
     if (match && !match[2] && request.method === "GET") return await status(request, env, match[1]);
     if (match && match[2] && request.method === "POST") return await code(request, env, url, match[1], now);

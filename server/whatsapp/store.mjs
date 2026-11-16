@@ -9,6 +9,15 @@ export const MESSAGES_PER_DAY = 400;
 // Pilven yksi kutsu kestää enintään 300 s; tätä vanhempi käsittelyvaraus on keskeytynyt.
 export const PROCESSING_LEASE_MS = 6 * 60_000;
 export const codeHash = (code) => crypto.createHash('sha256').update(code.trim()).digest('hex');
+// Landing page link code (deploy/cloudflare/src/signup.ts, normalizeLinkCode): 8 symbols without I, L, O, 0, 1.
+// "abcd-efgh" and "ABCD EFGH" are the same code. Returns the canonical form, or null for anything else.
+export function landingCode(value) {
+  const code = String(value ?? '').replace(/[\s-]/g, '').toUpperCase();
+  return /^[A-HJKMNP-Z2-9]{8}$/.test(code) ? code : null;
+}
+// Itse ilmoittautuneen kutsu on voimassa yhtä kauan kuin ilmoittautuminen Workerissa.
+export const LANDING_INVITE_MAX_MS = 7 * 24 * 3600_000;
+export const LANDING_INVITES_PER_PHONE = 5;
 export function phoneNumber(value) {
   const phone = String(value || '').replace(/^\+/, '');
   if (!/^[1-9]\d{6,14}$/.test(phone)) throw new Error('Anna puhelinnumero kansainvälisessä muodossa, esimerkiksi +358401234567.');
@@ -32,7 +41,13 @@ export function openWhatsAppStore(filename, now = Date.now) {
     CREATE TABLE IF NOT EXISTS reply_parts (message_id TEXT NOT NULL, part INTEGER NOT NULL, text TEXT NOT NULL, reply_id TEXT,
       PRIMARY KEY(message_id,part));
     CREATE TABLE IF NOT EXISTS turns (seq INTEGER PRIMARY KEY, binding TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created INTEGER NOT NULL);
-    CREATE INDEX IF NOT EXISTS turns_binding ON turns(binding, seq);`);
+    CREATE INDEX IF NOT EXISTS turns_binding ON turns(binding, seq);
+    -- Landing page sign-ups: several browsers may have signed up the same number, each with its own code.
+    -- Only a WhatsApp message from that number with one of the codes makes it a member (audit #14).
+    CREATE TABLE IF NOT EXISTS landing_invites (phone TEXT NOT NULL, hash TEXT NOT NULL, company TEXT NOT NULL, person TEXT NOT NULL,
+      expires INTEGER NOT NULL, created INTEGER NOT NULL, PRIMARY KEY(phone, hash));
+    -- How a binding was made. No row = an administrator's invitation (YHDISTA code given by the team).
+    CREATE TABLE IF NOT EXISTS member_sources (binding TEXT PRIMARY KEY, source TEXT NOT NULL, created INTEGER NOT NULL);`);
   // A process may have died during a read-only model call or delivery. Saved replies are reused.
   const member = (phone) => db.prepare('SELECT * FROM members WHERE phone=?').get(phone);
   return {
@@ -48,11 +63,27 @@ export function openWhatsAppStore(filename, now = Date.now) {
       db.prepare('INSERT OR REPLACE INTO invites VALUES(?,?,?,?,?)').run(phone, company.trim().slice(0, 120), person.trim().slice(0, 120), codeHash(code), expires);
       return { code, expires };
     },
+    // The landing page sign-up's code arrives only as its hash. Until a WhatsApp message from this number
+    // carries the code, the number is not a member and cannot order.
+    inviteLanding(phone, company, person, hash, expires) {
+      phone = phoneNumber(phone);
+      if (!/^[a-f0-9]{64}$/.test(String(hash || ''))) throw new Error('Kutsun tiiviste puuttuu.');
+      if (!company?.trim() || !person?.trim()) throw new Error('Yritys ja henkilö vaaditaan.');
+      if (!Number.isSafeInteger(expires) || expires <= now()) return false;
+      db.prepare('INSERT OR REPLACE INTO landing_invites VALUES(?,?,?,?,?,?)').run(phone, hash, company.trim().slice(0, 120), person.trim().slice(0, 120),
+        Math.min(expires, now() + LANDING_INVITE_MAX_MS), now());
+      // A flood of sign-ups for one number keeps only the newest few codes.
+      db.prepare(`DELETE FROM landing_invites WHERE phone=? AND hash NOT IN (SELECT hash FROM landing_invites WHERE phone=? ORDER BY created DESC, rowid DESC LIMIT ${LANDING_INVITES_PER_PHONE})`).run(phone, phone);
+      return true;
+    },
+    memberSource(binding) { return db.prepare('SELECT source FROM member_sources WHERE binding=?').get(binding || '')?.source || 'admin'; },
     revoke(phone) {
       phone = phoneNumber(phone);
       const old = member(phone);
       db.prepare('DELETE FROM members WHERE phone=?').run(phone);
       db.prepare('DELETE FROM invites WHERE phone=?').run(phone);
+      db.prepare('DELETE FROM landing_invites WHERE phone=?').run(phone);
+      if (old) db.prepare('DELETE FROM member_sources WHERE binding=?').run(old.binding);
       if (old) db.prepare('DELETE FROM turns WHERE binding=?').run(old.binding);
       if (old && db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wa_dialogue'").get()) {
         db.prepare('DELETE FROM wa_dialogue WHERE binding=?').run(old.binding);
@@ -63,17 +94,23 @@ export function openWhatsAppStore(filename, now = Date.now) {
     },
     pair(phone, hash, jobId) {
       // Includes failed attempts; a new invitation does not bypass the attempt limit.
-      const attempts = db.prepare("SELECT count(*) n FROM inbox WHERE phone=? AND kind='pair' AND received>=?").get(phone, now() - 15 * 60_000).n;
+      const attempts = db.prepare("SELECT count(*) n FROM inbox WHERE phone=? AND kind IN ('pair','signup') AND received>=?").get(phone, now() - 15 * 60_000).n;
+      // The code must match an invitation for this very number: a code typed from another number never pairs.
       const invitation = db.prepare('SELECT * FROM invites WHERE phone=? AND hash=? AND expires>?').get(phone, hash, now());
-      if (!invitation || attempts > 5) return null;
+      const landing = !invitation && db.prepare('SELECT * FROM landing_invites WHERE phone=? AND hash=? AND expires>?').get(phone, hash, now());
+      if (!(invitation || landing) || attempts > 5) return null;
+      const chosen = invitation || landing;
       const binding = crypto.randomUUID();
       const old = member(phone);
       db.exec('BEGIN IMMEDIATE');
       try {
-        db.prepare('INSERT OR REPLACE INTO members VALUES(?,?,?,?)').run(phone, invitation.company, invitation.person, binding);
+        db.prepare('INSERT OR REPLACE INTO members VALUES(?,?,?,?)').run(phone, chosen.company, chosen.person, binding);
         db.prepare('DELETE FROM invites WHERE phone=?').run(phone);
+        db.prepare('DELETE FROM landing_invites WHERE phone=?').run(phone);
+        if (landing) db.prepare('INSERT OR REPLACE INTO member_sources VALUES(?,?,?)').run(binding, 'landing', now());
         if (jobId) db.prepare('UPDATE inbox SET binding=? WHERE id=?').run(binding, jobId);
         if (old) db.prepare('DELETE FROM turns WHERE binding=?').run(old.binding);
+        if (old) db.prepare('DELETE FROM member_sources WHERE binding=?').run(old.binding);
         db.exec('COMMIT');
       } catch (err) { db.exec('ROLLBACK'); throw err; }
       return member(phone);
@@ -83,18 +120,36 @@ export function openWhatsAppStore(filename, now = Date.now) {
       const count = (ms) => db.prepare('SELECT count(*) n FROM inbox WHERE phone=? AND received>=?').get(message.phone, now() - ms).n;
       // Kustannusraja: yksi numero ei voi käynnistää loputtomasti mallikutsuja. Tavallinen keskustelu ei osu näihin.
       if (count(60_000) >= 10 || count(3600_000) >= MESSAGES_PER_HOUR || count(86400_000) >= MESSAGES_PER_DAY) return false;
-      const pair = message.text.match(/^yhdist[aä]\s+(\S+)\s*$/iu);
+      // The landing page's chat link ends with "YHDISTA ABCD-EFGH" on its own line after the greeting.
+      // An administrator's code is still the whole message. Only the code's hash is stored.
+      // Only a typed text message can carry a code; an image or voice note is never a pairing.
+      const text = message.text || '';
+      const typed = !message.kind || message.kind === 'text';
+      const signup = typed && /(?:^|\s)yhdist[aä]\s+([a-z0-9]{4}[ \t-]?[a-z0-9]{4})\s*$/iu.exec(text);
+      const code = signup && landingCode(signup[1]);
+      const pair = typed && !code && /^yhdist[aä]\s+(\S+)\s*$/iu.exec(text);
       db.prepare('INSERT INTO inbox(id,phone,text,kind,binding,received,sent_at) VALUES(?,?,?,?,?,?,?)').run(
-        message.id, message.phone, pair ? codeHash(pair[1]) : message.text,
-        pair ? 'pair' : message.kind || 'text', member(message.phone)?.binding || null, now(), message.sentAt);
+        message.id, message.phone, code ? codeHash(code) : pair ? codeHash(pair[1]) : text,
+        code ? 'signup' : pair ? 'pair' : message.kind || 'text', member(message.phone)?.binding || null, now(), message.sentAt);
       return true;
     },
+    // Atominen varaus yhdellä lauseella (audit #12): valinta ja varaus tapahtuvat samassa kirjoituksessa, joten
+    // kaksi rinnakkaista käsittelijää (sama prosessi, toinen prosessi tai toinen pilvi-instanssi) eivät saa samaa
+    // viestiä eivätkä saman numeron seuraavaa viestiä, ennen kuin edellinen on valmis. Eri numerot kulkevat rinnakkain.
+    // next_at on käsittelyn aikaraja (recoverStale).
     next() {
-      const job = db.prepare("SELECT * FROM inbox WHERE state='pending' AND next_at<=? AND NOT EXISTS (SELECT 1 FROM inbox prior WHERE prior.phone=inbox.phone AND prior.state IN ('pending','processing') AND prior.rowid<inbox.rowid) ORDER BY received,rowid LIMIT 1").get(now());
-      if (!job) return null;
-      // Atominen varaus: toinen samaa kantaa käyttävä prosessi ei saa samaa viestiä. next_at on käsittelyn aikaraja.
-      const claimed = db.prepare("UPDATE inbox SET state='processing', attempts=attempts+1, next_at=? WHERE id=? AND state='pending'").run(now() + PROCESSING_LEASE_MS, job.id);
-      return claimed.changes ? { ...job, attempts: job.attempts + 1 } : null;
+      const at = now();
+      // An idle poll stays a plain read, as before: only a waiting message starts a write.
+      if (!db.prepare("SELECT 1 FROM inbox WHERE state='pending' AND next_at<=? LIMIT 1").get(at)) return null;
+      const job = db.prepare(`UPDATE inbox SET state='processing', attempts=attempts+1, next_at=? WHERE id=(
+        SELECT id FROM inbox WHERE state='pending' AND next_at<=? AND NOT EXISTS (SELECT 1 FROM inbox prior WHERE prior.phone=inbox.phone
+          AND prior.state IN ('pending','processing') AND prior.rowid<inbox.rowid) ORDER BY received,rowid LIMIT 1
+      ) AND state='pending' RETURNING *`).get(at + PROCESSING_LEASE_MS, at);
+      return job ? { ...job } : null;
+    },
+    // Recent messages still waiting behind another message: their sender should keep seeing "typing".
+    waiting(since) {
+      return db.prepare("SELECT id, phone, sent_at FROM inbox WHERE state='pending' AND received>=? ORDER BY received,rowid LIMIT 50").all(since).map((r) => ({ ...r }));
     },
     history(binding) {
       return db.prepare('SELECT role,content FROM (SELECT seq,role,content FROM turns WHERE binding=? ORDER BY seq DESC LIMIT 18) ORDER BY seq').all(binding).map((r) => ({ ...r }));
@@ -123,11 +178,13 @@ export function openWhatsAppStore(filename, now = Date.now) {
     },
     saveReplyPart(id, part, replyId) { db.prepare('UPDATE reply_parts SET reply_id=? WHERE message_id=? AND part=?').run(replyId, id, part); },
     finish(id, state, replyId = null) { db.prepare('UPDATE inbox SET state=?,reply_id=? WHERE id=?').run(state, replyId, id); },
-    retry(job, error) {
-      db.prepare('UPDATE inbox SET state=?,next_at=?,error=? WHERE id=?').run(job.attempts >= 3 ? 'failed' : 'pending', now() + job.attempts * 30_000, error, job.id);
+    retry(job, error, max = 3) {
+      db.prepare('UPDATE inbox SET state=?,next_at=?,error=? WHERE id=?').run(job.attempts >= max ? 'failed' : 'pending', now() + job.attempts * 30_000, error, job.id);
     },
     prune() {
       db.prepare('DELETE FROM invites WHERE expires<=?').run(now());
+      db.prepare('DELETE FROM landing_invites WHERE expires<=?').run(now());
+      db.exec('DELETE FROM member_sources WHERE binding NOT IN (SELECT binding FROM members)');
       db.prepare('DELETE FROM turns WHERE created<?').run(now() - 7 * 86400_000);
       db.prepare('DELETE FROM inbox WHERE received<?').run(now() - 7 * 86400_000);
       db.exec('DELETE FROM reply_parts WHERE message_id NOT IN (SELECT id FROM inbox)');

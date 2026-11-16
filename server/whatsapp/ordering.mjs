@@ -22,6 +22,14 @@ export function validateOrderingEnvironment(env = process.env, { cwd = process.c
   }
 }
 
+// Demo-ostajan mandaatti. Ylläpitäjän kutsuma testiasiakas saa tilata 6 000 €:oon asti ilman kuittausta.
+// Landing-sivulta itse ilmoittautunut saa pienen rajan: sen ylittävä tilaus jää odottamaan ihmisen hyväksyntää
+// (SPEND_CAP_ORDER / SPEND_CAP_DAY), vaikka numero onkin todistettu WhatsApp-viestillä (audit #14).
+export const DEMO_BUYER_LIMITS = { admin: { maxOrderNet: 6000, maxDayNet: 8000 }, landing: { maxOrderNet: 300, maxDayNet: 600 } };
+export function demoMandate(source, base) {
+  return { ...structuredClone(base), approval: 'exceptions', ...(DEMO_BUYER_LIMITS[source] || DEMO_BUYER_LIMITS.landing) };
+}
+
 export function bootstrapDemoMember(store, env = process.env) {
   if (!env.WHATSAPP_DEMO_PHONE) return;
   const phone = phoneNumber(env.WHATSAPP_DEMO_PHONE);
@@ -67,10 +75,11 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
     return { ...ordering, buyerName: (id) => buyers.byId(id)?.name, dialogue: await createConfiguredDialogue(store, { supportContact }), links: await createConfiguredLinkAdvice(store), ensureBuyer(customer) {
       const member = store.db.prepare('SELECT * FROM members WHERE binding=?').get(customer.bindingVersion);
       if (member && resolveBuyer(member).mapped && !buyers.byId(customer.buyerId)) throw new Error('Valittua demoasiakasta ei löydy. Alusta kaupan asiakas ennen numeroliitosta.');
+      const source = store.memberSource?.(customer.bindingVersion) || 'admin';
       if (!buyers.byId(customer.buyerId)) buyers.save({
-        id: customer.buyerId, name: customer.companyName, kind: 'WhatsApp-testiasiakas',
+        id: customer.buyerId, name: customer.companyName, kind: source === 'landing' ? 'WhatsApp-kokeilija (itse ilmoittautunut)' : 'WhatsApp-testiasiakas',
         apiKey: crypto.randomBytes(32).toString('hex'), approver: 'Testaaja',
-        mandate: { ...structuredClone(DEFAULT_MANDATE), approval: 'exceptions', maxOrderNet: 6000, maxDayNet: 8000 },
+        mandate: demoMandate(source, DEFAULT_MANDATE),
       });
     } };
   });
