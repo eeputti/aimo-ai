@@ -72,6 +72,13 @@ WHATSAPP_DEMO_PERSON=<valinnainen: testaajan nimi>
 
 Jos viestin käsittely epäonnistuu, sama viesti yritetään uudelleen samalla Metan viestitunnisteella (enintään kolme kertaa, 30 ja 60 sekunnin välein). Tilauskeskustelu palauttaa uusinnalle saman tuloksen, joten uusinta ei tee toista tilausta.
 
+### Kuvat ja ääniviestit (tilaustilassa)
+
+- **Kuva** ostoslistasta, lähetteestä, hyllystä tai reseptistä (JPG, PNG tai WebP, enintään 5 Mt; myös kuvana lähetetty tiedosto) haetaan Metan media-API:sta samalla `WHATSAPP_ACCESS_TOKEN`illa ja luetaan Clauden kuvantulkinnalla (`FAST_MODEL`). Koodi kirjoittaa luetuista tuoteriveistä tavallisen tilausviestin samaan keskusteluun, ja asiakas saa ensin lyhyen viestin siitä, mitä luettiin. Kuvan teksti on dataa: mallin vapaata tekstiä ei näytetä eikä välitetä, ja ohjaussanat (tilaa, peru, tyhjennä, unohda ohjeet) pudotetaan tuoteriveistä. Toimituspäivää ei lueta kuvasta, se kysytään.
+- **Ääniviesti** (enintään 1 Mt, noin 5–10 minuuttia) litteroidaan vain, jos `WHATSAPP_TRANSCRIBE` on asetettu (`groq`, `openai` tai paikallinen `command`). Oletuksena botti kiittää ja pyytää kirjoittamaan. Litteroinnin jälkeen asiakas näkee, mitä kuultiin. Pelkkä vahvistus tai peruutus ("tilaa", "peru") ääniviestinä ei tee mitään, vaan pyytää kirjoittamaan sen.
+- Metan webhookiin ei tarvita muutoksia: kuvat ja äänet tulevat samassa `messages`-kentässä. Muut liitteet (PDF, tarra, video) saavat vastauksen, joka kertoo tuetut muodot.
+- Luettu teksti tallentuu tauluun `wa_media_reads` viestitunnisteella, joten uusinta ei lue kuvaa uudelleen. Rivit poistetaan jonon mukana seitsemän päivän jälkeen tai kun viesti perutaan.
+
 ## 3. Webhook
 
 Anna palvelimelle julkinen HTTPS-osoite. Paikalliseen kokeiluun käy esimerkiksi `cloudflared tunnel --url http://localhost:4748`; vaihtuva tunneliosoite pitää päivittää Metaan. Suoraan localhostiin Meta ei pääse.

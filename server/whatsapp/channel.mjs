@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { phoneNumber } from './store.mjs';
 import { messageLinks } from './link-reader.mjs';
+import { mediaMessage } from './media.mjs';
 
 const same = (a, b) => crypto.timingSafeEqual(crypto.createHash('sha256').update(a).digest(), crypto.createHash('sha256').update(b).digest());
 const json = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
@@ -35,7 +36,9 @@ export function extractMessages(payload, phoneId, now = Date.now()) {
         const phone = phoneNumber(m.from); const sentAt = Number(m.timestamp) * 1000;
         if (typeof m.id !== 'string' || m.id.length > 250 || !m.id || !Number.isFinite(sentAt) || sentAt > now + 300_000 || sentAt < now - 23 * 3600_000) continue;
         const supported = m.type === 'text' && typeof m.text?.body === 'string' && m.text.body.trim().length > 0 && m.text.body.length <= 4000;
-        messages.push({ id: m.id, phone, sentAt, kind: supported ? 'text' : 'unsupported', text: supported ? m.text.body.trim() : '' });
+        // Kuva ja ääniviesti jonoon tunnisteena; tiedosto haetaan Metalta vasta käsittelyssä (media.mjs).
+        const media = mediaMessage(m);
+        messages.push({ id: m.id, phone, sentAt, ...(media || { kind: supported ? 'text' : 'unsupported', text: supported ? m.text.body.trim() : '' }) });
       } catch { /* malformed or unsupported sender */ }
     }
   }
@@ -121,7 +124,7 @@ export function createMetaTypingIndicator(settings, fetchImpl = fetch) {
   };
 }
 
-export function createWhatsAppChannel({ settings, store, chat, send, typing, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now, onPrune = () => {} }) {
+export function createWhatsAppChannel({ settings, store, chat, send, typing, media = null, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now, onPrune = () => {} }) {
   store.db.exec('CREATE TABLE IF NOT EXISTS wa_link_progress (message_id TEXT PRIMARY KEY, created INTEGER NOT NULL)');
   let busy = false; let stopped = false; let timer; let active = Promise.resolve();
   const typingUpdates = new Map();
@@ -161,7 +164,7 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, pau
         typingTimer = setInterval(indicate, 20_000); typingTimer.unref?.();
       }
       if (!reply) {
-        let historyBinding; let parts;
+        let historyBinding; let historyText; let parts;
         if (job.kind === 'pair') {
           const paired = store.pair(job.phone, job.text, job.id);
           if (paired) job.binding = paired.binding;
@@ -169,13 +172,25 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, pau
             : 'Yhdistämiskoodi on virheellinen, käytetty tai vanhentunut, tai yrityksiä on liikaa. Pyydä ylläpitäjältä uusi koodi ja tarvittaessa odota 15 minuuttia.';
         } else if (!member || !job.binding) {
           reply = `Numeroasi ei ole yhdistetty asiakastiliin. Pyydä yrityksesi ylläpitäjältä yhdistämiskoodi ja lähetä: YHDISTA koodi\n${support}`;
-        } else if (job.kind === 'unsupported') {
-          reply = 'Lähetä enintään 4000 merkin tekstiviesti. Tämä testiversio ei käsittele kuvia, ääniviestejä tai liitteitä.';
-        } else if (/^(apua|tuki|asiakaspalvelu|help)$/iu.test(job.text)) {
+        } else if (job.kind === 'unsupported' || ((job.kind === 'image' || job.kind === 'audio') && !media)) {
+          reply = media ? `Käsittelen tekstiviestit${media.enabled.audio ? ', ääniviestit' : ''} ja kuvat ostoslistasta tai lähetteestä. Kirjoita tilaus viestinä tai lähetä kuva (enintään 4000 merkkiä tekstiä).`
+            : 'Lähetä enintään 4000 merkin tekstiviesti. Tämä testiversio ei käsittele kuvia, ääniviestejä tai liitteitä.';
+        } else if (job.kind === 'text' && /^(apua|tuki|asiakaspalvelu|help)$/iu.test(job.text)) {
           reply = `${settings.orderingDemo ? 'Olen Valio Aimo Tilausapurin demo. Kerro tarvitsemasi tuotteet ja määrät, niin kokoan hyväksyttävän luonnoksen.' : 'Olen Aimon tuoteapuri. Voin hakea tuotteita, hintoja ja toimitusaikoja.'} Kiireelliset toimitusongelmat ja tilausmuutokset hoitaa asiakaspalvelu.\n${support}`;
         } else {
+          let input = job.text; let note = ''; let label = job.text;
           try {
-            if (settings.orderingDemo && messageLinks(job.text).length) {
+            if (job.kind === 'image' || job.kind === 'audio') {
+              // Kuvan tai litteroinnin teksti kulkee samaan tilauskeskusteluun kuin kirjoitettu viesti.
+              const read = await media.read(job);
+              if (read.reply) reply = read.reply; else ({ input, note, history: label } = read);
+            }
+          } catch (err) {
+            if (job.attempts < 3) throw err;
+            reply = `${job.kind === 'audio' ? 'Ääniviestin' : 'Kuvan'} lukeminen ei nyt onnistunut. Kirjoita tilaus viestinä tai lähetä ${job.kind === 'audio' ? 'viesti' : 'kuva'} hetken kuluttua uudelleen.\n${support}`;
+          }
+          if (!reply) try {
+            if (settings.orderingDemo && messageLinks(input).length) {
               // Reserve before delivery: a worker retry must not repeat the waiting message.
               // This cosmetic receipt is separate from the durable final reply and its history.
               store.db.prepare('DELETE FROM wa_link_progress WHERE created<?').run(now() - 7 * 86400_000);
@@ -185,12 +200,14 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, pau
               }
               if (store.member(job.phone)?.binding !== job.binding) { store.finish(job.id, 'cancelled'); return true; }
             }
-            const result = await chat({ messages: [...store.history(member.binding), { role: 'user', content: job.text }], channel: 'whatsapp',
+            const result = await chat({ messages: [...store.history(member.binding), { role: 'user', content: input }], channel: 'whatsapp',
               member, messageId: job.id, receivedAt: job.sent_at });
             parts = replyChunks(Array.isArray(result.messages) && result.messages.length ? result.messages : [result.text]);
+            if (!parts.length) throw new Error('EMPTY_REPLY');
+            // Ensin oma lyhyt viesti siitä, mitä kuvasta luettiin tai ääniviestistä kuultiin, jotta asiakas voi tarkistaa sen.
+            if (note) parts.unshift(note);
             reply = parts.join('\n\n');
-            if (!reply) throw new Error('EMPTY_REPLY');
-            historyBinding = member.binding;
+            historyBinding = member.binding; historyText = label;
           } catch (err) {
             // Ordering turns are idempotent by Meta message id: retry the same turn instead of guessing whether
             // an order was saved. Only the last attempt answers, and it makes no claim about the order.
@@ -202,7 +219,8 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, pau
         }
         // Recheck after a slow model call: a revoked identity must not receive its result.
         if (job.binding && store.member(job.phone)?.binding !== job.binding) { store.finish(job.id, 'cancelled'); return true; }
-        store.saveReply(job, reply, historyBinding, parts || replyChunks([reply]));
+        // Historiaan luettu teksti, ei median tunnistetta.
+        store.saveReply(historyText ? { ...job, text: historyText } : job, reply, historyBinding, parts || replyChunks([reply]));
       }
       // Finish the last status request before replying, so a slow typing update cannot arrive after the answer.
       clearInterval(typingTimer); await typingUpdate;

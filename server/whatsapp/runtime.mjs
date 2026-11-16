@@ -9,6 +9,9 @@ import { createCartLink } from './cart-link.mjs';
 import { createStorefrontCartPage } from './storefront-cart.mjs';
 import { withDemoCheckout, handleDemoCheckoutAsset } from './checkout.mjs';
 import { createWebChat } from './web-chat.mjs';
+import { createMediaReader, createMetaMediaFetcher } from './media.mjs';
+import { createConfiguredTranscriber } from './transcribe.mjs';
+import { llmEnabled } from '../config.mjs';
 
 export const whatsappDbPath = () => process.env.WHATSAPP_DB || fileURLToPath(new URL('../../data/whatsapp.db', import.meta.url));
 export function whatsappSettings(env = process.env) {
@@ -38,8 +41,11 @@ export function createConfiguredWhatsApp() {
   const cartLink = ordering ? createCartLink({ store, ordering, baseUrl: process.env.WHATSAPP_PUBLIC_URL, secret: settings.appSecret }) : null;
   // Korilinkin sivu kaupan ostoskorin ulkoasulla. Vain staattiset tiedostot; API pysyy cartLinkissä.
   const storefrontCart = cartLink ? createStorefrontCartPage() : null;
-  const channel = createWhatsAppChannel({ settings, store, chat: cartLink?.chat || ordering?.chat || replyToAssistant,
-    onPrune: () => ordering?.prune(), send: createMetaSender(settings), typing: createMetaTypingIndicator(settings) });
+  // Kuvat ja ääniviestit vain tilaustilassa. Ääniviestit tarvitsevat erikseen valitun litterointipalvelun (transcribe.mjs).
+  const media = ordering && process.env.WHATSAPP_MEDIA !== 'false' ? createMediaReader({ db: store.db, fetchMedia: createMetaMediaFetcher(settings),
+    vision: llmEnabled(), transcriber: createConfiguredTranscriber() }) : null;
+  const channel = createWhatsAppChannel({ settings, store, chat: cartLink?.chat || ordering?.chat || replyToAssistant, media,
+    onPrune: () => { ordering?.prune(); media?.prune(); }, send: createMetaSender(settings), typing: createMetaTypingIndicator(settings) });
   // Selaindemo on olemassa vain tilaustilassa, jolloin kannat ovat eristetyt.
   const webDemo = ordering ? createWebDemo({ store, chat: ordering.chat }) : null;
   // Workers-sivuston selainkeskustelu: vain WEBCHAT_SECRETin tunteva Worker voi kutsua.
@@ -48,7 +54,7 @@ export function createConfiguredWhatsApp() {
   const shoppingLists = ordering ? createShoppingListHandoff({ store, ordering, defaultPhone: process.env.WHATSAPP_DEMO_PHONE }) : null;
   return { ...channel, store,
     // Pilviversio siivoaa ajastetusti, koska siellä ei ole start()-silmukkaa.
-    prune() { store.prune(); ordering?.prune(); },
+    prune() { store.prune(); ordering?.prune(); media?.prune(); },
     async handle(req, res, url = new URL(req.url, 'http://localhost')) { return (cartLink ? handleDemoCheckoutAsset(req, res, url) : false) || (storefrontCart ? storefrontCart.handle(req, res, url) : false) || (cartLink ? await cartLink.handle(req, res, url) : false) || (webChat ? await webChat.handle(req, res, url) : false) || (await channel.handle(req, res, url)) || (shoppingLists ? await shoppingLists.handle(req, res, url) : false) || (webDemo ? webDemo.handle(req, res, url) : false); },
     async close() {
       try { await channel.stop(); await ordering?.close(); }
