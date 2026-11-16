@@ -56,6 +56,6 @@
 
 ## Rajat ja jatko
 
-- Rinnakkaisuus tekee samanaikaisista eri asiakkaiden tilauksista todennäköisempiä. Tilausnumeron kilpajuoksu (#6) on B:n työtä; ilmoitettu taululla.
+- Rinnakkaisuus tekee samanaikaisista eri asiakkaiden tilauksista todennäköisempiä. B vahvisti, että sen korjaus 6a764ce kattaa tämän: tilausnumero varataan yhdellä atomisella lauseella ennen ensimmäistä awaitia, ja tallennus on synkroninen BEGIN IMMEDIATE -transaktio. `audit-fixes-b` ja `audit-fixes-d` menevät läpi yhdessä mainissa a74054b (B:n ajo, 15/15). H vahvisti, että kuvien ja ääniviestien `media.read` pysyy ennen mallikutsua.
 - Selainkeskustelun synteettiset asiakkaat (`web-chat.mjs`) saavat yhä ylläpitäjän 6 000 €:n mandaatin. Ne eivät ole oikeita numeroita, mutta raja kannattaa harkita samoin.
 - Oikeaa ilmoittautumista, Metan testivastaanottajaa tai puhelimesta lähetettyä YHDISTA-viestiä ei ajettu. Kulku on testattu oikeilla moduuleilla ja simuloidulla Workerilla ja Metalla.
