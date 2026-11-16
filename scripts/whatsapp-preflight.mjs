@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { createConfiguredTranscriber } from '../server/whatsapp/transcribe.mjs';
 
 export const ROOT = fileURLToPath(new URL('../', import.meta.url));
 
@@ -97,6 +98,13 @@ export function checkWhatsAppEnvironment(env = process.env, { cwd = process.cwd(
     } catch { error('SIGNING_KEY', 'GATEWAY_PRIVATE_KEY_PEM tai pysyvän data-hakemiston Ed25519-avain ei ole käyttökelpoinen.'); }
     if (!value('ANTHROPIC_API_KEY')) warn('RULE_INTERPRETER', 'Kielimalli ei ole asetettu: keskustelu tulkitaan säännöillä.');
     if (!value('VALIO_API_KEY')) warn('SIMULATED_PRICES', 'VALIO_API_KEY puuttuu: hinnat ja saatavuus simuloidaan.');
+    if (env.WHATSAPP_MEDIA && !['true', 'false'].includes(env.WHATSAPP_MEDIA)) error('MEDIA_FLAG', 'WHATSAPP_MEDIA on true tai false ilman välilyöntejä.');
+    // Litterointiasetus tarkistetaan ennen käynnistystä ilman verkkokutsua: puuttuva avain pysäyttäisi botin (transcribe.mjs).
+    if (env.WHATSAPP_MEDIA !== 'false') {
+      try {
+        if (!createConfiguredTranscriber(env)) warn('NO_VOICE', 'WHATSAPP_TRANSCRIBE puuttuu: ääniviestejä ei litteroida, botti pyytää kirjoittamaan.');
+      } catch (err) { error('TRANSCRIBE', err.message); }
+    }
     if (value('DEMO_NOW')) {
       const normalized = value('DEMO_NOW').replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
       if (!/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?)?$/.test(normalized) || Number.isNaN(Date.parse(normalized))) error('DEMO_CLOCK', 'DEMO_NOW tarvitsee ISO-päivämäärän tai aikaleiman.');

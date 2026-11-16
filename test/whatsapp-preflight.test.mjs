@@ -32,7 +32,7 @@ test('preflight reads local configuration without creating databases and keeps s
   const result = check();
   assert.equal(result.ok, true);
   assert.equal(result.catalogProducts, 1);
-  assert.deepEqual(result.warnings.map((w) => w.code), ['RULE_INTERPRETER', 'SIMULATED_PRICES']);
+  assert.deepEqual(result.warnings.map((w) => w.code), ['RULE_INTERPRETER', 'SIMULATED_PRICES', 'NO_VOICE']);
   assert.equal(fs.existsSync(path.join(root, 'isolated')), false);
   for (const json of [false, true]) {
     const out = formatPreflight(result, json);
@@ -162,4 +162,18 @@ test('real standalone service restarts with the same membership, reply, draft an
   }
   assert.equal(fs.existsSync(path.join(root, 'data/gateway.db')), false);
   assert.equal(fs.existsSync(path.join(root, 'data/aimo.db')), false);
+});
+
+test('preflight tarkistaa ääniviestien litterointiasetuksen ennen käynnistystä tulostamatta avainta', (t) => {
+  const { check } = fixture(t);
+  const groqNoKey = check({ WHATSAPP_TRANSCRIBE: 'groq' });
+  assert.equal(groqNoKey.ok, false);
+  assert.match(groqNoKey.errors.find((e) => e.code === 'TRANSCRIBE').message, /GROQ_API_KEY/);
+  const groq = check({ WHATSAPP_TRANSCRIBE: 'groq', GROQ_API_KEY: 'gsk-private-fixture' });
+  assert.equal(groq.ok, true);
+  assert.equal(groq.warnings.some((w) => w.code === 'NO_VOICE'), false);
+  for (const json of [false, true]) assert.equal(formatPreflight(groq, json).includes('gsk-private-fixture'), false);
+  assert.equal(check({ WHATSAPP_TRANSCRIBE: 'whisperx' }).errors.some((e) => e.code === 'TRANSCRIBE'), true);
+  assert.equal(check({ WHATSAPP_MEDIA: 'false', WHATSAPP_TRANSCRIBE: 'groq' }).ok, true, 'media pois: litterointia ei käytetä');
+  assert.equal(check({ WHATSAPP_MEDIA: 'yes' }).errors.some((e) => e.code === 'MEDIA_FLAG'), true);
 });

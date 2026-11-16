@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 — Ääniviestien litterointiin Groq, avain puuttuu vielä (Claude Code, sessio H)
+
+- **Käyttäjän päätös:** Eelis valitsi ääniviestien litterointipalveluksi Groqin (whisper-large-v3-turbo, noin 0,0007 USD/min, suomi tuettu, ei säilytä ääntä). Vertailu `docs/parallel/whatsapp-media-reorder.md`.
+- **Tila:** koodi tukee jo Groqia (1c49398). Käyttöön tarvitaan Eeliksen oma Groq-avain: `WHATSAPP_TRANSCRIBE=groq` ja `GROQ_API_KEY` `.env.whatsapp`-tiedostoon (0600) sekä pilven ympäristöön, sitten botin restart (sessio E, Eeliksen luvalla). Avainta ei luotu eikä lisätty tässä chatissa. Ilman avainta ääniviestit pysyvät "kirjoita tekstinä" -tilassa.
+- **Muutos:** `scripts/whatsapp-preflight.mjs` tarkistaa litterointiasetuksen ennen käynnistystä ilman verkkokutsua: `WHATSAPP_TRANSCRIBE=groq` ilman `GROQ_API_KEY`:tä tai tuntematon palvelu pysäyttää käynnistyksen selkeällä virheellä ennen kuin botti kaatuu, puuttuva asetus on vain huomautus (NO_VOICE), ja `WHATSAPP_MEDIA` tarkistetaan. Avain ei näy tulosteessa.
+- **Tarkistukset:** `test/whatsapp-preflight.test.mjs` 7/7 (uusi testi asetusyhdistelmille). Oikeaa Groq-kutsua ei ole tehty; ensimmäinen ääniviesti puhelimella avaimen lisäämisen jälkeen on varsinainen koe.
+
 ## 16.11.2026 — WhatsApp: kuvat ostoslistasta ja lähetteestä, ääniviestit vaihdettavalla litteroinnilla, "sama kuin viime kerralla" gatewaysta (Claude Code, sessio H)
 
 - **Käyttäjän pyyntö:** Eelis pyysi tekemään kaikki jäljellä olevat työt rinnakkain; tavoite on DM Champin kaltainen apuri Valion datalla, virallisella Cloud API:lla. Sessio H: kuva ostoslistasta, lähetteestä tai hyllystä, ääniviestit ja "sama kuin viime kerralla".
