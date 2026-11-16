@@ -3,77 +3,60 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-// Run the shipped browser script against controlled network responses and DOM events.
-function page() {
-  const elements = new Map(), tasks = new Map(), requests = [];
-  let taskId = 0;
-  const element = id => {
-    if (!elements.has(id)) elements.set(id, { value: '', hidden: true, checked: false, disabled: false, listeners: {},
-      addEventListener(event, fn) { this.listeners[event] = fn; }, removeAttribute() {}, setAttribute() {}, focus() {}, blur() {} });
-    return elements.get(id);
-  };
-  const document = { hidden: false, activeElement: null, getElementById: element, querySelectorAll: () => [], addEventListener() {} };
-  const context = vm.createContext({ document, Date, localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-    setTimeout(fn) { const id = ++taskId; tasks.set(id, fn); return id; }, clearTimeout(id) { tasks.delete(id); },
-    fetch(url, init) { return new Promise(resolve => requests.push({ url, init, resolve })); } });
-  vm.runInContext(fs.readFileSync(new URL('../public/landing.js', import.meta.url), 'utf8'), context);
-  const submit = (id) => element(id).listeners.submit({ preventDefault() {} });
-  const register = async (id = 'first', extra = {}) => {
-    element('phone').value = '0401234567'; element('name').value = 'Test'; element('consent').checked = true;
-    const action = submit('signup-form');
-    requests.at(-1).resolve(Response.json({ id, token: id, status: 'linked', ...extra })); await action;
-  };
-  const nextPoll = () => { const [id, fn] = tasks.entries().next().value; tasks.delete(id); return fn(); };
-  return { element, requests, register, nextPoll, submit };
+const read = (path) => fs.readFileSync(new URL(path, import.meta.url), 'utf8');
+
+// Run the shipped landing script against a minimal DOM: the button and the contact panel.
+function page(hash = '') {
+  const listeners = {}, windowListeners = {};
+  const button = { attributes: {}, setAttribute(k, v) { this.attributes[k] = v; }, addEventListener(e, fn) { listeners[e] = fn; } };
+  const panel = { hidden: true, scrolled: 0, focused: 0, scrollIntoView() { this.scrolled++; }, focus() { this.focused++; } };
+  const location = { hash };
+  const context = vm.createContext({
+    document: { getElementById: (id) => ({ 'wa-toggle': button, whatsapp: panel })[id] },
+    window: { addEventListener(e, fn) { windowListeners[e] = fn; } },
+    location,
+  });
+  vm.runInContext(read('../public/landing.js'), context);
+  return { button, panel, click: () => listeners.click(), navigate(h) { location.hash = h; windowListeners.hashchange(); } };
 }
 
-test('a linked number explains manual verification and submitting a code never claims approval', async () => {
-  const p = page(); await p.register();
-  assert.match(p.element('status-detail').textContent, /tämä lomake ei lähetä koodia/);
-  assert.equal(p.element('open-whatsapp').hidden, true);
-  p.element('code').value = '12345';
-  const action = p.submit('code-form');
-  p.requests.at(-1).resolve(Response.json({ status: 'linked', codeSent: true })); await action;
-  assert.equal(p.element('status-title').textContent, 'Koodi toimitettu Aimo-tiimille');
-  assert.equal(p.element('open-whatsapp').hidden, true);
-  const polling = p.nextPoll();
-  p.requests.at(-1).resolve(new Response('', { status: 503 })); await polling;
-  assert.equal(p.element('status-title').textContent, 'Koodi toimitettu Aimo-tiimille');
+test('Kokeile WhatsAppissa opens and closes the contact panel', () => {
+  const p = page();
+  assert.equal(p.panel.hidden, true);
+  p.click();
+  assert.equal(p.panel.hidden, false);
+  assert.equal(p.button.attributes['aria-expanded'], 'true');
+  assert.equal(p.panel.focused, 1);
+  p.click();
+  assert.equal(p.panel.hidden, true);
+  assert.equal(p.button.attributes['aria-expanded'], 'false');
 });
 
-test('changing number during a pending request keeps the new registration polling and ignores the old response', async () => {
-  const p = page(); await p.register('first');
-  const oldPoll = p.nextPoll(), oldRequest = p.requests.at(-1);
-  p.element('restart').listeners.click();
-  await p.register('second');
-  const newPoll = p.nextPoll(), newRequest = p.requests.at(-1);
-  assert.equal(newRequest.url, '/api/signups/second');
-  oldRequest.resolve(Response.json({ status: 'ready', chatUrl: 'https://wa.me/358400000000' })); await oldPoll;
-  assert.equal(p.element('open-whatsapp').hidden, true);
-  newRequest.resolve(Response.json({ status: 'ready', chatUrl: 'https://wa.me/358400000001' })); await newPoll;
-  assert.equal(p.element('open-whatsapp').hidden, false);
-  assert.equal(p.element('open-whatsapp').href, 'https://wa.me/358400000001');
+test('the browser chat link /#whatsapp opens the panel on arrival and on a hash change', () => {
+  const arrived = page('#whatsapp');
+  assert.equal(arrived.panel.hidden, false);
+  assert.equal(arrived.panel.scrolled, 1);
+  const later = page();
+  later.navigate('#muu');
+  assert.equal(later.panel.hidden, true);
+  later.navigate('#whatsapp');
+  assert.equal(later.panel.hidden, false);
 });
 
-test('a waiting number gets a call button to the presenter that disappears once WhatsApp is ready', async () => {
-  const p = page(); await p.register('first', { status: 'pending', call: { tel: '+358501112223', display: '+358 50 111 2223' } });
-  assert.equal(p.element('call').hidden, false);
-  assert.equal(p.element('call').href, 'tel:+358501112223');
-  assert.equal(p.element('call-number').textContent, '+358 50 111 2223');
-  assert.equal(p.element('status-title').textContent, 'Soita tai laita viesti Eelikselle');
-  assert.match(p.element('status-detail').textContent, /hyväksyttää numerosi/);
-  assert.equal(p.element('message').hidden, false);
-  assert.equal(p.element('message').href, 'https://wa.me/358501112223?text=' + encodeURIComponent('Hei Eelis! Lisäsin numeroni Aimon WhatsApp-tilausapuriin nimellä Test. Voitko hyväksyä sen?'));
-  const polling = p.nextPoll();
-  p.requests.at(-1).resolve(Response.json({ status: 'ready', chatUrl: 'https://wa.me/358400000000' })); await polling;
-  assert.equal(p.element('call').hidden, true);
-  assert.equal(p.element('message').hidden, true);
-  assert.equal(p.element('open-whatsapp').hidden, false);
+test('the landing page has no sign-up form, only the call instruction for Eelis', () => {
+  const html = read('../index.html');
+  assert.doesNotMatch(html, /<form|<input|signup/i);
+  assert.match(html, /<a href="tel:\+358503260441">050 326 0441<\/a>/);
+  assert.match(html, /Olethan yhteydessä Eelikseen!/);
+  assert.ok(html.indexOf('Kokeile heti selaimessa') < html.indexOf('Kokeile WhatsAppissa'));
+  assert.doesNotMatch(html, /href="\/tilaukset"/);
 });
 
-test('a malformed presenter number from the server is never turned into a link', async () => {
-  const p = page(); await p.register('first', { call: { tel: 'javascript:alert(1)', display: 'x' } });
-  assert.equal(p.element('call').hidden, true);
-  assert.equal(p.element('message').hidden, true);
-  assert.match(p.element('status-detail').textContent, /tämä lomake ei lähetä koodia/);
+test('the browser chat has no ready-made quick replies and links to WhatsApp on the landing page', () => {
+  const html = read('../public/keskustele.html');
+  assert.doesNotMatch(html, /data-text=|id="quick"/);
+  assert.match(html, /class="aside-button" href="\/#whatsapp"/);
+  assert.match(html, /class="notice-wa" href="\/#whatsapp"/);
+  assert.doesNotMatch(html, /href="\/tilaukset"/);
+  assert.doesNotMatch(read('../public/keskustele.js'), /\$\('quick'\)/);
 });

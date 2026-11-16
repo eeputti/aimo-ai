@@ -1,20 +1,36 @@
-/* WhatsAppin näköinen keskustelu. Värit WhatsAppin vaaleasta teemasta, otsikko Aimon sinisellä. */
-.chat-page{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;background:#dfe7ea}
+/* WhatsAppin näköinen keskustelu puhelinkehyksessä. Värit WhatsAppin vaaleasta teemasta, otsikko Aimon sinisellä.
+   Kapealla näytöllä (oikea puhelin) kehys ja tilarivi pois, keskustelu täyttää ruudun. */
+.chat-page{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden;background:#e6eef2}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.phone{flex:1;min-height:0;display:flex;flex-direction:column;width:100%;max-width:560px;margin:16px auto;background:#efeae2;border-radius:18px;overflow:hidden;box-shadow:0 12px 40px rgba(0,60,117,.15)}
+.chat-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:56px;padding:20px 16px}
+.phone{position:relative;flex-shrink:0;display:flex;width:390px;max-width:100%;height:100%;max-height:844px;padding:11px;border-radius:58px;background:#101c26;
+  box-shadow:inset 0 0 0 2px #3a4954,0 30px 60px rgba(0,40,80,.25),0 4px 12px rgba(0,40,80,.12)}
+.phone::before,.phone::after{content:"";position:absolute;width:4px;border-radius:2px;background:#26343f}
+.phone::before{right:-4px;top:190px;height:86px}
+.phone::after{left:-4px;top:150px;height:56px;box-shadow:0 74px 0 #26343f}
+.screen{flex:1;min-width:0;display:flex;flex-direction:column;border-radius:47px;overflow:hidden;background:#efeae2}
+.phone-status{position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;height:46px;padding:4px 28px 0 34px;background:#003c75;color:#fff}
+.phone-time{font-size:15px;font-weight:700;letter-spacing:.2px}
+.phone-island{position:absolute;left:50%;top:11px;width:112px;height:30px;border-radius:20px;background:#000;transform:translateX(-50%)}
+.phone-icons{display:flex;align-items:center;gap:5px}
+.phone-icons svg{height:11px;width:auto;fill:currentColor}
+.phone-home{flex-shrink:0;height:22px;background:#f0f2f5;position:relative}
+.phone-home::after{content:"";position:absolute;left:50%;top:8px;width:132px;height:5px;border-radius:3px;background:#111b21;transform:translateX(-50%)}
 .wa-top{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#003c75;color:#fff}
 .avatar{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:#fff;overflow:hidden;flex-shrink:0}
 .avatar img{width:34px;height:auto}
 .who{flex:1;min-width:0;display:flex;flex-direction:column}
 .who strong{font-size:16px}
 .who span{font-size:12px;opacity:.85}
-.wa-cart{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;text-decoration:none;font-size:13px;font-weight:700}
+.wa-cart{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;text-decoration:none;font-size:13px;font-weight:700}
 .wa-cart svg,.wa-reset svg{width:20px;height:20px}
+.wa-cart span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .wa-reset{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:50%;background:none;color:#fff;cursor:pointer}
 .wa-reset:hover,.wa-cart:hover{background:rgba(255,255,255,.22)}
 .wa-log{flex:1;min-height:0;overflow-y:auto;padding:12px 14px 8px;display:flex;flex-direction:column;gap:6px;overscroll-behavior:contain}
 .wa-day{align-self:center;margin:2px 0 6px;padding:4px 10px;border-radius:8px;background:#fff;font-size:12px;color:#54656f;box-shadow:0 1px 1px rgba(0,0,0,.06)}
 .wa-notice{align-self:center;max-width:92%;margin-bottom:6px;padding:8px 12px;border-radius:8px;background:#ffeecd;color:#54656f;font-size:12px;line-height:1.45;text-align:center}
+.notice-wa{display:none;margin-top:6px;color:#128c4a;font-weight:700}
 .msg{display:flex}
 .msg.me{justify-content:flex-end}
 .bubble{position:relative;max-width:82%;padding:7px 9px 5px;border-radius:9px;background:#fff;box-shadow:0 1px 1px rgba(0,0,0,.08);font-size:15px;line-height:1.42;color:#111b21}
@@ -32,17 +48,35 @@
 @media (prefers-reduced-motion:reduce){.typing i{animation:none}}
 .wa-offline{margin:0 10px 6px;padding:10px 12px;border-radius:10px;background:#fff3d6;color:#7a4b00;font-size:13px;line-height:1.45}
 .wa-offline a{color:#003c75;font-weight:700}
-.wa-quick{display:flex;gap:6px;padding:4px 10px 6px;overflow-x:auto;scrollbar-width:none}
-.wa-quick::-webkit-scrollbar{display:none}
-.wa-quick button{flex-shrink:0;padding:8px 12px;border:1px solid #c9d7e3;border-radius:999px;background:#fff;color:#003c75;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
-.wa-quick button:hover{background:#e6eff8}
 .wa-composer{display:flex;align-items:flex-end;gap:8px;padding:8px 10px 10px;background:#f0f2f5}
 .wa-composer textarea{flex:1;min-width:0;max-height:120px;padding:11px 14px;border:0;border-radius:22px;background:#fff;font:inherit;font-size:15px;line-height:1.35;resize:none;color:#111b21}
 .wa-composer textarea:focus{outline:2px solid #1668e3}
 .wa-composer button{display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;border:0;border-radius:50%;background:#1fa855;color:#fff;cursor:pointer}
 .wa-composer button svg{width:20px;height:20px}
 .wa-composer button:disabled{opacity:.5;cursor:wait}
+/* Puhelimen vieressä: vie etusivun WhatsApp-ohjeeseen. */
+.chat-aside{width:280px;flex-shrink:0;text-align:left;color:#18354b}
+.aside-icon{display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:#25d366;box-shadow:0 8px 20px rgba(37,211,102,.3)}
+.aside-icon svg{width:34px;height:34px}
+.chat-aside h2{margin:20px 0 10px;font-family:National,'Arial Narrow',sans-serif;font-weight:400;font-size:40px;line-height:1;color:#003c75}
+.chat-aside p{margin:0 0 22px;font-size:15px;line-height:1.55;color:#5f7283}
+.aside-button{display:inline-flex;align-items:center;gap:10px;padding:14px 20px;border-radius:999px;background:#1fa855;color:#fff;font-size:15px;font-weight:700;text-decoration:none}
+.aside-button:hover{background:#128c4a}
+.aside-button svg{width:18px;height:18px}
+.aside-button:focus-visible,.notice-wa:focus-visible{outline:2px solid #1668e3;outline-offset:3px}
+@media (max-width:900px){
+  .chat-aside{display:none}
+  .notice-wa{display:block}
+}
+@media (max-height:640px) and (min-width:601px){
+  .phone{border-radius:44px;padding:9px}
+  .screen{border-radius:36px}
+  .phone-status{height:36px}
+  .phone-island{top:7px;height:24px;width:96px}
+}
 @media (max-width:600px){
-  .phone{margin:0;border-radius:0;max-width:none;box-shadow:none}
-  .wa-cart span{display:none}
+  .chat-stage{padding:0}
+  .phone{width:100%;max-width:none;max-height:none;padding:0;border-radius:0;background:none;box-shadow:none}
+  .phone::before,.phone::after,.phone-status,.phone-home{display:none}
+  .screen{border-radius:0}
 }

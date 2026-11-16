@@ -46,7 +46,7 @@ function typing(on) {
 function offline(message) {
   const box = $('offline');
   box.replaceChildren(document.createTextNode(`${message} `));
-  const a = document.createElement('a'); a.href = '/'; a.textContent = 'Pyydä oikea WhatsApp-kokeilu →';
+  const a = document.createElement('a'); a.href = '/#whatsapp'; a.textContent = 'Kokeile WhatsAppissa →';
   box.append(a); box.hidden = false;
 }
 
@@ -78,7 +78,6 @@ function resize() { const t = $('text'); t.style.height = 'auto'; t.style.height
 $('text').addEventListener('input', resize);
 $('text').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); void send($('text').value); } });
 $('composer').addEventListener('submit', (e) => { e.preventDefault(); void send($('text').value); });
-$('quick').addEventListener('click', (e) => { const b = e.target.closest('button[data-text]'); if (b) void send(b.dataset.text); });
 $('reset').addEventListener('click', async () => {
   if (busy) return;
   await fetch('/api/chat/reset', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(() => {});
@@ -98,4 +97,7 @@ async function init() {
   } catch { offline('Tilausapuriin ei saatu yhteyttä.'); }
   $('text').focus();
 }
+// Puhelinkehyksen tilarivin kello (piilossa kapealla näytöllä, jossa oikea puhelin näyttää omansa).
+function clock() { $('clock').textContent = time(); }
+clock(); setInterval(clock, 30_000);
 void init();

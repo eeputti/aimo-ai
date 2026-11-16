@@ -14,7 +14,7 @@
   <script type="module" src="/landing.js"></script>
 </head>
 <body>
-  <header class="site-header"><a class="site-logo" href="/" aria-label="Aimo-tilausapurin etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="120" height="42"></a><nav class="site-tabs" aria-label="Sivut"><a href="/" aria-current="page">Etusivu</a><a href="/keskustele">Keskustele</a><a href="/ostoskori">Ostoskori</a><a href="/miten">Näin se toimii</a><a href="/tilaukset">Tilaukset</a></nav></header>
+  <header class="site-header"><a class="site-logo" href="/" aria-label="Aimo-tilausapurin etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="120" height="42"></a><nav class="site-tabs" aria-label="Sivut"><a href="/" aria-current="page">Etusivu</a><a href="/keskustele">Keskustele</a><a href="/ostoskori">Ostoskori</a><a href="/miten">Näin se toimii</a></nav></header>
   <main class="page">
     <div class="marks" role="img" aria-label="Valio Aimo ja WhatsApp">
       <img class="logo" src="/aimo-logo.png" alt="Valio Aimo" width="152" height="53">
@@ -42,44 +42,10 @@
     <a class="button try" href="/keskustele"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>Kokeile heti selaimessa</a>
     <p class="try-note">Sama tilausapuri, WhatsAppin näköisenä tällä sivulla. Ei numeroa, ei odottelua.</p>
 
-    <h2 class="card-title">Pyydä oikea WhatsApp-kokeilu Eelikseltä</h2>
-    <div class="card">
-      <form id="signup-form" novalidate>
-        <label for="phone">Puhelinnumero</label>
-        <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+358 40 123 4567" required>
-        <label for="name">Nimi</label>
-        <input id="name" name="name" autocomplete="name" maxlength="60" required>
-        <p class="signup-help">Testidemossa numerosi hyväksytään käsin. Lähetä numerosi, ja soita tai laita sen jälkeen Eelikselle viesti, niin hän hyväksyttää numerosi WhatsAppiin.</p>
-        <label class="consent"><input id="consent" name="consent" type="checkbox" required><span>Numeroani saa käyttää tämän demon WhatsApp-keskusteluun. Tiedot poistetaan viimeistään 7 päivän kuluttua.</span></label>
-        <p id="form-error" class="error" role="alert" hidden></p>
-        <button id="submit" class="button" type="submit">Aloita WhatsAppissa</button>
-      </form>
-
-      <div id="status" class="status" hidden aria-live="polite">
-        <ol class="track" aria-label="Vaiheet">
-          <li data-step="received">Numero vastaanotettu</li>
-          <li data-step="call">Soita tai laita viesti Eelikselle</li>
-          <li data-step="approved">Hyväksytty WhatsAppiin</li>
-          <li data-step="ready">Valmis keskusteluun</li>
-        </ol>
-        <h2 id="status-title">Lisätään numeroasi apuriin</h2>
-        <p id="status-detail">Tämä kestää yleensä muutaman sekunnin.</p>
-        <a id="call" class="button call" href="#" hidden>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15.2 15.2 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2Z" fill="currentColor"/></svg>
-          <span class="call-text"><span class="call-name">Soita Eelikselle</span><span id="call-number" class="call-number"></span></span>
-        </a>
-        <a id="message" class="button message" href="#" target="_blank" rel="noopener noreferrer" hidden>
-          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3.5A12.4 12.4 0 0 0 5.3 22.2L3.6 28.4l6.4-1.7A12.4 12.4 0 1 0 16 3.5Z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/></svg>
-          <span class="call-name">Laita viesti Eelikselle</span>
-        </a>
-        <form id="code-form" class="code-form" hidden novalidate>
-          <label for="code">Jos sait Metalta vahvistuskoodin, kirjoita se tähän</label>
-          <div class="code-row"><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="9" placeholder="12345"><button id="code-submit" class="button" type="submit">Toimita koodi</button></div>
-          <p id="code-error" class="error" role="alert" hidden></p>
-        </form>
-        <a id="open-whatsapp" class="button whatsapp" href="#" target="_blank" rel="noopener noreferrer" hidden>Avaa WhatsApp</a>
-        <button id="restart" class="link" type="button">Käytä toista numeroa</button>
-      </div>
+    <button id="wa-toggle" class="button whatsapp-try" type="button" aria-expanded="false" aria-controls="whatsapp"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3.5A12.4 12.4 0 0 0 5.3 22.2L3.6 28.4l6.4-1.7A12.4 12.4 0 1 0 16 3.5Z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M11.6 9.6c.4 0 .8 0 1 .6l1.2 2.8c.1.3 0 .6-.1.9l-.8 1c-.2.2-.2.5 0 .8.7 1.2 2.2 2.8 3.9 3.6.3.1.6.1.8-.1l1-1.2c.2-.3.5-.3.8-.2l2.7 1.3c.3.1.5.4.5.7 0 1.4-1.3 2.6-2.7 2.6-4.6-.4-9.3-4.9-9.7-9.6 0-1.4 1-3.2 1.4-3.2Z" fill="currentColor"/></svg>Kokeile WhatsAppissa</button>
+    <div id="whatsapp" class="wa-contact" tabindex="-1" hidden>
+      <span class="contact-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6.6 10.8a15.2 15.2 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2Z" fill="currentColor"/></svg></span>
+      <p>Olethan yhteydessä Eelikseen! Voit soittaa Eelikselle <a href="tel:+358503260441">050 326 0441</a>, niin annetaan sinulle mahdollisuus jutella WhatsAppissa tämän Aimo-tilausapurin kanssa!</p>
     </div>
 
     <p class="foot">Junction 2026 -demo. Tilaukset eivät ole oikeita Valio-tilauksia.</p>

@@ -90,7 +90,7 @@ async function proxy(request: Request, url: URL, origin: string) {
 
 export function siteHeader(current: string) {
   const tabs: [string, string, string][] = [["etusivu", "/", "Etusivu"], ["keskustele", "/keskustele", "Keskustele"], ["ostoskori", "/ostoskori", "Ostoskori"],
-    ["miten", "/miten", "Näin se toimii"], ["tilaukset", "/tilaukset", "Tilaukset"]];
+    ["miten", "/miten", "Näin se toimii"]];
   return `<header class="site-header"><a class="site-logo" href="/" aria-label="Aimo-tilausapurin etusivu"><img src="/aimo-logo.png" alt="Valio Aimo" width="120" height="42"></a><nav class="site-tabs" aria-label="Sivut">${
     tabs.map(([id, href, label]) => `<a href="${href}"${id === current ? ' aria-current="page"' : ""}>${label}</a>`).join("")}</nav></header>`;
 }
@@ -136,8 +136,8 @@ export async function handleWebChat(request: Request, env: WebChatEnv): Promise<
     if (!origin) return unavailable();
     const id = current || newSession();
     const setCookie: Record<string, string> = current ? {} : { "set-cookie": cookie(id, secure) };
-    if (!await count(env, "*", CHAT_PER_DAY)) return json({ error: "Selainkokeilun päiväraja täyttyi. Pyydä oikea WhatsApp-kokeilu etusivulta.", code: "limit" }, 429, setCookie);
-    if (!await count(env, id, CHAT_PER_SESSION_DAY)) return json({ error: `Tämän selaimen ${CHAT_PER_SESSION_DAY} viestin päiväraja täyttyi. Pyydä oikea WhatsApp-kokeilu etusivulta.`, code: "limit" }, 429, setCookie);
+    if (!await count(env, "*", CHAT_PER_DAY)) return json({ error: "Selainkokeilun päiväraja täyttyi. Kokeile WhatsAppissa: ohje on etusivulla.", code: "limit" }, 429, setCookie);
+    if (!await count(env, id, CHAT_PER_SESSION_DAY)) return json({ error: `Tämän selaimen ${CHAT_PER_SESSION_DAY} viestin päiväraja täyttyi. Kokeile WhatsAppissa: ohje on etusivulla.`, code: "limit" }, 429, setCookie);
     let reply;
     try { reply = await callBot(origin, env, "chat", { session: id, text, messageId: input.messageId }); }
     catch { return unavailable(); }
