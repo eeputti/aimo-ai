@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { PERSONAS, REGRESSIONS, inspectPersona, parseOptions } from '../eval/whatsapp-personas.mjs';
 import { inspectConversation } from '../eval/whatsapp-selfplay-cases.mjs';
-import { costUsd, modelOf, restoreTurns, summarize, loadCases, CASE_SETS } from '../scripts/whatsapp-selfplay-batch.mjs';
+import { costUsd, modelOf, simTierFromEnv, restoreTurns, summarize, loadCases, CASE_SETS } from '../scripts/whatsapp-selfplay-batch.mjs';
 import { EXTENDED, SLOTS, earliestDate } from '../eval/whatsapp-personas-extended.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -157,6 +157,23 @@ test('kustannusarvio käyttää mallikohtaisia hintoja ja yhteenveto listaa virh
   const md = summarize(results, { calls: 10, failed: 0, input: 100, output: 50, cacheRead: 0, orders: 0, ms: 60000, personaMs: 60000, assistantMs: 30000, byPurpose: { whatsapp_order_turn: { calls: 10, input: 100, output: 50, cacheRead: 0 } } },
     { created: 'x', commit: 'abc', dirty: [], snapshotHash: '0'.repeat(64), deepModel: 'claude-opus-5-5', fastModel: 'claude-haiku-5-5' });
   assert.match(md, /missing: 1/u); assert.match(md, /options_no_more_hint: 1/u); assert.doesNotMatch(md, /https:/u); assert.doesNotMatch(md, /\u00b7/u);
+});
+
+test('simuloitu asiakas ja arvioija ovat oletuksena Haiku, apuri pysyy deep-mallilla', () => {
+  assert.equal(simTierFromEnv({}), 'fast'); assert.equal(simTierFromEnv({ WHATSAPP_SELFPLAY_SIM_TIER: 'deep' }), 'deep');
+  assert.equal(simTierFromEnv({ WHATSAPP_SELFPLAY_SIM_TIER: 'opus' }), 'fast');
+  for (const p of ['whatsapp_selfplay_customer', 'whatsapp_selfplay_review']) {
+    assert.equal(modelOf(p, 'claude-opus-5-5', 'claude-haiku-5-5', 'fast'), 'claude-haiku-5-5');
+    assert.equal(modelOf(p, 'claude-opus-5-5', 'claude-haiku-5-5', 'deep'), 'claude-opus-5-5');
+    assert.equal(modelOf(p), 'claude-opus-5-5', 'vanhan ajon meta ilman simTieri\u00e4: ajettiin Opuksella');
+  }
+  for (const p of ['whatsapp_dialogue', 'whatsapp_order_turn', 'whatsapp_cart_reply']) assert.equal(modelOf(p, 'claude-opus-5-5', 'claude-haiku-5-5', 'fast'), 'claude-opus-5-5');
+  const totals = { calls: 2, failed: 0, input: 2_000_000, output: 0, cacheRead: 0, orders: 0, ms: 1, personaMs: 1, assistantMs: 1,
+    byPurpose: { whatsapp_selfplay_customer: { calls: 1, input: 1_000_000, output: 0, cacheRead: 0 }, whatsapp_order_turn: { calls: 1, input: 1_000_000, output: 0, cacheRead: 0 } } };
+  const meta = { created: 'x', commit: 'abc', dirty: [], snapshotHash: '0'.repeat(64), deepModel: 'claude-opus-5-5', fastModel: 'claude-haiku-5-5' };
+  assert.match(summarize([], totals, { ...meta, simTier: 'fast' }), /Kustannusarvio 4\.10 USD/u);
+  assert.match(summarize([], totals, { ...meta, simTier: 'fast' }), /simuloitu asiakas ja arvioija claude-haiku-5-5/u);
+  assert.match(summarize([], totals, meta), /Kustannusarvio 8\.00 USD/u);
 });
 
 test('laajennettu joukko X001–X100: luokat, kellonajat ja kellon mukaan laskettu aikaisin päivä', () => {

@@ -3,7 +3,8 @@
 // keskusteluydin eristetyillä kannoilla, simuloidut hinnat, ei Meta-lähetyksiä eikä tilauksia. Persoonat ja omat
 // tarkistukset: eval/whatsapp-personas.mjs. Ajetaan vain käsin; ei ajastu eikä toistu itsestään.
 //
-//   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --limit 10
+//   node --env-file=.env --env-file=.env.whatsapp scripts/whatsapp-selfplay-batch.mjs --limit 10
+//     (.env.whatsapp antaa apurille saman DEEP_MODELin kuin puhelimen palvelimella; ilman sitä apuri käyttää .env:n mallia)
 //   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --offset 10 --limit 90 --concurrency 3 --max-calls 4000
 //   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --set regressions   (R01–R06, baseline-ajon löydökset)
 //   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --set extended      (X001–X100: virheet, murteet, kiire, kysymykset)
@@ -55,10 +56,14 @@ const normalize = (r) => (Array.isArray(r) ? { failures: r, newRequirement: [], 
 // Hinnat USD / 1M tokenia, claude-api-taidon mallitaulukko (välimuistissa 2026-11-03). Välimuistiluku Opus 5.5: 0,20.
 // Ajattelutokenit laskutetaan output-tokeneina. Arvio on suuntaa antava: välimuistiin kirjoitusta ei eritellä.
 export const PRICES = { 'claude-opus-5-5': { input: 4, output: 20, cacheRead: 0.2 }, 'claude-haiku-5-5': { input: 0.1, output: 0.5, cacheRead: 0.01 } };
-// Ainoa fast-tason kutsu (Haiku) on lisätuote-ehdotus; muut ovat deep-tasoa (DEEP_MODEL). Välimuistiin kirjoitusta
-// (cache_creation_input_tokens) agentStats ei laske, joten arvio on hieman alakanttiin.
+// Apurin ainoa fast-tason kutsu (Haiku) on lisätuote-ehdotus; sen muut kutsut ovat deep-tasoa (DEEP_MODEL). Simuloitu
+// asiakas ja arvioija ovat simTier-tasoa: uusissa ajoissa oletuksena fast, ennen 16.11.2026 tehdyissä ajoissa (meta ilman
+// simTieriä) deep. Välimuistiin kirjoitusta (cache_creation_input_tokens) agentStats ei laske, joten arvio on hieman alakanttiin.
 export const FAST_PURPOSES = new Set(['whatsapp_optional_addition']);
-export const modelOf = (purpose, deepModel = 'claude-opus-5-5', fastModel = 'claude-haiku-5-5') => (FAST_PURPOSES.has(purpose) ? fastModel : deepModel);
+export const SIM_PURPOSES = new Set(['whatsapp_selfplay_customer', 'whatsapp_selfplay_review']);
+export const simTierFromEnv = (env = process.env) => (env.WHATSAPP_SELFPLAY_SIM_TIER === 'deep' ? 'deep' : 'fast');
+export const modelOf = (purpose, deepModel = 'claude-opus-5-5', fastModel = 'claude-haiku-5-5', simTier = 'deep') =>
+  (FAST_PURPOSES.has(purpose) || (SIM_PURPOSES.has(purpose) && simTier === 'fast') ? fastModel : deepModel);
 export function costUsd(tokens, model) {
   const p = PRICES[model] || PRICES['claude-opus-5-5'];
   return ((tokens.input - tokens.cacheRead) * p.input + tokens.cacheRead * p.cacheRead + tokens.output * p.output) / 1e6;
@@ -125,12 +130,13 @@ export function summarize(results, totals, meta) {
     const t = (want && r.turns.find(want)) || r.turns.at(-1);
     return t ? ` Esim. ${r.id} (${r.route}): ostaja "${redact(t.user).slice(0, 120)}" / apuri "${redact(t.assistant).replace(/\n+/gu, ' / ').slice(0, 220)}"` : ` Esim. ${r.id}.`;
   };
-  const cost = Object.entries(totals.byPurpose).reduce((sum, [k, t]) => sum + costUsd(t, modelOf(k, meta.deepModel, meta.fastModel)), 0);
+  const cost = Object.entries(totals.byPurpose).reduce((sum, [k, t]) => sum + costUsd(t, modelOf(k, meta.deepModel, meta.fastModel, meta.simTier)), 0);
   const perPersona = ok.length ? cost / ok.length : 0;
   const lines = [
     `# Itsekeskustelu ${meta.created}${meta.reinspected ? ` (tarkistukset ajettu uudelleen ${meta.reinspected})` : ''}`, '',
     `Lähde: ${meta.sourceRef ? `${meta.sourceRef} = ` : ''}${meta.commit}${meta.dirty.length ? ` + ${meta.dirty.length} commitoimatonta tiedostoa (${meta.dirty.slice(0, 8).join(', ')}${meta.dirty.length > 8 ? ', …' : ''})` : ''}, lähdekopion sormenjälki ${meta.snapshotHash.slice(0, 12)}.`,
-    `Tila: eristetyt kannat, simuloidut hinnat, ei Meta-lähetyksiä, ei tilauksia (tilauksia ${totals.orders}).`, '',
+    `Tila: eristetyt kannat, simuloidut hinnat, ei Meta-lähetyksiä, ei tilauksia (tilauksia ${totals.orders}).`,
+    `Mallit: apuri ${meta.deepModel || 'claude-opus-5-5'} (lisätuote ${meta.fastModel || 'claude-haiku-5-5'}), simuloitu asiakas ja arvioija ${modelOf('whatsapp_selfplay_customer', meta.deepModel, meta.fastModel, meta.simTier)}.`, '',
     `Persoonat ${results.length}, ajettu ${ok.length}, ajovirheitä ${results.length - ok.length}. Perusvaatimukset läpi ${ok.filter((r) => !r.failures.length).length}/${ok.length}, uusi vaatimus (a–c) läpi ${ok.filter((r) => !r.newRequirement.length).length}/${ok.length}.`,
     `Mallikutsut ${totals.calls} (epäonnistuneita ${totals.failed}), ${ok.length ? (totals.calls / ok.length).toFixed(1) : 0} / persoona. Tokenit sisään ${totals.input} (välimuistista ${totals.cacheRead}), ulos ${totals.output}. Kustannusarvio ${cost.toFixed(2)} USD, ${perPersona.toFixed(3)} USD / persoona (välimuistiin kirjoitus puuttuu laskurista). Kesto ${(totals.ms / 60000).toFixed(1)} min, persoonaa kohden ${(ok.length ? totals.personaMs / ok.length / 1000 : 0).toFixed(0)} s seinäkelloa, josta apurin vastaukset ${(ok.length ? totals.assistantMs / ok.length / 1000 : 0).toFixed(0)} s.`, '',
     '## Perusvaatimukset (d–f)', ...base.map(([k, n]) => `- ${k}: ${n}.${example(k, (r) => r.failures || [])}`), ...(base.length ? [] : ['- ei virheitä']), '',
@@ -141,7 +147,7 @@ export function summarize(results, totals, meta) {
     '## Polut', '| polku | n | perus läpi | uusi läpi |', '|---|---|---|---|', ...Object.entries(byRoute).map(([k, x]) => `| ${k} | ${x.n} | ${x.pass} | ${x.fresh} |`), '',
     '## Arvioijan pisteet (1–5)', ...Object.entries(scores).sort().map(([k, n]) => `- ${k}: ${n}`), '',
     '## Mallikutsut tarkoituksittain', '| tarkoitus | kutsut | sisään | välimuistista | ulos | USD |', '|---|---|---|---|---|---|',
-    ...Object.entries(totals.byPurpose).sort((a, b) => b[1].calls - a[1].calls).map(([k, t]) => `| ${k} | ${t.calls} | ${t.input} | ${t.cacheRead} | ${t.output} | ${costUsd(t, modelOf(k, meta.deepModel, meta.fastModel)).toFixed(2)} |`), '',
+    ...Object.entries(totals.byPurpose).sort((a, b) => b[1].calls - a[1].calls).map(([k, t]) => `| ${k} | ${t.calls} | ${t.input} | ${t.cacheRead} | ${t.output} | ${costUsd(t, modelOf(k, meta.deepModel, meta.fastModel, meta.simTier)).toFixed(2)} |`), '',
     ...(results.some((r) => r.error) ? ['## Ajovirheet', ...results.filter((r) => r.error).map((r) => `- ${r.id}: ${redact(r.error).slice(0, 200)}`), ''] : []),
     '## Arvioijan nimeämät ongelmat (otos)', ...ok.filter((r) => r.judgment?.problems?.length).slice(0, 15).map((r) => `- ${r.id} (${r.route}, ${r.judgment.score}): ${redact(r.judgment.problems.slice(0, 2).join(' | ')).slice(0, 300)}`),
   ];
@@ -181,7 +187,7 @@ function snapshot(caseFiles = [], sourceRef = null) {
 
 function runChild(src, ids, out, maxTurns, spec) {
   const env = { PATH: process.env.PATH, TMPDIR: process.env.TMPDIR || os.tmpdir(), HOME: process.env.HOME, ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-    DEEP_MODEL: process.env.DEEP_MODEL || '', FAST_MODEL: process.env.FAST_MODEL || '', VALIO_API_KEY: '', AIMO_LEARNED: path.join(path.dirname(out), `learned-${path.basename(out)}`) };
+    DEEP_MODEL: process.env.DEEP_MODEL || '', FAST_MODEL: process.env.FAST_MODEL || '', VALIO_API_KEY: '', WHATSAPP_SELFPLAY_SIM_TIER: simTierFromEnv(), AIMO_LEARNED: path.join(path.dirname(out), `learned-${path.basename(out)}`) };
   for (const k of ['DEEP_MODEL', 'FAST_MODEL']) if (!env[k]) delete env[k];
   const argv = ['--disable-warning=ExperimentalWarning', path.join(src, 'scripts/whatsapp-selfplay-batch.mjs'), '--child', '--cases', spec, '--ids', ids.join(','), '--out', out, ...(maxTurns ? ['--max-turns', String(maxTurns)] : [])];
   return new Promise((resolve) => {
@@ -238,7 +244,7 @@ async function main() {
   const outDir = path.resolve(arg('--out-dir', path.join(ROOT, 'data/selfplay', created.replace(/[:.]/gu, '-'))));
   fs.mkdirSync(outDir, { recursive: true, mode: 0o700 });
   const src = snapshot(caseFiles, arg('--source-ref'));
-  const meta = { created, cases: spec, sourceRef: src.sourceRef, commit: src.commit, dirty: src.dirty, snapshotHash: src.hash, deepModel: process.env.DEEP_MODEL || 'claude-opus-5-5', fastModel: process.env.FAST_MODEL || 'claude-haiku-5-5', chunk, concurrency, maxCalls };
+  const meta = { created, cases: spec, sourceRef: src.sourceRef, commit: src.commit, dirty: src.dirty, snapshotHash: src.hash, deepModel: process.env.DEEP_MODEL || 'claude-opus-5-5', fastModel: process.env.FAST_MODEL || 'claude-haiku-5-5', simTier: simTierFromEnv(), chunk, concurrency, maxCalls };
   console.log(JSON.stringify({ personas: selected.length, chunk, concurrency, maxCalls, outDir, commit: src.commit.slice(0, 9), dirty: src.dirty.length, snapshot: src.dir }));
 
   // Erät saman demokellon mukaan, koska kello ladataan kerran lapsiprosessia kohden.

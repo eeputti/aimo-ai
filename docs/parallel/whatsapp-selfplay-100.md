@@ -176,6 +176,12 @@ Tarkistuksiin tuli kolme korjausta:
 - "Muita vaihtoehtoja ei löytynyt" ja sama lista on oikein.
 - Laskutusaiheen mainitseminen tukeen ohjatessa ei ole keksitty fakta.
 
+## Simuloitu asiakas ja arvioija Haikuun 16.11.2026
+
+Eelis kysyi, ajettiinko itsekeskustelut Opuksella, ja hyväksyi vaihdon. Simuloitu asiakas ja arvioija käyttävät nyt oletuksena fast-tasoa (`FAST_MODEL`, claude-haiku-5-5, ilman ajattelua, effort low). Apurin omat kutsut käyttävät `DEEP_MODEL`ia kuten puhelimen palvelin. Kustannuschat vaihtoi samana päivänä puhelimen apurin Haikuun `.env.whatsapp`-asetuksella (cd83f66), joten saman mallin saa testiin ajamalla `node --env-file=.env --env-file=.env.whatsapp scripts/whatsapp-selfplay-batch.mjs ...`. Ilman `.env.whatsapp`ia apuri ajaa `.env`:n Opuksella. `WHATSAPP_SELFPLAY_SIM_TIER=deep` palauttaa simuloidut roolit Opukselle. Ajuri välittää asetuksen lapsiprosesseille, ja raportin otsakkeessa kerrotaan käytetyt mallit. Kustannusarvio hinnoittelee simuloidut roolit oikealla mallilla. Ennen tätä tehtyjen ajojen raportit (meta ilman `simTier`iä) lasketaan edelleen Opuksen hinnoilla.
+
+Koeajo X001–X003 (d0f8db1 + tämä muutos): 3/3 läpi koodin tarkistuksista, 28 kutsua, 0 virhettä, 0 tilausta, 0,15 USD eli 0,051 USD persoonaa kohden. Laajennetun joukon aiempi ajo maksoi 8,55 USD / 100 eli noin 0,086 USD persoonaa kohden, joten säästö on noin 40 %. Koeajossa apuri oli vielä Opus (vain `.env`), ja suurin osa kustannuksesta oli sen kutsuja. Kun apuri ajetaan Haikulla kuten puhelimessa, koko ajo on Haikua ja hinta laskee hinnaston mukaan noin neljäskymmenesosaan. Haiku-asiakas piti tavoitteen ja korjasi yksiköt kuten pitää. Haiku-arvioija antoi samoille persoonille pisteet 3, 3, 2, kun Opus antoi aiemmin 4, 3, 3, ja sen perusteluissa oli epätarkkuuksia. Arvioijan pisteet eivät siis ole vertailukelpoisia aiempiin ajoihin. Läpäisy ratkaistaan edelleen koodin tarkistuksilla.
+
 ## Seuraavat askeleet
 
 - Uusi 100 personan ajo nykyisellä koodilla mittaa 1a517f5:n, 5e0a61f:n ja 252b337:n vaikutuksen samaan baselineen (noin 9–10 USD, 17 min, `--source-ref origin/main`). Sitä ei ajettu ilman erillistä hyväksyntää.
