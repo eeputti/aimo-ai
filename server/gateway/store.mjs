@@ -9,7 +9,9 @@ import { clock } from './clock.mjs';
 // GATEWAY_DB: testiajo (npm run eval) käyttää omaa kantaansa, jotta demon tilaukset ja loki säilyvät.
 const db = openSqlite(process.env.GATEWAY_DB || path.join(ROOT, 'data', 'gateway.db'));
 // busy_timeout ensin: usea prosessi voi avata saman kannan yhtä aikaa (pilvi-instanssit, julkaisija, testit).
-db.exec(`
+// Uuden tiedoston WAL-vaihto voi silti palauttaa SQLITE_BUSY heti ilman odotusta, kun toinen prosessi luo saman kannan
+// samalla hetkellä. Alustus on toistettava (IF NOT EXISTS), joten se yritetään lyhyen tauon jälkeen uudelleen.
+const SCHEMA = `
   PRAGMA busy_timeout = 5000;
   PRAGMA journal_mode = WAL;
   CREATE TABLE IF NOT EXISTS buyers (id TEXT PRIMARY KEY, api_key TEXT UNIQUE NOT NULL, json TEXT NOT NULL);
@@ -18,7 +20,14 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS ledger (seq INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, actor TEXT NOT NULL, type TEXT NOT NULL, buyer_id TEXT, order_id TEXT, quote_id TEXT, payload TEXT NOT NULL, prev_hash TEXT NOT NULL, hash TEXT NOT NULL);
   CREATE INDEX IF NOT EXISTS ledger_order ON ledger (order_id);
   CREATE TABLE IF NOT EXISTS counters (name TEXT PRIMARY KEY, value INTEGER NOT NULL);
-`);
+`;
+for (let attempt = 1; ; attempt++) {
+  try { db.exec(SCHEMA); break; } catch (err) {
+    const busy = err?.errcode === 5 || err?.errcode === 6 || /database is locked|SQLITE_BUSY/i.test(String(err?.message));
+    if (!busy || attempt >= 20) throw err;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 * attempt);
+  }
+}
 
 // Kirjoitustransaktio (BEGIN IMMEDIATE): lukeminen ja kirjoitus tehdään yhtenä, jotta kaksi samanaikaista tilausta
 // (sama prosessi await-kohdan jälkeen tai kaksi pilvi-instanssia samassa Turso-kannassa) eivät näe samaa tilannetta.

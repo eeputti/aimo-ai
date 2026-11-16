@@ -106,6 +106,7 @@ export const REASONS = {
   // tarjousvaihe: miksi ehdokas jäi pois
   UNKNOWN_PRODUCT: { fi: 'Tuotekoodia ei ole katalogissa', en: 'Product code not in catalogue' },
   PRICE_UNAVAILABLE: { fi: 'Hintaa ei saatu rajapinnasta', en: 'No price returned by the pricing API' },
+  PRICE_TOO_OLD: { fi: 'Viimeisin tunnettu hinta on liian vanha', en: 'Last known price is too old' },
   AVAILABILITY_UNKNOWN: { fi: 'Saatavuutta ei voitu varmistaa', en: 'Availability could not be confirmed' },
   NOT_DELIVERABLE: { fi: 'Ei toimitettavissa (ei toimitusriviä tai saldo 0)', en: 'Not deliverable (no schedule line or zero stock)' },
   SALES_BLOCK: { fi: 'Myyntiesto', en: 'Sales block' },
@@ -125,6 +126,7 @@ export const REASONS = {
   SUBSTITUTION_OUTSIDE_POLICY: { fi: 'Korvaava tuote ylittää korvaussäännöt', en: 'Substitute product is outside the substitution policy' },
   PARTIAL_FILL_SPLIT: { fi: 'Määrä täytetty usealla tuotteella', en: 'Quantity filled with more than one product' },
   DELIVERY_DATE_SHIFT: { fi: 'Aikaisin toimitus on pyydettyä myöhemmin', en: 'Earliest delivery is later than requested' },
+  PRICE_NOT_LIVE: { fi: 'Hinta on viimeisin tunnettu, ei juuri nyt rajapinnasta tarkistettu', en: 'Price is the last known value, not checked live just now' },
   STOCK_UNKNOWN: { fi: 'Tarkkaa saldoa ei tiedetä: rajapinta ei ilmoita määrää (999999)', en: 'Exact quantity unknown: the API reports no real amount (999999)' },
   // taustavahti (watch.mjs): vertaa tilausta ostajan omaan historiaan, voi vain siirtää ihmisen hyväksyntään
   UNUSUAL_QUANTITY: { fi: 'Määrä poikkeaa selvästi ostajan tavallisesta', en: 'Quantity is far above the buyer\'s typical order' },

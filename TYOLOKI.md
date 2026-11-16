@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 ilta — B:n jatko: hintojen syykoodit ja gatewayn kannan samanaikainen ensiavaus (Claude Code, sessio B)
+
+- **Muutos:** `contract.mjs`:n REASONS-listaan `PRICE_NOT_LIVE` ja `PRICE_TOO_OLD` (A vapautti tiedoston), joten 6a764ce:n hintamerkinnät näkyvät selkokielisinä. `server/gateway/store.mjs`: kannan alustus yritetään uudelleen lyhyen tauon jälkeen, jos toinen prosessi luo saman uuden kannan samalla hetkellä (WAL-vaihto palautti SQLITE_BUSY ilman odotusta). Alustus on toistettava (IF NOT EXISTS).
+- **Syy:** 6a764ce:n kolmen prosessin testi epäonnistui satunnaisesti noin joka kolmannella ajolla käynnistyksen "database is locked" -virheeseen. Ei vaikuta käynnissä olevaan bottiin (yksi prosessi) eikä Tursoon (pragmat ohitetaan).
+- **Tarkistukset:** `test/audit-fixes-b.test.mjs` 25 ajoa peräkkäin ilman virheitä, `npm test` 365/365, Worker 59/59. D:n rinnakkainen jono (14dddf8) tarkistettu: 6a764ce kattaa sen, audit-fixes-b ja -d yhdessä 15/15.
+- **Käyttöönotto:** sama kuin 6a764ce (E), ei lisävaiheita.
+
 ## 16.11.2026 ilta — WhatsApp-apurin laatu Haikulla mitattu: Haiku riittää (Claude Code, Haiku-laatumittaus F)
 
 - **Käyttäjän kysymys:** botin syvä malli vaihdettiin Opuksesta Haikuun kustannusten vuoksi, mutta itsekeskustelun 96–99/100 mitattiin Opuksella. Mittaus nykykoodilla (origin/main 671b9a1, kiinnitetty kaikissa ajoissa), eristetyt kannat, simuloidut hinnat ja Meta, ei Valion API:a, 0 tilausta. Mallin avain luettiin yhteisen kansion `.env`:stä kopioimatta sitä.

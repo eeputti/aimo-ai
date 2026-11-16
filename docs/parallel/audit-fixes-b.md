@@ -48,6 +48,10 @@ Sessio B (Claude Code), taulun tehtävät adaf1c4d ja 312988a4. Korjatut kohdat 
 - Sähköposti lähtee kaikista `ORDER_EMAIL_TO`-osoitteeseen. Tervehdysnimi (`ORDER_EMAIL_CUSTOMER_NAME`) vain demonumeron ja kiinnitetyn ostajan tilauksiin, muille neutraali tervehdys. Jäsenten nimiä ei lähetetä Workerille.
 - **Yksityisyys, päätettävä ennen käyttöönottoa:** julkinen tilauslista näyttää nyt myös muiden testaajien tilausten julkiset kentät (tuotteet, määrät, summa, tila, numero). Nimiä ja numeroita ei näy. Aiemmin käyttäjä hyväksyi julkiseksi vain yhden testiasiakkaan tilaukset.
 
+### Syykoodit
+
+`PRICE_NOT_LIVE` ja `PRICE_TOO_OLD` lisättiin `contract.mjs`:n REASONS-listaan erillisessä jatkocommitissa, kun A vapautti tiedoston.
+
 ### A:n pyyntö (#16)
 
 `service.mjs`: tilaukselle `clockCycle`, tarjouspayloadiin `cyc` ja `verifyOffers` hylkää (`OFFER_EXPIRED`) edellisen kierroksen tarjouksen, kun `clock.looping`. Kutsu on `clock.cycle?.() ?? 0`, joten se toimii ennen A:n `clock.mjs`-muutosta ja sen jälkeen.
@@ -73,4 +77,3 @@ Sessio B (Claude Code), taulun tehtävät adaf1c4d ja 312988a4. Korjatut kohdat 
 
 - `addToOrder` lukee tilauksen ennen tuoretta tarkistusta ja tallentaa sen jälkeen: kaksi samanaikaista lisäystä voi kadottaa toisen. Sama kuvio kuin #6, mutta vain saman tilauksen lisäyksissä.
 - WhatsAppin vastaus ei vielä kerro asiakkaalle `PRICE_NOT_LIVE`-merkinnästä (order-tools ja order-conversation, A:n ja C:n tiedostot).
-- `contract.mjs`:n REASONS-listasta puuttuvat `PRICE_NOT_LIVE` ja `PRICE_TOO_OLD` (A:n varaus, pyydetty taululla #289). Siihen asti viesti on syykoodi.
