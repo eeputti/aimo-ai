@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 ilta — Tilaukset-välilehti pois Workers-sivuston yläpalkista (Claude Code, Tilaukset pois -chat)
+
+- **Käyttäjän pyyntö:** Eelis katsoi, ettei Tilaukset-näkymä ole brändin mukainen, ja pyysi poistamaan Tilaukset-napin kokonaan yläpalkista. Itse `/tilaukset`-sivu jää paikalleen suoralla osoitteella, ja sisällön linkit siihen (esim. demomaksusivun "Palaa tilausnäkymään" ja agentin jäljen "Takaisin tilauksiin") säilyvät; niitä ei pyydetty poistamaan.
+- **Tämä commit:** linkki poistettu viidestä sivusta: `agentti.html`, `demo-payment.html`, `miten.html`, `ostoskori.html` ja `tilaukset.html` (varaus 39076917). Tehty erillisessä worktreessä `origin/main` 671b9a1:n päällä; yhteisen kansion keskeneräiset muutokset ennallaan.
+- **Työnjako:** `index.html`, `keskustele.html` ja `src/web-chat.ts` (korisivun otsake) ovat etusivu-chatin varauksessa 089950aa. Se lupasi poistaa linkin niistä omassa työssään, rebasata tämän commitin päälle ja julkaista Workerin. Tämä chat ei julkaissut Workeria, jotta keskeneräinen julkaisu ei ylikirjoitu. **Live-sivulla nappi näkyy, kunnes etusivu-chat on julkaissut.**
+- **Tarkistukset:** staattinen esikatselu viidestä sivusta: navigaatiossa Etusivu, Keskustele, Ostoskori, Näin se toimii, aktiivinen välilehti oikein, ei vaakaylivuotoa 1024 px ja 375 px. Worker-testeissä ei ole navigaatiotarkistuksia, eikä niitä ajettu pelkälle linkkipoistolle. `git diff --check` läpi.
+
 ## 16.11.2026 — WhatsApp: rivit ajatusviivalla, päivä ja puuttuvat määrät samassa kysymyksessä (Claude Code, tilannechat)
 
 - **Käyttäjän pyynnöt:** Eelis kokeili puhelimella Haiku-bottia uuden tunnelin kautta. "moi tarviin voita" tuli perille klo 22.21, ja vastaus lähti kolmena osana, joilla kaikilla on Metan tunniste. Botti kysyi ensin päivän. Kuvakaappauksen perusteella WhatsApp näyttää rivin alun "- " luettelopallona, ja Eelis haluaa ranskalaiset viivat. Lisäksi, kun määrä puuttuu, sama kysymys kysyy päivän ja määrän ("mille päivälle tarviit toimituksen ja kuinka paljon laitetaan voita?"). Tämä muuttaa 15.11. päätöstä, jossa päivä kysyttiin yksin.
