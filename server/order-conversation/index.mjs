@@ -123,7 +123,7 @@ function apply(draft, turn, customer, today) {
       draft.deliveryDate = turn.deliveryDate;
     }
   }
-  for (const o of (turn.ops || []).slice(0, 30)) {
+  for (let o of (turn.ops || []).slice(0, 30)) {
     const line = o.ref ? find(o.ref) : null;
     // Viestissä mainittu ruokavaatimus tarkoittaa, että asia on käsitelty: sitä ei kysytä enää erikseen.
     if (['add', 'update'].includes(o.op) && (claims([...(o.claims || []), ...(o.addClaims || [])]).length || allergens(o.excludeAllergens).length)) draft.diet.known = true;
@@ -141,6 +141,8 @@ function apply(draft, turn, customer, today) {
       touch(ref);
     } else if (o.op === 'update' && line) {
       const before = JSON.stringify([line.productTerm, line.claims, line.excludeAllergens]);
+      // Kiloja kysyttiin (kiloina myytävä tuote): pelkkä luku tai kappalemäärä vastauksena tarkoittaa kiloja.
+      if (line.byWeight && o.quantity?.unit === 'PCS' && !o.quantity.basis) o = { ...o, quantity: { value: o.quantity.value, unit: 'KG' } };
       if (o.quantity) {
         if (!validQuantity(o.quantity)) notes.push(`Tarkista määrä: ${line.productTerm}.`);
         else {
@@ -413,6 +415,27 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         const hint = e ? `Aikaisin toimitettava päivä on ${dateLabel(e.date)}. Kirjoita "${dateLabel(e.date)}", jos se käy.` : 'Kokeile toista päivää tai tarkenna tuotetta.';
         return { status: 'collecting', text: `${problems.join('\n')}\n${hint} Tilausta ei ole tehty.` };
       }
+      // Kappalemäärä ei kerro kiloja (puhelinkuva 17.11.: "kanan fileesuikale 100 kpl" → 100 kg, 899 €). Kiloina myytävää
+      // tuotetta ei tarjota kappaleriville. Kun vähintään puolet vaihtoehdoista myydään kiloina, tuote on kilotavaraa ja
+      // kilot kysytään (muuten 100 kpl → 100 rasiaa à 3 kg = 300 kg). Muuten kiloina myytävät vain jäävät pois (10 kpl leipää).
+      // Edellisestä tilauksesta kopioitu rivi (packFor) on jo oikeina myyntierinä, eikä munien kappalemäärä (items) koske tätä.
+      if (line.quantity?.unit === 'PCS' && line.quantity.basis !== 'items' && !line.packFor) {
+        const counted = x.options.filter((o) => o.salesUnitLabel !== 'kg');
+        if (!again && counted.length * 2 <= x.options.length) {
+          const asked = line.quantity;
+          line.quantity = null; line.byWeight = true; delete draft.offered[line.ref]; delete draft.seen[line.ref];
+          draft.revision += 1; draft.quote = null;
+          draft.pending = { kind: 'checklist', asks: ['quantity'], refs: [line.ref] };
+          const rows = draft.lines.map((l) => `- ${lineLabel(l)}${l.selectedName ? `: ${l.selectedName}` : ''}`).join('\n');
+          return { status: 'collecting', text: [...problems, `${cap(line.productTerm)} myydään kiloina, joten määrästä ${num(asked.value)} kpl en voi laskea tilattavia kiloja.`,
+            `Luonnoksessa nyt:\n${rows}`, `Kuinka monta kiloa laitetaan: ${line.productTerm}?`].join('\n\n') };
+        }
+        if (!counted.length) {
+          // Lisäsivulla vain kiloina myytäviä: näytetään edellinen lista, numerot pysyvät samoina.
+          problems.push(`Muita kappaleina myytäviä vaihtoehtoja ei löytynyt: ${line.productTerm}.`);
+          x = { ref: line.ref, options: draft.offered[line.ref] || [], more: false, exact: x.exact };
+        } else if (counted.length < x.options.length) x = { ...x, options: counted };
+      }
       if (line.avoidClaims?.includes('FREE_FROM_LACTOSE')) {
         const regular = x.options.filter((o) => !lactoseFree(o));
         if (regular.length) x = { ...x, options: regular };
@@ -584,7 +607,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         const onlyRepeat = repeat && !/\p{L}{2}/u.test(toInterpret.replace(REPEAT_FILLER, ' '));
         const repeatNote = last?.lines?.length ? `Kopioin edellisen tilauksen${last.orderId ? ` ${last.orderId}` : ''} tuotteet. Hinnat ja saatavuus tarkistetaan uudelle toimituspäivälle.` : '';
         // Tulkki ajetaan silti: samassa viestissä voi olla lisäyksiä ("sama ku viimeks, mut 10 l maitoa lisää").
-        const interpreted = dateAnswer || choice || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
+        // Vastaus kilokysymykseen ("30", "30 kg"): kilot suoraan kysyttyyn riviin ilman tulkkia (kiloina myytävä tuote).
+        const weightLine = draft.pending?.kind === 'checklist' && draft.pending.asks?.includes('quantity') ? draft.lines.find((l) => l.ref === draft.pending.refs?.[0] && l.byWeight) : null;
+        const kilos = weightLine && t.match(/^(\d+(?:[.,]\d+)?)\s*(?:kg|kilo\p{L}*)?[.!\s]*$/iu);
+        const weightAnswer = kilos ? { intent: 'order', ops: [{ op: 'update', ref: weightLine.ref, quantity: { value: Number(kilos[1].replace(',', '.')), unit: 'KG' } }] } : null;
+        const interpreted = dateAnswer || choice || weightAnswer || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
           ? { op: 'update', ref, addClaims: [draft.pending.claim] } : { op: 'no_preference', ref }) }
           : onlyRepeat ? { intent: 'order', ops: [] }
           : await interpretTurn({ text: withoutClockWords(toInterpret), draft: structuredClone(draft), today, now: now(), receivedAt, context }));
