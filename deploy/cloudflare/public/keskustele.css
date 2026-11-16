@@ -93,3 +93,8 @@
   .phone::before,.phone::after,.phone-status,.phone-home{display:none}
   .screen{border-radius:0}
 }
+/* Oikean WhatsAppin lisäominaisuudet: ääniviestit, reseptilinkit ja kuvat. */
+.aside-features{order:3;flex:1 1 100%;list-style:none;display:grid;gap:8px;margin:0;padding:12px 0 0;border-top:1px solid #e6eef2}
+.aside-features li{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.45;color:#18354b}
+.aside-features svg{flex-shrink:0;width:20px;height:20px;margin-top:1px;color:#1fa855}
+.aside-features strong{color:#003c75}

@@ -28,6 +28,93 @@
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
 
+    <section class="stack" aria-labelledby="stack-title">
+      <h2 id="stack-title">Mitä kaikkea käytetään, vaihe vaiheelta</h2>
+      <p class="miten-sub">Yksi tilaus kulkee näiden vaiheiden läpi ylhäältä alas. Jokaisessa vaiheessa lukee, mitä tapahtuu ja mitä palvelua tai tekniikkaa siinä käytetään.</p>
+      <ol class="stack-steps">
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">1</span>
+          <div class="stack-body">
+            <h3>Viesti tulee sisään</h3>
+            <p>Kokki kirjoittaa, puhuu ääniviestin tai lähettää kuvan WhatsAppissa, tai kirjoittaa täällä Keskustele-sivulla. Viesti kuitataan heti, laitetaan jonoon ja kokki näkee "kirjoittaa…".</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>WhatsApp Cloud API (Metan virallinen rajapinta)</li><li>Webhook, jonka allekirjoitus tarkistetaan</li><li>Jono SQLite-kannassa</li><li>Keskustele-sivulta Cloudflare Worker välittää viestin samalle apurille</li></ul>
+          </div>
+        </li>
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">2</span>
+          <div class="stack-body">
+            <h3>Ääni, kuva ja reseptilinkki muutetaan tekstiksi</h3>
+            <p>Ääniviesti litteroidaan suomeksi tekstiksi. Kuvasta (ostoslista, lähete tai hylly) luetaan tuoterivit ja määrät. Reseptilinkki avataan, ja siitä luetaan ainekset ja annosmäärä, jos sivu ei ole bottisuojan takana. Kuvan ja sivun teksti on vain tietoa: siinä olevia käskyjä ei noudateta. Ensin kokki näkee, mitä kuultiin tai luettiin.</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>Groq: Whisper large-v3 turbo -malli (ääni)</li><li>Claude Haiku 5.5, Anthropic (kuva)</li><li>Metan media-API (tiedoston lataus)</li><li>Oma linkinlukija: vain julkiset HTTPS-sivut</li></ul>
+          </div>
+        </li>
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">3</span>
+          <div class="stack-body">
+            <h3>Viesti ymmärretään</h3>
+            <p>Kielimalli poimii viestistä tuotteet, määrät, toimituspäivän ja ruokavalion. Yksikkömuunnokset (dl, g, kpl) lasketaan koodissa. Puuttuva päivä kysytään aina ensin. Malli ei itse valitse tuotteita eikä hintoja.</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>Claude Haiku 5.5 (rakenteinen vastaus)</li><li>Varalla omat säännöt, jos malli ei vastaa</li></ul>
+          </div>
+        </li>
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">4</span>
+          <div class="stack-body">
+            <h3>Tuotteet haetaan</h3>
+            <p>Haku etsii Valion valikoimasta vain tuotteet, jotka ehtivät valitulle päivälle. Allergeenit ja merkinnät tarkistetaan Valion tuotetiedoista. Kokki valitsee vaihtoehdon numerolla 1, 2 tai 3.</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>Valion tuotedata: 17 546 tuotetta</li><li>Allergeenit, ainesosat, alkuperä, hiilijalanjälki ja toimitusvarmuus</li><li>Oma tuotehaku palvelimella</li></ul>
+          </div>
+        </li>
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">5</span>
+          <div class="stack-body">
+            <h3>Hinnat ja saatavuus tarkistetaan</h3>
+            <p>Jokaisen tuotteen hinta, saatavuus ja tilausaikaraja kysytään Valiolta valitulle päivälle. Jos rajapinta ei vastaa, käytetään viimeisintä Valiolta saatua hintaa, ei keksittyä.</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>Valion hinta- ja saatavuusrajapinta</li><li>Välimuisti, ettei samaa kysytä turhaan</li></ul>
+          </div>
+        </li>
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">6</span>
+          <div class="stack-body">
+            <h3>Ostoskori</h3>
+            <p>Kun lista on valmis, kokki saa henkilökohtaisen linkin ostoskoriin, joka näyttää Valio Aimon Toimitustukun korilta. Linkki on allekirjoitettu ja sidottu kokin puhelinnumeroon ja tähän koriin, ja se vanhenee vuorokaudessa. Kori ja WhatsApp ovat samaa luonnosta. Siirry maksamaan -nappi tekee tilauksen ja avaa maksun.</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>Allekirjoitettu korilinkki, sidottu puhelinnumeroon</li><li>Sama luonnos WhatsAppissa ja korissa</li></ul>
+          </div>
+        </li>
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">7</span>
+          <div class="stack-body">
+            <h3>Tarjous ja tilaus agenttiportin kautta</h3>
+            <p>Agenttiportti lukitsee tuotteet ja hinnat allekirjoitettuun tarjoukseen. Ostovaltuus tarkistaa euromäärärajat, allergeenit ja korvaukset: tilaus menee läpi tai jää ihmisen hyväksyttäväksi. Jokainen päätös kirjataan lokiin, jota ei voi muuttaa jälkikäteen.</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>Oma agenttiportti: /v1/quotes ja /v1/orders</li><li>Ed25519-allekirjoitus</li><li>Ostovaltuus (mandaatti)</li><li>Hash-ketjutettu päätösloki</li><li>Sama portti MCP- ja REST-rajapintana muille agenteille</li></ul>
+          </div>
+        </li>
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">8</span>
+          <div class="stack-body">
+            <h3>Maksu ja tilausnäkymä</h3>
+            <p>Vahvistettu tilaus siirtyy tälle sivustolle. Demomaksu, tilauslista ja agentin jälki näkyvät täällä. Rahaa ei veloiteta.</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>Cloudflare Workers</li><li>Cloudflare D1 -tietokanta</li></ul>
+          </div>
+        </li>
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">9</span>
+          <div class="stack-body">
+            <h3>Missä tämä pyörii</h3>
+            <p>Apuri pyörii nyt Eeliksen koneella Cloudflare-tunnelin takana. Siirto pilveen (Vercel ja Turso) on testattu. Tämä sivusto on Cloudflaressa.</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>Node.js ja SQLite</li><li>Cloudflare Tunnel</li><li>Testattu pilvessä: Vercel ja Turso</li></ul>
+          </div>
+        </li>
+        <li class="stack-step">
+          <span class="stack-no" aria-hidden="true">10</span>
+          <div class="stack-body">
+            <h3>Miten tämä tehtiin</h3>
+            <p>Koodin kirjoittivat tekoälyavustajat rinnakkain, ja jokainen vaihe tallennettiin GitHubiin. Laatua mitattiin keskusteluttamalla apuria satojen simuloitujen asiakkaiden kanssa.</p>
+            <ul class="stack-tools" aria-label="Käytetään"><li>Claude Code</li><li>OpenAI Codex</li><li>GitHub</li><li>Simuloidut asiakkaat Claude-mallilla</li></ul>
+          </div>
+        </li>
+      </ol>
+    </section>
+
     <section id="koodi" class="miten-code" aria-labelledby="code-title">
       <h2 id="code-title">Agentin ajo, rivi riviltä</h2>
       <p class="miten-sub">Esimerkki oikeasta demotilauksesta. Keskustele-sivulla sama näkymä päivittyy omasta keskustelustasi.</p>
