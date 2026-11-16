@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 yö — maksusivu oikeaksi kassaksi: maksutiedot, Maksa-painike ja Maksu onnistui (Claude Code, maksusivuchat)
+
+- **Käyttäjän pyyntö:** Eelis halusi demomaksusivun (Tarkista ja kokeile maksua) tilalle oikean maksusivun: maksutiedot, maksun vahvistus samalta sivulta ja sen jälkeen pelkkä "maksu meni läpi" ja paluu etusivulle. Selittävää välisivua ei enää tarvita.
+- **Muutos (`deploy/cloudflare/public/demo-payment.*`):** maksutapa (maksukortti tai lasku 14 pv netto), testikortin kuva (päättyy 4242), laskulle eräpäivä ja viite, vihreä "Maksa 31,62 €" -painike käsittelytilalla ja hiljainen "Peruuta maksu". Vieressä tilauksen yhteenveto: tilausnumero, toimituspäivä, rivit määrineen ja rivihintoineen, yhteensä alv 0 %. Maksun jälkeen lomake vaihtuu onnistumisnäkymään: animoitu tarkistusmerkki, "Maksu onnistui" (laskulla "Tilaus vahvistettu"), summa, toimitus, maksutapa, sähköpostin tila (uudelleenlähetys vain kesken jääneelle), **Palaa etusivulle** ja agentin jälki. Maksetun tilauksen uudelleenlataus avaa suoraan onnistumisnäkymän, virheellinen linkki näyttää virheen ja etusivulinkin.
+- **Päätökset:** vapaita korttikenttiä ei lisätty, koska julkisella demosivulla joku voisi kirjoittaa oikean korttinumeronsa; maksutiedot ovat näkyvä testikortti ja laskun tiedot. Pieni "Demo, rahaa ei veloiteta" -merkintä jäi, jotta kokeilija ei luule maksaneensa oikeasti. Maksusivu on nyt pois puhelinten "käytä tietokoneella" -estosta (`mobile-gate.js`), koska WhatsAppin ostoskorin Siirry maksamaan -painike avaa sen puhelimella: esto pysäytti tilauspolun viimeisen vaiheen. Sivun CSP sallii nyt sivuston omat fontit (font-src), aiemmin Matter ei latautunut maksusivulla.
+- **Yhteensovitus:** tehty session B:n henkilökohtaisten tilauslinkkien commitin päälle; sen `remember()`, latauksen uusinta ja pelkän linkin init säilyivät sellaisinaan (taulu #310, varaus c5beecca).
+- **Tarkistukset:** uusi `deploy/cloudflare/test/payment-page.test.mjs` (skriptin elementit sivulla, ei vapaita kenttiä, etusivulinkki, puhelinesto vain muilla sivuilla). Worker-testit 65/65 session B:n bdee619:n päällä. Selaimessa paikallinen esikatselu tuotannon CSP:llä ja jäljitellyllä maksurajapinnalla (ei oikeita tilauksia) 800 ja 375 px: korttimaksu, lasku, peruutus, uudelleenlataus maksun jälkeen, kesken jäänyt sähköposti, virheellinen linkki; ei vaakaylivuotoa eikä konsolivirheitä. Puhelinleveydellä esto ei näy ja Maksa-painike on ensimmäisellä ruudulla.
+- **Kesken:** Workeria ei julkaistu. Muutos näkyy vasta Worker-julkaisun jälkeen, ja session B:n mukaan Worker ja botti julkaistaan yhdessä sen henkilökohtaisten linkkien kanssa (sessio E).
+
 ## 17.11.2026 yö — tilaukset näkyvät vain tilaajalle henkilökohtaisella tilauslinkillä (Claude Code, sessio B)
 
 - **Käyttäjän pyyntö:** Eelis kysyi, voisiko demon tilaukset näkyä selain- tai puhelinnumerokohtaisesti, ja pyysi toteuttamaan sen ("Kyllä, tee se"). Raportti `docs/parallel/personal-orders.md`.
