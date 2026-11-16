@@ -55,11 +55,11 @@ export async function loadCases(root, spec) {
 const normalize = (r) => (Array.isArray(r) ? { failures: r, newRequirement: [], observations: [], metrics: {} } : { failures: [], newRequirement: [], observations: [], metrics: {}, ...r });
 
 // Hinnat USD / 1M tokenia, claude-api-taidon mallitaulukko (välimuistissa 2026-11-03). Välimuistiluku Opus 5.5: 0,20.
-// Ajattelutokenit laskutetaan output-tokeneina. Arvio on suuntaa antava: välimuistiin kirjoitusta ei eritellä.
+// Ajattelutokenit laskutetaan output-tokeneina. Välimuistiin kirjoitus (5 min) maksaa 1,25 × syötteen hinta.
 export const PRICES = { 'claude-opus-5-5': { input: 4, output: 20, cacheRead: 0.2 }, 'claude-sonnet-5-5': { input: 2, output: 10, cacheRead: 0.1 }, 'claude-haiku-5-5': { input: 0.1, output: 0.5, cacheRead: 0.01 } };
 // Apurin ainoa fast-tason kutsu (Haiku) on lisätuote-ehdotus; sen muut kutsut ovat deep-tasoa (DEEP_MODEL). Simuloitu
 // asiakas ja arvioija ovat simTier-tasoa: uusissa ajoissa oletuksena fast, ennen 16.11.2026 tehdyissä ajoissa (meta ilman
-// simTieriä) deep. Välimuistiin kirjoitusta (cache_creation_input_tokens) agentStats ei laske, joten arvio on hieman alakanttiin.
+// simTieriä) deep. Ennen 17.11.2026 tehdyissä ajoissa välimuistiin kirjoitusta ei laskettu, joten niiden arvio on hieman alakanttiin.
 export const FAST_PURPOSES = new Set(['whatsapp_optional_addition']);
 export const SIM_PURPOSES = new Set(['whatsapp_selfplay_customer', 'whatsapp_selfplay_review']);
 export const simTierFromEnv = (env = process.env) => (env.WHATSAPP_SELFPLAY_SIM_TIER === 'deep' ? 'deep' : 'fast');
@@ -67,7 +67,8 @@ export const modelOf = (purpose, deepModel = 'claude-opus-5-5', fastModel = 'cla
   (FAST_PURPOSES.has(purpose) || (SIM_PURPOSES.has(purpose) && simTier === 'fast') ? fastModel : deepModel);
 export function costUsd(tokens, model) {
   const p = PRICES[model] || PRICES['claude-opus-5-5'];
-  return ((tokens.input - tokens.cacheRead) * p.input + tokens.cacheRead * p.cacheRead + tokens.output * p.output) / 1e6;
+  const write = tokens.cacheWrite || 0;
+  return ((tokens.input - tokens.cacheRead - write) * p.input + write * p.input * 1.25 + tokens.cacheRead * p.cacheRead + tokens.output * p.output) / 1e6;
 }
 
 // ------------------------------------------------------------------------------------------------ lapsiprosessi
@@ -92,14 +93,14 @@ async function child() {
   const clockAt = clock.now().toISOString();
   // aimoAgent lukee vain mallin asetukset (config.mjs). Kantapolut luetaan vasta runSelfplayn eristämässä ympäristössä.
   const { agentStats } = await import(pathToFileURL(path.join(ROOT, 'server/aimoAgent.mjs')).href);
-  const tokens = {}; let seen = { input: 0, output: 0, cacheRead: 0 };
+  const tokens = {}; let seen = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   const track = (purpose, entry) => {
     let calls = entry.calls || 0;
     Object.defineProperty(entry, 'calls', { enumerable: true, get: () => calls, set: (value) => {
       // askAgent kasvattaa tokenilaskurit ja tarkoituksen kutsumäärän samassa synkronisessa jaksossa: erotus kuuluu tälle kutsulle.
-      const now = { input: agentStats.inputTokens, output: agentStats.outputTokens, cacheRead: agentStats.cacheReadTokens };
-      const t = (tokens[purpose] ||= { calls: 0, input: 0, output: 0, cacheRead: 0 });
-      t.calls += value - calls; t.input += now.input - seen.input; t.output += now.output - seen.output; t.cacheRead += now.cacheRead - seen.cacheRead;
+      const now = { input: agentStats.inputTokens, output: agentStats.outputTokens, cacheRead: agentStats.cacheReadTokens, cacheWrite: agentStats.cacheWriteTokens };
+      const t = (tokens[purpose] ||= { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
+      t.calls += value - calls; t.input += now.input - seen.input; t.output += now.output - seen.output; t.cacheRead += now.cacheRead - seen.cacheRead; t.cacheWrite += now.cacheWrite - seen.cacheWrite;
       seen = now; calls = value;
     } });
     return entry;
@@ -111,7 +112,7 @@ async function child() {
   try { report = await runSelfplay({ cases, maxTurns: Number(arg('--max-turns')) || undefined, out: null }); }
   catch (err) { error = String(err?.message || err).slice(0, 500); }
   fs.writeFileSync(out, JSON.stringify({ ids, error, ms: Date.now() - started, report, tokens, clock: { requested: now, at: clockAt },
-    stats: { calls: agentStats.calls, failed: agentStats.failed, input: agentStats.inputTokens, output: agentStats.outputTokens, cacheRead: agentStats.cacheReadTokens } }, null, 1), { mode: 0o600 });
+    stats: { calls: agentStats.calls, failed: agentStats.failed, input: agentStats.inputTokens, output: agentStats.outputTokens, cacheRead: agentStats.cacheReadTokens, cacheWrite: agentStats.cacheWriteTokens } }, null, 1), { mode: 0o600 });
 }
 
 // ------------------------------------------------------------------------------------------------ yhteenveto
@@ -141,7 +142,7 @@ export function summarize(results, totals, meta) {
     `Tila: eristetyt kannat, simuloidut hinnat, ei Meta-lähetyksiä, ei tilauksia (tilauksia ${totals.orders}).`,
     `Mallit: apuri ${meta.deepModel || 'claude-opus-5-5'} (lisätuote ${meta.fastModel || 'claude-haiku-5-5'}), simuloitu asiakas ja arvioija ${modelOf('whatsapp_selfplay_customer', meta.deepModel, meta.fastModel, meta.simTier)}.`, '',
     `Persoonat ${results.length}, ajettu ${ok.length}, ajovirheitä ${results.length - ok.length}. Perusvaatimukset läpi ${ok.filter((r) => !r.failures.length).length}/${ok.length}, uusi vaatimus (a–c) läpi ${ok.filter((r) => !r.newRequirement.length).length}/${ok.length}.`,
-    `Mallikutsut ${totals.calls} (epäonnistuneita ${totals.failed}), ${ok.length ? (totals.calls / ok.length).toFixed(1) : 0} / persoona. Tokenit sisään ${totals.input} (välimuistista ${totals.cacheRead}), ulos ${totals.output}. Kustannusarvio ${cost.toFixed(2)} USD, ${perPersona.toFixed(3)} USD / persoona (välimuistiin kirjoitus puuttuu laskurista). Kesto ${(totals.ms / 60000).toFixed(1)} min, persoonaa kohden ${(ok.length ? totals.personaMs / ok.length / 1000 : 0).toFixed(0)} s seinäkelloa, josta apurin vastaukset ${(ok.length ? totals.assistantMs / ok.length / 1000 : 0).toFixed(0)} s.`, '',
+    `Mallikutsut ${totals.calls} (epäonnistuneita ${totals.failed}), ${ok.length ? (totals.calls / ok.length).toFixed(1) : 0} / persoona. Tokenit sisään ${totals.input} (välimuistista ${totals.cacheRead}, välimuistiin ${totals.cacheWrite}), ulos ${totals.output}. Kustannusarvio ${cost.toFixed(2)} USD, ${perPersona.toFixed(3)} USD / persoona (välimuistiin kirjoitus puuttuu laskurista). Kesto ${(totals.ms / 60000).toFixed(1)} min, persoonaa kohden ${(ok.length ? totals.personaMs / ok.length / 1000 : 0).toFixed(0)} s seinäkelloa, josta apurin vastaukset ${(ok.length ? totals.assistantMs / ok.length / 1000 : 0).toFixed(0)} s.`, '',
     '## Perusvaatimukset (d–f)', ...base.map(([k, n]) => `- ${k}: ${n}.${example(k, (r) => r.failures || [])}`), ...(base.length ? [] : ['- ei virheitä']), '',
     '## Uusi vaatimus (a–c ja tervehdys): päivä ensin, numeroidut vaihtoehdot, 4 = lisää, tervehdys kellonajan mukaan', ...fresh.map(([k, n]) => `- ${k}: ${n}.${example(k, (r) => r.newRequirement || [])}`), ...(fresh.length ? [] : ['- ei virheitä']), '',
     '## Lisähavainnot (deterministiset, eivät kaada persoonaa)', ...obs.map(([k, n]) => `- ${k}: ${n}.${example(k, (r) => r.observations || [])}`), ...(obs.length ? [] : ['- ei havaintoja']), '',
@@ -253,7 +254,7 @@ async function main() {
   // Erät saman demokellon mukaan, koska kello ladataan kerran lapsiprosessia kohden.
   const groups = new Map(); for (const p of selected) { const k = p.now || ''; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p.id); }
   const queue = []; for (const ids0 of groups.values()) for (let i = 0; i < ids0.length; i += chunk) queue.push(ids0.slice(i, i + chunk));
-  const totals = { calls: 0, failed: 0, input: 0, output: 0, cacheRead: 0, orders: 0, ms: 0, personaMs: 0, assistantMs: 0, byPurpose: {} };
+  const totals = { calls: 0, failed: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, orders: 0, ms: 0, personaMs: 0, assistantMs: 0, byPurpose: {} };
   const raw = new Map(); const skipped = []; const t0 = Date.now(); let n = 0;
   const work = async () => {
     while (queue.length) {
@@ -262,10 +263,10 @@ async function main() {
       console.log(`aloitetaan ${batch.join(', ')}`);
       await runChild(src.dir, batch, out, maxTurns, spec);
       let result; try { result = JSON.parse(fs.readFileSync(out, 'utf8')); } catch { result = { ids: batch, error: 'Lapsiprosessi päättyi ilman tulosta (katso .log)', tokens: {}, stats: {} }; }
-      totals.calls += result.stats.calls || 0; totals.failed += result.stats.failed || 0; totals.input += result.stats.input || 0; totals.output += result.stats.output || 0; totals.cacheRead += result.stats.cacheRead || 0;
+      totals.calls += result.stats.calls || 0; totals.failed += result.stats.failed || 0; totals.input += result.stats.input || 0; totals.output += result.stats.output || 0; totals.cacheRead += result.stats.cacheRead || 0; totals.cacheWrite += result.stats.cacheWrite || 0;
       totals.orders += result.report?.orders || 0;
       if (/must not submit orders/iu.test(result.error || '')) totals.orders += 1;
-      for (const [k, t] of Object.entries(result.tokens || {})) { const x = (totals.byPurpose[k] ||= { calls: 0, input: 0, output: 0, cacheRead: 0 }); for (const f of Object.keys(x)) x[f] += t[f] || 0; }
+      for (const [k, t] of Object.entries(result.tokens || {})) { const x = (totals.byPurpose[k] ||= { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }); for (const f of Object.keys(x)) x[f] += t[f] || 0; }
       result.out = out; for (const id of batch) raw.set(id, { result, id });
     }
   };

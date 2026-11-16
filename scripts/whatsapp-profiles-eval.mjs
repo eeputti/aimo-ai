@@ -167,8 +167,9 @@ async function worker(profiles, out) {
           else if (profile.route === 'unavailable-product') text = `En hyväksy mitään korvaavaa jogurttia. Tarvitsen nimenomaan kuukivijogurttia ${profile.lines[0].value} kg. Jos sitä ei ole, kerro suoraan ettei sitä saa. Älä tilaa muuta.`;
           else if (turn < 11) {
             const next = await askAgent({ purpose: 'whatsapp_100_customer', tier: 'fast', schema, system: CUSTOMER, maxTokens: 700, timeoutMs: 45000, retries: 0,
-              user: JSON.stringify({ persona: profile.persona, goal: profile.goal, phase, remainingTurns: 11 - turn,
-                history: result.turns.slice(-9).map(({ user, assistant }) => ({ user, assistant })), ...(phase === 'cart' ? { visibleBasket: result.finalBasket } : {}) }) });
+              // Persoona ja keskustelu vuoro kerrallaan omina lohkoinaan (välimuistiin), vaihe ja kori muuttuvana loppuna.
+              turns: [JSON.stringify({ persona: profile.persona, goal: profile.goal }), ...result.turns.slice(-9).map(({ user, assistant }) => JSON.stringify({ user, assistant }))],
+              user: JSON.stringify({ phase, remainingTurns: 11 - turn, ...(phase === 'cart' ? { visibleBasket: result.finalBasket } : {}) }) });
             text = String(next.json.text || '').trim(); if (!text) throw new Error('Empty simulated customer response');
             stuckCount = next.json.stuck ? stuckCount + 1 : 0;
             if (stuckCount >= 2) { result.customerStuck = next.json.where || 'Customer could not find a next step after two attempts.'; break; }

@@ -17,9 +17,25 @@ const getClient = () => (clientPromise ||= import('@anthropic-ai/sdk').then(({ d
 /** Lämmitys käynnistyksessä: SDK muistiin, ettei demon ensimmäinen kutsu ole hitain. */
 export async function warmAgent() { if (agentEnabled()) await getClient(); }
 
-export const agentStats = { calls: 0, failed: 0, lastMs: null, lastError: null, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, byPurpose: {} };
+// inputTokens sisältää kaikki syötetokenit: välimuistista luetut (cacheReadTokens, noin 0,1 × hinta) ja välimuistiin
+// kirjoitetut (cacheWriteTokens, 1,25 × hinta) mukaan lukien.
+export const agentStats = { calls: 0, failed: 0, lastMs: null, lastError: null, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, byPurpose: {} };
 
 const textOf = (msg) => msg.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+
+/**
+ * Käyttäjäviestin sisältö. `turns` on kutsusta toiseen vain kasvava alku (esim. keskustelu vuoro kerrallaan): jokainen
+ * vuoro on oma lohkonsa ja viimeinen merkitään välimuistiin, joten seuraava kutsu lukee aiemmat vuorot välimuistista.
+ * Välimuisti osuu vain lohkon rajaan, siksi yhteen kasvavaan tekstiin koottu keskustelu ei osu koskaan.
+ * `user` on tämän kutsun muuttuva loppu, ja se tulee merkinnän jälkeen.
+ */
+export function userContent(user, turns) {
+  if (!turns?.length) return user;
+  const blocks = turns.map((t) => (typeof t === 'string' ? { type: 'text', text: t } : { ...t }));
+  blocks[blocks.length - 1].cache_control = { type: 'ephemeral' };
+  const tail = typeof user === 'string' ? (user ? [{ type: 'text', text: user }] : []) : (user || []);
+  return [...blocks, ...tail];
+}
 
 /**
  * Yksi mallikutsu.
@@ -28,15 +44,16 @@ const textOf = (msg) => msg.content.filter((b) => b.type === 'text').map((b) => 
  * @param {'fast'|'deep'} [o.tier]
  * @param {string} o.system    tehtävän ohje (välimuistitetaan)
  * @param {string|Array<object>} o.user      teksti tai multimodaaliset sisältölohkot
+ * @param {Array<string|object>} [o.turns]   kutsusta toiseen kasvava alku ennen `user`-osaa, välimuistiin (userContent)
  * @param {object} [o.schema]  JSON-skeema: vastaus palautetaan myös jäsennettynä kentässä json
  * @param {number} [o.maxTokens]
  * @param {number} [o.timeoutMs]  kutsukohtainen aikakatkaisu; ilman tätä asiakkaan oletus (120 s)
  * @param {number} [o.retries]    kutsukohtaiset uusintayritykset; ilman tätä asiakkaan oletus (1)
  * @param {(text: string) => void} [o.onToken]  striimaa vastauksen pala kerrallaan
- * @returns {Promise<{text: string, json: any, model: string, ms: number, stopReason: string, usage: {input: number, output: number, cacheRead: number}}>}
+ * @returns {Promise<{text: string, json: any, model: string, ms: number, stopReason: string, usage: {input: number, output: number, cacheRead: number, cacheWrite: number}}>}
  * Heittää virheen, jos malli kieltäytyy, vastaus katkeaa tai kutsu epäonnistuu. Kutsuja päättää, miten jatketaan säännöillä.
  */
-export async function askAgent({ purpose, tier = 'fast', system, user, schema, maxTokens = 1024, timeoutMs, retries, onToken }) {
+export async function askAgent({ purpose, tier = 'fast', system, user, turns, schema, maxTokens = 1024, timeoutMs, retries, onToken }) {
   const t0 = performance.now();
   const deep = tier === 'deep';
   const params = {
@@ -45,7 +62,7 @@ export async function askAgent({ purpose, tier = 'fast', system, user, schema, m
     thinking: deep ? { type: 'adaptive' } : { type: 'disabled' },
     output_config: { effort: deep ? 'high' : 'low', ...(schema ? { format: { type: 'json_schema', schema } } : {}) },
     system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: user }],
+    messages: [{ role: 'user', content: userContent(user, turns) }],
   };
   const opts = {};
   if (timeoutMs != null) opts.timeout = timeoutMs;
@@ -76,10 +93,14 @@ export async function askAgent({ purpose, tier = 'fast', system, user, schema, m
     const json = schema ? JSON.parse(text) : null;
     const ms = Math.round(performance.now() - t0);
     const cacheRead = msg.usage?.cache_read_input_tokens || 0;
-    const usage = { input: (msg.usage?.input_tokens || 0) + cacheRead, output: msg.usage?.output_tokens || 0, cacheRead };
+    const cacheWrite = msg.usage?.cache_creation_input_tokens || 0;
+    const usage = { input: (msg.usage?.input_tokens || 0) + cacheRead + cacheWrite, output: msg.usage?.output_tokens || 0, cacheRead, cacheWrite };
     agentStats.calls += 1; agentStats.lastMs = ms;
-    agentStats.inputTokens += usage.input; agentStats.outputTokens += usage.output; agentStats.cacheReadTokens += cacheRead;
+    agentStats.inputTokens += usage.input; agentStats.outputTokens += usage.output; agentStats.cacheReadTokens += cacheRead; agentStats.cacheWriteTokens += cacheWrite;
     const p = (agentStats.byPurpose[purpose] ||= { calls: 0, failed: 0, lastMs: null });
+    // Tarkoituskohtaiset tokenit näyttävät, mikä kutsu osuu välimuistiin. Laskurit päivitetään ennen calls-kenttää,
+    // koska itsekeskustelun kustannusseuranta (whatsapp-selfplay-batch.mjs) lukee ne calls-kentän muutoshetkellä.
+    p.inputTokens = (p.inputTokens || 0) + usage.input; p.cacheReadTokens = (p.cacheReadTokens || 0) + cacheRead; p.cacheWriteTokens = (p.cacheWriteTokens || 0) + cacheWrite;
     p.calls += 1; p.lastMs = ms;
     return { text, json, model: msg.model, ms, stopReason: msg.stop_reason, usage };
   } catch (err) {
