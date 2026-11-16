@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 16.11.2026 ilta — yhteinen projektikansio siivottu ja mainin tasalle (Claude Code, sessio G)
+
+- **Käyttäjän pyyntö:** Eelis halusi yhteisen kansion `/Users/eeputti/developer/aimo-ai` kuntoon menettämättä mitään. Se oli 85 committia jäljessä mainista ja siinä oli 43 commitoimatonta tiedostoa muilta chateilta (muokattu 15.11. klo 00.51–03.06). Eelis antoi luvan palautukseen ("Yes, restore").
+- **Luokittelu:** jokaisen 43 tiedoston täsmälleen sama sisältö on jo mainin historiassa. 19 oli samat kuin nykyinen main, 24 vanhempia versioita (21:stä mainissa uudempi, 3 raporttia `b6f1efd` poisti tarkoituksella). Ainutlaatuista tallentamatonta työtä ei ollut. Tiedostokohtainen taulukko tekijöineen: `docs/parallel/shared-tree-cleanup.md`.
+- **Varmuuskopio:** koko työpuun tila haarassa `wip/shared-tree-2026-11-16`, commit `2fb0b91`, tehty väliaikaisella indeksillä työpuuta tai haaraa muuttamatta. Pushattu ja etäcommit varmennettu. Ei `.env`-, kanta-, avain-, `node_modules`- tai `data/raw/`-sisältöä.
+- **Palautus:** 16 muutettua tiedostoa HEAD-versioon, 27 seuraamatonta poistettu nimeltä vasta blobin tarkistuksen jälkeen (ei `git clean`), sitten `git pull --ff-only` → `962f0fa`. Fast-forward poisti Gitin nykyään ohittaman `services/team-mcp/`-lähdekoodin (50 tiedostoa), joten koordinointitaulu lakkasi hetkeksi toimimasta. Lähteet palautettiin commitista `5e0a61f` Gitin ohittamina tiedostoina ja tarkistettiin; taulu toimii taas. Taulun kanta säilyi koko ajan.
+- **Rajat:** botti käyttää tämän kansion `data/whatsapp*.db`-kantoja (`.env`, `.env.whatsapp` ja `data` linkkeinä snapshotissa), ja julkaisija PID 21794 on lukenut `deploy/cloudflare/.env.publisher`-tiedoston. Kumpikin ajaa omasta `/private/tmp`-snapshotistaan. Tämä työ ei käynnistänyt kumpaakaan uudelleen; tilannechat vaihtoi samaan aikaan botin PID 94487 → 34645 (oma merkintänsä alla). Taulu palautettiin sen jälkeen, kun tilannechat oli todennut sen puuttuvan. `.claude/worktrees/` sisältää muiden sessioiden worktreet. **Tässä kansiossa ei saa ajaa `git clean` -komentoa.** Muiden kuin tämän kansion worktreihin ei koskettu.
+- **Jatkossa:** kun tallennat työn erillisestä worktreestä mainiin, älä jätä samoja muutoksia yhteiseen kansioon. Yhteinen kansio pysyy ajan tasalla vain, jos joku ajaa siinä `git pull --ff-only`, kun se on puhdas.
+
 ## 16.11.2026 — botti 4749 versioon 671b9a1: ajatusviivat ja päivä+määrä käytössä (Claude Code, tilannechat)
 
 - **Käyttäjän lupa ("Kyllä, käynnistä"):** botti uudelleen versiolla 671b9a1 (rivit ajatusviivalla, päivä ja puuttuvat määrät samassa kysymyksessä). Mainin uudemmat commitit c44fac4:ään asti muuttavat botin osalta vain itsepeliskriptiä, joten botin koodi on sama kuin mainissa.
