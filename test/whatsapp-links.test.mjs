@@ -186,7 +186,7 @@ test('prepared broth never transfers the recipe weight as a concentrate order an
 
 test('inaccessible pages, model failures, non-food pages and multiple links have truthful fallbacks', async (t) => {
   const failed = fixture(t, { readPage: async () => { throw new Error('private'); } });
-  assert.match((await failed.turn('https://example.com')).text, /En saanut sivun sisältöä luettua/);
+  assert.match((await failed.turn('https://example.com')).text, /Sivu example\.com ei auennut minulle\. Olen pahoillani, mutta voisitko lähettää reseptin ainekset tähän tekstinä\?$/);
   assert.match((await failed.turn('https://example.com https://example.org')).text, /yhden linkin kerrallaan/);
   const broken = fixture(t, { ask: async () => { throw new Error('timeout'); } });
   assert.match((await broken.turn('https://example.com')).text, /Sivu aukesi, mutta/);

@@ -54,6 +54,8 @@ export function requestPage(url, { address, family, signal, maxBytes }) {
       if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
         resolve({ status: res.statusCode, location: res.headers.location }); res.destroy(); return;
       }
+      // Bottisuoja tai kirjautuminen (Cloudflaren haaste, 401/403/429): sivua ei yritetä kiertää, asiakkaalta pyydetään kopio.
+      if ([401, 403, 429].includes(res.statusCode) || res.headers['cf-mitigated']) { reject(failure('LINK_BLOCKED')); res.destroy(); return; }
       const type = String(res.headers['content-type'] || '');
       if (res.statusCode !== 200 || !/^(?:text\/(?:html|plain)|application\/xhtml\+xml)\b/i.test(type)
         || !['', 'identity'].includes(String(res.headers['content-encoding'] || '').toLowerCase())) {
@@ -189,7 +191,8 @@ export function extractPage(body, type = 'text/html') {
   return { title, text: plain(main).slice(0, 18000), recipes };
 }
 
-export function createPageReader({ resolve = lookup, request = requestPage, timeoutMs = 12000, maxBytes = 1_000_000 } = {}) {
+// Isot reseptisivut (arla.fi noin 1,25 Mt) mahtuvat. Jäsennys on lineaarinen, joten 3 Mt ei jumita palvelinta.
+export function createPageReader({ resolve = lookup, request = requestPage, timeoutMs = 12000, maxBytes = 3_000_000 } = {}) {
   return async function readPage(value) {
     const signal = AbortSignal.timeout(timeoutMs);
     let url = pageUrl(value);
@@ -202,6 +205,7 @@ export function createPageReader({ resolve = lookup, request = requestPage, time
         if (!response.location || hop === 3) throw failure('LINK_REDIRECT');
         url = pageUrl(new URL(response.location, url).href); continue;
       }
+      if ([401, 403, 429].includes(response.status)) throw failure('LINK_BLOCKED');
       if (response.status !== 200 || !response.body || response.body.length > maxBytes) throw failure('LINK_CONTENT');
       const page = extractPage(response.body, response.type);
       if (page.text.length < 30 && !page.recipes.some((r) => r.ingredients.length)) throw failure('LINK_EMPTY');
@@ -212,3 +216,15 @@ export function createPageReader({ resolve = lookup, request = requestPage, time
 }
 
 export const readPublicPage = createPageReader();
+
+/** Sivun nimi osoitteesta, kun sivua ei päästä lukemaan: /reseptit/kermainen-kanapasta -> Kermainen kanapasta. */
+export function pageNameFromUrl(value) {
+  let url; try { url = new URL(value); } catch { return { site: '', name: '' }; }
+  const site = url.hostname.replace(/^www\./i, '');
+  const segment = url.pathname.split('/').filter(Boolean).at(-1) || '';
+  let words = '';
+  try { words = decodeURIComponent(segment); } catch { words = segment; }
+  words = words.replace(/\.(?:html?|php|aspx?)$/i, '').replace(/[-_+]+/g, ' ').replace(/\b\d+\b/g, ' ').replace(/\s+/g, ' ').trim();
+  const name = /^[\p{L}][\p{L} ]{2,79}$/u.test(words) ? words[0].toLocaleUpperCase('fi-FI') + words.slice(1) : '';
+  return { site, name };
+}

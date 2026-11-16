@@ -117,7 +117,7 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
       });
     },
     chat(args) { return serial(args.member?.binding, () => bridge.chatTurn(args)); },
-    async chatTurn({ member, messageId, receivedAt, messages, expectedList, cartLinkAvailable = false }) {
+    async chatTurn({ member, messageId, receivedAt, messages, expectedList, cartLinkAvailable = false, channel = '' }) {
       const current = member?.phone && store.member(member.phone);
       if (!current || current.binding !== member.binding || !messageId) {
         return { text: 'Testiyhteys ei ole voimassa. Pyydä ylläpitäjältä uusi yhdistäminen.' };
@@ -144,7 +144,7 @@ export function createDemoOrderingChat({ store, phoneId, draftDb, quoteDb, loadO
         allowed: () => livePermissions(customer).readProducts }) : runOrder(input);
       const linked = await ordering.links?.respond({ binding: current.binding, messageId, text,
         shoppingList: ordering.getShoppingList?.({ conversationId: conversationId(customer), customer }) || null,
-        runOrder: respond, allowed: () => livePermissions(customer).readProducts });
+        runOrder: respond, allowed: () => livePermissions(customer).readProducts, customer, channel });
       const result = linked || await respond(text);
       if (!livePermissions(customer).readProducts) return { status: 'error', text: 'Testiyhteys ei ole enää voimassa.' };
       if (expectedList === undefined) return result;

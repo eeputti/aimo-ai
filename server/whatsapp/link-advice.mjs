@@ -1,5 +1,6 @@
 // A page supplies evidence for suggestions, never instructions or order authority.
-import { messageLinks, readPublicPage } from './link-reader.mjs';
+import { messageLinks, pageNameFromUrl, readPublicPage } from './link-reader.mjs';
+import { checkAvailability, dateLabel, findSubstitutes, helsinkiDate, mapLimited } from './link-substitutes.mjs';
 import { safeModelText } from './model-guard.mjs';
 import { verifiedFree } from '../allergens.mjs';
 
@@ -57,35 +58,213 @@ function restrictions(text, list) {
 // Allergeenikielto katsoo koodihierarkian (allergens.mjs): pähkinätön ei saa mantelia, gluteeniton ei vehnää.
 const fits = (p, rules) => rules.claims.every((c) => p.labels?.includes(c)) && verifiedFree(rules.allergens, p);
 
-// A short "ok" answers the recipe question before it can acknowledge an older cart.
-export function hasLinkAdviceReply(db, binding, text, now = Date.now()) {
-  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wa_link_advice'").get()) return false;
-  return !!db.prepare('SELECT 1 FROM wa_link_advice WHERE binding=? AND updated>?').get(binding, now - 3600_000)
-    && (YES.test(text) || NO.test(text) || !!servingsOf(text) || /^\s*\d{1,5}\s*[.!]?\s*$/u.test(text));
+const MULTIPLIER = /(?:^|[\s(])(?:[x×*]\s*(\d{1,4})|(\d{1,4})\s*(?:[x×]|-?kertaise\p{L}*|kertaa))(?=$|[\s.,!?)])/iu;
+const multiplierOf = (text) => { const m = String(text || '').match(MULTIPLIER); const n = m && Number(m[1] || m[2]); return n > 1 && n <= 1000 ? n : null; };
+const scaleOf = (s) => (s.target && s.servings ? s.target / s.servings : s.multiplier || 1);
+const amountOf = (q, s) => `${count(q.value * scaleOf(s))} ${q.unit}`;
+const scalable = (s) => !s.target || s.servings;
+const quantityText = (item, s) => (item.quantity && scalable(s) ? amountOf(item.quantity, s) : 'määrä tarkennettava');
+const cap = (s) => s.charAt(0).toLocaleUpperCase('fi-FI') + s.slice(1);
+const joinFi = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} ja ${xs.at(-1)}`);
+const fiDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return `${d}.${m}.${y}`; };
+const MISSING = ['notInCatalog', 'notForDate', 'inexact'];
+const openSubstitute = (s) => s.items.find((i) => i.substitutes?.length && i.choice === undefined);
+const DROP = /^(?:ei(?:\s|$)|jätä|jätetään|ilman(?:\s|$)|pois(?:\s|$))|jät(?:ä|etään)\s+(?:se\s+)?pois/u;
+
+function sizeLine(s) {
+  if (s.target && !s.servings) return `Toiveesi on ${s.target} annosta. Alkuperäinen annosmäärä puuttuu: monelleko resepti on?`;
+  if (s.target) return `Määrät ${s.target} annokselle.`;
+  if (s.multiplier) return `Määrät ${s.multiplier}-kertaisina${s.servings ? ` (${count(s.servings * s.multiplier)} annosta)` : ''}. Jos tarkoitit ${s.multiplier} annosta, kirjoita "${s.multiplier} annosta".`;
+  if (s.servings) return `Määrät ${s.servings} annokselle.`;
+  return 'Määrät ovat reseptin alkuperäiset. Voit kertoa haluamasi annosmäärän.';
+}
+const header = (s) => `${s.source === 'copy' ? 'Luin reseptin' : 'Luin sivun'}${s.title ? `: ${s.title}` : '.'}`;
+
+function reason(item, s) {
+  const a = item.availability || {};
+  if (a.status === 'notInCatalog') return 'ei löydy Aimon valikoimasta';
+  if (a.status === 'notForDate') return `ei saatavilla ${dateLabel(s.date)}${a.next ? ` (aikaisintaan ${dateLabel(a.next)})` : ''}`;
+  return 'tarkalleen tätä tuotetta ei ole tilattavana';
+}
+function substituteAmount(c, s) {
+  const q = ingredientQuantity(c.amount, c.amount);
+  return q && scalable(s) ? `, noin ${amountOf(q, s)}` : '';
+}
+function substituteQuestion(item, s) {
+  const n = item.substitutes.length;
+  const why = reason(item, s);
+  return [`${cap(item.term)}: ${why}${why.endsWith('.') ? '' : '.'} Kelpaisiko tilalle jokin näistä?`,
+    ...item.substitutes.map((c, i) => `${i + 1}) ${c.term}${substituteAmount(c, s)}${c.product ? ` (esim. ${c.product})` : ''}`),
+    `${n + 1}) jätetään pois`].join('\n');
+}
+// Lopullinen lista: korvaajat korvattavan nimellä, pois jätetyt eivät näy.
+function finalLines(s) {
+  return s.items.filter((i) => i.choice !== 'drop').map((i) => (typeof i.choice === 'object'
+    ? `- ${i.choice.term}${substituteAmount(i.choice, s)} (korvaa: ${i.term})` : `- ${i.term}, ${i.needsQuantityCheck ? 'ostomäärä tarkennetaan' : quantityText(i, s)}`));
+}
+function confirmQuestion(s) {
+  return s.date ? `Lisätäänkö nämä ostoslistalle toimitukselle ${dateLabel(s.date)}? Tuotevalinnat ja hinnat käydään läpi sen jälkeen.`
+    : 'Lisätäänkö nämä ainekset ostoslistalle? Tuotteet ja toimitus tarkistetaan sen jälkeen.';
+}
+function availabilityText(s) {
+  const ok = s.items.filter((i) => !MISSING.includes(i.availability?.status));
+  const missing = (status) => s.items.filter((i) => i.availability?.status === status);
+  const parts = [`Tarkistin saatavuuden toimitukselle ${dateLabel(s.date)}`];
+  if (ok.length) {
+    // Tuote valitaan vasta tilauksessa, joten tässä ei näytetä haun ensimmäistä osumaa (se voi olla maustettu tai erikoistuote).
+    parts.push(`Saatavilla:\n${ok.map((i) => `- ${i.term}, ${i.needsQuantityCheck ? 'ostomäärä tarkennetaan' : quantityText(i, s)}${i.availability?.status === 'ok' ? '' : ' (saatavuutta ei saatu tarkistettua)'}`).join('\n')}`);
+  }
+  const notes = [];
+  if (missing('notInCatalog').length) notes.push(`Ei Aimon valikoimassa: ${joinFi(missing('notInCatalog').map((i) => i.term))}.`);
+  if (missing('notForDate').length) notes.push(`Ei saatavilla ${dateLabel(s.date)}: ${joinFi(missing('notForDate').map((i) => `${i.term}${i.availability.next ? ` (aikaisintaan ${dateLabel(i.availability.next)})` : ''}`))}.`);
+  if (missing('inexact').length) notes.push(`Ei tilattavana tarkalleen tätä tuotetta: ${joinFi(missing('inexact').map((i) => i.term))}.`);
+  const dropped = s.items.filter((i) => i.autoDropped).map((i) => i.term);
+  if (dropped.length) notes.push(`En löytänyt näille tilattavaa korvaajaa, joten jätän ne pois listalta: ${joinFi(dropped)}. Voit lisätä ne myöhemmin itse.`);
+  if (notes.length) parts.push(notes.join('\n'));
+  return parts.join('\n\n');
+}
+function substituteChoice(text, item) {
+  const t = norm(text); const subs = item.substitutes;
+  const n = t.match(/^(\d)\s*[.)!]?$/u);
+  if (n) { const k = Number(n[1]); return k >= 1 && k <= subs.length ? subs[k - 1] : k === subs.length + 1 ? 'drop' : null; }
+  if (DROP.test(t)) return 'drop';
+  const named = subs.filter((c) => t.includes(norm(c.term)));
+  return named.length === 1 ? named[0] : null;
+}
+function unreadable(code, site, name, images) {
+  const page = `Sivu${site ? ` ${site}` : ''}${name ? ` (${name})` : ''}`;
+  const why = code === 'LINK_BLOCKED' ? 'näyttää olevan bottisuojan takana, joten en pääse lukemaan sitä'
+    : code === 'LINK_EMPTY' ? 'rakentuu vasta selaimessa, joten en näe sen sisältöä'
+      : code === 'LINK_TIMEOUT' ? 'ei vastannut ajoissa'
+        : code === 'LINK_SIZE' ? 'on liian suuri luettavaksi'
+          : code === 'LINK_URL' || code === 'LINK_ADDRESS' ? 'ei ole julkinen https-sivu, joten en avaa sitä' : 'ei auennut minulle';
+  return `${page} ${why}. Olen pahoillani, mutta voisitko lähettää reseptin ainekset tähän tekstinä?${images ? ' Kuvakin reseptistä kelpaa, jos se on sinulle helpompaa!' : ''}`;
 }
 
-export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, now = Date.now }) {
+// A short "ok" answers the recipe question before it can acknowledge an older cart. Date and substitute answers too.
+export function hasLinkAdviceReply(db, binding, text, now = Date.now()) {
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wa_link_advice'").get()) return false;
+  const row = db.prepare('SELECT json FROM wa_link_advice WHERE binding=? AND updated>?').get(binding, now - 3600_000);
+  if (!row) return false;
+  let awaiting = '';
+  try { awaiting = JSON.parse(row.json).awaiting || ''; } catch { /* old rows */ }
+  if (awaiting === 'copy') return String(text).trim().length >= 30;
+  if ((awaiting === 'date' || awaiting === 'substitute') && String(text).length <= 200) return true;
+  return YES.test(text) || NO.test(text) || !!servingsOf(text) || /^\s*\d{1,5}\s*[.!]?\s*$/u.test(text);
+}
+
+/**
+ * suggest: tilauskeskustelun työkalu saatavuuteen (order-tools). parseDate: viestin toimituspäivä (YYYY-MM-DD) tai null.
+ * Ilman niitä ehdotukset toimivat kuten ennen: katalogiosumat ilman päivää, saatavuus tarkistetaan tilauksessa.
+ */
+export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, now = Date.now, suggest = null, parseDate = null, today = () => helsinkiDate(now()) }) {
   db.exec(`CREATE TABLE IF NOT EXISTS wa_link_advice (binding TEXT PRIMARY KEY, json TEXT NOT NULL, updated INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS wa_link_results (message_id TEXT PRIMARY KEY, binding TEXT NOT NULL, json TEXT NOT NULL, created INTEGER NOT NULL);`);
   const forget = (binding) => db.prepare('DELETE FROM wa_link_advice WHERE binding=?').run(binding);
   const saveResult = (messageId, binding, result) => { db.prepare('INSERT OR REPLACE INTO wa_link_results VALUES(?,?,?,?)').run(messageId, binding, JSON.stringify(result), now()); return result; };
+  const keep = (binding, state) => db.prepare('INSERT OR REPLACE INTO wa_link_advice VALUES(?,?,?)').run(binding, JSON.stringify(state), now());
   const reply = (text) => ({ status: 'collecting', text, messages: [text] });
-  async function present(state, shoppingList) {
-    const rules = restrictions(state.request, shoppingList);
-    const scale = state.target && state.servings ? state.target / state.servings : 1;
-    const lines = [];
-    for (const item of state.items) {
-      const products = (item.products || []).filter((p) => fits(p, rules));
-      const quantity = item.quantity && (!state.target || state.servings) ? `${count(item.quantity.value * scale)} ${item.quantity.unit}` : 'määrä tarkennettava';
-      lines.push(`- ${item.term}, ${quantity}\n  ${products.length ? products.map((p) => clean(p.name)).join(' / ') : 'Sopivaa katalogiosumaa ei löytynyt.'}${item.needsQuantityCheck ? '\n  Reseptin määrä on valmistetulle ainekselle. Ostettavan tuotteen määrä täsmennetään erikseen.' : ''}`);
+  const checking = (customer) => Boolean(suggest && customer?.customerId);
+  const dateFrom = (text) => {
+    if (!parseDate || !text) return null;
+    let d = null; try { d = parseDate(text); } catch { /* no date */ }
+    return /^\d{4}-\d{2}-\d{2}$/.test(d || '') && d >= today() ? d : null;
+  };
+
+  function present(state, shoppingList, lead = '') {
+    if (state.date && state.checked) {
+      const open = openSubstitute(state);
+      return reply([lead, header(state), sizeLine(state), availabilityText(state), open ? substituteQuestion(open, state) : confirmQuestion(state)].filter(Boolean).join('\n\n'));
     }
-    const size = state.target && !state.servings ? `Toiveesi on ${state.target} annosta. Alkuperäinen annosmäärä puuttuu: monelleko sivun resepti on?`
-      : state.target || state.servings ? `Määrät ${state.target || state.servings} annokselle.` : 'Määrät ovat sivun alkuperäiset. Voit kertoa haluamasi annosmäärän.';
-    return reply([`Luin sivun${state.title ? `: ${state.title}` : '.'}`, size, `Katalogista sopivia vaihtoehtoja:\n${lines.join('\n')}`,
-      state.target && !state.servings ? 'Kerro alkuperäinen annosmäärä, niin lasken tarpeen.' : 'Lisätäänkö nämä ainekset ostoslistalle? Tuotteet ja toimitus tarkistetaan sen jälkeen.'].filter(Boolean).join('\n\n'));
+    const rules = restrictions(state.request, shoppingList);
+    const lines = state.items.map((item) => {
+      const products = (item.products || []).filter((p) => fits(p, rules));
+      return `- ${item.term}, ${quantityText(item, state)}\n  ${products.length ? products.map((p) => clean(p.name)).join(' / ') : 'Sopivaa katalogiosumaa ei löytynyt.'}${item.needsQuantityCheck ? '\n  Reseptin määrä on valmistetulle ainekselle. Ostettavan tuotteen määrä täsmennetään erikseen.' : ''}`;
+    });
+    const question = state.target && !state.servings ? 'Kerro alkuperäinen annosmäärä, niin lasken tarpeen.'
+      : state.awaiting === 'date' ? 'Mille päivälle tarvitset toimituksen? Tarkistan sitten, mitä aineksista saa sille päivälle, ja ehdotan korvaavan tuotteen puuttuville.'
+        : confirmQuestion(state);
+    return reply([lead, header(state), sizeLine(state), `Katalogista sopivia vaihtoehtoja:\n${lines.join('\n')}`, question].filter(Boolean).join('\n\n'));
   }
+
+  // Saatavuus valitulle päivälle ja korvaajat puuttuville. Mitään ei valita asiakkaan puolesta.
+  async function assess(state, customer, shoppingList) {
+    const rules = restrictions(state.request, shoppingList);
+    const need = (q) => (q && scalable(state) ? { value: q.value * scaleOf(state), unit: q.unit } : null);
+    const checked = await mapLimited(state.items, 4, (item) => checkAvailability({ suggest, customer, date: state.date, term: item.term, quantity: item.needsQuantityCheck ? null : need(item.quantity), rules }));
+    state.items.forEach((item, i) => { item.availability = checked[i]; delete item.choice; delete item.substitutes; delete item.autoDropped; });
+    const missing = state.items.map((item, index) => ({ index, term: item.term, source: item.source })).filter(({ index }) => MISSING.includes(state.items[index].availability.status));
+    const found = await findSubstitutes({ ask, suggest, customer, date: state.date, dish: state.title, rules, missing, quantityOf: (amount) => need(ingredientQuantity(amount, amount)) });
+    for (const { index } of missing) {
+      const item = state.items[index];
+      item.substitutes = found.get(index) || [];
+      if (!item.substitutes.length) { item.choice = 'drop'; item.autoDropped = true; }
+    }
+    state.checked = true;
+  }
+  // Seuraava vaihe: alkuperäinen annosmäärä, toimituspäivä, saatavuus ja korvaajat, lopuksi lisäyksen hyväksyntä.
+  async function advance(state, { customer, shoppingList, reply: answer = '' }) {
+    if (state.target && !state.servings) { state.awaiting = 'servings'; return; }
+    if (!checking(customer)) { state.awaiting = 'confirm'; return; }
+    const listDate = /^\d{4}-\d{2}-\d{2}$/.test(shoppingList?.deliveryDate || '') && shoppingList.deliveryDate >= today() ? shoppingList.deliveryDate : null;
+    const date = dateFrom(answer) || (!state.date && (dateFrom(state.request) || listDate));
+    if (date && date !== state.date) { state.date = date; state.checked = false; }
+    if (!state.date) { state.awaiting = 'date'; return; }
+    if (!state.checked) await assess(state, customer, shoppingList);
+    state.awaiting = openSubstitute(state) ? 'substitute' : 'confirm';
+  }
+
+  async function analyse(page, { binding, messageId, request, shoppingList, customer, kept = {} }) {
+    const fromCopy = !page.url;
+    let data;
+    try { data = (await ask({ purpose: 'whatsapp_link_read', tier: 'deep', system: SYSTEM, schema: SCHEMA, maxTokens: 5000, timeoutMs: 60000, retries: 0,
+      user: JSON.stringify({ request, shoppingList, page }) })).json; } catch {
+      if (fromCopy) { forget(binding); return saveResult(messageId, binding, reply('En saanut reseptin aineksia tulkittua luotettavasti. Kirjoita tarvittavat tuotteet ja määrät, niin jatketaan niistä.')); }
+      return saveResult(messageId, binding, reply('Sivu aukesi, mutta en saanut sen aineksia tulkittua luotettavasti. Kopioi ainekset tähän, niin jatketaan.'));
+    }
+    const evidence = norm([page.text, ...page.recipes.flatMap((r) => [r.name, r.yield, ...r.ingredients])].join(' '));
+    const items = (Array.isArray(data?.ingredients) ? data.ingredients : []).slice(0, 16).filter((i) => i && typeof i.term === 'string' && /^[\p{L}][\p{L}\s-]{1,69}$/u.test(i.term) && !COMMAND.test(i.term)
+      && i.source?.length >= 3 && evidence.includes(norm(i.source))).map((i) => ({ term: clean(i.term, 70), source: i.source.slice(0, 240), quantity: ingredientQuantity(i.amount, i.source) })).filter((i) => i.term);
+    if (!items.length) {
+      // Liitetty teksti, josta ei löydy reseptiä, on luultavasti tavallinen viesti: tilauskeskustelu jatkaa siitä.
+      if (fromCopy) { forget(binding); return null; }
+      return saveResult(messageId, binding, reply(`Sivu aukesi${clean(page.title) ? `: ${clean(page.title)}` : '.'}\nEn löytänyt siitä luotettavasti poimittavaa reseptiä tai tilattavaa tuotetta. Kerro mitä haluat sivulta, tai kopioi tarvittava kohta tähän.`));
+    }
+    const servings = Number(data.servings);
+    const verifiedServings = servings > 0 && servings <= 10000 && data.servingsEvidence && evidence.includes(norm(data.servingsEvidence))
+      && new RegExp(`(?<!\\d)${servings}(?!\\d)`).test(data.servingsEvidence) ? servings : null;
+    const state = { title: clean(page.recipes[0]?.name || page.title) || kept.title || '', summary: clean(data.summary, 350), items, servings: verifiedServings,
+      target: kept.target ?? servingsOf(request), multiplier: kept.multiplier ?? multiplierOf(request), request, cart: fingerprint(shoppingList), source: fromCopy ? 'copy' : 'page' };
+    const rules = restrictions(state.request, shoppingList);
+    const candidates = [];
+    for (const [index, item] of state.items.entries()) {
+      let products = [];
+      try { products = (await lookup(item.term)).filter((p) => p?.id && clean(p.name) && fits(p, rules)).slice(0, 8); } catch { /* No candidate means no recommendation. */ }
+      candidates.push({ index, term: item.term, source: item.source, candidates: products });
+    }
+    let matches;
+    try { matches = (await ask({ purpose: 'whatsapp_link_match', tier: 'deep', system: MATCH_SYSTEM, schema: MATCH_SCHEMA, maxTokens: 3000, timeoutMs: 60000, retries: 0,
+      user: JSON.stringify({ request: state.request, rules, rows: candidates }) })).json; } catch { /* Ingredients remain readable when matching fails. */ }
+    const rows = Array.isArray(matches?.rows) ? matches.rows : [];
+    for (const [index, item] of state.items.entries()) {
+      const match = rows.find((r) => r.index === index);
+      const ids = Array.isArray(match?.productIds) ? match.productIds.slice(0, 2) : [];
+      item.products = candidates[index].candidates.filter((p) => ids.includes(p.id));
+      // Prepared stock must never keep its recipe amount when the only offers are concentrates.
+      const stock = /liemi/iu.test(item.term) && !/(?:jauhe|tiiviste|fondi)/iu.test(item.term);
+      const concentrate = (p) => /(?:liemijauhe|liemikuutio|tiiviste|fondi|\d+(?:[.,]\d+)?\s*(?:kg|g)\s*\/\s*\d+\s*l)/iu.test(p.name);
+      const onlyConcentrates = stock && candidates[index].candidates.length > 0 && candidates[index].candidates.every(concentrate);
+      const pickedConcentrate = stock && item.products.some(concentrate);
+      if (stock) item.products = item.products.filter((p) => !concentrate(p));
+      item.needsQuantityCheck = match?.needsQuantityCheck === true || onlyConcentrates || !match && stock || pickedConcentrate && !item.products.length;
+      if (item.needsQuantityCheck) item.products = [];
+    }
+    await advance(state, { customer, shoppingList });
+    return state;
+  }
+
   return {
-    async respond({ binding, messageId, text, shoppingList, runOrder, allowed = () => true }) {
+    async respond({ binding, messageId, text, shoppingList, runOrder, allowed = () => true, customer = null, channel = '' }) {
       if (!allowed()) return reply('Testiyhteys ei ole enää voimassa.');
       const cached = db.prepare('SELECT json FROM wa_link_results WHERE message_id=? AND binding=?').get(messageId, binding);
       if (cached) return JSON.parse(cached.json);
@@ -93,72 +272,76 @@ export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, n
       const row = db.prepare('SELECT json FROM wa_link_advice WHERE binding=? AND updated>?').get(binding, now() - 3600_000);
       let state = row && JSON.parse(row.json);
       if (!links.length && !state) return null;
-      if (!links.length) {
-        if (NO.test(text)) { forget(binding); return saveResult(messageId, binding, reply('Selvä, jätetään linkin ainekset lisäämättä. Mitä tarvitset seuraavaksi?')); }
-        const portions = servingsOf(text) || (/^\s*\d{1,5}\s*[.!]?\s*$/u.test(text) ? Number(text.replace(/\D/g, '')) : null);
-        if (portions > 0 && portions <= 10000) {
-          if (state.target && !state.servings) state.servings = portions; else state.target = portions;
-        } else if (YES.test(text)) {
-          if (state.target && !state.servings) return saveResult(messageId, binding, reply('Monelleko annokselle alkuperäinen resepti on? Tarvitsen tiedon määrien laskemiseen.'));
-          if (state.cart !== fingerprint(shoppingList)) { forget(binding); return saveResult(messageId, binding, reply('Ostoslista muuttui linkin lukemisen jälkeen. Lähetä linkki uudelleen, niin sovitan ehdotukset nykyiseen listaan.')); }
-          const scale = state.target && state.servings ? state.target / state.servings : 1;
-          const orderText = `Lisää ostoslistalle: ${state.items.map((i) => `${i.term}${i.quantity && !i.needsQuantityCheck ? ` ${count(i.quantity.value * scale)} ${i.quantity.unit}` : ''}`).join(', ')}.\nAsiakkaan toive: ${state.request}`;
-          const result = await runOrder(orderText);
-          if (!allowed()) return reply('Testiyhteys ei ole enää voimassa.');
-          saveResult(messageId, binding, result); forget(binding); return result;
-        } else { forget(binding); return null; }
-      } else {
+      const finish = (next, result) => {
+        if (!allowed()) return reply('Testiyhteys ei ole enää voimassa.');
+        keep(binding, next); return saveResult(messageId, binding, result);
+      };
+
+      if (links.length) {
         forget(binding);
         if (links.length > 1) return saveResult(messageId, binding, reply('Luen yhden linkin kerrallaan. Lähetä ensin se sivu, jonka tuotteista haluat ehdotukset.'));
         if (!ask) return saveResult(messageId, binding, reply('Linkin sisällön tulkinta ei ole nyt käytössä. Voit kopioida ainekset tähän viestiin.'));
+        const request = text.replace(/(?:https?:\/\/|www\.)\S+/giu, '').replace(/[ \t]{2,}/g, ' ').trim().slice(0, 2000);
         let page;
-        try { page = await readPage(links[0]); } catch {
-          return saveResult(messageId, binding, reply('En saanut sivun sisältöä luettua. Lähetä julkinen https-linkki tai kopioi resepti tai tuotetiedot tähän. Kirjautumista ja selaimessa toimivia sivuja en vielä pysty lukemaan.'));
+        try { page = await readPage(links[0]); } catch (err) {
+          // Sivua ei kierretä (bottisuoja, kirjautuminen). Asiakkaan muu toive säilyy, ja liitetty resepti jatkaa siitä.
+          const { site, name } = pageNameFromUrl(links[0]);
+          const waiting = { awaiting: 'copy', request, site, title: name, target: servingsOf(request), multiplier: multiplierOf(request), cart: fingerprint(shoppingList) };
+          return finish(waiting, reply(unreadable(err?.code, site, name, channel === 'whatsapp')));
         }
         if (!allowed()) return reply('Testiyhteys ei ole enää voimassa.');
-        let data;
-        try { data = (await ask({ purpose: 'whatsapp_link_read', tier: 'deep', system: SYSTEM, schema: SCHEMA, maxTokens: 5000, timeoutMs: 60000, retries: 0,
-          user: JSON.stringify({ request: text, shoppingList, page }) })).json; } catch {
-          return saveResult(messageId, binding, reply('Sivu aukesi, mutta en saanut sen aineksia tulkittua luotettavasti. Kopioi ainekset tähän, niin jatketaan.'));
+        const analysed = await analyse(page, { binding, messageId, request, shoppingList, customer });
+        if (!analysed?.items) return analysed;
+        return finish(analysed, present(analysed, shoppingList));
+      }
+
+      if (/^\s*unohda\b/iu.test(text)) { forget(binding); return saveResult(messageId, binding, reply('Selvä, unohdetaan resepti. Mitä tarvitset seuraavaksi?')); }
+      if (state.awaiting === 'copy') {
+        if (NO.test(text)) { forget(binding); return saveResult(messageId, binding, reply('Selvä, jätetään resepti. Mitä tarvitset seuraavaksi?')); }
+        if (text.trim().length < 30 || !ask) { forget(binding); return null; }
+        const analysed = await analyse({ url: '', title: state.title || '', text: text.slice(0, 18000), recipes: [] },
+          { binding, messageId, request: state.request, shoppingList, customer, kept: state });
+        if (!analysed?.items) return analysed;
+        return finish(analysed, present(analysed, shoppingList));
+      }
+      if (state.awaiting === 'substitute') {
+        const item = openSubstitute(state);
+        const pick = item && substituteChoice(text, item);
+        if (pick) {
+          item.choice = pick === 'drop' ? 'drop' : { term: pick.term, amount: pick.amount };
+          const lead = pick === 'drop' ? `Selvä, jätetään ${item.term} pois.` : `Selvä, ${item.term} → ${pick.term}.`;
+          const next = openSubstitute(state);
+          state.awaiting = next ? 'substitute' : 'confirm';
+          return finish(state, reply([lead, next ? substituteQuestion(next, state) : `Ostoslistalle tulisi:\n${finalLines(state).join('\n')}`, next ? '' : confirmQuestion(state)].filter(Boolean).join('\n\n')));
         }
-        const evidence = norm([page.text, ...page.recipes.flatMap((r) => [r.name, r.yield, ...r.ingredients])].join(' '));
-        const items = (Array.isArray(data?.ingredients) ? data.ingredients : []).slice(0, 16).filter((i) => i && typeof i.term === 'string' && /^[\p{L}][\p{L}\s-]{1,69}$/u.test(i.term) && !COMMAND.test(i.term)
-          && i.source?.length >= 3 && evidence.includes(norm(i.source))).map((i) => ({ term: clean(i.term, 70), source: i.source.slice(0, 240), quantity: ingredientQuantity(i.amount, i.source) })).filter((i) => i.term);
-        if (!items.length) return saveResult(messageId, binding, reply(`Sivu aukesi${clean(page.title) ? `: ${clean(page.title)}` : '.'}\nEn löytänyt siitä luotettavasti poimittavaa reseptiä tai tilattavaa tuotetta. Kerro mitä haluat sivulta, tai kopioi tarvittava kohta tähän.`));
-        const servings = Number(data.servings);
-        const verifiedServings = servings > 0 && servings <= 10000 && data.servingsEvidence && evidence.includes(norm(data.servingsEvidence))
-          && new RegExp(`(?<!\\d)${servings}(?!\\d)`).test(data.servingsEvidence) ? servings : null;
-        state = { title: clean(page.recipes[0]?.name || page.title), summary: clean(data.summary, 350), items, servings: verifiedServings,
-          target: servingsOf(text), request: text.replace(/(?:https?:\/\/|www\.)\S+/giu, '').trim().slice(0, 2000), cart: fingerprint(shoppingList) };
-        const rules = restrictions(state.request, shoppingList);
-        const candidates = [];
-        for (const [index, item] of state.items.entries()) {
-          let products = [];
-          try { products = (await lookup(item.term)).filter((p) => p?.id && clean(p.name) && fits(p, rules)).slice(0, 8); } catch { /* No candidate means no recommendation. */ }
-          candidates.push({ index, term: item.term, source: item.source, candidates: products });
-        }
-        let matches;
-        try { matches = (await ask({ purpose: 'whatsapp_link_match', tier: 'deep', system: MATCH_SYSTEM, schema: MATCH_SCHEMA, maxTokens: 3000, timeoutMs: 60000, retries: 0,
-          user: JSON.stringify({ request: state.request, rules, rows: candidates }) })).json; } catch { /* Ingredients remain readable when matching fails. */ }
-        const rows = Array.isArray(matches?.rows) ? matches.rows : [];
-        for (const [index, item] of state.items.entries()) {
-          const match = rows.find((r) => r.index === index);
-          const ids = Array.isArray(match?.productIds) ? match.productIds.slice(0, 2) : [];
-          item.products = candidates[index].candidates.filter((p) => ids.includes(p.id));
-          // Prepared stock must never keep its recipe amount when the only offers are concentrates.
-          const stock = /liemi/iu.test(item.term) && !/(?:jauhe|tiiviste|fondi)/iu.test(item.term);
-          const concentrate = (p) => /(?:liemijauhe|liemikuutio|tiiviste|fondi|\d+(?:[.,]\d+)?\s*(?:kg|g)\s*\/\s*\d+\s*l)/iu.test(p.name);
-          const onlyConcentrates = stock && candidates[index].candidates.length > 0 && candidates[index].candidates.every(concentrate);
-          const pickedConcentrate = stock && item.products.some(concentrate);
-          if (stock) item.products = item.products.filter((p) => !concentrate(p));
-          item.needsQuantityCheck = match?.needsQuantityCheck === true || onlyConcentrates || !match && stock || pickedConcentrate && !item.products.length;
-          if (item.needsQuantityCheck) item.products = [];
+        if (item && !servingsOf(text)) {
+          if (YES.test(text) || /^\s*\d{1,5}\s*[.!]?\s*$/u.test(text)) {
+            return finish(state, reply(`Kumpi käy? Vastaa ${item.substitutes.map((_, i) => i + 1).join(', ')} tai ${item.substitutes.length + 1}, jos jätetään pois.`));
+          }
+          forget(binding); return null;
         }
       }
-      const result = await present(state, shoppingList);
-      if (!allowed()) return reply('Testiyhteys ei ole enää voimassa.');
-      db.prepare('INSERT OR REPLACE INTO wa_link_advice VALUES(?,?,?)').run(binding, JSON.stringify(state), now());
-      return saveResult(messageId, binding, result);
+      if (NO.test(text)) { forget(binding); return saveResult(messageId, binding, reply('Selvä, jätetään linkin ainekset lisäämättä. Mitä tarvitset seuraavaksi?')); }
+      const portions = servingsOf(text) || (state.awaiting !== 'substitute' && /^\s*\d{1,5}\s*[.!]?\s*$/u.test(text) ? Number(text.replace(/\D/g, '')) : null);
+      const date = checking(customer) && state.awaiting !== 'substitute' ? dateFrom(text) : null;
+      if ((portions > 0 && portions <= 10000) || date) {
+        if (portions > 0 && portions <= 10000) { if (state.target && !state.servings) state.servings = portions; else state.target = portions; }
+        await advance(state, { customer, shoppingList, reply: text });
+        return finish(state, present(state, shoppingList));
+      }
+      if (YES.test(text)) {
+        if (state.target && !state.servings) return saveResult(messageId, binding, reply('Monelleko annokselle alkuperäinen resepti on? Tarvitsen tiedon määrien laskemiseen.'));
+        if (state.cart !== fingerprint(shoppingList)) { forget(binding); return saveResult(messageId, binding, reply('Ostoslista muuttui linkin lukemisen jälkeen. Lähetä linkki uudelleen, niin sovitan ehdotukset nykyiseen listaan.')); }
+        const lines = state.items.filter((i) => i.choice !== 'drop').map((i) => {
+          if (typeof i.choice === 'object') { const q = ingredientQuantity(i.choice.amount, i.choice.amount); return `${i.choice.term}${q && scalable(state) ? ` ${amountOf(q, state)}` : ''}`; }
+          return `${i.term}${i.quantity && !i.needsQuantityCheck ? ` ${amountOf(i.quantity, state)}` : ''}`;
+        });
+        const orderText = `Lisää ostoslistalle: ${lines.join(', ')}.${state.date ? ` Toimitus ${fiDate(state.date)}.` : ''}\nAsiakkaan toive: ${state.request}`;
+        const result = await runOrder(orderText);
+        if (!allowed()) return reply('Testiyhteys ei ole enää voimassa.');
+        saveResult(messageId, binding, result); forget(binding); return result;
+      }
+      forget(binding); return null;
     },
     prune() {
       db.prepare('DELETE FROM wa_link_advice WHERE updated<? OR binding NOT IN (SELECT binding FROM members)').run(now() - 3600_000);
@@ -168,8 +351,12 @@ export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, n
 }
 
 export async function createConfiguredLinkAdvice(store) {
-  const [{ askAgent, agentEnabled }, { loadCatalog, publicProduct }] = await Promise.all([import('../aimoAgent.mjs'), import('../catalog.mjs')]);
-  return createLinkAdvice({ db: store.db, ask: agentEnabled() ? askAgent : null,
+  const [{ askAgent, agentEnabled }, { loadCatalog, publicProduct }, { createOrderingTools }, { understand }, { clock }] = await Promise.all([
+    import('../aimoAgent.mjs'), import('../catalog.mjs'), import('../order-tools/index.mjs'), import('../aimo/understand.mjs'), import('../gateway/clock.mjs')]);
+  // Oma työkaluinstanssi vain saatavuuden lukemiseen: suggest ei tee tarjousta eikä tilausta.
+  const tools = createOrderingTools({ dbPath: ':memory:', now: () => clock.now().getTime() });
+  return createLinkAdvice({ db: store.db, ask: agentEnabled() ? askAgent : null, suggest: tools.suggest,
+    parseDate: (text) => understand(text).deliveryDate || null, today: () => helsinkiDate(clock.now().getTime()),
     lookup: async (query) => {
       const queries = [...new Set([query, query.replace(/^pakaste/iu, '').trim()])];
       const products = queries.flatMap((q) => loadCatalog().search(q, { limit: 8 }).filter((hit) => hit.match === 'core').map((hit) => publicProduct(hit.product)));
