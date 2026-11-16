@@ -107,13 +107,15 @@ function confirmQuestion(s) {
     : 'Lisätäänkö nämä ainekset ostoslistalle? Tuotteet ja toimitus tarkistetaan sen jälkeen.';
 }
 function availabilityText(s) {
-  const ok = s.items.filter((i) => !MISSING.includes(i.availability?.status));
+  const line = (i) => `- ${i.term}, ${i.needsQuantityCheck ? 'ostomäärä tarkennetaan' : quantityText(i, s)}`;
+  const ok = s.items.filter((i) => i.availability?.status === 'ok');
+  const unknown = s.items.filter((i) => !MISSING.includes(i.availability?.status) && i.availability?.status !== 'ok');
   const missing = (status) => s.items.filter((i) => i.availability?.status === status);
   const parts = [`Tarkistin saatavuuden toimitukselle ${dateLabel(s.date)}`];
-  if (ok.length) {
-    // Tuote valitaan vasta tilauksessa, joten tässä ei näytetä haun ensimmäistä osumaa (se voi olla maustettu tai erikoistuote).
-    parts.push(`Saatavilla:\n${ok.map((i) => `- ${i.term}, ${i.needsQuantityCheck ? 'ostomäärä tarkennetaan' : quantityText(i, s)}${i.availability?.status === 'ok' ? '' : ' (saatavuutta ei saatu tarkistettua)'}`).join('\n')}`);
-  }
+  // Tuote valitaan vasta tilauksessa, joten tässä ei näytetä haun ensimmäistä osumaa (se voi olla maustettu tai erikoistuote).
+  if (ok.length) parts.push(`Saatavilla:\n${ok.map(line).join('\n')}`);
+  // Ei tietoa (rajapinta ei vastaa, ei välimuistissa) ei ole "ei saatavilla": aines pysyy listalla ja tarkistetaan tilauksessa.
+  if (unknown.length) parts.push(`Saatavuutta ei saatu nyt tarkistettua, tarkistetaan tilauksessa:\n${unknown.map(line).join('\n')}`);
   const notes = [];
   if (missing('notInCatalog').length) notes.push(`Ei Aimon valikoimassa: ${joinFi(missing('notInCatalog').map((i) => i.term))}.`);
   if (missing('notForDate').length) notes.push(`Ei saatavilla ${dateLabel(s.date)}: ${joinFi(missing('notForDate').map((i) => `${i.term}${i.availability.next ? ` (aikaisintaan ${dateLabel(i.availability.next)})` : ''}`))}.`);

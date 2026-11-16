@@ -89,6 +89,14 @@ export async function availableStorefront(r, opts = {}) {
     const item = r.understood.items[i];
     // Haku ei löytänyt valikoimasta pyydettyä tuotetta lainkaan (tai mikään ei täytä ehtoja): ei toimituspäivän ongelma.
     const catalogMiss = card.status !== 'ok';
+    // Rajapinta ei vastannut eikä tuotteista ole voimassa olevaa tietoa (välimuistin ulkopuoliset tuotteet katkon aikana):
+    // saatavuus on tuntematon, ei "ei saatavilla". Muuten resepti- ja tilauspolku pudottaisivat tuotteita, joita ei tunneta.
+    const unknownOf = (p) => { const a = quotes.get(p.id)?.avail; return !a || a.stale || a.status === 'unknown'; };
+    const unknownData = !catalogMiss && card.list.length > 0 && card.list.every(unknownOf);
+    // Pyydetyn tuotteen omat osumat (kuratoitu tuotetyyppi: kaikki osumat). Jos niistä ei ole tietoa, muut tilattavat ovat
+    // vain lähimpiä, eikä pyydettyä tuotetta voi sanoa saatavuudettomaksi.
+    const wanted = catalogMiss ? [] : card.list.filter((p) => { const prod = cat.get(p.id); if (!prod) return false; const t = typeInfo(prod, item); return t.tier == null || t.requested === true; });
+    const wantedUnknown = wanted.length > 0 && wanted.every(unknownOf);
     const exact = card.status === 'ok' ? card.list.flatMap((p) => {
       const a = orderableProduct(cat.get(p.id), quotes.get(p.id), date, item.quantity);
       return a.ok ? [a.product] : [];
@@ -123,6 +131,8 @@ export async function availableStorefront(r, opts = {}) {
     card.top = card.list.slice(0, 3); card.total = card.list.length;
     card.status = card.total ? 'ok' : 'no_match';
     card.notInCatalog = catalogMiss && !card.total;
+    card.availabilityUnknown = unknownData && !card.total;
+    card.requestedUnknown = !guessed && wantedUnknown && !exact.some((p) => p.requested !== false);
     // Katalogin suodatinten lukumäärät eivät kuvaa tämän päivän saatavuutta.
     card.chips = card.chips.map(({ matches, ...chip }) => chip);
     if (!card.total) card.reason = nextDeliveryDate

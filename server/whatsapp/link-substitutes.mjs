@@ -25,9 +25,10 @@ export async function checkAvailability({ suggest, customer, date, term, quantit
   let s;
   try { s = await suggest({ customer, draft, limit: 1 }); } catch { return { status: 'unknown' }; }
   const line = s?.lines?.[0];
-  if (line?.options?.length) return line.exact === false ? { status: 'inexact' } : { status: 'ok', product: clean(line.options[0].name, 120) };
+  if (line?.options?.length) return line.exact === false ? { status: line.availabilityUnknown ? 'unknown' : 'inexact' } : { status: 'ok', product: clean(line.options[0].name, 120) };
   const none = (s?.issues || []).find((i) => i.code === 'NO_ORDERABLE_PRODUCT');
   if (none?.notInCatalog) return { status: 'notInCatalog' };
+  if (none?.availabilityUnknown) return { status: 'unknown' }; // ei tietoa ei ole "ei saatavilla": ainesta ei pudoteta eikä korvata
   if (none) return { status: 'notForDate', next: /^\d{4}-\d{2}-\d{2}$/.test(none.nextDeliveryDate || '') ? none.nextDeliveryDate : null };
   return { status: 'unknown' };
 }

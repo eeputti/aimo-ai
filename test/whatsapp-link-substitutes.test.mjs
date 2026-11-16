@@ -24,9 +24,11 @@ const blocked = () => { throw Object.assign(new Error('LINK_BLOCKED'), { code: '
 
 // Saatavuus: valkosipulikerma ei ole valikoimassa, sitruunaa ei saa perjantaiksi, limettiäkään ei.
 const AVAILABILITY = { valkosipulikerma: { notInCatalog: true }, sitruuna: { next: '2026-11-23' }, limetti: { next: null } };
+const UNKNOWN = new Set();
 function suggestStub(calls) {
   return async ({ customer: c, draft, limit }) => {
     const line = draft.lines[0]; calls.push({ term: line.productTerm, date: draft.deliveryDate, quantity: line.quantity, customer: c.customerId, limit });
+    if (UNKNOWN.has(line.productTerm)) return { lines: [], issues: [{ code: 'NO_ORDERABLE_PRODUCT', ref: line.ref, message: 'x', availabilityUnknown: true }] };
     const gone = AVAILABILITY[line.productTerm];
     if (!gone) return { lines: [{ ref: line.ref, exact: true, options: [{ productId: line.productTerm, name: `Testi ${line.productTerm} 1 kg` }] }], issues: [] };
     return { lines: [], issues: [{ code: 'NO_ORDERABLE_PRODUCT', ref: line.ref, message: 'x', notInCatalog: gone.notInCatalog === true, nextDeliveryDate: gone.next || null }] };
@@ -152,6 +154,34 @@ test('past dates are not used, unrelated replies and forget leave the recipe, a 
   await f.turn(MESSAGE); await f.turn(PASTED); await f.turn('perjantaina');
   assert.match((await f.turn('unohda koko resepti')).text, /unohdetaan resepti/);
   assert.equal(f.orders.length, 0);
+});
+
+test('unknown availability (Valio API down, nothing cached) keeps the ingredient and says it could not be checked', async (t) => {
+  UNKNOWN.add('tagliatelle'); t.after(() => UNKNOWN.delete('tagliatelle'));
+  const f = fixture(t, { readPage: async () => ({ url: 'https://example.com/r', title: 'Kanapasta', text: PASTED, recipes: [] }),
+    ask: async ({ purpose, user }) => ({ json: purpose === 'whatsapp_link_match'
+      ? { rows: JSON.parse(user).rows.map((r) => ({ index: r.index, productIds: [], needsQuantityCheck: false })) }
+      : purpose === 'whatsapp_link_substitutes' ? { rows: [] } : structuredClone(analysis) }) });
+  const out = await f.turn('https://example.com/r perjantaiksi 40 hengelle');
+  assert.match(out.text, /Saatavuutta ei saatu nyt tarkistettua, tarkistetaan tilauksessa:\n- tagliatelle, 2,5 kg/);
+  assert.doesNotMatch(out.text, /jätän ne pois listalta: [^.]*tagliatelle/);
+  await f.turn('joo');
+  assert.match(f.orders[0], /tagliatelle 2,5 kg/);
+});
+
+test('order tools report unknown availability as unknown, not as unavailable', async () => {
+  const { createOrderingTools } = await import('../server/order-tools/index.mjs');
+  const deps = { product: () => ({ hasAllergenData: true, contains: [] }), buyer: () => ({}), requestQuote: async () => ({}), placeOrder: async () => ({}) };
+  const draft = { id: 'd', deliveryDate: '2026-11-20', diet: { claims: [], excludeAllergens: [] }, lines: [{ ref: 'r', productTerm: 'tagliatelle', quantity: { value: 2, unit: 'KG' }, claims: [] }] };
+  const unknown = await createOrderingTools({ ...deps, search: async () => Object.assign([], { availabilityUnknown: true }) }).suggest({ customer, draft });
+  assert.equal(unknown.issues[0].availabilityUnknown, true); assert.match(unknown.issues[0].message, /^Saatavuutta ei saatu nyt tarkistettua päivälle pe 20\.11\.: tagliatelle\.$/);
+  const near = [{ id: 'f', name: 'Spaghetti 1 kg', qty: 2, price: 3, unit: 'KG', kg: 1, requested: false }];
+  const closest = await createOrderingTools({ ...deps, search: async () => Object.assign(near.slice(), { requestedUnknown: true }) }).suggest({ customer, draft });
+  assert.equal(closest.lines[0].exact, false); assert.equal(closest.lines[0].availabilityUnknown, true);
+  const known = await createOrderingTools({ ...deps, search: async () => near.slice() }).suggest({ customer, draft });
+  assert.equal(known.lines[0].availabilityUnknown, undefined);
+  const gone = await createOrderingTools({ ...deps, search: async () => Object.assign([], { nextDeliveryDate: null }) }).suggest({ customer, draft });
+  assert.equal(gone.issues[0].availabilityUnknown, undefined); assert.match(gone.issues[0].message, /^Ei tilattavaa tuotetta päivälle/);
 });
 
 test('ordering bridge passes the customer and the channel to the link step', async (t) => {

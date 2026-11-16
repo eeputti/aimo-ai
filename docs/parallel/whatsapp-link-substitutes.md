@@ -24,8 +24,17 @@ k-ruoka.fi palauttaa kaikille automaattisille hakijoille Cloudflaren haasteen (H
 - Oikea malli ja oikea katalogi, simuloidut hinnat ja saatavuus (tyhjä `VALIO_API_KEY`), muistikanta, ei Metaa eikä tilausta: Eeliksen viesti k-ruoka-linkillä → bottisuojaviesti (95 ms) → liitetty resepti (noin 20 s, kaksi mallikutsua) → "perjantaiks" (noin 13 s) → saatavuus pe 20.11. → valkosipulikerman tilalle ruokakerma tai kuohukerma, parmesaanin tilalle grana padano tai pecorino → lista ja tilauskeskustelun syöte "Toimitus 20.11.2026" sekä alkuperäinen toive.
 - Tilauskeskustelun jatkoa (juusto 100 kg toiveesta) ei ajettu tässä kokeessa, ja simuloitu saatavuus ei kerro, mitä oikea testirajapinta palauttaa perjantaille.
 
+## Jatko 17.11.: tuntematon saatavuus ei ole "ei saatavilla"
+
+- Valion testirajapinnan nimi ei ratkea (DNS), ja botti vastaa vain välimuistin tiedoilla (`VALIO_FALLBACK=last-known`). Tuotantoa vastaavassa kokeessa (kopio Macin `whatsapp-kitchen.db`:stä ja todelliset asetukset) välimuistin ulkopuoliset tagliatelle, öljy ja persilja näkyivät virheellisesti puuttuvina, ja botti jätti ne pois.
+- `storefront.mjs`: kortti kertoo `availabilityUnknown`, kun yhdestäkään osumasta ei ole voimassa olevaa saatavuustietoa, ja `requestedUnknown`, kun pyydetyn tuotteen omista osumista ei ole tietoa ja tilattavat ovat vain lähimpiä muita tuotteita.
+- `order-tools`: tyhjä tulos ilman tietoa antaa viestin "Saatavuutta ei saatu nyt tarkistettua päivälle …" (`availabilityUnknown: true`), ei "Ei tilattavaa tuotetta". Lähimpien vaihtoehtojen rivi saa `availabilityUnknown: true`. Tilauskeskustelun ydin näyttää jälkimmäisessä tapauksessa vielä vanhan tekstin "Tarkkaa osumaa ei löytynyt", koska `order-conversation/index.mjs` on toisen session varauksessa.
+- Reseptilinkki pitää nämä ainekset listalla omana kohtanaan ("Saatavuutta ei saatu nyt tarkistettua, tarkistetaan tilauksessa"), eikä niille ehdoteta korvaajia.
+- Uusinta samoissa olosuhteissa: tagliatelle, öljy ja persilja pysyivät listalla, valkosipulikerman tilalle tarjottiin ruokakermaa tai kuohukermaa, ja vain parmesaani jäi pois (siitä on välimuistissa tietoa, mutta ei tilattavaa tuotetta eikä tilattavaa korvaajaa).
+- Testit: link-substitutes 8/8, links 15/15, hakutyyppi ja order-tools mukana yhteensä 44/44. Koko `npm test` 366/372 (samat kuusi libsql-testiä), `aimo:eval` 26/26.
+
 ## Rajat ja käyttöönotto
 
 - Suojattuja sivuja ei kierretä. Kopio tai kuva on ainoa reitti.
 - Saatavuuden tarkistus tekee yhden haun ainesta ja korvaajaa kohden (enintään neljä rinnakkain).
-- Tulee käyttöön vasta botin seuraavassa sovitussa uudelleenkäynnistyksessä tai pilvijulkaisussa.
+- Botti siirtyi 16.11. noin klo 23.45 Verceliin (sessio E). Muutos tulee käyttöön vasta seuraavassa `vercel deploy --prod` -julkaisussa; Macin bottia ei käynnistetä uudelleen.

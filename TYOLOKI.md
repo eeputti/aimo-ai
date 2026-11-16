@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 yö — reseptilinkki ja tilaus: tuntematon saatavuus ei ole "ei saatavilla"; Macin bottia ei käynnistetty (Claude Code, sessio I)
+
+- **Käyttäjän lupa ("Yes, restart"):** botti versioon 6fa9496. Tarkistuksessa Macin botti ja julkaisija olivat jo pysähtyneet noin klo 23.47, tunneli antoi 502, ja `https://aimo-whatsapp.vercel.app/healthz` vastasi `host: cloud`, eli sessio E on siirtänyt botin Verceliin (snapshot `/private/tmp/aimo-vercel-5d6ae75`). Macin bottia ei käynnistetty, jotta keskustelut eivät jakaudu kahteen kantaan. Sessiolle E lähetettiin taululla viesti #304 uuden version julkaisusta. Vastausta ei vielä tullut.
+- **Löydös ennen julkaisua:** Valion testirajapinnan nimi ei ratkea, ja botti käyttää vain välimuistia. Tuotantoa vastaavassa kokeessa (kopio Macin `whatsapp-kitchen.db`:stä ja todelliset asetukset) reseptilinkki ilmoitti välimuistin ulkopuoliset tagliatellen, öljyn ja persiljan puuttuviksi ja jätti ne pois.
+- **Korjaus:** `storefront.mjs` merkitsee kortin `availabilityUnknown`/`requestedUnknown`, kun osumista ei ole voimassa olevaa saatavuustietoa. `order-tools` antaa silloin viestin "Saatavuutta ei saatu nyt tarkistettua päivälle …" eikä "Ei tilattavaa tuotetta", ja lähimpien vaihtoehtojen rivi saa `availabilityUnknown`. Reseptilinkki pitää nämä ainekset listalla omana kohtanaan eikä tarjoa niille korvaajia. Ytimen (`order-conversation/index.mjs`, toisen session varauksessa) teksti "Tarkkaa osumaa ei löytynyt" on ennallaan.
+- **Tarkistukset:** uusinta samoissa olosuhteissa: tagliatelle, öljy ja persilja pysyivät listalla, valkosipulikermalle tarjottiin ruokakerma tai kuohukerma, ja vain parmesaani jäi pois. Testit link-substitutes 8/8, links 15/15, hakutyyppi ja order-tools mukana 44/44. Koko `npm test` 366/372 (kuusi libsql-testiä, `@libsql/client` puuttuu yhteisestä `node_modules`ista), `aimo:eval` 26/26. Raportti `docs/parallel/whatsapp-link-substitutes.md`.
+- **Kesken:** muutokset tulevat puhelimeen vasta seuraavassa Vercel-julkaisussa (`vercel deploy --prod`), joka sovitaan session E kanssa.
+
 ## 16.11.2026 ilta — Groq-avain lisätty ja koestettu, pääominaisuudet etusivulle, Keskusteluun ja Näin se toimii -sivulle (Claude Code, sessio H)
 
 - **Groq:** Eelis loi Groq-avaimen ja lisäsi sen itse `.env.whatsapp`:iin (0600) yhdessä `WHATSAPP_TRANSCRIBE=groq`-rivin kanssa; avain ei kulkenut chatin kautta. Tarkistettu avainta näyttämättä: yksi rivi, muoto `gsk_`, esitarkistus "asetukset kunnossa" ilman NO_VOICE-huomautusta. Oikea Groq-koe macOS:n suomenkielisellä keinoäänellä (m4a): "Moi, tarvisin 20 litraa laktoositonta maitoa ja 5 kiloa voita perjantaiksi." 0,3 s, komentoesto ei osunut. Botti käyttää avainta vasta E:n restartin jälkeen; pilven ympäristöön sama avain E:n kautta.

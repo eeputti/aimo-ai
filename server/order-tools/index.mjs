@@ -114,6 +114,8 @@ async function defaultDeps() {
       const list = r.cards[0]?.list || [];
       list.nextDeliveryDate = r.cards[0]?.reason?.nextDeliveryDate || null;
       list.notInCatalog = r.cards[0]?.notInCatalog === true;
+      list.availabilityUnknown = r.cards[0]?.availabilityUnknown === true;
+      list.requestedUnknown = r.cards[0]?.requestedUnknown === true;
       return list;
     },
     product: (id) => cat.get(String(id)),
@@ -190,6 +192,9 @@ export function createOrderingTools(deps = {}) {
       if (!scored.length) {
         issues.push(found.notInCatalog
           ? issue('NO_ORDERABLE_PRODUCT', `Pyydettyä tuotetta ei ole valikoimassa: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: null, notInCatalog: true })
+          // Saatavuustietoa ei saatu (rajapinta alhaalla, ei välimuistissa): sanotaan se, ei väitetä tuotetta saatavuudettomaksi.
+          : !found.length && (found.availabilityUnknown || found.requestedUnknown)
+            ? issue('NO_ORDERABLE_PRODUCT', `Saatavuutta ei saatu nyt tarkistettua päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: null, availabilityUnknown: true })
           : issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: found.nextDeliveryDate || null }));
         continue;
       }
@@ -249,7 +254,9 @@ export function createOrderingTools(deps = {}) {
       // more: tälle päivälle on vielä näyttämättömiä vaihtoehtoja seuraavalle sivulle.
       const more = rest.some((o) => !top.includes(o));
       // exact=false: yksikään tilattava vaihtoehto ei ole pyydettyä tuotetta (strutsinmuna -> viiriäisen munat). Kerrotaan ostajalle.
-      lines.push({ ref: line.ref, total: fit.length, more, shownBefore: seen.size, exact: fit.some(onTerm), clarify, options: top.map((o) => ({
+      lines.push({ ref: line.ref, total: fit.length, more, shownBefore: seen.size, exact: fit.some(onTerm),
+        // Pyydetyn tuotteen saatavuus on tuntematon (rajapinta alhaalla): lähimmät vaihtoehdot eivät todista sen puuttumista.
+        ...(!fit.some(onTerm) && found.requestedUnknown ? { availabilityUnknown: true } : {}), clarify, options: top.map((o) => ({
         productId: String(o.id), name: o.name, brand: o.brand || null, salesUnits: o.qty, salesUnitLabel: o.unitLabel,
         covers: o.quantityExplanation ? { value: o.quantityExplanation.providedItems, unit: 'PCS' } : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
         unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
