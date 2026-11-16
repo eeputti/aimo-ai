@@ -46,9 +46,12 @@
 - Koko `npm test` **339/339**, Worker **52/52**, `npm run typecheck` läpi. Ensimmäinen koko ajo löysi oman virheeni: tyhjä kierros herätti poolin uudelleen tiiviissä silmukassa, ja toisen prosessin kirjoitus sai "database is locked". Korjattu ennen committia.
 - Ei Meta-, Valio-, malli- tai sähköpostikutsuja, ei Worker-julkaisua, D1-migraatiota eikä botin restarttia. Käyttäjän kantoihin ei koskettu.
 
-## Käyttöönotto E:lle (Eeliksen luvalla)
+## Käyttöönotto (tehty 16.11.2026, E Eeliksen luvalla)
 
-1. **D1:** `cd deploy/cloudflare && npm exec -- cf d1 execute aimo-order-demo --remote --file signup-verify.sql`. Lisää viisi saraketta ja indeksin; vanhat rivit säilyvät. Toinen ajo pysähtyy virheeseen "duplicate column name" eikä muuta mitään. Uusi tyhjä kanta saa sarakkeet suoraan `signup.sql`:stä.
+E teki kaikki viisi kohtaa (`docs/parallel/cloud-cutover.md`): migraatio D1:een, 14 ilmoittautumisriviä säilyi; Worker ja pilven botti versiosta 94c62f3, joka sisältää 14dddf8:n; seurantaa ajaa pilven minuutin tick, ja `cloud.mjs` kutsuu `load().drain(budgetMs)`. D tarkisti: 94c62f3 sisältää 14dddf8:n, `cloud.mjs` käyttää rinnakkaista `drain`ia, ja livenä `GET /api/signups/invites` vastaa ilman avainta 401 (vanha Worker 404). Alla alkuperäinen ohje.
+
+
+1. **D1:** aja `signup-verify.sql`:n lauseet komennolla `cf d1 query <tietokannan ID>` hakemistossa `deploy/cloudflare` (tämä cf-versio ei tunne `d1 execute` -komentoa). Lisää viisi saraketta ja indeksin; vanhat rivit säilyvät. Toinen ajo pysähtyy virheeseen "duplicate column name" eikä muuta mitään. Uusi tyhjä kanta saa sarakkeet suoraan `signup.sql`:stä.
 2. **Worker** julkaistaan ajantasaisesta origin/mainista (sisältää 962f0fa:n, ettei vanha lomake palaa). Migraatio ennen julkaisua, koska uusi `signup.ts` kirjoittaa uusiin sarakkeisiin.
 3. **Seuranta** (Macin `whatsapp-signups.mjs watch` tai pilven tick) käynnistetään uudelleen uudella koodilla Workerin jälkeen. Vanhan Workerin kanssa uusi seuranta ei liitä uusia numeroita ja kertoo siitä kerran. Uusi Worker toimii myös vanhan seurannan kanssa, mutta silloin vanha seuranta liittää numerot yhä suoraan.
 4. **Botti (4749):** `channel.mjs`:n ja `store.mjs`:n muutokset tulevat voimaan seuraavassa restartissa. Kanta saa automaattisesti taulut `landing_invites` ja `member_sources`. Rinnakkaisuus on oletuksena 4; `WHATSAPP_CONCURRENCY=1` palauttaa vanhan peräkkäisen käsittelyn.
