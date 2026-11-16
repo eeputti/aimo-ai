@@ -1,5 +1,6 @@
 // "Katso, mitä agentti näki": draws one order's published trace. All text goes through textContent.
 import { nf, money, time, day, quantity, CLAIM, ALLERGEN, STATUS, FLAG, EXCLUDED, el, cap, lit, short, codeLines, renderCode, createPlayer } from './agent-code.js';
+import { renderOptions } from './agent-options.js';
 const $ = (id) => document.getElementById(id);
 const LINK = /^(AGW-\d{8}-\d{4,12})\.([A-Za-z0-9_-]{43})$/;
 const match = LINK.exec(location.hash.slice(1));
@@ -101,35 +102,8 @@ function understood(trace) {
   }));
 }
 
-function options(trace) {
-  $('options').replaceChildren(...trace.options.map((group) => {
-    const wrap = el('div', 'option-group');
-    const head = el('div', 'option-head');
-    const line = trace.understood.lines.find((l) => l.ref === group.ref);
-    head.append(el('h3', '', `${cap(group.term)} ${line ? quantity(line.quantity) : ''}`.trim()),
-      el('span', 'muted', `${nf(group.shown.length)} näytetty${group.seen && group.seen > group.shown.length ? `, ${nf(group.seen)} käyty läpi` : ''}`));
-    const grid = el('div', 'option-grid');
-    if (!group.shown.length) grid.append(el('p', 'muted', 'Vaihtoehtoja ei näytetty: tuote tuli suoraan aiemmasta valinnasta.'));
-    group.shown.forEach((o, i) => {
-      const card = el('div', `option ${o.selected ? 'selected' : ''}`.trim());
-      const top = el('div', 'option-top');
-      top.append(el('span', 'option-num', String(i + 1)), o.selected ? chip('Valittu', 'good solid') : el('span'));
-      const name = el('p', 'option-name', o.name);
-      const pack = el('p', 'option-pack', `${nf(o.salesUnits || 0)} ${o.salesUnitLabel || ''}${o.covers ? ` (${quantity(o.covers)})` : ''}`);
-      const price = el('p', 'option-price'); price.append(el('strong', '', money(o.lineNet)), el('small', '', o.unitPriceNet != null ? `${money(o.unitPriceNet)} / ${o.salesUnitLabel || 'kpl'}` : ''));
-      const facts = el('div', 'facts');
-      if (o.co2PerKg != null) { const f = el('span', 'fact'); f.append(icon('leaf'), document.createTextNode(`${nf(o.co2PerKg, 2)} kg CO₂e/kg`)); facts.append(f); }
-      if (o.deliveryReliability != null) { const f = el('span', 'fact'); f.append(icon('truck'), document.createTextNode(`${nf(o.deliveryReliability * 100)} % toimitusvarmuus`)); facts.append(f); }
-      const labels = el('div', 'tags');
-      [...new Set(o.labels.map(label).filter(Boolean))].slice(0, 3).forEach((l) => labels.append(chip(l)));
-      card.append(top, name, pack, price, facts, labels);
-      if (o.warning) card.append(el('p', 'warning', o.warning));
-      grid.append(card);
-    });
-    wrap.append(head, grid);
-    return wrap;
-  }));
-}
+// Vaihtoehdot ja syy, miksi juuri ne näytettiin: agent-options.js.
+function options(trace) { $('options').replaceChildren(...renderOptions(trace, { icon, chip, label })); }
 
 function eventText(e) {
   const d = e.detail || {};

@@ -24,11 +24,18 @@ const json = (text) => { try { return JSON.parse(text); } catch { return null; }
 const CART_ACTION = { confirmed: 'Vahvisti demotilauksen ostoskorisivulla', pending_approval: 'Lähetti tilauksen hyväksyttäväksi ostoskorisivulla',
   ready: 'Tarkisti ostoskorin', choosing: 'Muutti ostoskoria', collecting: 'Muutti ostoskoria' };
 
-function option(o, selectedId) {
+export function option(o, selectedId) {
   return { productId: String(o.productId).slice(0, 40), name: str(o.name), brand: str(o.brand, 60), salesUnits: num(o.salesUnits), salesUnitLabel: str(o.salesUnitLabel, 24),
     covers: qty(o.covers), unitPriceNet: num(o.unitPriceNet), lineNet: num(o.lineNet), deliveryDate: str(o.deliveryDate, 10),
     labels: list(o.labels), co2PerKg: num(o.co2PerKg), deliveryReliability: num(o.deliveryReliability), warning: str(o.warning, 240),
+    // Miksi tämä vaihtoehto näytettiin (server/order-tools/why.mjs). Vanhoissa luonnoksissa sitä ei ole.
+    pick: o.pick && typeof o.pick === 'object' ? { place: num(o.pick.place), codes: list(o.pick.codes) } : null, why: str(o.why, 160),
     selected: String(o.productId) === String(selectedId) };
+}
+// Rivin luvut: montako toimituspäivälle tilattavaa, sopivaa ja pyydettyä tuotetta haku löysi.
+export function pool(p) {
+  if (!p || typeof p !== 'object') return null;
+  return { orderable: num(p.orderable), suitable: num(p.suitable), requested: num(p.requested), shown: num(p.shown), more: p.more === true, nextPage: p.nextPage === true };
 }
 
 function quoteNeed(need) {
@@ -124,6 +131,7 @@ export function readAgentTrace({ orderId, gatewayFile, whatsappFile, draftFile, 
         selectedProductId: l.selectedProductId ? String(l.selectedProductId).slice(0, 40) : null, selectedName: str(l.selectedName) })) };
     const options = lines.map((l) => ({ ref: String(l.ref).slice(0, 12), term: str(l.productTerm, 80),
       seen: Array.isArray(draft.seen?.[l.ref]) ? draft.seen[l.ref].length : null,
+      pool: pool(draft.offered?.[l.ref]?.[0]?.pool),
       shown: (draft.offered?.[l.ref] || []).slice(0, 8).map((o) => option(o, l.selectedProductId)) }));
 
     // Every quote this draft asked for: the buyer's quotes between the first turn and the order.

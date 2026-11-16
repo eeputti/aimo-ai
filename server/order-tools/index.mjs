@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { openSqlite } from '../sqlite.mjs';
 import { clock } from '../gateway/clock.mjs';
 import { touchesBanned, verifiedFree, bannedHits } from '../allergens.mjs';
+import { explainPicks } from './why.mjs';
 
 const CLAIM_WORD = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
 const UNIT_WORD = { L: 'l', KG: 'kg', PCS: 'kpl' };
@@ -204,7 +205,7 @@ export function createOrderingTools(deps = {}) {
         } catch { alts = []; }
         if (alts.length) {
           lines.push({ ref: line.ref, total: alts.length, more: false, shownBefore: 0, exact: false, availabilityUnknown: true, alternatives: true, clarify: [],
-            options: alts.map((o) => ({
+            options: alts.map((o, i) => ({
               productId: String(o.id), name: o.name, brand: o.brand || null, salesUnits: o.qty, salesUnitLabel: o.unitLabel,
               covers: o.askQuantity ? null : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
               unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
@@ -213,6 +214,7 @@ export function createOrderingTools(deps = {}) {
               deliveryReliability: Number.isFinite(product(o.id)?.reliability) ? product(o.id).reliability : null,
               // Valinta vaihtaa rivin tuotteen (replaceTerm). Eri mittayksikössä määrä kysytään uudelleen (askQuantity).
               why: o.why || null, replaceTerm: o.alternativeTerm || o.name, askQuantity: o.askQuantity === true, warning: null,
+              pick: { place: i + 1, codes: ['SIMILAR_KNOWN'] }, // why.mjs: vastaava tuote, jonka saatavuus tunnetaan
             })) });
           continue;
         }
@@ -281,6 +283,8 @@ export function createOrderingTools(deps = {}) {
       top.sort((a, b) => groupOf.get(a) - groupOf.get(b) || pricey(a) - pricey(b));
       // more: tälle päivälle on vielä näyttämättömiä vaihtoehtoja seuraavalle sivulle.
       const more = rest.some((o) => !top.includes(o));
+      // Miksi juuri nämä: tallentuu vaihtoehtojen mukana agentin jälkeä varten (why.mjs). Ei muuta järjestystä.
+      const why = explainPicks({ found, fit, scored, first, top, cheapest, seen, onTerm, pricey, more, size });
       // exact=false: yksikään tilattava vaihtoehto ei ole pyydettyä tuotetta (strutsinmuna -> viiriäisen munat). Kerrotaan ostajalle.
       lines.push({ ref: line.ref, total: fit.length, more, shownBefore: seen.size, exact: fit.some(onTerm),
         // Pyydetyn tuotteen saatavuus on tuntematon (rajapinta alhaalla): lähimmät vaihtoehdot eivät todista sen puuttumista.
@@ -294,6 +298,7 @@ export function createOrderingTools(deps = {}) {
         co2PerKg: Number.isFinite(product(o.id)?.co2) ? product(o.id).co2 : null,
         deliveryReliability: Number.isFinite(product(o.id)?.reliability) ? product(o.id).reliability : null,
         why: o.substituteFor ? `Korvaa tuotteen ${o.substituteFor.name}` : null,
+        pick: why(o), pool: why.pool,
         warning: [soft.filter((c) => !o.labels?.includes(c)).length ? `Ei merkintää: ${soft.filter((c) => !o.labels?.includes(c)).map((c) => CLAIM_WORD[c] || c).join(', ')}` : null, diet.excludeAllergens.length && !product(o.id)?.hasAllergenData ? 'allergeenitieto puuttuu, tarkista itse' : null].filter(Boolean).join('; ') || null,
       })) });
     }
