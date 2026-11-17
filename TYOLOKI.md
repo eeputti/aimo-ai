@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — white label -palvelun tuotteistamis- ja arkkitehtuurisuositus (Codex, Danielin chatti)
+
+- Käyttäjä kysyi järkevää ratkaisua yrityksille tarjottavaan white label -palveluun. Suositus: yhteinen koodipohja, ensimmäisille 2–3 maksavalle pilotille omat käyttöönotot/kannat ja numerot, kielimalli palvelua myyvän yrityksen API-organisaatiosta asiakaskohtaisilla kulurajoilla. Laajempi jaettu SaaS-ajo ja oma GPU arvioidaan todellisen käytön ja laatutestien perusteella. Ei käyttäjän päätös ostaa palvelinta tai tilata koko SaaS-muutos.
+- Koodista tarkistettu: WhatsApp-runtime käyttää yhtä prosessikohtaista phoneId/token-asetusta, keskusteluissa on ostaja-/binding-rajaus ja luonnoskannassa conversation/message-id:t mutta ei erillistä tenant_id:tä. Valio-/malliasetukset ovat prosessikohtaiset. Ensimmäisten yritysten erilliset ajot samalla paketilla sopivat tähän lähtökohtaan paremmin kuin asiakkuusrajojen olettaminen valmiiksi.
+- Suunnitelma [docs/white-label-plan.md](docs/white-label-plan.md): brändiasetukset, oikean kaupan adapteri, yrityskohtaiset tiedot ja salaisuudet, seuranta/kulurajat, tilausvaltuudet, ristikkäisen käytön testaus ja myöhemmin Metan Embedded Signup. Tuotehinnoittelu käyttöönottomaksu + kuukausimaksu + määritelty käyttöpaketti; markkinahintaa tai kannattavuutta ei väitetä mitatuksi.
+- Valmistajien lähteet tarkistettu API-workspaceista ja alueasetuksista, Metan yritysliittymisestä sekä PostgreSQL RLS:stä. EU-hostaus ei yksin lupaa mallikäsittelyn EU-aluetta. API-workspace ei korvaa sovelluksen yrityseristystä. Esimerkki 10 × 1000 Sonnet-kutsua/kk = aiemman tokenioletuksen mukaan 110 $, ei koko palvelun kustannus.
+- Vain dokumentaatio, ei nykyisen tuotannon, demon, asiakkuuksien tai kantojen muutoksia; ei mallikutsuja. Käyttäjän aiempi vain asiakkaan aloittamat puhelut -rajaus säilyy. Tarkistukset: koodiviitteet ja git diff --check; sovellustestejä ei ajettu dokumentaatiolle.
+
 ## 17.11.2026 — GPU-vuokran ja Anthropicin API:n kustannusvertailu (Codex, Danielin chatti)
 
 - Käyttäjä pyysi hintavertailua. Valmistajien ajantasaiset hinnastot tarkistettu: Haiku 5.5 syöte/tuloste 0,10/0,50 $, Sonnet 5.5 2/10 $, Opus 5.5 4/20 $ miljoonalta tokenilta. Haikun perushinta enintään 100 000 tokenin syötteelle. Runpod A5000 0,27 $/h, 4090 0,89 $/h, Scaleway L4 noin 0,79 €/h + lisäkulut.
