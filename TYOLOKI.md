@@ -2,6 +2,19 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — puuttuvat määrät arvioidaan annetusta määrästä ja syy kerrotaan (Claude Code, Aimo-tilausapuri verkossa -chat)
+
+- **Käyttäjän palaute:** Eelis tilasi spagettia, 2 kg kanafilettä ja valkosipulikastiketta. Botti kysyi vain "Kuinka paljon: spagetti, valkosipulikastike?". Se ei suhteuttanut spagetin määrää kanaan eikä kertonut, miksi määrää ei annettu. Tuotannon kantaa ei luettu (automaattinen tarkistus esti), vaan tilanne toistettiin paikallisesti oikealla mallilla, ja vastaus oli sama.
+- **Muutos (`whatsapp/cart-presentation.mjs`):** kun ainakin yhdellä rivillä on määrä ja muilta puuttuu, malli (`whatsapp_quantity_estimate`) arvioi puuttuvat määrät. Arvio lasketaan suurkeittiön annoskoilla samalle annosmäärälle, jos tuotteet kuuluvat samaan ruokaan. Koodi hylkää arvion, jos lähtömäärää ei ole korissa, ruoan nimi tai annosmäärä on outo, jokin puuttuva puuttuu arviosta, arviossa on keksitty tuote tai määrä annosta kohti on epärealistinen. Silloin kysytään tavallisesti. Viesti kertoo syyn: "Näille ei ollut määrää: spagetti ja valkosipulikastike. Arvioin ne annetusta määrästä (kanafilee 2 kg riittää noin 15 annokseen kanaspagettia): …" ja "Käykö? Vastaa joo …". Arvio ajetaan rinnakkain kuittauksen kanssa.
+- **`whatsapp/dialogue.mjs`:** näytetty arvio tallennetaan, ja "joo", "käy", "ok" tai "sopii" kirjaa sen määrät riveille ilman dialogimallia, vain jos lista on yhä sama. Omat määrät toimivat kuten ennen.
+- **Tarkistukset:** uusi `test/whatsapp-quantity-estimate.test.mjs` 4/4 (arvio ja viesti, seitsemän hylättävää mallivastausta, ei mallikutsua ilman annettua määrää, "joo" kirjaa ja muuttunut lista ei kirjaa). `npm test` 424/424. Oikea Haiku koko keskustelupinossa välimuistikannan kopiolla:
+  - spagetti + 2 kg kanaa + kastike → 15 annosta, spagetti 1,4 kg, kastike 1,9 l, ja "joo" kirjasi molemmat
+  - lohikeitto 3 kg lohta → 22 annosta, peruna ja kerma arvioitiin
+  - maito 10 l + voi → ei arviota, tavallinen kysymys
+  - vuoro noin 10 s
+  - ei tilauksia, Meta-viestejä eikä julkaisua
+- **Avoinna:** käyttöön botin julkaisussa (sessio E, Eeliksen luvalla). Kokeessa spagetille ei ollut tilattavaa tuotetta pe 20.11. välimuistin tiedoilla (rajapinta alhaalla). "10 kpl kappaleina" -korjaus on omassa sessiossaan.
+
 ## 17.11.2026 aamu — reseptilinkin korjaus tuotantoon (Claude Code, sessio E)
 
 - **Käyttäjän lupa:** sessio H pyysi julkaisua, Eelis vahvisti tässä sessiossa ("Kyllä, julkaise").

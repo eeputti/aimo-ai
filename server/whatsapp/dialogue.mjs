@@ -17,6 +17,8 @@ const NO_CONTACT_CLAIM = /(?:ei|en|eikä)\s[^.!?\n]{0,80}(?:yhteystie|numero|oso
 const NO_DATA_CLAIM = /(?:^|[\s,])(?:en|emme)\s+(?:itse\s+)?(?:näe|pysty\s+(?:näkemään|varmistamaan|sanomaan)|tiedä)(?=\s)[^.!?\n]{0,60}(?:hin(?:ta|no|toj)|hiilijalanj|toimitusvarm)|(?:hin(?:ta|no|toj)\p{L}*|hiilijalanj\p{L}*|toimitusvarm\p{L}*)[^.!?\n]{0,50}\s(?:en|emme)\s+(?:itse\s+)?(?:näe|pysty|tiedä)(?=\s)/iu;
 const withoutNoDataClaim = (text) => (NO_DATA_CLAIM.test(text) ? String(text).split(/(?<=[.!?])\s+|\n+/u).filter((x) => x && !NO_DATA_CLAIM.test(x)).join(' ') : text);
 const YES = /^(kyllä|joo|juu|jep|sopii|lisää se|lisää vaan|otetaan)[.!\s]*$/iu;
+// Määräarvion hyväksyntä: "joo", "käy", "ok", "sopii", "joo käy hyvin", "laita ne".
+const ESTIMATE_YES = /^(?:joo|juu|jep|kyllä|ok|okei|käy|sopii|hyvä|laita|laitetaan|kirjaa|otetaan)(?:[,\s]+(?:joo|käy|hyvin|vaan|ne|nää|nämä|näin|kiitos|sopii))*[.!\s]*$/iu;
 const NO = /^(ei|ei kiitos|ei tarvitse|ei tarvi|ei muuta)[.!\s]*$/iu;
 const QUANTITY = /^\d+(?:[.,]\d+)?\s*(?:l|litra\w*|kg|kilo\w*|kpl|pakett\w*|laatik\w*|ltk)[.!\s]*$/iu;
 // Viestissä on tilattava määrä ("30 l maitoa", "5 kg voita"): se on tilausviesti, vaikka samassa on kysymys.
@@ -258,6 +260,7 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
         }
       }
       let orderText = text;
+      let estimateShown = null;
       // Tauon jälkeen kesken jäänyt kori: kysytään ennen kuin uusi viesti muuttaa sitä (staleCartMessages).
       const staleList = !result && !lead && !inCart && staleAfterMs > 0 && cartIdle != null && cartIdle >= staleAfterMs && !CONTROL.test(text.trim())
         && !PLAIN_ACK.test(text.trim()) && !DEADLINE_QUESTION.test(text) && !compareKind(text) && !RELIST.test(text) && !isFreshStart(text) && !CANCEL_ALL.test(text.trim())
@@ -275,6 +278,13 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
       if (!result) orderText = orderText.replace(/^(tyhjennä|tyhjää)\s+/iu, 'Poista ');
       const quantityText = normalizeOrderUnits(text.replace(/^(?:joo|kyllä|juu|jep|sopii)[,\s]+/iu, '').replace(/^(?:lisää|otetaan)\s+(?:se|sitä|tuota)\s*/iu, ''));
       const positive = state.pendingSuggestion && (YES.test(text) || QUANTITY.test(quantityText));
+      // Hyväksytty määräarvio ("joo"): arvioidut määrät kirjataan riveille, kun lista on yhä sama kuin arvion hetkellä.
+      const pendingEstimate = state.pendingEstimate;
+      const listForEstimate = pendingEstimate ? listNow() : null;
+      const estimateYes = !result && !positive && pendingEstimate && ESTIMATE_YES.test(text.trim())
+        && listForEstimate?.id === pendingEstimate.listId && listForEstimate?.revision === pendingEstimate.revision;
+      if (estimateYes) orderText = pendingEstimate.orderText;
+      state.pendingEstimate = null;
       if (!result && positive) { orderText = `Lisää ostoslistalle ${state.pendingSuggestion}${QUANTITY.test(quantityText) ? ` ${quantityText}` : ''}`; state.pendingSuggestion = null; }
       else if (!result && state.pendingSuggestion && NO.test(text)) {
         state.pendingSuggestion = null;
@@ -288,7 +298,7 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
         result = { ...shown, text: reply }; messages = [reply];
         state.lastOrder = result;
       }
-      if (!result && !positive && !CONTROL.test(text) && !isDateOnly(text) && ask) {
+      if (!result && !positive && !estimateYes && !CONTROL.test(text) && !isDateOnly(text) && ask) {
         try {
           plan = (await ask({ purpose: 'whatsapp_dialogue', tier: 'deep', system: SYSTEM, schema: SCHEMA, maxTokens: 2000, timeoutMs: 60000, retries: 0,
             user: JSON.stringify(GREETING.test(text)
@@ -412,7 +422,7 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
           const answered = !!plan?.text?.trim() && !['error', 'rejected'].includes(result.status);
           const presented = await presentCollectingCart({ result, previousList, shoppingList: current, ask,
             userText: text, history: state.history || [], answered });
-          if (presented) messages = presented;
+          if (presented) { messages = presented; estimateShown = presented.estimate || null; }
           else if (!answered) {
             // Valinnan jälkeen kerrotaan mitä otettiin, ei aina samaa "päivitin ostoskorin" -fraasia.
             const opening = selectionAcknowledgement({ previousList, shoppingList: current, status: result.status });
@@ -427,6 +437,7 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
         if (result.removedNote && plan?.openCart) result = { ...result, conversationAnswer: [result.conversationAnswer, result.removedNote].filter(Boolean).join('\n') };
         state.lastOrder = result;
         state.pendingSuggestion = null;
+        state.pendingEstimate = estimateShown;
         // Enintään yksi lisäidea luonnosta kohden: ei toistuvaa lisämyyntiä samalle listalle.
         const ideaAllowed = result.status === 'ready' && state.suggestedFor !== result.draftId;
         if (ideaAllowed && !plan && ask) {

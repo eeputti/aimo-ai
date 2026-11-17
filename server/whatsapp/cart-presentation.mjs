@@ -110,6 +110,72 @@ export function selectionAcknowledgement({ previousList, shoppingList, status })
 
 export const FALLBACK_ACKNOWLEDGEMENT = 'Selvä, kirjasin ylös!';
 
+// ---------- Puuttuvien määrien arvio annetusta määrästä ----------
+// Eelis 17.11.: "spagettia, 2 kg kanafilettä ja valkosipulikastiketta" kysyi vain "Kuinka paljon: spagetti, valkosipulikastike?".
+// Kun ainakin yhdellä rivillä on määrä ja tuotteet ovat saman ruoan aineksia, malli arvioi puuttuvat suurkeittiön annoskoilla
+// samalle annosmäärälle, ja koodi kertoo miksi arvioi. Malli vain ehdottaa: koodi tarkistaa luvut, ja ostaja hyväksyy (joo)
+// tai antaa omat määränsä. Mitään ei kirjata ostoskoriin ilman ostajan vastausta.
+const ESTIMATE_SCHEMA = { type: 'object', additionalProperties: false, required: ['applies', 'anchor', 'dishPartitive', 'portions', 'estimates'], properties: {
+  applies: { type: 'boolean' },
+  anchor: { type: 'string', description: 'Ostoskorin tuote, jonka määrästä annosmäärä laskettiin (product-kentän arvo sellaisenaan).' },
+  dishPartitive: { type: 'string', description: 'Ruoan nimi partitiivissa pienillä kirjaimilla, esim. "kanaspagettia". Tyhjä, jos ei yhtä ruokaa.' },
+  portions: { type: 'integer' },
+  estimates: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['product', 'value', 'unit'], properties: {
+    product: { type: 'string' }, value: { type: 'number' }, unit: { type: 'string', enum: ['KG', 'L', 'PCS'] } } } },
+} };
+const ESTIMATE_SYSTEM = `Olet suurkeittiön tukkutilausten avustaja. Asiakas kertoi osan tuotteiden määristä. Arvioi puuttuvat määrät suhteessa annettuun määrään, kun tuotteet ovat selvästi saman ruoan tai käytön aineksia: asiakkaan viesti tai keskustelu kertoo ruoan, tai tuotteet muodostavat tunnetun ruoan (spagetti, kanafilee ja valkosipulikastike = kanaspagetti).
+Laske ensin, moneenko annokseen annettu määrä riittää suurkeittiön tavallisella annoskoolla, ja arvioi puuttuvat samalle annosmäärälle. Tavallisia annoskokoja: kuiva pasta tai riisi 80–100 g, kana tai liha 120–150 g, kala 120–150 g, perunat 200–250 g, kastike 1–1,5 dl, keitto 3 dl, kerma ruoanlaittoon 0,3–0,5 dl, juusto raasteena 15–25 g.
+Ilmoita määrä samassa yksikössä kuin tuotetta tavallisesti tilataan: kuivat ja kiinteät KG, nesteet ja kastikkeet L, kappaletavarat PCS.
+applies=false, jos tuotteet eivät kuulu samaan ruokaan, annettu määrä ei kerro annosmäärää tai et ole varma. Älä arvioi tuotteita, joilla on jo määrä, äläkä keksi tuotteita, joita ostoskorissa ei ole.`;
+const MIN_PER_PORTION = { KG: 0.003, L: 0.003, PCS: 0.05 };
+const MAX_PER_PORTION = { KG: 1, L: 1, PCS: 10 };
+const roundEstimate = (value, unit) => (unit === 'PCS' ? Math.ceil(value) : value >= 2 ? Math.ceil(value * 2) / 2 : Math.max(0.1, Math.ceil(value * 10) / 10));
+
+/** @returns {Promise<null | {anchor: object, portions: number, dish: string, estimates: {productTerm: string, quantity: object}[]}>} */
+export async function estimateMissingQuantities({ ask, shoppingList, userText, history = [] }) {
+  const missing = (shoppingList?.lines || []).filter((line) => !line.quantity);
+  const known = (shoppingList?.lines || []).filter((line) => line.quantity);
+  if (!ask || !missing.length || !known.length || missing.length > 6) return null;
+  let json;
+  try {
+    ({ json } = await ask({ purpose: 'whatsapp_quantity_estimate', tier: 'deep', system: ESTIMATE_SYSTEM, schema: ESTIMATE_SCHEMA, maxTokens: 1500, timeoutMs: 30000, retries: 0,
+      user: JSON.stringify({ message: userText, history: history.slice(-6).map((h) => ({ role: h.role, text: String(h.text || '').slice(0, 300) })),
+        cart: known.map((line) => ({ product: line.productTerm, quantity: { value: line.quantity.value, unit: line.quantity.unit } })),
+        missing: missing.map((line) => line.productTerm) }) }));
+  } catch { return null; }
+  if (!json?.applies) return null;
+  const anchor = known.find((line) => line.productTerm === json.anchor);
+  const portions = Number(json.portions);
+  const dish = String(json.dishPartitive || '').trim().toLocaleLowerCase('fi-FI');
+  if (!anchor || !Number.isInteger(portions) || portions < 1 || portions > 5000 || !/^[\p{L} -]{3,40}$/u.test(dish)) return null;
+  const byTerm = new Map(missing.map((line) => [line.productTerm, line]));
+  const estimates = [];
+  for (const e of Array.isArray(json.estimates) ? json.estimates : []) {
+    const line = byTerm.get(e?.product);
+    const value = Number(e?.value);
+    if (!line || !['KG', 'L', 'PCS'].includes(e.unit) || !(value > 0)) return null;
+    // Annosta kohden järkevä määrä: malli ei saa ehdottaa 1000 kg spagettia 2 kg:n kanoihin.
+    const per = value / portions;
+    if (per < MIN_PER_PORTION[e.unit] || per > MAX_PER_PORTION[e.unit]) return null;
+    estimates.push({ productTerm: line.productTerm, quantity: { value: roundEstimate(value, e.unit), unit: e.unit } });
+    byTerm.delete(e.product);
+  }
+  // Kaikille puuttuville arvio tai ei mitään: osittainen arvio sekoittaisi kysymyksen.
+  if (!estimates.length || byTerm.size) return null;
+  return { anchor: { productTerm: anchor.productTerm, quantity: anchor.quantity }, portions, dish, estimates };
+}
+
+/** Arvion viesti: miksi arvioitiin, mistä, ehdotetut määrät ja miten vastataan. Kaikki luvut ovat koodin tarkistamia. */
+export function estimateMessage(estimate) {
+  const rows = estimate.estimates.map((e) => `- ${e.productTerm} ${quantityLabel(e.quantity)}`).join('\n');
+  return `Näille ei ollut määrää: ${join(estimate.estimates.map((e) => e.productTerm))}. Arvioin ne annetusta määrästä `
+    + `(${estimate.anchor.productTerm} ${quantityLabel(estimate.anchor.quantity)} riittää noin ${estimate.portions} annokseen ${estimate.dish}):\n${rows}\n`
+    + 'Käykö? Vastaa joo, niin kirjaan nämä määrät, tai kerro omat.';
+}
+
+/** Hyväksytyn arvion viesti tilausmoottorille: puuttuvat määrät riveille. */
+export const estimateOrderText = (estimate) => join(estimate.estimates.map((e) => `${e.productTerm} ${quantityLabel(e.quantity)}`));
+
 export async function presentCollectingCart({ result, shoppingList, previousList, ask, userText, history = [], answered = false }) {
   // Only the plain missing-details response is restyled. Errors, notes, offers, prices and
   // explicit confirmation instructions are always returned verbatim by the established engine.
@@ -133,6 +199,8 @@ export async function presentCollectingCart({ result, shoppingList, previousList
   let acknowledgement = changed && !answered ? FALLBACK_ACKNOWLEDGEMENT : '';
   let quantityQuestion = productCase === 'partitive' ? QUESTION_FORMS[0] : QUESTION_FORMS[4];
   const deliveryDate = dateLabel(shoppingList.deliveryDate);
+  // Arvio ajetaan rinnakkain kuittauksen kanssa, jotta viesti ei odota kahta mallikutsua peräkkäin.
+  const estimating = asksQuantity && !dateFirst ? estimateMissingQuantities({ ask, shoppingList, userText, history }) : Promise.resolve(null);
   if (ask) {
     // Malli saa oikean tallennetun korin, muutoksen ja keskustelun, jotta vastaus voi reagoida juuri tähän viestiin.
     const before = new Map((previousList?.id === shoppingList.id ? previousList.lines : []).map((line) => [line.ref, line]));
@@ -162,6 +230,11 @@ export async function presentCollectingCart({ result, shoppingList, previousList
     rest[0] = rest[0].replace(DATE_PREFIX, () => `Mille päivälle tarvitset toimituksen, ja ${quantityText[0].toLocaleLowerCase('fi-FI')}${quantityText.slice(1)}`);
     quantityText = '';
   }
+  // Annetusta määrästä arvioidut puuttuvat määrät korvaavat pelkän määräkysymyksen; ostaja hyväksyy tai antaa omat.
+  const estimate = await estimating;
+  if (estimate) quantityText = estimateMessage(estimate);
   const followUp = [...(quantityText ? [quantityText] : []), ...rest].join('\n');
-  return [...(acknowledgement ? [acknowledgement] : []), cart, ...(followUp ? [followUp] : [])];
+  const out = [...(acknowledgement ? [acknowledgement] : []), cart, ...(followUp ? [followUp] : [])];
+  if (estimate) out.estimate = { listId: shoppingList.id, revision: shoppingList.revision, orderText: estimateOrderText(estimate) };
+  return out;
 }
