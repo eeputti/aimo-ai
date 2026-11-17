@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — umpikujakorjaukset livenä 16ddf16:n jälkeen, "Kirjoita 4" korjattu (Claude Code, pääsessio)
+
+- **Julkaisu:** Eelis hyväksyi ("Kyllä, julkaise"), sessio E julkaisi botin mainista 16ddf16 (aimo-whatsapp-3ewo907q8, klo 21.35). Healthz tarkistettu tästäkin sessiosta: 200, host cloud.
+- **Livekoe:** WhatsApp ei ottanut taustakirjoitusta vastaan (koneella oli auki järjestelmäikkuna), joten kokeilin samaa bottikoodia sivuston Keskustele-sivulla. "8 litraa kermaa torstaiks, ei mittää laktoosittomii" → "Listalle tuli kerma 8 l." ja uusi siirtymä "Hyvä! Katsotaan seuraavaksi sopivat tuotteet." "EI laktoositonta. tavallista kuohukermaa" → "Okei, nyt kuohukerma 8 l." ja kuohukermat. "haloo?? laktoosillinen kerma kiitos" → "Ärsyttävää, anteeksi! Kaikki kolme listan vaihtoehtoa ovat laktoosittomia, joten tavallista kuohukermaa ei valitettavasti ole tarjolla..." eikä listaa uudelleen. "mitä eroo noil on?? mikä näistä vaahtoutuu parhaiten kakkuun" → vastaus listan tiedoilla ja yleisellä 30 % -rasvasäännöllä. Ei tilausta.
+- **Löydös ja korjaus:** vastaus ehdotti "Kirjoita 4", vaikka kolmen vaihtoehdon listassa ei ollut 4:ää. `unchanged-reply.mjs` kertoo mallille, onko lisävaihtoehtoja (moreAvailable), ja pudottaa 4:ää ehdottavan virkkeen, kun niitä ei ole. Testi lisätty, `npm test` 490/490.
+- **Käyttöönotto kesken:** tämä pieni korjaus tarvitsee uuden botin julkaisun (sessio E, Eeliksen luvalla).
+
 ## 17.11.2026 — botti tuotantoon mainista 16ddf16: vastaus listaa muuttamattomaan viestiin ja ääniviestien ääkköset (Claude Code, sessio E)
 
 - **Käyttäjän lupa:** pääsessio pyysi julkaisua Eeliksen luvalla ("Kyllä, julkaise"), ja Eelis vahvisti sen myös tässä sessiossa.

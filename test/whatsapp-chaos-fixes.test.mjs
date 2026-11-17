@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openWhatsAppStore } from '../server/whatsapp/store.mjs';
 import { createOrderingDialogue } from '../server/whatsapp/dialogue.mjs';
-import { announcedChoice, optionsPrompt, unchangedReply, UNCHANGED_FALLBACK } from '../server/whatsapp/unchanged-reply.mjs';
+import { announcedChoice, hasMore, optionsPrompt, unchangedReply, UNCHANGED_FALLBACK } from '../server/whatsapp/unchanged-reply.mjs';
 import { CHOOSE_TRANSITIONS, selectionAcknowledgement } from '../server/whatsapp/cart-presentation.mjs';
 import { createRuleInterpreter } from '../server/order-conversation/interpret.mjs';
 import { understand } from '../server/aimo/understand.mjs';
@@ -120,4 +120,16 @@ test('saman päivän tilattavattomat rivit yhdeksi lauseeksi, muut ongelmat enna
     'Tarkkaa osumaa ei löytynyt: strutsinmuna.', 'Ei tilattavaa tuotetta päivälle ke 18.11.: kananmuna.']),
   ['Ei tilattavaa tuotetta päivälle ke 18.11.: maito, voi ja kananmuna.', 'Tarkkaa osumaa ei löytynyt: strutsinmuna.']);
   assert.deepEqual(mergeUnavailable(['Ei tilattavaa tuotetta päivälle pe 20.11.: spagetti.']), ['Ei tilattavaa tuotetta päivälle pe 20.11.: spagetti.']);
+});
+
+test('"Kirjoita 4" vain, kun listassa on lisävaihtoehtojen rivi', async () => {
+  const three = OPTIONS.replace('4) Näytä lisää vaihtoehtoja\n', '').replace('Vastaa 1, 2, 3 tai 4.', 'Vastaa 1, 2 tai 3.');
+  assert.equal(hasMore(OPTIONS), true); assert.equal(hasMore(three), false);
+  let seen;
+  const ask = async ({ user }) => { seen = JSON.parse(user); return { json: { text: 'Äh, kaikki on laktoosittomia. Kirjoita 4, niin katsotaan lisää.' } }; };
+  assert.equal(await unchangedReply({ ask, message: 'laktoosillinen kiitos', options: three }), 'Äh, kaikki on laktoosittomia.');
+  assert.equal(seen.moreAvailable, false);
+  assert.equal(await unchangedReply({ ask, message: 'laktoosillinen kiitos', options: OPTIONS }), 'Äh, kaikki on laktoosittomia. Kirjoita 4, niin katsotaan lisää.');
+  assert.equal(seen.moreAvailable, true);
+  assert.equal(optionsPrompt(three), 'Vastaa 1, 2 tai 3.');
 });
