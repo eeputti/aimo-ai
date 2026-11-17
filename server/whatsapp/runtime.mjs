@@ -11,7 +11,7 @@ import { withDemoCheckout, handleDemoCheckoutAsset } from './checkout.mjs';
 import { createWebChat } from './web-chat.mjs';
 import { createMediaReader, createMetaMediaFetcher } from './media.mjs';
 import { createConfiguredTranscriber } from './transcribe.mjs';
-import { llmEnabled } from '../config.mjs';
+import { config, llmEnabled } from '../config.mjs';
 
 export const whatsappDbPath = () => process.env.WHATSAPP_DB || fileURLToPath(new URL('../../data/whatsapp.db', import.meta.url));
 export function whatsappSettings(env = process.env) {
@@ -45,7 +45,7 @@ export function createConfiguredWhatsApp() {
   const storefrontCart = cartLink ? createStorefrontCartPage() : null;
   // Kuvat ja ääniviestit vain tilaustilassa. Ääniviestit tarvitsevat erikseen valitun litterointipalvelun (transcribe.mjs).
   const media = ordering && process.env.WHATSAPP_MEDIA !== 'false' ? createMediaReader({ db: store.db, fetchMedia: createMetaMediaFetcher(settings),
-    vision: llmEnabled(), transcriber: createConfiguredTranscriber() }) : null;
+    vision: llmEnabled() && config.llmProvider === 'anthropic', transcriber: createConfiguredTranscriber() }) : null;
   const channel = createWhatsAppChannel({ settings, store, chat: cartLink?.chat || ordering?.chat || replyToAssistant, media,
     onPrune: () => { ordering?.prune(); media?.prune(); }, send: createMetaSender(settings), typing: createMetaTypingIndicator(settings) });
   // Selaindemo on olemassa vain tilaustilassa, jolloin kannat ovat eristetyt.

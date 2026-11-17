@@ -1,5 +1,5 @@
 // Valmis kokoonpano kytkentää varten (henkilö 1): luonnoskanta, tuotetyökalut ja tulkki oletusriippuvuuksilla.
-// Kielimalli on käytössä, kun ANTHROPIC_API_KEY on asetettu; muuten viestit tulkitaan säännöillä.
+// Kielimalli valitaan AIMO_MODEL_PROVIDER-asetuksella; ilman malliasetusta käytetään sääntöjä.
 import { storefrontCartProjection } from '../storefront-whatsapp-sync.mjs';
 import { cartNotes } from '../cart-notes.mjs';
 import { shoppingListView } from '../shopping-list/index.mjs';

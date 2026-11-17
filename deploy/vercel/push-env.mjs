@@ -34,9 +34,10 @@ values.set('NODEJS_HELPERS', '0');
 if (!values.get('DEMO_NOW_ANCHOR') && values.get('DEMO_NOW')) values.set('DEMO_NOW_ANCHOR', new Date().toISOString());
 
 const required = ['WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_APP_SECRET', 'WHATSAPP_VERIFY_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID', 'WHATSAPP_API_VERSION',
-  'WHATSAPP_SUPPORT_CONTACT', 'WHATSAPP_DEMO_PHONE', 'WHATSAPP_PUBLIC_URL', 'ANTHROPIC_API_KEY', 'VALIO_API_KEY', 'VALIO_API_BASE',
+  'WHATSAPP_SUPPORT_CONTACT', 'WHATSAPP_DEMO_PHONE', 'WHATSAPP_PUBLIC_URL', 'VALIO_API_KEY', 'VALIO_API_BASE',
   'GATEWAY_PRIVATE_KEY_PEM', 'CLOUDFLARE_DEMO_URL', 'CLOUDFLARE_DEMO_SYNC_TOKEN', 'TURSO_AUTH_TOKEN', 'TICK_SECRET',
   'WHATSAPP_DB', 'WHATSAPP_DRAFT_DB', 'WHATSAPP_QUOTE_DB', 'GATEWAY_DB', 'AIMO_DB'];
+required.push(...(values.get('AIMO_MODEL_PROVIDER') === 'ollama' ? ['OLLAMA_BASE_URL', 'OLLAMA_MODEL'] : ['ANTHROPIC_API_KEY']));
 const missing = required.filter((k) => !values.get(k));
 // Julkinen osoite tulee pilven tiedostosta, ei Macin .env.whatsapp-tiedostosta (siellä on pikatunnelin osoite).
 if (!/^https:\/\/[a-z0-9.-]+$/i.test(cloud.get('WHATSAPP_PUBLIC_URL') || '') || /trycloudflare\.com$/i.test(cloud.get('WHATSAPP_PUBLIC_URL')))

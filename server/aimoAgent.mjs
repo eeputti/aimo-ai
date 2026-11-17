@@ -2,20 +2,21 @@
 // Agentti = Aimon ohjeet, skeemat ja tarkistukset valmiin kielimallin päällä. Tehtävät (keittiön reititys ja tarkistus
 // WhatsApp-dialogi, pyynnön tulkinta aimo/model.mjs, portin neuvonantaja gateway/advisor.mjs) antavat ohjeen, syötteen ja skeeman;
 // tämä moduuli omistaa asiakkaan, mallivalinnan, kutsuasetukset ja laskurit. Mallin tai toimittajan vaihto tehdään täällä.
-// Ilman ANTHROPIC_API_KEY:tä agentti on pois päältä ja sovellus toimii sääntöpohjaisesti.
+// Mallitoimittaja valitaan palvelinasetuksista; Ollama ei siirry maksulliseen API:in.
 import { config, llmEnabled } from './config.mjs';
+import { askOllama } from './ollama-agent.mjs';
 
-export const AIMO_AGENT = { name: 'Aimo-agentti', provider: 'anthropic' };
+export const AIMO_AGENT = { name: 'Aimo-agentti', provider: config.llmProvider };
 export const agentEnabled = llmEnabled;
 
 /** Kaksi nopeutta: 'deep' ajattelee rauhassa taustalla, 'fast' vastaa heti (ajattelu pois, matala effort). */
-export const modelFor = (tier = 'fast') => (tier === 'deep' ? config.deepModel : config.fastModel);
+export const modelFor = (tier = 'fast') => (config.llmProvider === 'ollama' ? (tier === 'deep' ? config.ollamaDeepModel : config.ollamaModel) : (tier === 'deep' ? config.deepModel : config.fastModel));
 
 let clientPromise;
 const getClient = () => (clientPromise ||= import('@anthropic-ai/sdk').then(({ default: Anthropic }) => ({ Anthropic, client: new Anthropic({ apiKey: config.anthropicKey, maxRetries: 1, timeout: 120_000 }) })));
 
 /** Lämmitys käynnistyksessä: SDK muistiin, ettei demon ensimmäinen kutsu ole hitain. */
-export async function warmAgent() { if (agentEnabled()) await getClient(); }
+export async function warmAgent() { if (agentEnabled() && config.llmProvider === 'anthropic') await getClient(); }
 
 // inputTokens sisältää kaikki syötetokenit: välimuistista luetut (cacheReadTokens, noin 0,1 × hinta) ja välimuistiin
 // kirjoitetut (cacheWriteTokens, 1,25 × hinta) mukaan lukien.
@@ -68,24 +69,28 @@ export async function askAgent({ purpose, tier = 'fast', system, user, turns, sc
   if (timeoutMs != null) opts.timeout = timeoutMs;
   if (retries != null) opts.maxRetries = retries;
   try {
-    const { Anthropic, client } = await getClient();
     let msg;
-    if (deep) {
-      try {
-        // Palvelinpuolen fallback: jos turvaluokitin hylkää pyynnön, API ajaa sen varamallilla saman kutsun sisällä.
-        msg = await client.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }, opts).finalMessage();
-      } catch (err) {
-        if (!(err instanceof Anthropic.BadRequestError)) throw err;
-        msg = await client.messages.stream(params, opts).finalMessage(); // malli tai alusta ei tue fallback-betaa
-      }
-    } else if (onToken) {
-      const stream = client.messages.stream(params, opts);
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') onToken(event.delta.text);
-      }
-      msg = await stream.finalMessage();
+    if (config.llmProvider === 'ollama') {
+      msg = await askOllama({ settings: config, model: modelFor(tier), system, user, turns, schema, maxTokens, timeoutMs, onToken });
     } else {
-      msg = await client.messages.create(params, opts);
+      const { Anthropic, client } = await getClient();
+      if (deep) {
+        try {
+          // Palvelinpuolen fallback: jos turvaluokitin hylkää pyynnön, API ajaa sen varamallilla saman kutsun sisällä.
+          msg = await client.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }, opts).finalMessage();
+        } catch (err) {
+          if (!(err instanceof Anthropic.BadRequestError)) throw err;
+          msg = await client.messages.stream(params, opts).finalMessage(); // malli tai alusta ei tue fallback-betaa
+        }
+      } else if (onToken) {
+        const stream = client.messages.stream(params, opts);
+        for await (const event of stream) {
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') onToken(event.delta.text);
+        }
+        msg = await stream.finalMessage();
+      } else {
+        msg = await client.messages.create(params, opts);
+      }
     }
     if (msg.stop_reason === 'refusal') throw new Error('Malli kieltäytyi vastaamasta');
     if (msg.stop_reason === 'max_tokens') throw new Error('Vastaus katkesi (max_tokens)');
@@ -125,6 +130,7 @@ export async function askAgent({ purpose, tier = 'fast', system, user, turns, sc
  * @returns {Promise<{text: string, model: string, ms: number, toolCalls: number, usage: {input: number, output: number, cacheRead: number}}>}
  */
 export async function chatWithMcp({ purpose, system, messages, mcp, onText, onTool, maxTokens = 16000, allowedTools }) {
+  if (config.llmProvider !== 'anthropic') throw new Error('Etä-MCP-connector tarvitsee Anthropic-palvelun; käytä Ollamalla WhatsAppin tilauspolkua.');
   const t0 = performance.now();
   const MCP_BETA = 'mcp-client-2025-11-20';
   const base = {

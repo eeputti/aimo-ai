@@ -205,6 +205,7 @@ Testit käyttävät omia tilapäisiä kantoja ja simuloituja ulkoisia palveluita
 
 - [WhatsAppin asetukset](docs/whatsapp.md)
 - [Pilvijulkaisu: Vercel ja Turso](docs/vercel.md)
+- [Itse ajettava tekstimalli: Ollama](docs/self-hosted-model.md)
 - [Selainkeskustelu](docs/web-chat.md)
 - [Agentin jälki](docs/agent-trace.md)
 - [WhatsApp-palvelin omalle koneelle](docs/whatsapp-deploy.md)

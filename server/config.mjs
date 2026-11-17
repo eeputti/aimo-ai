@@ -1,5 +1,7 @@
+import { modelSettings } from './model-settings.mjs';
 // Ympäristöasetukset yhdessä paikassa. .env ladataan Noden --env-file-if-exists -lipulla (ks. package.json).
 export const config = {
+  ...modelSettings(),
   port: Number(process.env.PORT || 4747),
   valioKey: (process.env.VALIO_API_KEY || '').trim(),
   valioBase: (process.env.VALIO_API_BASE || 'https://junction26.valioaimo.fi').replace(/\/$/, ''),
@@ -13,4 +15,4 @@ export const config = {
 };
 
 export const apiMode = () => (config.valioKey ? 'live' : 'sim');
-export const llmEnabled = () => Boolean(config.anthropicKey);
+export const llmEnabled = () => config.llmProvider === 'ollama' || Boolean(config.anthropicKey);

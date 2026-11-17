@@ -177,3 +177,14 @@ test('preflight tarkistaa ääniviestien litterointiasetuksen ennen käynnistyst
   assert.equal(check({ WHATSAPP_MEDIA: 'false', WHATSAPP_TRANSCRIBE: 'groq' }).ok, true, 'media pois: litterointia ei käytetä');
   assert.equal(check({ WHATSAPP_MEDIA: 'yes' }).errors.some((e) => e.code === 'MEDIA_FLAG'), true);
 });
+
+
+test('Ollama preflight requires a model and ordering mode without demanding a paid key', (t) => {
+  const { check } = fixture(t);
+  const settings = { AIMO_MODEL_PROVIDER: 'ollama', OLLAMA_BASE_URL: 'http://ollama:11434', OLLAMA_MODEL: 'qwen3:8b', ANTHROPIC_API_KEY: '' };
+  const result = check(settings);
+  assert.equal(result.ok, true);
+  assert.equal(result.warnings.some((w) => w.code === 'RULE_INTERPRETER'), false);
+  assert.equal(check({ ...settings, OLLAMA_MODEL: '' }).errors.some((e) => e.code === 'MODEL_SETTINGS'), true);
+  assert.equal(check({ ...settings, WHATSAPP_ORDERING_ENABLED: 'false' }).errors.some((e) => e.code === 'OLLAMA_ORDERING_REQUIRED'), true);
+});

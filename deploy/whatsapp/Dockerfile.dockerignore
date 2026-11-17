@@ -25,3 +25,5 @@
 **/*.pem
 **/*.db
 **/*.db-*
+
+!scripts/ollama-smoke.mjs

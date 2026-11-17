@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — itse ajettavan tekstimallin toteutus valmis GitHubiin, käyttöönotto avoin (Codex, Danielin chatti)
+
+- Viimeistelty Ollama-sovitin, malliasetusten ennakkotarkistus, ehdollinen Vercel-asetusten vienti, tekstipohjainen median rajaus ja sisäverkon Compose-palvelu. Docker-pakettiin lisätty kolmen todellisen mallikutsun savutesti. Ohje docs/self-hosted-model.md sisältää VPS-/Vercel-vaihtoehdot, mallin/kuvan version lukituksen, kustannukset ja avoimet laatu-/kapasiteettikokeet. Nykyinen Anthropic-oletus säilyy.
+- Tarkistukset: kohdistetut testit 18/18. Koko npm test 464: 381 läpi, 0 epäonnistunutta, 83 ohitettu katalogin puuttuessa. Ensimmäisen laajan ajon viisi virhettä olivat puuttuva @libsql/client; lukittujen riippuvuuksien asennuksen jälkeen sarja läpi. Compose validoitu erillisellä tyhjällä env-tiedostolla ja git diff --check läpi.
+- Docker-buildia yritetty, mutta ympäristön varmenneketju esti npm-pakettien latauksen kontissa (self-signed certificate in certificate chain). TLS-tarkistusta ei poistettu. Konttikäynnistystä tai oikean mallin laatua ei väitetä testatuksi. Ollamaa/painoja ei asennettu, ei maksettuja mallikutsuja, tuotannon julkaisua, Metan callback-muutosta tai restarttia. Seuraava konkreettinen vaihe on palvelin ja oikean valitun mallin savutesti sekä WhatsApp-laatukoe eristetyillä kannoilla.
+
+## 17.11.2026 — Ollama-sovitin ja maksullisen fallbackin esto testattu (Codex, Danielin chatti)
+
+- Lisätty AIMO_MODEL_PROVIDER=ollama, erilliset OLLAMA_BASE_URL/OLLAMA_MODEL-asetukset ja Ollaman /api/chat-sovitin. Sama askAgent palauttaa tekstin, JSONin ja tokenilaskurit nykyisille WhatsApp-tehtäville. Mallinimi ei periydy Claude-asetuksista. Virhe, katkeaminen tai puuttuva malli ei siirrä kutsua Anthropic API:in.
+- Ensimmäinen kohdistettu koe 17/17 läpi: oikea paikallinen HTTP-palvelin + erillinen Node-prosessi käyttää Ollamaa myös henkilökohtaisen API-avaimen ollessa ympäristössä; MCP-connector estetään ja HTTP-virhe raportoidaan ilman upstreamin salaisuuksia. Lisäksi JSON, aikakatkaisu, tokenit ja vanhat välimuisti-/käynnistystestit. Mallipalvelin on tässä testitupla, ei oikea avoin malli.
+- Lisätty seuraavaksi ajettava todellisen mallin savutesti ja sisäverkkoon rajattu Compose-palvelu. Niiden ja laajemman regressiosarjan varmennus sekä ohje viimeistellään seuraavassa vaiheessa. Tuotantoa ei muutettu.
+
 ## 17.11.2026 — itse ajettavan mallin tuki, työ aloitettu (Codex, Danielin chatti)
 
 - Käyttäjä pyysi rakentamaan itse ajettavan mallin ja päivittämään työlokia tasaisesti. Toteutetaan Ollama-sovitin nykyisen keskitetyn askAgent-rajapinnan taakse; käytetään valmista avoimen mallin painotiedostoa, ei kouluteta perusmallia alusta.

@@ -1,3 +1,4 @@
+import { modelSettings } from '../server/model-settings.mjs';
 // Read-only startup checks. Never import an application store, open SQLite, or call an API here.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -79,6 +80,9 @@ export function checkWhatsAppEnvironment(env = process.env, { cwd = process.cwd(
     } catch { error('DB_NOT_WRITABLE', `${key}: kantatiedoston ja sen hakemiston pitää olla kirjoitettavissa.`); }
   }
 
+  let model;
+  try { model = modelSettings(env); } catch (err) { error('MODEL_SETTINGS', err.message); }
+  if (model?.llmProvider === 'ollama' && !ordering) error('OLLAMA_ORDERING_REQUIRED', 'Ollama tarvitsee WHATSAPP_ORDERING_ENABLED=true; etä-MCP-connector ei ole tuettu.');
   let catalogProducts;
   if (ordering) {
     if (env.AIMO_CATALOG && env.AIMO_CATALOG !== value('AIMO_CATALOG')) error('PATH_WHITESPACE', 'AIMO_CATALOG: poista polun alku- ja loppuvälilyönnit.');
@@ -96,7 +100,7 @@ export function checkWhatsAppEnvironment(env = process.env, { cwd = process.cwd(
         if (crypto.createPrivateKey(pem.replace(/\\n/g, '\n')).asymmetricKeyType !== 'ed25519') throw new Error('KEY_TYPE');
       } else writableTarget(keyFile); // The gateway generates its first key on the persistent data volume.
     } catch { error('SIGNING_KEY', 'GATEWAY_PRIVATE_KEY_PEM tai pysyvän data-hakemiston Ed25519-avain ei ole käyttökelpoinen.'); }
-    if (!value('ANTHROPIC_API_KEY')) warn('RULE_INTERPRETER', 'Kielimalli ei ole asetettu: keskustelu tulkitaan säännöillä.');
+    if (model?.llmProvider !== 'ollama' && !value('ANTHROPIC_API_KEY')) warn('RULE_INTERPRETER', 'Kielimalli ei ole asetettu: keskustelu tulkitaan säännöillä.');
     if (!value('VALIO_API_KEY')) warn('SIMULATED_PRICES', 'VALIO_API_KEY puuttuu: hinnat ja saatavuus simuloidaan.');
     if (env.WHATSAPP_MEDIA && !['true', 'false'].includes(env.WHATSAPP_MEDIA)) error('MEDIA_FLAG', 'WHATSAPP_MEDIA on true tai false ilman välilyöntejä.');
     // Litterointiasetus tarkistetaan ennen käynnistystä ilman verkkokutsua: puuttuva avain pysäyttäisi botin (transcribe.mjs).

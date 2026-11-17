@@ -5,7 +5,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund
 COPY server ./server
 COPY public ./public
-COPY scripts/whatsapp-preflight.mjs ./scripts/whatsapp-preflight.mjs
+COPY scripts/whatsapp-preflight.mjs scripts/ollama-smoke.mjs ./scripts/
 COPY deploy/whatsapp/start.mjs ./deploy/whatsapp/start.mjs
 RUN mkdir -p /app/data/whatsapp && chown -R node:node /app/data
 ENV NODE_ENV=production WHATSAPP_PORT=4749
