@@ -15,6 +15,7 @@
 //     (id, first, brief, expected, date, maxTurns). Moduulin oma inspect(case, turns, list) korvaa inspectPersonan;
 //     se voi palauttaa listan virheitä tai { failures, newRequirement, observations, metrics }. Kenttä now asettaa
 //     demokellon tapauskohtaisesti (sama now ajetaan samassa lapsiprosessissa).
+//   node --env-file=.env scripts/whatsapp-selfplay-batch.mjs --deep-effort medium   (apurin syvän tason effort ajon lähdekopiossa; oletus on sovelluksen high)
 //   node scripts/whatsapp-selfplay-batch.mjs --dry-run         (ei mallikutsuja: listaa persoonat)
 //   node scripts/whatsapp-selfplay-batch.mjs --reinspect data/selfplay/<ajo>/results.json   (tarkistukset uudelleen tallennetuista vuoroista)
 //
@@ -140,7 +141,7 @@ export function summarize(results, totals, meta) {
     `# Itsekeskustelu ${meta.created}${meta.reinspected ? ` (tarkistukset ajettu uudelleen ${meta.reinspected})` : ''}`, '',
     `Lähde: ${meta.sourceRef ? `${meta.sourceRef} = ` : ''}${meta.commit}${meta.dirty.length ? ` + ${meta.dirty.length} commitoimatonta tiedostoa (${meta.dirty.slice(0, 8).join(', ')}${meta.dirty.length > 8 ? ', …' : ''})` : ''}, lähdekopion sormenjälki ${meta.snapshotHash.slice(0, 12)}.`,
     `Tila: eristetyt kannat, simuloidut hinnat, ei Meta-lähetyksiä, ei tilauksia (tilauksia ${totals.orders}).`,
-    `Mallit: apuri ${meta.deepModel || 'claude-opus-5-5'} (lisätuote ${meta.fastModel || 'claude-haiku-5-5'}), simuloitu asiakas ja arvioija ${modelOf('whatsapp_selfplay_customer', meta.deepModel, meta.fastModel, meta.simTier)}.`, '',
+    `Mallit: apuri ${meta.deepModel || 'claude-opus-5-5'}${meta.deepEffort ? ` (effort ${meta.deepEffort})` : ''} (lisätuote ${meta.fastModel || 'claude-haiku-5-5'}), simuloitu asiakas ja arvioija ${modelOf('whatsapp_selfplay_customer', meta.deepModel, meta.fastModel, meta.simTier)}.`, '',
     `Persoonat ${results.length}, ajettu ${ok.length}, ajovirheitä ${results.length - ok.length}. Perusvaatimukset läpi ${ok.filter((r) => !r.failures.length).length}/${ok.length}, uusi vaatimus (a–c) läpi ${ok.filter((r) => !r.newRequirement.length).length}/${ok.length}.`,
     `Mallikutsut ${totals.calls} (epäonnistuneita ${totals.failed}), ${ok.length ? (totals.calls / ok.length).toFixed(1) : 0} / persoona. Tokenit sisään ${totals.input} (välimuistista ${totals.cacheRead}, välimuistiin ${totals.cacheWrite}), ulos ${totals.output}. Kustannusarvio ${cost.toFixed(2)} USD, ${perPersona.toFixed(3)} USD / persoona (välimuistiin kirjoitus puuttuu laskurista). Kesto ${(totals.ms / 60000).toFixed(1)} min, persoonaa kohden ${(ok.length ? totals.personaMs / ok.length / 1000 : 0).toFixed(0)} s seinäkelloa, josta apurin vastaukset ${(ok.length ? totals.assistantMs / ok.length / 1000 : 0).toFixed(0)} s.`, '',
     '## Perusvaatimukset (d–f)', ...base.map(([k, n]) => `- ${k}: ${n}.${example(k, (r) => r.failures || [])}`), ...(base.length ? [] : ['- ei virheitä']), '',
@@ -161,7 +162,15 @@ export function summarize(results, totals, meta) {
 // ------------------------------------------------------------------------------------------------ pääprosessi
 // sourceRef (esim. origin/main): apurin koodi (server/, runSelfplay ja sen tapaukset) Gitistä eikä työpuusta, jotta tulos
 // vastaa julkaistua versiota. Tämän ajurin ja persoonien tiedostot tulevat aina työpuusta.
-function snapshot(caseFiles = [], sourceRef = null) {
+/** Kiinnittää syvän tason effort-arvon ajon lähdekopioon (ei sovelluskoodiin): vertailuajoja varten. Heittää, jos rivi on muuttunut. */
+export function patchDeepEffort(source, effort) {
+  if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(effort)) throw new Error(`Tuntematon effort: ${effort}`);
+  const from = "effort: deep ? 'high' : 'low'";
+  if (!source.includes(from)) throw new Error('server/aimoAgent.mjs:n effort-rivi ei vastaa odotettua: effort-asetusta ei voi kiinnittää');
+  return source.replace(from, `effort: deep ? '${effort}' : 'low'`);
+}
+
+function snapshot(caseFiles = [], sourceRef = null, deepEffort = null) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-selfplay100-src-'));
   fs.cpSync(path.join(ROOT, 'server'), path.join(dir, 'server'), { recursive: true });
   const fromRef = ['server', 'scripts/whatsapp-selfplay.mjs', 'eval/whatsapp-selfplay-cases.mjs'];
@@ -177,6 +186,7 @@ function snapshot(caseFiles = [], sourceRef = null) {
     const archive = execFileSync('git', ['archive', sourceRef, ...fromRef], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 });
     execFileSync('tar', ['-x', '-C', dir], { input: archive });
   }
+  if (deepEffort) { const agentFile = path.join(dir, 'server/aimoAgent.mjs'); fs.writeFileSync(agentFile, patchDeepEffort(fs.readFileSync(agentFile, 'utf8'), deepEffort)); }
   fs.symlinkSync(path.join(ROOT, 'node_modules'), path.join(dir, 'node_modules'));
   const hash = crypto.createHash('sha256');
   for (const f of fs.readdirSync(dir, { recursive: true }).filter((x) => !String(x).startsWith('node_modules') && !String(x).startsWith('data')).sort()) {
@@ -247,8 +257,9 @@ async function main() {
   const created = new Date().toISOString();
   const outDir = path.resolve(arg('--out-dir', path.join(ROOT, 'data/selfplay', created.replace(/[:.]/gu, '-'))));
   fs.mkdirSync(outDir, { recursive: true, mode: 0o700 });
-  const src = snapshot(caseFiles, arg('--source-ref'));
-  const meta = { created, cases: spec, sourceRef: src.sourceRef, commit: src.commit, dirty: src.dirty, snapshotHash: src.hash, deepModel: process.env.DEEP_MODEL || 'claude-opus-5-5', fastModel: process.env.FAST_MODEL || 'claude-haiku-5-5', simTier: simTierFromEnv(), chunk, concurrency, maxCalls };
+  const deepEffort = arg('--deep-effort') || process.env.WHATSAPP_SELFPLAY_DEEP_EFFORT || null;
+  const src = snapshot(caseFiles, arg('--source-ref'), deepEffort);
+  const meta = { created, cases: spec, deepEffort, sourceRef: src.sourceRef, commit: src.commit, dirty: src.dirty, snapshotHash: src.hash, deepModel: process.env.DEEP_MODEL || 'claude-opus-5-5', fastModel: process.env.FAST_MODEL || 'claude-haiku-5-5', simTier: simTierFromEnv(), chunk, concurrency, maxCalls };
   console.log(JSON.stringify({ personas: selected.length, chunk, concurrency, maxCalls, outDir, commit: src.commit.slice(0, 9), dirty: src.dirty.length, snapshot: src.dir }));
 
   // Erät saman demokellon mukaan, koska kello ladataan kerran lapsiprosessia kohden.

@@ -139,6 +139,22 @@ Jäljellä neljä V-virhettä, joista yksikään ei liity A:n korjauksiin:
 
 Päätelmä: A1–A3-korjaukset toimivat Haikulla, ja V-joukon Haiku-tulos 31/35 on nyt samaa luokkaa kuin S ja X. Lähes kaikki V-virheet olivat koodia eivätkä mallia, kuten raportissa arvioitiin. Kulu tähän lisämittaukseen noin 0,10 USD (yhteensä noin 3,8 USD, noin 4,2 USD välimuistikirjoituksineen).
 
+## Effort-koe 17.11.2026 (keskeneräinen, käyttöraja katkaisi)
+
+Kysymys: voiko Haikun syvän tason effortin laskea (nyt `high`, `server/aimoAgent.mjs`) ilman että vastaukset heikkenevät. Ajurille lisättiin `--deep-effort <taso>`, joka kiinnittää effortin vain ajon lähdekopioon (sovelluskoodi ennallaan, testi `patchDeepEffort`). Sama 241 persoonan joukko, sama commit 56fe2df, Haiku kaikissa rooleissa, kolme tasoa rinnakkain:
+
+| effort | perus läpi | uusi läpi | apurin tulostokenit / persoona | apurin kulu / persoona | vuoron kesto p50 / p90 / p99 |
+|---|---|---|---|---|---|
+| high (nyt) | 225/241 | 228/241 | 3 493 | 0,0027 USD | 5,7 / 10,7 / 14,9 s |
+| medium | 226/240 (1 ajovirhe) | 226/240 | 2 363 (-32 %) | 0,0021 USD | 4,5 / 8,2 / 11,3 s |
+| low | 222/241 | 225/241 | 1 457 (-58 %) | 0,0016 USD | 3,3 / 6,2 / 9,2 s |
+
+- **Medium vastaa high-tasoa koodin tarkistuksilla.** Persoonia, jotka epäonnistuivat vain medium-ajossa, oli 11 ja vain high-ajossa 12, eli ero on kohinaa. Medium on myös Haiku 5.5:n API-oletus.
+- **Low on nopein mutta ei todistettu yhtä hyväksi:** 15 vain low-ajossa epäonnistunutta vs 10 vain high-ajossa epäonnistunutta. R-joukko 2/6 (high ja medium 5/6) ja "ei selitetty, ettei tuotetta ole" kahdesti (S026, R06). Otos on pieni, joten tämä on vihje eikä tulos.
+- 14 persoonaa epäonnistui kaikilla tasoilla (S more-options-four ja date-missing-more-options, R04, V032 ym.). Syy on pääosin tarkistimessa: C:n uusi vaihtoehtorivi ("5 kpl, yhteensä 5 l") osui `parseOptions`in "yhteensä"-sääntöön, jolloin vaihtoehtoja ei luettu (`more_requested_before_options`). Korjattu `eval/whatsapp-personas.mjs`:ssä (testi lisätty), mutta tuloksia ei ehditty laskea uudelleen (`--reinspect`), joten yllä olevat luvut ovat korjausta edeltäviä.
+- **Ei ehditty:** 34 eri tavoin menneen persoonan uusinta kaikilla tasoilla (keskeytetty, ei tuloksia), sokkoarvio effort-tasoille ja `--reinspect` korjatulla tarkistimella. Effortia ei vaihdettu sovelluksessa.
+- **Johtopäätös toistaiseksi:** medium on varovainen ehdokas (nopeampi, halvempi, ei havaittua heikkenemistä), low vaatii uusinnan ennen käyttöä. Effort-kokeen kulu noin 2,1 USD ja keskeytetty uusinta alle 0,3 USD.
+
 ## Toisto
 
 Raakadata (Gitin ulkopuolella, session väliaikaishakemisto): `runs/haiku-all241.json`, `runs/{sonnet,opus}-*`, `judge-sample10.json`. Analyysi- ja arvioijaskriptit eivät ole repossa. Tarkistukset: `node --test test/whatsapp-personas.test.mjs` 16/16.

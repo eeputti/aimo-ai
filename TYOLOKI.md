@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — Haikun effort-tason koe alkuun, mittausajuri ja tarkistin korjattu (Claude Code, Haiku-laatumittaus F)
+
+- **Pyyntö:** Eelis halusi kokeilla Haikun effort-tason laskua ilman että vastaukset tyhmenevät. Ajurille `--deep-effort` (kiinnittää effortin vain ajon kopioon, sovelluskoodi ennallaan) ja testi. 241 persoonaa kolmella tasolla samalla commitilla 56fe2df: medium vastaa high-tasoa koodin tarkistuksilla (226/240 vs 225/241, poikkeavia 11 vs 12) ja vähentää tulostokeneita 32 % ja vuoron mediaania 21 %; low on nopein (-58 % tokeneita, -43 % mediaani) mutta hieman heikompi (222/241, R-joukko 2/6).
+- **Tarkistin:** `parseOptions` ei lukenut C:n uutta riviä "5 kpl, yhteensä 5 l" vaihtoehdoksi ("yhteensä"-sääntö), mikä kaatoi 14 persoonaa kaikilla effort-tasoilla. Korjattu ja testi lisätty, tuloksia ei ehditty laskea uudelleen.
+- **Kesken:** 34 vaihtelevan persoonan uusinta, sokkoarvio ja `--reinspect` (käyttöraja katkaisi, uusinta-ajot pysäytetty). Kulu noin 2,1 USD. Tarkemmin raportin kohta "Effort-koe". Effortia ei vaihdettu sovelluksessa.
+
 ## 17.11.2026 aamu — puuttuvat määrät arvioidaan annetusta määrästä ja syy kerrotaan (Claude Code, Aimo-tilausapuri verkossa -chat)
 
 - **Käyttäjän palaute:** Eelis tilasi spagettia, 2 kg kanafilettä ja valkosipulikastiketta. Botti kysyi vain "Kuinka paljon: spagetti, valkosipulikastike?". Se ei suhteuttanut spagetin määrää kanaan eikä kertonut, miksi määrää ei annettu. Tuotannon kantaa ei luettu (automaattinen tarkistus esti), vaan tilanne toistettiin paikallisesti oikealla mallilla, ja vastaus oli sama.

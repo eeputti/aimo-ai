@@ -278,7 +278,8 @@ const matchesKey = (term, key, q) => [key, ...(q?.aliases || [])].some((k) => lo
 
 /** Numeroidut vaihtoehdot vastauksesta. Tilausyhteenveto (Yhteensä) ei ole vaihtoehtolista. */
 export function parseOptions(text) {
-  if (/yhteensä/iu.test(text)) return [];
+  // Tilausluonnos (otsikko tai rahasumman "Yhteensä 150,50 €" -rivi) ei ole vaihtoehtolista. Vaihtoehtorivin "yhteensä 5 l" ei saa osua tähän.
+  if (/tilausluonnos|^\s*yhteensä\s+\d[\d\s]*[,.]\d{2}\s?€/imu.test(text)) return [];
   const blocks = []; let current = null; let heading = '';
   for (const raw of String(text || '').split('\n')) {
     const m = raw.match(OPTION);
@@ -287,7 +288,7 @@ export function parseOptions(text) {
       if (!current || number <= current.at(-1).number) { current = []; current.heading = heading; blocks.push(current); }
       const body = m[2].replace(/[*_]/gu, '');
       // Vanha muoto "Nimi: 5 pkt (10 kg), 47,20 €", uusi "Nimi, 4 laatikkoa (20 l), 110,60 €": nimi päättyy määrään.
-      const name = body.split(/:\s|\s[\u2013-]\s|,\s(?=\d+(?:[,.]\d+)?\s?[\p{L}]+(?:\s\(|,|\s*$))/u)[0].trim();
+      const name = body.split(/:\s|\s[\u2013-]\s|,\s(?=\d+(?:[,.]\d+)?\s?[\p{L}]+(?:\s\(|\s\u00e0\s|,|\s*$))/u)[0].trim();
       const rest = body.slice(name.length).replace(PRICE, '');
       current.push({ number, name, hasPrice: true, hasQuantity: QTY.test(rest) || QTY.test(name), line: raw.trim() });
     } else if (raw.trim()) { heading = raw.replace(/[*_]/gu, '').trim(); current = null; }

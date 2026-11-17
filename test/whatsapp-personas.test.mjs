@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { PERSONAS, REGRESSIONS, inspectPersona, parseOptions } from '../eval/whatsapp-personas.mjs';
 import { inspectConversation } from '../eval/whatsapp-selfplay-cases.mjs';
-import { costUsd, modelOf, simTierFromEnv, restoreTurns, summarize, loadCases, CASE_SETS } from '../scripts/whatsapp-selfplay-batch.mjs';
+import { costUsd, modelOf, simTierFromEnv, restoreTurns, summarize, loadCases, CASE_SETS, patchDeepEffort } from '../scripts/whatsapp-selfplay-batch.mjs';
 import { EXTENDED, SLOTS, earliestDate } from '../eval/whatsapp-personas-extended.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -305,4 +305,24 @@ test('gluteenittomuusmerkintä kattaa gluteeniallergian, valinta ilman listaa ke
   const milk = { ...p, requiredAllergen: 'AM' };
   const lf = [line('kaurajuoma', 10, 'L', { selectedProductId: 'x', claims: ['FREE_FROM_LACTOSE'] })];
   assert.ok(inspectPersona(milk, [{ user: 'x', assistant: '[ostoskorilinkki]', list: list('2026-11-17', lf) }], list('2026-11-17', lf)).failures.includes('allergen:kaura'), 'laktoositon ei ole maidoton');
+});
+
+test('patchDeepEffort kiinnittää syvän tason effortin ajon kopioon eikä koske nopeaan tasoon', () => {
+  const source = fs.readFileSync(path.join(ROOT, 'server/aimoAgent.mjs'), 'utf8');
+  const patched = patchDeepEffort(source, 'medium');
+  assert.ok(patched.includes("effort: deep ? 'medium' : 'low'"));
+  assert.ok(!patched.includes("effort: deep ? 'high' : 'low'"));
+  assert.equal(patched.length - source.length, "medium".length - "high".length);
+  assert.throws(() => patchDeepEffort(source, 'korkea'), /Tuntematon effort/u);
+  assert.throws(() => patchDeepEffort('const x = 1;', 'low'), /ei vastaa odotettua/u);
+});
+
+test('parseOptions lukee rivimuodon "yhteensä 5 l" vaihtoehdoksi mutta ei tilausluonnosta', () => {
+  const text = '*Ruokakerma 5 l:*\n1) Valio ruokakerma 15 % 1 l UHT laktoositon, 5 kpl, yhteensä 5 l, 42,85 €\n2) 6 x Arla Lempi 2 dl, 5 laatikkoa à 1,2 l, yhteensä 6 l, 61,55 €\n3) Arla Ruokakerma 10 l, 1 kpl, yhteensä 10 l, 112,81 €\n4) Näytä lisää vaihtoehtoja';
+  const blocks = parseOptions(text);
+  assert.equal(blocks.length, 1); assert.equal(blocks[0].length, 3);
+  assert.ok(blocks[0].every((o) => o.hasQuantity && o.hasPrice));
+  assert.equal(blocks[0][0].name, 'Valio ruokakerma 15 % 1 l UHT laktoositon');
+  assert.equal(blocks[0][1].name, '6 x Arla Lempi 2 dl');
+  assert.deepEqual(parseOptions('*Tilausluonnos*, toimitus ti 17.11., Testikeittiö\n1. Maito 20 l: 4 ltk (20 l), 110,60 €\nYhteensä 110,60 € (alv 0 %)'), []);
 });
