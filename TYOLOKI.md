@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — botti tuotantoon mainista 0123b38: "Kirjoita 4" vain, kun lisävaihtoehtoja on (Claude Code, sessio E)
+
+- **Käyttäjän lupa:** pääsessio pyysi julkaisua Eeliksen luvalla ("Kyllä, julkaise"). Tässä sessiossa Eelis vastasi "julkastaa vaa" ja valitsi tarkennuskysymyksessä "Botti + synkka sinne".
+- **Julkaisu:** botti mainista 0123b38, deployment aimo-whatsapp-6kxwilejn, tuotannossa klo 21.43. Ainoa muutos 16ddf16:n jälkeen on `unchanged-reply.mjs`: malli tietää, onko listassa lisävaihtoehtoja, ja "Kirjoita 4" -virke pudotetaan, kun niitä ei ole.
+- **Tarkistukset:** ennen julkaisua `npm test` 490/490, Worker 58/58, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54 ja tuoteajo 611 vaihtoehtoa ilman tarjouksen kaatumista. Julkaisun jälkeen healthz `host: cloud`, webhookin vahvistus 200 ja tick 200 (12 tilausta), ja tuotantoalias osoittaa uuteen julkaisuun. Worker, asetukset ja malli ovat ennallaan.
+- **valioaimo-tilausapuri:** synkan 0123b38:aan teki samaan aikaan sessio "Valioaimo-tilausapuri koodin siirto", joten sessio E ei koskenut kansioon. Ensimmäinen julkaisuyritys estyi automaattisessa tarkistuksessa, koska pyyntö oli epäselvä. Julkaisu tehtiin vasta Eeliksen tarkennuksen jälkeen. Tuotanto julkaistaan edelleen aimo-ai:sta, koska valioaimo-tilausapurista puuttuvat fontit.
+
 ## 17.11.2026 — umpikujakorjaukset livenä 16ddf16:n jälkeen, "Kirjoita 4" korjattu (Claude Code, pääsessio)
 
 - **Julkaisu:** Eelis hyväksyi ("Kyllä, julkaise"), sessio E julkaisi botin mainista 16ddf16 (aimo-whatsapp-3ewo907q8, klo 21.35). Healthz tarkistettu tästäkin sessiosta: 200, host cloud.
