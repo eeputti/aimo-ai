@@ -72,8 +72,12 @@ test('koko tilauksen ruokavalio: sisältävä pois, puuttuva allergeenitieto nä
   const seen = [];
   const { tools } = fakes({ search: async (l) => { seen.push(l.claims); return l.claims.includes('FREE_FROM_GLUTEN') ? [] : [found('1', ['FREE_FROM_LACTOSE']), found('2'), found('3')]; } });
   const nutFree = await tools.suggest({ customer, draft: draftOf([line('a')], { diet: { claims: [], excludeAllergens: ['AM'] } }) });
-  // Tuote 1 sisältää maitoa: pois. Tuote 2 on varmennettu. Tuotteelta 3 puuttuu tieto: näytetään varoituksella.
-  assert.deepEqual(nutFree.lines[0].options.map((o) => [o.productId, o.warning]), [['2', null], ['3', 'allergeenitieto puuttuu, tarkista itse']]);
+  // Tuote 1 sisältää maitoa: pois. Tuote 2 on varmennettu. Tuotteelta 3 puuttuu tieto: näytetään varoituksella lisäsivulla,
+  // koska maitoa esiintyy saman haun tuotteissa ja varmennettu vaihtoehto on (itsepeli V033).
+  assert.deepEqual(nutFree.lines[0].options.map((o) => [o.productId, o.warning]), [['2', null]]);
+  assert.equal(nutFree.lines[0].more, true);
+  const page2 = await tools.suggest({ customer, draft: draftOf([line('a')], { diet: { claims: [], excludeAllergens: ['AM'] } }), exclude: { a: ['2'] } });
+  assert.deepEqual(page2.lines[0].options.map((o) => [o.productId, o.warning]), [['3', 'allergeenitieto puuttuu, tarkista itse']]);
   // Halvin on aina näkyvissä, vaikka se ei olisi järjestyksen kärjessä. Kun muut maksavat yli kaksi kertaa sen verran, se näytetään ensin.
   const pricey = fakes({ search: async () => [found('2'), found('5'), found('6'), found('7', [], { price: 1 })] });
   assert.deepEqual((await pricey.tools.suggest({ customer, draft: draftOf([line('a')]) })).lines[0].options.map((o) => o.productId), ['7', '2', '5']);

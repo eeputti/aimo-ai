@@ -255,6 +255,14 @@ export function createOrderingTools(deps = {}) {
         scored = scored.filter((x) => !flavoured(x.o, line));
         if (!scored.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Maustamatonta vaihtoehtoa ei löytynyt päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref })); continue; }
       }
+      // Koko tilauksen allergiakielto: allergeenivapaaksi todennetut vaihtoehdot ennen tuotteita, joilta allergeenitieto puuttuu
+      // (itsepeli V033: maitoallergiselle lapselle tarjottiin ensin jäätelöä ilman allergeenitietoa). Vain kun kielletty allergeeni
+      // oikeasti esiintyy saman haun tuotteissa (jäätelö ja maito): tuoreilla kasviksilla tietoa ei ole eikä riskiä, joten niiden
+      // järjestys säilyy. Mitään ei pudoteta: ilman todennettua vaihtoehtoa tuote ilman tietoa näytetään varoituksella.
+      const verified = (x) => !!product(x.o.id)?.hasAllergenData;
+      const risky = diet.excludeAllergens.length > 0 && found.some((o) => touchesBanned(diet.excludeAllergens, product(o.id)));
+      const dietVerified = risky && scored.some(verified);
+      if (dietVerified) scored = [...scored.filter(verified), ...scored.filter((x) => !verified(x))];
       fit = scored.map((x) => x.o);
       // Laktoosikysymys vain, jos ainakin yhdessä oikeassa vaihtoehdossa on tunnettu maitoainesosa: kananmunien
       // satunnaiset laktoositon-merkinnät eivät tee kysymyksestä olennaista.
@@ -279,6 +287,8 @@ export function createOrderingTools(deps = {}) {
       // pakkaus on tarjolla (itsepeli X096: kuormalava 3 kg:n sokeritarpeeseen). Lisäsivulla se näkyy edelleen.
       const sane = first.filter((x) => !x.oversize);
       if (sane.length && sane.some((x) => x.known)) first = sane;
+      // Ensimmäiselle sivulle vain todennetut, kun niitä on; tuote ilman allergeenitietoa jää "Näytä lisää" -sivulle.
+      if (dietVerified && first.some(verified)) first = first.filter(verified);
       const top0 = first[0].group;
       const flat = (x) => !flavoured(x.o, line);
       const pick = [(x) => x.regular && x.known, (x) => x.regular, (x) => x.group === top0 && x.known && flat(x), (x) => x.group === top0 && x.known, (x) => x.group === top0]

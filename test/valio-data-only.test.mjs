@@ -74,7 +74,7 @@ test('a WhatsApp product question is answered from Valio data, never from produc
   const reply = await f.turn('Onko Valion kuohukerma laktoositon ja mistä maasta se on?');
   // Pelkkä tuotetietokysymys: Valion tiedot ovat koko vastaus, ja kyllä/ei vastataan suoraan (Haiku-mittaus 16.11. A2).
   assert.equal(reply.messages.length, 1);
-  assert.match(reply.messages[0], /\*Valio kuohukerma 1 l\* \(tuotenro 900001\): Kyllä: merkitty laktoosittomaksi\./);
+  assert.match(reply.messages[0], /\*Valio kuohukerma 1 l\* \(tuotenro 900001\): Kyllä, tuote on laktoositon: merkitty laktoosittomaksi\./);
   assert.match(reply.messages[0], /Allergeenit: maito/); assert.match(reply.messages[0], /Merkinnät: laktoositon/); assert.match(reply.messages[0], /Alkuperämaa: Suomi/);
   // Käyttötapakysymyksessä mallin neuvo jää tuotetietojen eteen.
   const usage = await dialogue({ advice: 'Kuohukerma sopii vaahdotukseen. Se on gluteeniton.' }).turn('Onko Valion kuohukerma laktoositon ja mihin se sopii?');

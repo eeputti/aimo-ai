@@ -35,14 +35,18 @@ test('A2 kyllä/ei-kysymykseen vastataan suoraan Valion tiedoista', { skip }, as
   const { loadCatalog } = await import('../server/catalog.mjs');
   const cat = loadCatalog();
   const reply = (id, q, kinds = ['allergens']) => factsReply([cat.get(id)], kinds, q);
-  assert.match(await reply('463480', 'Onko HK Coleslaw 3 kg munaton?'), /\(tuotenro 463480\): Ei: sisältää kananmunaa\./);
-  assert.match(await reply('468319', 'Onko Oatly iKaffe 0,5L gluteeniton?', ['allergens', 'labels']), /: Ei: sisältää gluteeniviljoja\./);
-  assert.match(await reply('463480', 'Sisältääkö HK Coleslaw 3 kg sinappia?'), /: Kyllä: sisältää sinappia\./);
+  assert.match(await reply('463480', 'Onko HK Coleslaw 3 kg munaton?'), /\(tuotenro 463480\): Ei, tuote ei ole munaton: sisältää kananmunaa\./);
+  assert.match(await reply('468319', 'Onko Oatly iKaffe 0,5L gluteeniton?', ['allergens', 'labels']), /: Ei, tuote ei ole gluteeniton: sisältää gluteeniviljoja \(kaura\)\./);
+  assert.match(await reply('463480', 'Sisältääkö HK Coleslaw 3 kg sinappia?'), /: Kyllä, tuote sisältää sinappia\./);
   const kerma = [...cat.products].find((p) => p.hasAllergenData && p.labels?.includes('FREE_FROM_LACTOSE') && (p.contains || []).includes('AM'));
-  assert.match(await factsReply([kerma], ['allergens', 'labels'], 'Onko tämä laktoositon?'), /: Kyllä: merkitty laktoosittomaksi\./);
-  assert.match(await reply('460896', 'Onko APPELSIINI JAFFA suomalainen?', ['origin']), /: Ei: alkuperämaa Israel\./);
-  assert.match(await reply('460896', 'Onko APPELSIINI JAFFA munaton?'), /: En voi sanoa: allergeenitieto puuttuu/);
+  assert.match(await factsReply([kerma], ['allergens', 'labels'], 'Onko tämä laktoositon?'), /: Kyllä, tuote on laktoositon: merkitty laktoosittomaksi\./);
+  assert.match(await reply('460896', 'Onko APPELSIINI JAFFA suomalainen?', ['origin']), /: Ei, tuote ei ole suomalainen: alkuperämaa Israel\./);
+  assert.match(await reply('460896', 'Onko APPELSIINI JAFFA munaton?'), /: En voi sanoa, onko tuote munaton: allergeenitieto puuttuu/);
   assert.doesNotMatch(await reply('463480', 'Mitä HK Coleslaw 3 kg sisältää?'), /\): (Kyllä|Ei)/, 'avoimeen kysymykseen ei kyllä/ei-vastausta');
+  // Säilytys: vastaus nimeää ominaisuuden, eikä sulatetun tai avatun säilytykseen vastata (sitä ei ole Valion tiedoissa).
+  assert.match(await reply('460896', 'Pitääkö APPELSIINI JAFFA laittaa pakkaseen?', ['storage']), /: Ei tarvitse pakastaa: lämpötilaluokka kuiva\./);
+  assert.doesNotMatch(await reply('460896', 'Voiko APPELSIINI JAFFA säilyttää sulatettuna pakkasessa?', ['storage']), /\): (Kyllä|Ei)/);
+  assert.match(await reply('468319', 'Sisältääkö Oatly iKaffe 0,5L maitoa?'), /: Ei, tuote ei sisällä maitoa: sitä ei ole merkitty tuotteen allergeeneihin\./);
 });
 
 test('A2 vain kysytty tuote: ei kysymättömiä tuotteita, ja tuntematon tuote ei löydy', { skip }, async () => {
@@ -79,7 +83,7 @@ test('A2 dialogi: pelkkä tuotetietokysymys ilman mallin irrallista avauslausett
   };
   const r = await make([publicProduct(cat.get('463480')), publicProduct(suomipekoni)], 'HK Coleslaw')('Onko HK Coleslaw 3 kg munaton?');
   assert.equal(r.messages.length, 1, r.messages.join(' | '));
-  assert.match(r.messages[0], /HK Coleslaw 3 kg\* \(tuotenro 463480\): Ei: sisältää kananmunaa\./);
+  assert.match(r.messages[0], /HK Coleslaw 3 kg\* \(tuotenro 463480\): Ei, tuote ei ole munaton: sisältää kananmunaa\./);
   assert.doesNotMatch(r.text, /Suomipekoni|Tarkista ne sieltä/);
   const none = await make([publicProduct(suomipekoni)], 'Barista Deluxe kauramaito')('Onko Barista Deluxe kauramaito munaton?');
   assert.match(none.text, /En löytänyt Valion tuotetiedoista tuotetta/);

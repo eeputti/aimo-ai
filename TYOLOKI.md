@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — V033 allergiaturvallinen vaihtoehtolista ja selkeämmät kyllä/ei-tuotevastaukset (Claude Code, sessio A)
+
+- **Pyyntö:** Eelis hyväksyi V-itsepelin löydösten korjauksen: V033 (maitoallergiselle lapselle tarjottiin ensin jäätelöä ilman allergeenitietoa) ja arvioijan moittima suorien vastausten muoto ("Ei: sisältää kananmunaa").
+- **V033 (`server/order-tools/index.mjs`):** koko tilauksen allergiakiellossa allergeenivapaaksi todennetut vaihtoehdot tulevat ensin. Tuote ilman allergeenitietoa siirtyy "Näytä lisää" -sivulle varoituksen kanssa. Sääntö koskee vain hakua, jonka tuotteissa kielletty allergeeni oikeasti esiintyy (jäätelö ja maito). Tuoreilla kasviksilla tietoa ei ole eikä riskiä, joten niiden järjestys säilyy. Mitään ei pudoteta.
+- **Vastausten muoto (`server/whatsapp/product-facts.mjs`):** vastaus nimeää kysytyn ominaisuuden: "Ei, tuote ei ole munaton: sisältää kananmunaa.", "Ei, tuote ei ole gluteeniton: sisältää gluteeniviljoja (kaura).", "Ei, tuote ei ole suomalainen: alkuperämaa Israel.", "Ei tarvitse pakastaa: lämpötilaluokka kuiva.". Keliakiakysymykseen vastataan erikseen, ja sulatetun tai avatun säilytyksen jatkokysymykseen ei vastata kyllä/ei-muodossa.
+- **Tarkistukset:** uusi `test/whatsapp-diet-allergy.test.mjs` (2). Allergiatesti epäonnistui vanhalla koodilla; kasvistesti varmistaa, ettei järjestys muutu. `haiku-findings-a`-, `valio-data-only`- ja `order-tools`-testien odotukset päivitetty tarkoitettuun muutokseen. `npm test` 435/435 uusimman mainin päällä, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54. Itsepeli Haikulla (V007–V016 ja V033, 83 kutsua, 0 virhettä, noin 0,03 USD): 11/11 läpi, ja V033 tarjoaa nyt ensin vegaanisia, allergeenitiedoltaan todennettuja jäätelöitä.
+- **Uusi havainto, ei korjattu:** kiitos- tai jatkoviestiin, jossa on tuotefaktan sana ("Eli pakaste? Ok, kiitos"), vastataan "Kerro tuotteen nimi", koska jatkoviestissä ei ole tuotetta (V011 ja V014, arvioijan pisteet 1–2). Käyttöönotto session E:n restartilla.
+
 ## 17.11.2026 — tilattavaa vailla olevaa tuotetta ei luvata valita seuraavaksi (Claude Code, Aimo-tilausapuri verkossa -chat)
 
 - **Käyttäjän pyyntö:** "korjaa myös toi spagetin ristiriita". Määräarvion live-kokeessa botti sanoi "Ei tilattavaa tuotetta päivälle pe 20.11.: spagetti." ja lopetti silti "Sen jälkeen valitaan spagetti ja valkosipulikastike."

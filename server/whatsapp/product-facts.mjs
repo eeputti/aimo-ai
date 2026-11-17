@@ -4,7 +4,7 @@
 // Puuttuva tieto sanotaan puuttuvaksi, sitä ei päätellä tuotenimestä eikä mallin omasta tietämyksestä.
 // catalog.mjs tuodaan vasta käytössä: staattinen tuonti lukisi AIMO_CATALOG-polun ennen kuin ajo on asettanut sen.
 const labels = () => import('../catalog.mjs');
-import { allergenStatus } from '../allergens.mjs';
+import { allergenStatus, allergenFamily } from '../allergens.mjs';
 
 const B = '(?<![\\p{L}\\d])';
 const word = (source) => new RegExp(`${B}(?:${source})`, 'iu');
@@ -92,45 +92,70 @@ export async function factsReply(products, kinds, question = '') {
 // (Haiku-mittaus 16.11. A2). Vastaus tulee samoista Valion kentistä kuin rivit. Puuttuva tieto ei ole kyllä eikä ei.
 const YES_NO = word('onko|onks|onkohan|onhan|sisältääkö|sisältäskö|sisältäiskö|sopiiko|käykö|voiko|pitääkö|onx');
 const PARTITIVE = { AE: 'kananmunaa', AM: 'maitoa', AN: 'pähkinöitä', AP: 'maapähkinää', AY: 'soijaa', AF: 'kalaa', AS: 'seesamia', BM: 'sinappia', BC: 'selleriä', UW: 'vehnää', AW: 'gluteeniviljoja', AC: 'äyriäisiä', AU: 'sulfiitteja', NL: 'lupiinia', UM: 'nilviäisiä' };
-// [sana kysymyksessä, GS1-koodi]. Tarkempi ensin: maapähkinä ennen pähkinää.
-const FREE_OF = [['maapähkinät(?:on|tö)', 'AP'], ['pähkinät(?:on|tö)', 'AN'], ['munat(?:on|to)', 'AE'], ['maidot(?:on|to)', 'AM'], ['soijat(?:on|to)', 'AY'], ['kalat(?:on|to)', 'AF'],
-  ['seesamit(?:on|to)', 'AS'], ['sinapit(?:on|to)', 'BM'], ['sellerit(?:on|tö)', 'BC'], ['vehnät(?:on|tö)', 'UW']].map(([re, code]) => [word(re), code]);
+// [sana kysymyksessä, GS1-koodi, ominaisuus]. Tarkempi ensin: maapähkinä ennen pähkinää.
+const FREE_OF = [['maapähkinät(?:on|tö)', 'AP', 'maapähkinätön'], ['pähkinät(?:on|tö)', 'AN', 'pähkinätön'], ['munat(?:on|to)', 'AE', 'munaton'], ['maidot(?:on|to)', 'AM', 'maidoton'],
+  ['soijat(?:on|to)', 'AY', 'soijaton'], ['kalat(?:on|to)', 'AF', 'kalaton'], ['seesamit(?:on|to)', 'AS', 'seesamiton'], ['sinapit(?:on|to)', 'BM', 'sinapiton'],
+  ['sellerit(?:on|tö)', 'BC', 'selleritön'], ['vehnät(?:on|tö)', 'UW', 'vehnätön']].map(([re, code, adj]) => [word(re), code, adj]);
 const CONTAINS_OF = [['maapähkin', 'AP'], ['pähkin', 'AN'], ['kananmun|munaa|munia', 'AE'], ['maitoa|maito\\b|maidon', 'AM'], ['soija', 'AY'], ['kalaa', 'AF'], ['seesam', 'AS'], ['sinapp?i', 'BM'],
   ['selleri', 'BC'], ['vehnä', 'UW'], ['gluteeni(?!t)', 'AW'], ['äyriäi', 'AC'], ['sulfiit', 'AU']].map(([re, code]) => [word(re), code]);
+const MISSING_ALLERGENS = 'allergeenitieto puuttuu Valion tuotetiedoista';
 
+// Vastaus nimeää kysytyn ominaisuuden ("Ei, tuote ei ole munaton: sisältää kananmunaa."): pelkkä "Ei:" jäi itsepelin arvioijalle
+// epäselväksi (17.11. V007–V016). Säilytyksen jatkokysymykseen (sulatettu, avattu) ei vastata, koska sitä ei ole Valion tiedoissa.
 async function directAnswer(p, question) {
   const q = String(question || '');
   if (!YES_NO.test(q)) return null;
+  const { allergenName } = await labels();
   const has = (label) => (p.labels || []).includes(label);
-  const allergen = (code, asksFree) => {
+  // Ryhmän tarkemmat koodit nimellä: "gluteeniviljoja (kaura)".
+  const which = (code) => { const names = (p.contains || []).filter((c) => c !== code && allergenFamily(code).includes(c)).map(allergenName); return names.length ? ` (${names.join(', ')})` : ''; };
+  const free = (code, adj) => {
     const s = allergenStatus([code], p); const part = PARTITIVE[code] || 'allergeenia';
-    if (s.contains.length) return asksFree ? `Ei: sisältää ${part}.` : `Kyllä: sisältää ${part}.`;
-    if (s.mayContain.length) return `Ei varmasti: voi sisältää ${part}.`;
-    if (s.unknown) return 'En voi sanoa: allergeenitieto puuttuu Valion tuotetiedoista.';
-    return asksFree ? `Kyllä: ${part} ei ole merkitty tuotteen allergeeneihin.` : `Ei: ${part} ei ole merkitty tuotteen allergeeneihin.`;
+    if (s.contains.length) return `Ei, tuote ei ole ${adj}: sisältää ${part}${which(code)}.`;
+    if (s.mayContain.length) return `Ei varmasti ${adj}: tuote voi sisältää ${part}.`;
+    if (s.unknown) return `En voi sanoa, onko tuote ${adj}: ${MISSING_ALLERGENS}.`;
+    return `Kyllä, tuote on ${adj}: ${part} ei ole merkitty tuotteen allergeeneihin.`;
   };
-  if (word('gluteenit\\p{L}*|keliaak\\p{L}*').test(q)) {
-    if (has('FREE_FROM_GLUTEN')) return 'Kyllä: merkitty gluteenittomaksi.';
-    const a = allergen('AW', true);
-    return a.startsWith('Kyllä') ? 'Ei gluteeniton-merkintää Valion tuotetiedoissa, mutta gluteeniviljoja ei ole merkitty allergeeneihin.' : a;
+  const contains = (code) => {
+    const s = allergenStatus([code], p); const part = PARTITIVE[code] || 'allergeenia';
+    if (s.contains.length) return `Kyllä, tuote sisältää ${part}${which(code)}.`;
+    if (s.mayContain.length) return `Mahdollisesti: tuote voi sisältää ${part}.`;
+    if (s.unknown) return `En voi sanoa: ${MISSING_ALLERGENS}.`;
+    return `Ei, tuote ei sisällä ${part}: sitä ei ole merkitty tuotteen allergeeneihin.`;
+  };
+  if (word('keliaak\\p{L}*').test(q)) {
+    if (has('FREE_FROM_GLUTEN')) return 'Kyllä, sopii keliaakikolle: tuote on merkitty gluteenittomaksi.';
+    const s = allergenStatus(['AW'], p);
+    if (s.contains.length) return `Ei sovi keliaakikolle: tuote sisältää gluteeniviljoja${which('AW')}.`;
+    if (s.mayContain.length) return 'Ei varmasti sovi keliaakikolle: tuote voi sisältää gluteeniviljoja.';
+    if (s.unknown) return `En voi sanoa, sopiiko tuote keliaakikolle: ${MISSING_ALLERGENS}.`;
+    return 'Gluteeniton-merkintää ei ole Valion tuotetiedoissa, mutta gluteeniviljoja ei ole merkitty allergeeneihin. Varmista sopivuus pakkauksesta.';
+  }
+  if (word('gluteenit\\p{L}*').test(q)) {
+    if (has('FREE_FROM_GLUTEN')) return 'Kyllä, tuote on gluteeniton: merkitty gluteenittomaksi.';
+    const a = free('AW', 'gluteeniton');
+    return a.startsWith('Kyllä') ? 'Gluteeniton-merkintää ei ole Valion tuotetiedoissa, mutta gluteeniviljoja ei ole merkitty allergeeneihin.' : a;
   }
   if (word('laktoosit\\p{L}*').test(q)) {
-    if (has('FREE_FROM_LACTOSE')) return 'Kyllä: merkitty laktoosittomaksi.';
-    return allergenStatus(['AM'], p).contains.length ? 'Ei: ei laktoositon-merkintää, ja tuote sisältää maitoa.' : 'Ei laktoositon-merkintää Valion tuotetiedoissa.';
+    if (has('FREE_FROM_LACTOSE')) return 'Kyllä, tuote on laktoositon: merkitty laktoosittomaksi.';
+    return allergenStatus(['AM'], p).contains.length ? 'Ei, tuotetta ei ole merkitty laktoosittomaksi, ja se sisältää maitoa.' : 'Laktoositon-merkintää ei ole Valion tuotetiedoissa.';
   }
-  const free = FREE_OF.find(([re]) => re.test(q));
-  if (free) return allergen(free[1], true);
-  if (word('vegaan\\p{L}*').test(q)) return has('VEGAN') ? 'Kyllä: merkitty vegaaniseksi.' : 'Ei vegaaninen-merkintää Valion tuotetiedoissa.';
-  if (word('luomu\\p{L}*').test(q)) return has('EU_ORGANIC_FARMING') ? 'Kyllä: luomu (EU).' : 'Ei luomumerkintää Valion tuotetiedoissa.';
+  const freeOf = FREE_OF.find(([re]) => re.test(q));
+  if (freeOf) return free(freeOf[1], freeOf[2]);
+  if (word('vegaan\\p{L}*').test(q)) return has('VEGAN') ? 'Kyllä, tuote on vegaaninen: merkitty vegaaniseksi.' : 'Vegaaninen-merkintää ei ole Valion tuotetiedoissa.';
+  if (word('luomu\\p{L}*').test(q)) return has('EU_ORGANIC_FARMING') ? 'Kyllä, tuote on luomu: EU:n luomumerkintä.' : 'Luomumerkintää ei ole Valion tuotetiedoissa.';
   if (word('suomalai\\p{L}*|kotimai\\p{L}*|suomesta').test(q)) {
     const c = String(p.country || '').toUpperCase();
-    if (!/^[A-Z]{2}$/.test(c)) return 'En voi sanoa: alkuperämaa ei ole Valion tuotetiedoissa.';
-    return c === 'FI' ? 'Kyllä: alkuperämaa Suomi.' : `Ei: alkuperämaa ${countryName(c)}.`;
+    if (!/^[A-Z]{2}$/.test(c)) return 'En voi sanoa, onko tuote suomalainen: alkuperämaa ei ole Valion tuotetiedoissa.';
+    return c === 'FI' ? 'Kyllä, tuote on suomalainen: alkuperämaa Suomi.' : `Ei, tuote ei ole suomalainen: alkuperämaa ${countryName(c)}.`;
   }
-  if (word('pakkase\\p{L}*|pakast\\p{L}*').test(q) && p.temp) return p.temp === 'frozen' ? 'Kyllä: pakaste.' : `Ei: lämpötilaluokka ${p.temp === 'chilled' ? 'kylmä' : 'kuiva'}.`;
-  if (word('huoneenlämp\\p{L}*').test(q) && p.temp) return p.temp === 'ambient' ? 'Kyllä: lämpötilaluokka kuiva.' : `Ei: lämpötilaluokka ${p.temp === 'frozen' ? 'pakaste' : 'kylmä'}.`;
-  const contains = CONTAINS_OF.find(([re]) => re.test(q));
-  if (contains && word('sisält\\p{L}*').test(q)) return allergen(contains[1], false);
+  if (!word('sulat\\p{L}*|avat\\p{L}*|avaami\\p{L}*').test(q) && p.temp) {
+    const cls = { frozen: 'pakaste', chilled: 'kylmä', ambient: 'kuiva' }[p.temp];
+    if (word('pakkase\\p{L}*|pakasta\\p{L}*|pakastim\\p{L}*').test(q)) return p.temp === 'frozen' ? 'Kyllä, säilytetään pakastettuna: lämpötilaluokka pakaste.' : `Ei tarvitse pakastaa: lämpötilaluokka ${cls}.`;
+    if (word('huoneenlämp\\p{L}*').test(q)) return p.temp === 'ambient' ? 'Kyllä, voi säilyttää huoneenlämmössä: lämpötilaluokka kuiva.' : `Ei, ei huoneenlämmössä: lämpötilaluokka ${cls}.`;
+  }
+  const c = CONTAINS_OF.find(([re]) => re.test(q));
+  if (c && word('sisält\\p{L}*').test(q)) return contains(c[1]);
   return null;
 }
 
