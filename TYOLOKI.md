@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — reseptin puuttuvan määrän arvio varmennettu livenä (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
+
+- **Käyttäjän pyyntö:** "tarkista reseptimäärä livenä kun E on julkaissut". Sessio E julkaisi botin mainista 1c0f200 (sisältää e1b0f8f:n ja 162dad1:n), deployment aimo-whatsapp-cf6qxfp19.
+- **Live-koe selainkeskustelussa omalla testiasiakkaalla, ei tilausta:** k-ruoka.fi-linkki "20 annokselle perjantaiksi" (bottisuoja, botti pyysi reseptin tekstinä), sitten liitetty resepti: kermainen kanapasta, 4 annosta, spagettia ilman määrää ja 2 valkosipulinkynttä. Vastaus: "spagetti, noin 2 kg, arvio" ja listan alla "Arvioin määrät, joita reseptissä ei ollut painona tai tilavuutena: spagetti 100 g annokselle (reseptissä ei ole määrää) ja valkosipuli 5 g annokselle (reseptissä "2 valkosipulinkynttä")." Reseptin tila tyhjennettiin lopuksi ("unohda resepti").
+- **Havainnot, ei korjattu:**
+  - Valkosipulin arvio vaihtelee mallin mukaan: livenä 5 g annokselle (0,1 kg 20 annokselle), paikallisessa kokeessa 2 g. Reseptin 2 kynttä 4 annokselle on noin 2,5 g annokselle, joten live-arvio on noin kaksinkertainen.
+  - Korvaajakysymyksessä broilerin fileesuikaleelle "kanan reisifilee" -vaihtoehdon esimerkkituotteena oli "MERIKROTTI FILEE 2/400G NAHATON" (kalaa). Esimerkkituotteen valinta (`link-substitutes.mjs`) ei tarkista, että tuote on samaa lajia kuin korvaaja.
+  - Spagetille ei ollut tilattavaa pe 20.11. (saatavuus välimuistista, Valion rajapinta ei vastaa).
+
 ## 17.11.2026 — reseptimäärien arvio ja jäätelön korvaajat tuotantoon: botti 1c0f200 (Claude Code, sessio E)
 
 - **Käyttäjän lupa:** kaksi sessiota pyysi samaa julkaisua Eeliksen nimissä; Eelis vahvisti tässä sessiossa ("Kyllä, julkaise").
