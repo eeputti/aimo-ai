@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — reseptin kappalemäärät lasketaan koodissa, ja korvaajan esimerkkituote on samaa tuotetta (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
+
+- **Käyttäjän pyyntö:** Eelis: "korjaa myös valkosipuliarvio ja kalafilee-esimerkki". Molemmat näkyivät reseptiarvion live-kokeessa (400a392).
+- **Valkosipuli (`server/whatsapp/link-advice.mjs`):** malli antoi "2 valkosipulinkynttä" 4 annokselle suoraan 5 g annokselle, kun oikein on noin 2,5 g. Nyt kappaleina tai muuna yksikkönä annetulle aineelle malli palauttaa vain sourcen luvun (count) ja yhden kappaleen painon (unitWeight), ja koodi jakaa annosmäärällä. Luvun pitää löytyä sourcesta (myös murtoluvut, esim. ½). Yhden kappaleen paino saa olla 0,5 g–5 kg, ja ilman alkuperäistä annosmäärää kappalearviota ei käytetä. Alle 10 g:n annosmäärä näytetään puolen gramman tarkkuudella ("2,5 g").
+- **Kalafilee (`server/whatsapp/link-substitutes.mjs`):** korvaajan esimerkkituote oli haun ensimmäinen vaihtoehto. "Kanan reisifilee" -haku piti MERIKROTTI FILEEtä pyydettynä "filee"-osuman takia. Nyt korvaajalle haetaan kolme vaihtoehtoa, ja esimerkiksi kelpaa vain tuote, jonka nimessä ovat korvaajan sanat. Yhdyssana kelpaa osina (pakastetilli → Tilli pakaste), ominaisuussanat (tuore, kuivattu, pakaste…) ohitetaan, ja kana, broileri ja kananpoika ovat sama. Ilman sopivaa tuotetta korvaajaa ei tarjota. Reseptin oman aineksen saatavuustarkistus on ennallaan.
+- **Tarkistukset:**
+  - `test/whatsapp-link-estimate.test.mjs` 5/5 (uusi: kappalepolku 2 × 5 g / 4 annosta = 0,05 kg 20 annokselle, mallin oma annosmäärä ohitetaan, sourcessa olematon luku ja epäuskottava paino hylätään).
+  - `test/whatsapp-link-substitutes.test.mjs` uusi testi: kalafilee ja kanan rintafilee eivät käy kanan reisifileen esimerkiksi, oikea reisifilee käy, tavalliset korvaajat (pakastetilli, kuivattu tilli, sitruunamehu, grana padano, ranskankerma, broileri ja kananpoika) kelpaavat, eikä sitruuna käy sitruunamehuksi.
+  - Koko `npm test` 457/457 origin/mainin 79aadf2 päällä, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54.
+  - Oikea Haiku: ensimmäinen ajo paljasti, että malli jätti kappalerivin yksikön tyhjäksi, jolloin arvio hylättiin. Ohjetta tarkennettu: yksikkö koskee myös kappaleen painoa. Neljä toistoa kahdella reseptillä antoi johdonmukaisesti valkosipuli 2 × 0,005 kg, kookosmaito 1 × 0,4 l, tilli 1 × 0,03 kg ja riisi 0,08–0,1 kg annokselle. Koko pinossa kermainen kanapasta 4 → 20 annosta: "valkosipuli, noin 0,05 kg, arvio" ja "valkosipuli 2,5 g annokselle". Oikea haku välimuistikannan kopiolla: "kanan reisifilee" → ei esimerkkiä (inexact), "kanan rintafilee" → Kariniemen rintafilee. Ei tilauksia, Meta- eikä Valio-kutsuja.
+- **Käyttöönotto kesken:** tarvitsee botin Vercel-julkaisun (sessio E, Eeliksen luvalla). Worker-julkaisua ei tarvita.
+
 ## 17.11.2026 — neljäs 30 persoonan Haiku-otos (Claude Code, sessio C)
 
 - **Käyttäjän pyyntö:** Eelis pyysi ajamaan otoksen uudelleen X064-tilausaikakorjauksen (7079c24) jälkeen. Samat asetukset, main 1c0f200.

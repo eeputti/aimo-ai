@@ -39,19 +39,32 @@ const fingerprint = (list) => JSON.stringify([list?.id || null, list?.revision ?
 // Reseptissä ei ole ostettavaa määrää (spagettia, 2 valkosipulinkynttä): arvio annosta kohti, jotta lista ei jää
 // "määrä tarkennettava" -tilaan ilman syytä (Eelis 17.11.). Arvio näytetään arviona ja siitä kerrotaan syy.
 const ESTIMATE_SCHEMA = { type: 'object', additionalProperties: false, required: ['rows'], properties: { rows: { type: 'array', items: {
-  type: 'object', additionalProperties: false, required: ['index', 'perPortion', 'unit'], properties: {
-    index: { type: 'integer' }, perPortion: { type: 'number' }, unit: { type: 'string', enum: ['KG', 'L', ''] } } } } } };
+  type: 'object', additionalProperties: false, required: ['index', 'perPortion', 'unit', 'count', 'unitWeight'], properties: {
+    index: { type: 'integer' }, perPortion: { type: 'number' }, unit: { type: 'string', enum: ['KG', 'L', ''] },
+    count: { type: 'number' }, unitWeight: { type: 'number' } } } } } };
 const ESTIMATE_SYSTEM = `Arvioit suurkeittiön reseptin raaka-aineille ostomäärän annosta kohti, kun reseptissä ei ole määrää painona tai tilavuutena.
 Saat ruoan nimen, alkuperäisen annosmäärän (servings, 0 jos ei tiedossa), aineet, joiden määrä tiedetään (known, koko reseptille), ja rivit, joilta määrä puuttuu (source on reseptin oma teksti).
 perPortion on ostettavan muodon määrä yhtä annosta kohti: KG kiloina (kuiva pasta, raaka liha, kasvikset) tai L litroina (nesteet). Esimerkiksi kuiva spagetti pääruoan lisukkeena noin 0.1 KG annokselle.
-Jos source kertoo kappaleita tai muun yksikön (2 valkosipulinkynttä, 1 nippu tilliä, 1 purkki) ja servings on annettu, muunna se painoksi annosta kohti.
+Jos source kertoo kappaleita tai muun yksikön (2 valkosipulinkynttä, 1 nippu tilliä, 1 purkki), älä laske annosmäärää itse: count on sourcen luku sellaisenaan (2) ja unitWeight yhden tällaisen yksikön paino KG tai tilavuus L (valkosipulinkynsi noin 0.005 KG), ja perPortion on 0. Palvelin jakaa annosmäärällä. Muuten count ja unitWeight ovat 0.
+unit on aina arvion yksikkö, KG tai L: unitWeightin yksikkö kappaleilla, muuten perPortionin. Tyhjä vain, kun et arvioi lainkaan.
 Käytä known-aineiden suhdetta apuna. Jos ainetta käytetään vain maun mukaan tai koristeeksi etkä osaa arvioida luotettavasti, unit on tyhjä ja perPortion 0. Älä lisää rivejä.`;
 const PER_PORTION_MAX = { kg: 0.5, l: 0.6 };
 const portionsOf = (s) => (s.target && s.servings ? s.target : s.servings && s.multiplier ? s.servings * s.multiplier : s.target || s.servings || null);
 const roundAmount = (v) => (v >= 10 ? Math.round(v * 2) / 2 : v >= 1 ? Math.round(v * 10) / 10 : v >= 0.1 ? Math.round(v * 100) / 100 : Math.round(v * 1000) / 1000);
 const estimateTotal = (item, s) => { const n = portionsOf(s); return item.estimate && n ? { value: roundAmount(item.estimate.perPortion * n), unit: item.estimate.unit } : null; };
-const perPortionText = (e) => (e.unit === 'kg' ? (e.perPortion < 1 ? `${count(Math.round(e.perPortion * 1000))} g` : `${count(e.perPortion)} kg`)
+const grams = (kg) => (kg < 0.01 ? Math.round(kg * 2000) / 2 : Math.round(kg * 1000)); // alle 10 g puolen gramman tarkkuudella (valkosipuli 2,5 g)
+const perPortionText = (e) => (e.unit === 'kg' ? (e.perPortion < 1 ? `${count(grams(e.perPortion))} g` : `${count(e.perPortion)} kg`)
   : e.perPortion < 0.1 ? `${count(Math.round(e.perPortion * 1000))} ml` : `${count(Math.round(e.perPortion * 100) / 10)} dl`);
+// Sourcen luvut: "2 valkosipulinkynttä" → [2], "1/2 sipulia" ja "½ sipulia" → [0.5], "1 1/2 dl" → [1.5, 1, 0.5].
+const countsIn = (source) => {
+  const t = String(source || '').replace(/½/g, ' 1/2').replace(/¼/g, ' 1/4').replace(/¾/g, ' 3/4').normalize('NFKC').replace(/⁄/g, '/');
+  const out = [];
+  for (const m of t.matchAll(/(?:(\d+)\s+)?(\d+(?:[.,]\d+)?)(?:\s*\/\s*(\d+))?/gu)) {
+    const frac = number(m[2]) / (m[3] ? Number(m[3]) : 1);
+    out.push(frac, ...(m[1] ? [Number(m[1]) + frac, Number(m[1])] : []));
+  }
+  return out.filter((n) => Number.isFinite(n) && n > 0);
+};
 async function estimateAmounts(ask, state) {
   const rows = state.items.map((item, index) => ({ index, term: item.term, source: item.source })).filter(({ index }) => !state.items[index].quantity && !state.items[index].needsQuantityCheck);
   if (!ask || !rows.length) return;
@@ -61,8 +74,13 @@ async function estimateAmounts(ask, state) {
   for (const r of Array.isArray(data?.rows) ? data.rows : []) {
     const item = rows.some((x) => x.index === r?.index) ? state.items[r.index] : null;
     const unit = { KG: 'kg', L: 'l' }[r?.unit];
+    // Kappaleet ("2 valkosipulinkynttä" 4 annokselle): annoskohtainen määrä lasketaan koodissa sourcen luvusta ja yhden kappaleen
+    // painosta. Malli antoi annoskohtaisen suoraan noin kaksinkertaisena (live 17.11.: 5 g, oikein noin 2,5 g).
+    const counted = Number.isFinite(r?.count) && r.count > 0 && countsIn(item?.source).includes(r.count);
+    const perPortion = counted ? (Number.isFinite(r.unitWeight) && r.unitWeight >= 0.0005 && r.unitWeight <= 5 && state.servings > 0 ? r.count * r.unitWeight / state.servings : NaN)
+      : r?.count > 0 ? NaN : r?.perPortion;
     // Vain järkevä annoskoko kelpaa: muuten määrä jää tarkennettavaksi kuten ennen.
-    if (item && unit && Number.isFinite(r.perPortion) && r.perPortion >= 0.0005 && r.perPortion <= PER_PORTION_MAX[unit]) item.estimate = { perPortion: r.perPortion, unit };
+    if (item && unit && Number.isFinite(perPortion) && perPortion >= 0.0005 && perPortion <= PER_PORTION_MAX[unit]) item.estimate = { perPortion: Number(perPortion.toPrecision(6)), unit };
   }
 }
 // Arvion syy listan alle: reseptissä ei ollut määrää tai se oli muuna yksikkönä.

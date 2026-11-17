@@ -18,14 +18,29 @@ const clean = (s, size) => safeModelText(String(s || '').replace(/[\n\r*`<>]/g, 
 export const dateLabel = (iso) => new Intl.DateTimeFormat('fi-FI', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'numeric' }).format(new Date(`${iso}T12:00:00Z`));
 export const helsinkiDate = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Helsinki' }).format(new Date(ms));
 
+// Korvaajan esimerkkituotteen nimessä pitää olla korvaajan sanat (live 17.11.: "kanan reisifilee" näytti esimerkkinä
+// MERIKROTTI FILEEn, koska haku piti pelkkää "filee"-osumaa pyydettynä). Yhdyssana kelpaa osina ("pakastetilli" → Tilli pakaste),
+// ominaisuussanat ohitetaan, ja kana, broileri ja kananpoika ovat sama asia.
+const ATTRIBUTE = /^(?:tuore|pakaste|pakastettu|kuivattu|jauhettu|luomu|kotimai|suomalai|maustamat|iso|pien|kypsä)\p{L}*$/u;
+const SAME_KIND = [['kana', 'broiler', 'kananpo']];
+const stem = (w) => (w.length <= 4 ? w : w.slice(0, Math.max(4, w.length - 2)));
+const has = (name, w) => name.includes(stem(w)) || SAME_KIND.some((g) => g.some((x) => stem(w).startsWith(x) || x.startsWith(stem(w))) && g.some((x) => name.includes(x)));
+const wordIn = (name, w) => has(name, w) || Array.from({ length: Math.max(0, w.length - 5) }, (_, i) => i + 3).some((i) => has(name, w.slice(0, i)) && has(name, w.slice(i)));
+export const namesTerm = (name, term) => norm(term).split(/[\s-]+/u).filter((w) => w.length >= 3 && !ATTRIBUTE.test(w)).every((w) => wordIn(norm(name), w));
+
 /** ok: pyydettyä tuotetta saa päivälle. notInCatalog: ei Aimon valikoimassa. notForDate: ei tälle päivälle. inexact: vain muita tuotteita. */
-export async function checkAvailability({ suggest, customer, date, term, quantity = null, rules = {} }) {
+export async function checkAvailability({ suggest, customer, date, term, quantity = null, rules = {}, nameMatch = false }) {
   const draft = { id: 'link-check', deliveryDate: date, diet: { claims: [], excludeAllergens: [] },
     lines: [{ ref: 'r', productTerm: term, quantity: probeOf(quantity), claims: rules.claims || [], excludeAllergens: rules.allergens || [] }] };
   let s;
-  try { s = await suggest({ customer, draft, limit: 1 }); } catch { return { status: 'unknown' }; }
+  try { s = await suggest({ customer, draft, limit: nameMatch ? 3 : 1 }); } catch { return { status: 'unknown' }; }
   const line = s?.lines?.[0];
-  if (line?.options?.length) return line.exact === false ? { status: line.availabilityUnknown ? 'unknown' : 'inexact' } : { status: 'ok', product: clean(line.options[0].name, 120) };
+  if (line?.options?.length) {
+    if (line.exact === false) return { status: line.availabilityUnknown ? 'unknown' : 'inexact' };
+    // Korvaajalle näytetään vain nimeltään sama tuote. Jos sellaista ei ole, korvaajaa ei tarjota.
+    const example = nameMatch ? line.options.find((o) => namesTerm(o.name, term)) : line.options[0];
+    return example ? { status: 'ok', product: clean(example.name, 120) } : { status: 'inexact' };
+  }
   const none = (s?.issues || []).find((i) => i.code === 'NO_ORDERABLE_PRODUCT');
   if (none?.notInCatalog) return { status: 'notInCatalog' };
   if (none?.availabilityUnknown) return { status: 'unknown' }; // ei tietoa ei ole "ei saatavilla": ainesta ei pudoteta eikä korvata
@@ -75,7 +90,7 @@ export async function findSubstitutes({ ask, suggest, customer, date, dish, rule
       if (!TERM.test(term) || COMMAND.test(term) || seen.has(norm(term))) continue;
       seen.add(norm(term)); candidates.push({ term, why: clean(o.why, 80), amount: typeof o.amount === 'string' ? o.amount.trim().slice(0, 30) : '' });
     }
-    const checked = await mapLimited(candidates, 3, (c) => checkAvailability({ suggest, customer, date, term: c.term, quantity: quantityOf(c.amount), rules }));
+    const checked = await mapLimited(candidates, 3, (c) => checkAvailability({ suggest, customer, date, term: c.term, quantity: quantityOf(c.amount), rules, nameMatch: true }));
     found.set(m.index, candidates.map((c, i) => ({ ...c, product: checked[i].product })).filter((_, i) => checked[i].status === 'ok').slice(0, 2));
   }
   return found;

@@ -196,3 +196,18 @@ test('ordering bridge passes the customer and the channel to the link step', asy
   const out = await chat.chat({ member: store.member(PHONE), messageId: 'm1', messages: [{ role: 'user', content: LINK }], channel: 'whatsapp' });
   assert.equal(out.text, 'link'); assert.equal(seen.channel, 'whatsapp'); assert.equal(seen.customer.permissions.readProducts, true);
 });
+
+test('korvaajan esimerkkituotteen nimessä on korvaajan sanat: kalafilee ei käy kanan reisifileen esimerkiksi', async () => {
+  // Live 17.11.: haku piti MERIKROTTI FILEEtä pyydettynä "filee"-osuman takia, ja se näytettiin kanan reisifileen esimerkkinä.
+  const { checkAvailability, namesTerm } = await import('../server/whatsapp/link-substitutes.mjs');
+  const option = (name) => ({ productId: name, name });
+  const suggestWith = (names) => async ({ draft }) => ({ issues: [], lines: [{ ref: draft.lines[0].ref, exact: true, options: names.map(option) }] });
+  const args = { customer: { customerId: 'c1' }, date: '2026-11-20', quantity: { value: 3, unit: 'kg' } };
+  assert.deepEqual(await checkAvailability({ ...args, suggest: suggestWith(['MERIKROTTI FILEE 2/400G NAHATON', 'Top Choice poultry Kanan rintafilee nahaton']), term: 'kanan reisifilee', nameMatch: true }), { status: 'inexact' });
+  assert.deepEqual(await checkAvailability({ ...args, suggest: suggestWith(['MERIKROTTI FILEE 2/400G NAHATON', 'Kariniemen Kananpojan reisifilee 2kg']), term: 'kanan reisifilee', nameMatch: true }), { status: 'ok', product: 'Kariniemen Kananpojan reisifilee 2kg' });
+  // Reseptin oman aineksen tarkistus pysyy ennallaan (ensimmäinen vaihtoehto), jotta synonyymit eivät pudota aineksia.
+  assert.equal((await checkAvailability({ ...args, suggest: suggestWith(['MERIKROTTI FILEE 2/400G NAHATON']), term: 'kanan reisifilee' })).status, 'ok');
+  for (const [name, term] of [['Apetit Tilli pakaste 100g', 'pakastetilli'], ['Santa Maria Tilli 10g', 'kuivattu tilli'], ['Pirkka sitruunamehu 1 l', 'sitruunamehu'],
+    ['GRANA PADANO 1KG', 'grana padano'], ['Valio ranskankerma 2 dl', 'ranskankerma'], ['Kariniemen Kananpojan rintafilee', 'broilerin rintafilee']]) assert.ok(namesTerm(name, term), `${term}: ${name}`);
+  for (const [name, term] of [['MERIKROTTI FILEE 2/400G NAHATON', 'kanan reisifilee'], ['Top Choice poultry Kanan rintafilee', 'kanan reisifilee'], ['Pirkka sitruuna', 'sitruunamehu']]) assert.ok(!namesTerm(name, term), `${term}: ${name}`);
+});

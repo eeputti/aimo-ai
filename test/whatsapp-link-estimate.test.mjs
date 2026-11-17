@@ -20,7 +20,8 @@ const analysis = (servings = 4) => ({ summary: 'Kanapastan resepti.', servings, 
   { term: 'ruokakerma', source: '2 dl ruokakermaa', amount: '2 dl' },
   { term: 'valkosipuli', source: '2 valkosipulinkynttä', amount: '' },
 ] });
-const sensible = { rows: [{ index: 1, perPortion: 0.1, unit: 'KG' }, { index: 3, perPortion: 0.003, unit: 'KG' }] };
+// Spagetti annosarviona, valkosipuli kappaleina: sourcen 2 kynttä × 5 g jaetaan koodissa 4 annoksella (2,5 g annokselle).
+const sensible = { rows: [{ index: 1, perPortion: 0.1, unit: 'KG', count: 0, unitWeight: 0 }, { index: 3, perPortion: 0, unit: 'KG', count: 2, unitWeight: 0.005 }] };
 
 function fixture(t, { estimate = async () => ({ json: sensible }), servings = 4 } = {}) {
   const store = openWhatsAppStore(':memory:'); t.after(() => store.close());
@@ -45,13 +46,13 @@ test('spagetilla ei ole määrää: arvio 100 g annokselle eli 2 kg 20 annoksell
   const out = await f.turn('https://example.com/kanapasta tää 20 annokselle');
   assert.match(out.text, /Määrät 20 annokselle\./u);
   assert.match(out.text, /- spagetti, noin 2 kg, arvio\n/u);
-  assert.match(out.text, /- valkosipuli, noin 0,06 kg, arvio/u);
+  assert.match(out.text, /- valkosipuli, noin 0,05 kg, arvio/u);
   assert.match(out.text, /- broilerin fileesuikale, 3 kg\n/u);
-  assert.match(out.text, /Arvioin määrät, joita reseptissä ei ollut painona tai tilavuutena: spagetti 100 g annokselle \(reseptissä ei ole määrää\) ja valkosipuli 3 g annokselle \(reseptissä "2 valkosipulinkynttä"\)\./u);
+  assert.match(out.text, /Arvioin määrät, joita reseptissä ei ollut painona tai tilavuutena: spagetti 100 g annokselle \(reseptissä ei ole määrää\) ja valkosipuli 2,5 g annokselle \(reseptissä "2 valkosipulinkynttä"\)\./u);
   const estimate = f.asks.find((a) => a.purpose === 'whatsapp_link_estimate');
   assert.deepEqual(JSON.parse(estimate.user).rows.map((r) => r.term), ['spagetti', 'valkosipuli'], 'vain määrää vailla olevat arvioidaan');
   await f.turn('joo');
-  assert.match(f.orders.at(-1), /broilerin fileesuikale 3 kg, spagetti 2 kg, ruokakerma 1 l, valkosipuli 0,06 kg/u);
+  assert.match(f.orders.at(-1), /broilerin fileesuikale 3 kg, spagetti 2 kg, ruokakerma 1 l, valkosipuli 0,05 kg/u);
 });
 
 test('annosmäärän muutos laskee arvion uudelleen', async (t) => {
@@ -80,4 +81,18 @@ test('annosmäärä ei tiedossa: arviota ei näytetä kokonaismääränä', asyn
   assert.match(out.text, /Määrät ovat reseptin alkuperäiset/u);
   assert.match(out.text, /- spagetti, määrä tarkennettava, reseptissä ei ole määrää\n/u);
   assert.doesNotMatch(out.text, /Arvioin/u);
+});
+
+test('kappalemäärä lasketaan koodissa: mallin oma annosmäärä ei kelpaa, eikä luku, jota sourcessa ei ole', async (t) => {
+  // Malli antoi suoraan 5 g annokselle (live 17.11.). Kappalepolulla se ohitetaan, ja koodi laskee 2 × 5 g / 4 annosta.
+  const f = fixture(t, { estimate: async () => ({ json: { rows: [{ index: 3, perPortion: 0.005, unit: 'KG', count: 2, unitWeight: 0.005 }] } }) });
+  const out = await f.turn('https://example.com/kanapasta tää 20 annokselle');
+  assert.match(out.text, /- valkosipuli, noin 0,05 kg, arvio/u);
+  for (const row of [{ index: 3, perPortion: 0, unit: 'KG', count: 3, unitWeight: 0.005 }, { index: 3, perPortion: 0.005, unit: 'KG', count: 2, unitWeight: 9 }]) {
+    const g = fixture(t, { estimate: async () => ({ json: { rows: [row] } }) });
+    const bad = await g.turn('https://example.com/kanapasta tää 20 annokselle');
+    assert.match(bad.text, /- valkosipuli, määrä tarkennettava\n/u, JSON.stringify(row));
+  }
+  const unknown = fixture(t, { servings: 0, estimate: async () => ({ json: { rows: [{ index: 3, perPortion: 0, unit: 'KG', count: 2, unitWeight: 0.005 }] } }) });
+  assert.doesNotMatch((await unknown.turn('https://example.com/kanapasta')).text, /Arvioin/u);
 });
