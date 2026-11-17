@@ -743,6 +743,9 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         if (offer && !dateAnswer && (turn.deliveryDate === offer.from || (!turn.deliveryDate && DATE_REFUSAL.test(t)))) {
           draft.keptDates = [...new Set([...(draft.keptDates || []), offer.from])];
         }
+        // Aikaisimman päivän hyväksyntä ("1" tai "tilaa sitten ti 17.11."): ostajalla on kiire, joten uuden päivän
+        // vaihtoehtojen alla kerrotaan tilausaikaraja (Haiku-otos X064: raja ei näkynyt ennen korilinkkiä).
+        if (offer && turn.deliveryDate === offer.date) draft.rush = true;
         const pendingRefs = draft.pending?.refs || [];
         const moreAsked = wantsMore || Boolean(choosing && (turn.ops || []).some((o) => o.op === 'more' && (!o.ref || o.ref === choosing.refs[0])));
         const selectedBefore = new Map(draft.lines.map((l) => [l.ref, l.selectedProductId]));

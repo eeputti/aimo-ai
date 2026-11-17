@@ -189,3 +189,17 @@ test('V023: toimitusvarmuuskysymys tunnistetaan molemmissa sanajärjestyksissä,
   assert.equal(reply.status, 'choosing');
   assert.match(reply.text, /^Toimitusvarmuus: 1\) 90 %, 2\) 99 %, 3\) 95 %\. Paras: 2\) maito 2\./);
 });
+
+test('X064: aikaisimman päivän hyväksyntä merkitsee tilauksen kiireelliseksi, joten vaihtoehtojen alla näkyy uuden päivän tilausaikaraja', async () => {
+  const script = { '20 l maitoa maanantaiks': add('maito', { value: 20, unit: 'L' }, '2026-11-16', ['FREE_FROM_LACTOSE']),
+    'Joo ok, tilaa sitten ti 17.11.': { intent: 'order', deliveryDate: '2026-11-17', ops: [] } };
+  for (const answer of ['1', 'Joo ok, tilaa sitten ti 17.11.']) {
+    const { say, store } = engine({ script, clock: at('14:00'),
+      options: (l, d) => (d.deliveryDate === '2026-11-16' ? null : [1, 2].map((i) => option(l.productTerm, i, { cutoff: '2026-11-16T12:00:00+02:00' }))) });
+    assert.match((await say('20 l maitoa maanantaiks')).text, /Vaihdetaanko koko tilauksen toimitus päivälle ti 17\.11\.\?/);
+    const options = await say(answer);
+    assert.equal(options.status, 'choosing', answer);
+    assert.equal(store.active('c').deliveryDate, '2026-11-17', answer);
+    assert.match(options.text, /Päivälle ti 17\.11\. ehtii tilata ma 16\.11\. klo 12\.00 asti\./, answer);
+  }
+});

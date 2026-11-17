@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — aikaisimman päivän hyväksyntä näyttää tilausaikarajan (Claude Code, sessio C)
+
+- **Käyttäjän pyyntö:** Eelis hyväksyi kolmannen Haiku-otoksen X064-löydöksen korjauksen: kun asiakas hyväksyi tiistain maanantain sijaan, tiistain tilausaikaraja ei näkynyt.
+- **Muutos (`server/order-conversation/index.mjs`):** aikaisimman ehdotetun päivän hyväksyntä numerolla tai sanoin merkitsee tilauksen kiireelliseksi, jolloin vaihtoehtojen alla näkyy "Päivälle ti 17.11. ehtii tilata ma 16.11. klo 12.00 asti."
+- **Tarkistukset:** regressiotesti molemmille hyväksyntätavoille (kaatui ennen korjausta), koko `npm test` 445/445 04ddcdd:n päällä. Käyttöön botin seuraavassa sovitussa restartissa (sessio E).
+
 ## 17.11.2026 — "10 kpl" on kappaleita kaikille tuotteille: 30 leivoksen laatikko ja 10 kpl on yksi laatikko (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
 
 - **Käyttäjän pyyntö:** Eelis: "korjaa myös 10 kpl kappaleiksi". Selainkokeilussa jäätelön tilalle valittu Elonen KP Vadelma-valkosuklaaleivos 30x60g ja vastaus "10 kpl" antoivat "10 laatikkoa, 555,50 €". Kappalemäärä luettiin kappaleiksi vain kananmunille, muille myyntieriksi.
