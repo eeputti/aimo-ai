@@ -4,6 +4,10 @@ import { normalizeOrderUnits, presentCollectingCart, selectionAcknowledgement } 
 import { withCartHandoffHint } from './cart-handoff.mjs';
 import { safeModelText } from './model-guard.mjs';
 import { factKinds, factProducts, factsReply, namedInMessage, withoutProductClaims } from './product-facts.mjs';
+// Kiitos tai kuittaus ilman kysymystä ("Sisältää siis maitoa, joten ei käy meille. Kiitos."): ei uusi tuotekysymys (itsepeli V011).
+const CLOSING = /(?<![\p{L}])(?:kiitos|kiitti|kiitoksia|kiitokset|thanks|thank you|selvä|selvä\s+homma|okei|ok|jees)(?![\p{L}])/iu;
+// Kysymyssana tekee viestistä kysymyksen, vaikka kysymysmerkki puuttuisi ("ok mitä siinä on").
+const QUESTION_WORDS = /(?<![\p{L}])(?:onko|onks|onkohan|mitä|mistä|missä|miten|mikä|mitkä|voiko|pitääkö|sisältääkö|sopiiko|käykö|entä|kertoisitko)(?![\p{L}])/iu;
 // Käyttötapakysymys tuotefaktan rinnalla ("sopiiko grilliin", "mihin käytän"): mallin neuvo jää vastaukseen.
 const USAGE_QUESTION = /(?<![\p{L}\d])(?:mihin|miten\s+(?:käytä|valmist|teen|teke)|käyttö\p{L}*|resepti\p{L}*|ruoka\p{L}*|sopi\p{L}*\s+(?!keliaak|allerg|maitoallerg)\p{L}+|kannattaa|vinkk\p{L}*)/iu;
 import { CANCEL_ALL, DEADLINE_QUESTION, REPEAT_LAST, USUAL_ORDER, compareKind, RELIST } from '../order-conversation/index.mjs';
@@ -390,20 +394,28 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
         // Tuotetietokysymys: vastaus Valion tuotetiedoista (ostoskorin valittu tuote ensin, sitten haun osumat).
         // Jos tuotetta ei löydy, sanotaan se: tietoa ei täydennetä mallin omasta tietämyksestä.
         let factText = null;
+        // Kuittaus tai kiitos ilman kysymysmerkkiä ei ole uusi tuotetietokysymys, vaikka siinä toistuisi tuotteen tieto.
+        const closing = !text.includes('?') && CLOSING.test(text) && !QUESTION_WORDS.test(text);
+        if (closing) kinds.length = 0;
         if (kinds.length) {
           // Viestiin sellaisenaan kirjoitettu tuotenimi ensin (APPELSIINI JAFFA ei ole Hartwall Jaffa), sitten haun osumat.
           // Vain kysytty tuote näytetään, ja kyllä/ei-kysymykseen vastataan suoraan (Haiku-mittaus 16.11. A2).
           let named = [];
           try { named = await namedInMessage(text); } catch { /* katalogi ei ole käytettävissä: pelkkä haku */ }
-          const shown = factProducts({ query, message: text, hits: [...named, ...hits], shoppingList: getShoppingList({ epoch: state.epoch || '' }), product });
+          let shown = factProducts({ query, message: text, hits: [...named, ...hits], shoppingList: getShoppingList({ epoch: state.epoch || '' }), product });
+          // Jatkokysymys ilman tuotteen nimeä ("Eli pakaste, mutta tarkkaa lämpötilaa ei ole?") koskee juuri kysyttyä tuotetta
+          // (itsepeli V014: vastaus oli "Kerro tuotteen nimi", vaikka nimi oli annettu edellisessä viestissä).
+          if (!shown.length && !query && state.lastFacts?.length) shown = state.lastFacts.map((id) => product(id)).filter(Boolean);
           factText = await factsReply(shown, kinds, text)
             || (query ? `En löytänyt Valion tuotetiedoista tuotetta haulla "${query.replace(/[^\p{L}\d\s-]/gu, '').trim().slice(0, 60)}", joten en voi kertoa sen tietoja. Kerro tuotteen tarkempi nimi.`
               : 'Kerro tuotteen nimi, niin katson sen tiedot Valion tuotetiedoista.');
+          const answered = shown.filter((p) => p?.id && p.name).slice(0, 2);
+          if (answered.length) state.lastFacts = answered.map((p) => String(p.id));
         }
         // Pelkkä tuotetietokysymys: koodin Valion-tiedot ovat koko vastaus, mallin irrallinen avauslause pois
         // ("Tarkista ne sieltä ennen ostopäätöstä"). Käyttötapakysymyksessä mallin neuvo jää.
         if (factText && !USAGE_QUESTION.test(text)) answer = '';
-        if (!answer && !factText) answer = 'Kootaan ostoslista kuntoon. Mitä keittiöön tarvitaan?';
+        if (!answer && !factText) answer = closing ? 'Ole hyvä! Kerro, jos keittiöön tarvitaan vielä jotain.' : 'Kootaan ostoslista kuntoon. Mitä keittiöön tarvitaan?';
         messages = [answer, factText].filter(Boolean);
         result = { status: state.lastOrder?.status || 'collecting', text: messages.join('\n\n') };
         if (adviceTerm && !state.lastOrder?.text.includes('Huomioitu:')) {

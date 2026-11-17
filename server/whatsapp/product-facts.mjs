@@ -137,6 +137,8 @@ async function directAnswer(p, question) {
     return a.startsWith('Kyllä') ? 'Gluteeniton-merkintää ei ole Valion tuotetiedoissa, mutta gluteeniviljoja ei ole merkitty allergeeneihin.' : a;
   }
   if (word('laktoosit\\p{L}*').test(q)) {
+    // Maitoallergia samassa kysymyksessä: laktoositon ei ole maidoton (itsepeli V011, Valio Edam on laktoositon mutta sisältää maitoa).
+    if (word('maitoallerg\\p{L}*|maidot\\p{L}*|maito\\s*allerg\\p{L}*|maito\\s+allergeeni').test(q) && allergenStatus(['AM'], p).contains.length) return 'Laktoositon ei tarkoita maidotonta: tuote sisältää maitoa, joten se ei sovi maitoallergiselle.';
     if (has('FREE_FROM_LACTOSE')) return 'Kyllä, tuote on laktoositon: merkitty laktoosittomaksi.';
     return allergenStatus(['AM'], p).contains.length ? 'Ei, tuotetta ei ole merkitty laktoosittomaksi, ja se sisältää maitoa.' : 'Laktoositon-merkintää ei ole Valion tuotetiedoissa.';
   }

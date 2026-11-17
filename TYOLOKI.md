@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — tuotekysymyksen jatko- ja kiitosviestit: ei enää "Kerro tuotteen nimi" (Claude Code, sessio A)
+
+- **Pyyntö:** Eelis pyysi korjaamaan V-itsepelin löydöksen. Jatko- tai kiitosviestiin, jossa toistuu tuotefaktan sana ("Eli pakaste, mutta tarkkaa lämpötilaa ei ole? Ok, kiitos", "Sisältää siis maitoa, joten ei käy meille. Kiitos."), vastattiin "Kerro tuotteen nimi", vaikka tuote oli juuri nimetty (V011, V014).
+- **Korjaus (`server/whatsapp/dialogue.mjs`):** dialogi muistaa viimeksi näytetyt tuotetietojen tuotteet (`state.lastFacts`). Jatkokysymys ilman tuotteen nimeä koskee niitä. Kiitos tai kuittaus ilman kysymysmerkkiä ja kysymyssanaa ei ole uusi tuotetietokysymys, joten siihen vastataan lyhyesti eikä tuotetietoja toisteta. Kysymyssana ilman kysymysmerkkiä ("ok mitä siinä on allergeeneina") on yhä kysymys. Ilman aiempaa tuotetta nimeä kysytään kuten ennen.
+- **Samalla (`server/whatsapp/product-facts.mjs`):** kun kysymyksessä on sekä laktoositon että maitoallergia, ja tuote sisältää maitoa, vastaus on "Laktoositon ei tarkoita maidotonta: tuote sisältää maitoa, joten se ei sovi maitoallergiselle." Itsepelissä Valio Edamille vastattiin "Kyllä, tuote on laktoositon" maitoallergikon kysymykseen.
+- **Tarkistukset:** uusi `test/whatsapp-fact-followup.test.mjs` 5/5. Neljä testiä epäonnistui vanhalla koodilla; viides varmistaa, että nimeä kysytään yhä ilman aiempaa tuotetta. `npm test` 450/450 uusimman mainin päällä, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54. Itsepeli Haikulla V007–V016 (ennen maitoallergiakohtaa, 75 kutsua, 0 virhettä, noin 0,02 USD): 10/10 läpi, ja yksikään vastaus ei ollut "Kerro tuotteen nimi" (aiemmassa ajossa V011 ja V014). Käyttöönotto session E:n julkaisulla Eeliksen luvalla.
+
 ## 17.11.2026 — README sama molemmissa repoissa, valioaimo-tilausapuri julkiseksi (Claude Code, repojen yhtenäistys)
 
 - **Käyttäjän pyynnöt:** "laita valioaimo-tilausapuri julkiseks" ja "päivitä aimo-ai:n readme samanlaiseks".
