@@ -1,4 +1,5 @@
-// "Tarkista nämä ensin" -huomiot WhatsApp-korisivulla: laskenta, kuittauslukko palvelimella ja sivun piirto.
+// Huomioita ostoskorista WhatsApp-korisivulla: laskenta ja sivun piirto. Eelis 17.11.: huomioita ei kuitata erikseen,
+// ostaja näkee korin ja hyväksyy sen SIIRRY MAKSAMAAN -painikkeella.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
@@ -81,7 +82,7 @@ test('missing label, unknown stock and an old price are noted; a list that is no
   assert.equal(storefrontCartProjection({ ...withDiet, status: 'needs_details' }, null, notes).notes, undefined);
 });
 
-// --- The confirmation lock on the cart API ---------------------------------------------------------------------
+// --- No acknowledgement step -----------------------------------------------------------------------------------
 
 const SECRET = 'cart-notes-secret';
 async function cartApi(t, cart) {
@@ -109,27 +110,10 @@ async function cartApi(t, cart) {
 const NOTE_A = { key: 'rounded:P1:3:5', kind: 'rounded', productId: 'P1', title: 'Pyöristetty ylöspäin', text: '…' };
 const NOTE_B = { key: 'stock:P1', kind: 'stock', productId: null, title: 'Saldoa ei vahvistettu', text: '…' };
 
-test('the order is not confirmed until every note shown on the cart page is acknowledged', async (t) => {
+test('notes do not block the order: SIIRRY MAKSAMAAN confirms without acknowledging them', async (t) => {
   const { post, chats } = await cartApi(t, { state: 'ready', id: 'WD-1', revision: 3, lines: [], notes: [NOTE_A, NOTE_B] });
-  let r = await post({ text: 'TILAA', confirm: true });
-  assert.equal(r.status, 400); assert.match(r.data.error, /Kuittaa ensin 2 huomiota/); assert.equal(chats.length, 0);
-  r = await post({ text: 'TILAA', confirm: true, acknowledged: [NOTE_A.key] });
-  assert.equal(r.status, 400); assert.match(r.data.error, /Kuittaa ensin huomio/); assert.equal(chats.length, 0);
-  for (const bad of ['x', [1], Array.from({ length: 51 }, (_, i) => `k${i}`)]) {
-    assert.equal((await post({ text: 'TILAA', confirm: true, acknowledged: bad })).status, 400);
-  }
-  r = await post({ text: 'TILAA', confirm: true, acknowledged: [NOTE_B.key, NOTE_A.key, 'old:key'] });
+  const r = await post({ text: 'TILAA', confirm: true });
   assert.equal(r.status, 200); assert.equal(r.data.status, 'confirmed'); assert.equal(chats.length, 1);
-  // Edits do not need acknowledgements.
-  assert.equal((await post({ text: 'maitoa 10 l lisää' })).status, 200);
-});
-
-test('without a ready export the lock steps aside and the ordering engine decides as before', async (t) => {
-  // A lost-response retry for an already closed cart: the export fails, the retry still reaches the idempotent engine.
-  const closed = await cartApi(t, Object.assign(new Error('closed'), { status: 410 }));
-  assert.equal((await closed.post({ text: 'TILAA', confirm: true })).status, 200);
-  const waiting = await cartApi(t, { state: 'waiting', id: 'WD-1', revision: 3, lines: [] });
-  assert.equal((await waiting.post({ text: 'TILAA', confirm: true })).status, 200);
 });
 
 // --- The cart page --------------------------------------------------------------------------------------------
@@ -156,32 +140,23 @@ async function page({ shoppingList, exportData, stored = {} }) {
   return { el: (id) => element(id), click, storage };
 }
 
-test('the cart page shows notes on their rows, keeps SIIRRY MAKSAMAAN locked until all are acknowledged, and escapes the text', async () => {
+test('the cart page shows notes as information on their rows, leaves SIIRRY MAKSAMAAN open and escapes the text', async () => {
   const shoppingList = { ...list(), lines: [list().lines[0]] };
   const hostile = '<img src=x onerror=alert(1)>';
   const exportData = { state: 'ready', id: 'WD-1', revision: 3, lines: [{ id: 'P1', name: 'Peruna', qty: 3, unit: 'sk', price: 1, vat: 14, requested: { value: 6, unit: 'KG' } }],
     notes: [{ ...NOTE_A, text: hostile }, { ...NOTE_B, title: hostile }] };
   const p = await page({ shoppingList, exportData });
-  assert.equal(p.el('wa-review').disabled, true);
-  assert.equal(p.el('wa-review-hint').hidden, false); assert.equal(p.el('wa-review-hint').textContent, 'Kuittaa 2 huomiota ennen maksamista.');
-  assert.equal(p.el('wa-checks').hidden, false); assert.equal(p.el('wa-checks-count').textContent, '0/2 kuitattu');
-  // The product note sits under its own row; the order-wide note is in the box above the table.
-  assert.match(p.el('wa-lines').innerHTML, /wa-check-row[\s\S]*data-ack="rounded:P1:3:5"/);
-  assert.match(p.el('wa-checks-list').innerHTML, /data-ack="stock:P1"/);
-  for (const id of ['wa-lines', 'wa-checks-list']) assert.doesNotMatch(p.el(id).innerHTML, /<img src=x/, id);
-  p.click(NOTE_A.key);
-  assert.equal(p.el('wa-review').disabled, true); assert.equal(p.el('wa-review-hint').textContent, 'Kuittaa 1 huomio ennen maksamista.');
-  assert.match(p.el('wa-lines').innerHTML, /Kuitattu/);
-  p.click(NOTE_B.key);
-  assert.equal(p.el('wa-review').disabled, false); assert.equal(p.el('wa-review-hint').hidden, true);
-  assert.equal(p.el('wa-checks-count').textContent, 'Kaikki kuitattu');
-  // A key the server did not send is ignored; acknowledgements survive a reload in the same tab.
-  p.click('forged:key');
-  const saved = [...p.storage].find(([k]) => k.startsWith('aimo.whatsapp-cart.ack.'));
-  assert.deepEqual(JSON.parse(saved[1]).sort(), [NOTE_A.key, NOTE_B.key].sort());
-  const reloaded = await page({ shoppingList, exportData, stored: Object.fromEntries([saved]) });
-  assert.equal(reloaded.el('wa-review').disabled, false);
-  // No notes: nothing to acknowledge, the box stays hidden.
+  assert.equal(p.el('wa-review').disabled, false);
+  assert.equal(p.el('wa-checks').hidden, false);
+  // The product note sits under its own row; the order-wide note is in the box above the table. Nothing to tick off.
+  assert.match(p.el('wa-lines').innerHTML, /wa-check-row[\s\S]*data-kind="rounded"/);
+  assert.match(p.el('wa-checks-list').innerHTML, /data-kind="stock"/);
+  assert.match(p.el('wa-checks-list').innerHTML, /1 huomio on tuoterivien alla/);
+  for (const id of ['wa-lines', 'wa-checks-list']) {
+    assert.doesNotMatch(p.el(id).innerHTML, /<img src=x/, id);
+    assert.doesNotMatch(p.el(id).innerHTML, /data-ack|Selvä|Kuitattu/, id);
+  }
+  // No notes: the box stays hidden.
   const clean = await page({ shoppingList, exportData: { ...exportData, notes: [] } });
   assert.equal(clean.el('wa-review').disabled, false); assert.equal(clean.el('wa-checks').hidden, true);
 });

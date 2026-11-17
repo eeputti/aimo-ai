@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — korisivun huomiot ilman kuittausta: riittää, että näkee korin ja hyväksyy (Claude Code, Mankeli-vertailu)
+
+- **Käyttäjän päätös:** Eelis ei halua, että huomioita kuitataan yksitellen ("ei tarvii jokasta tuotetta eriksee checkaa, riittää et vaa näkee mitä ostoskoriin on tullut ja sitte hyväksyy ne"). Tämä kumoaa 9609308:n kuittauslukon, joka ehti tuotantoon (aimo-whatsapp-5wlnx0w9b klo 9.33).
+- **Muutos:** huomiot (tuplatilaus, poikkeava määrä, pyöristys, puuttuva merkintä, saldo, vanha hinta) näkyvät edelleen keltaisina tietoriveinä tuotteen alla ja koko tilausta koskevat korin yläpuolella otsikolla "Huomioita ostoskorista". Selvä-painikkeet, laskuri ja "Kuittaa … ennen maksamista" -teksti poistettu. SIIRRY MAKSAMAAN toimii heti, kun kori on valmis, ja palvelin ei enää vaadi kuittauksia vahvistukseen (`cart-link.mjs` kuten ennen 9609308:aa). Huomioiden laskenta (`server/cart-notes.mjs`) on ennallaan. Workerin `kori/shop.css` synkattu uudelleen (`sync-cart-shell.mjs`).
+- **Tarkistukset:** `test/cart-notes.test.mjs` päivitetty (vahvistus menee läpi huomioista huolimatta, sivulla ei Selvä-painikkeita, maksupainike auki) 4/4. Koko `npm test` 417/417 ja Worker 58/58 puhtaassa työkopiossa origin/mainin 47b42fd päällä. Selaimessa eristetty paikallinen palvelin (omat kannat, simuloidut hinnat): kolmas kori näytti kaksi huomiota ilman painikkeita ja SIIRRY MAKSAMAAN oli auki. Tilaus, jossa oli tuplatilaushuomio, vahvistui ilman kuittausta.
+- **Käyttöönotto kesken:** tarvitsee botin Vercel-julkaisun (sessio E). Siihen asti puhelimen korisivulla on vielä kuittauslukko. Worker-julkaisua ei tarvita korisivun takia, koska Worker välittää sen botilta.
+- **Huomio:** samassa kansiossa on toisen session keskeneräinen "se tavallinen" -tilaus (`order-conversation/index.mjs`, `runtime.mjs`, `dialogue.mjs`), joka ei ole tässä commitissa.
+
 ## 17.11.2026 — puhelimella kaikki sivut toimivat paitsi Keskustele (Claude Code, puhelinesto-chat)
 
 - **Käyttäjän havainto ja päätös:** maksun onnistumisnäkymän Palaa etusivulle ja Katso, miten agentti kokosi tilauksen veivät puhelimella "Käytäthän tätä tietokoneella" -estoon. Eelis ehdotti ensin paluuta WhatsAppiin, sitten päätti: puhelimella kaikki sivut saa katsoa, vain Keskustele pois, koska puhelimella keskustellaan jo WhatsAppissa. Tämä korvaa 16.11. päätöksen estosta kaikilla sivuilla.

@@ -46,31 +46,19 @@ button.wa-qty:disabled { cursor: default; opacity: .6; }
 .wa-cart .wa-note .cart-move-line { justify-content: flex-start; padding: 8px 12px; border-radius: 3px; background: #fff1bf; }
 .wa-note .cart-move-line > .icon { width: 18px; height: 18px; color: #b26b00; }
 
-/* "Tarkista nämä ensin": huomiot kuitataan Selvä-painikkeella ennen SIIRRY MAKSAMAAN -vaihetta. */
+/* Huomioita ostoskorista: pelkkää tietoa, ei kuitata erikseen. */
 .wa-lines-col { min-width: 0; }
 .wa-checks { margin-bottom: 16px; padding: 14px 16px; border-radius: 4px; background: #fff8dc; box-shadow: inset 4px 0 0 #f0b400; }
-.wa-checks.is-done { background: #eef7f1; box-shadow: inset 4px 0 0 #1a7f37; }
 .wa-checks-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .wa-checks-head h3 { margin: 0; font: 400 22px/1.1 National, sans-serif; color: var(--petrol); }
 .wa-checks-head .icon { width: 22px; height: 22px; color: #b26b00; }
-.wa-checks.is-done .wa-checks-head .icon { color: #1a7f37; }
-.wa-checks-count { margin-left: auto; padding: 2px 10px; border-radius: 10px; background: #fff; font-size: 13px; font-weight: 700; color: #6b5300; white-space: nowrap; }
-.wa-checks.is-done .wa-checks-count { color: #1a5c38; }
 .wa-checks-rows { margin: 6px 0 0; font-size: 14px; color: #4d5a5e; }
 .wa-check { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 3px; background: #fff1bf; font-size: 14px; line-height: 1.4; color: #000; }
 .wa-check + .wa-check { margin-top: 6px; }
 .wa-check p { flex: 1; margin: 0; }
 .wa-check > .icon { flex: 0 0 18px; width: 18px; height: 18px; color: #b26b00; }
-.wa-check.is-ok { background: #eef7f1; color: #4d5a5e; }
-.wa-tick { flex: 0 0 18px; width: 18px; height: 18px; border-radius: 50%; background: #1a7f37; position: relative; }
-.wa-tick::after { content: ''; position: absolute; left: 6px; top: 3px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-.wa-ack { flex: 0 0 auto; min-height: 32px; padding: 4px 18px; border-radius: 4px; background: var(--petrol); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; }
-.wa-ack:hover { background: #0b4a5c; }
-.wa-ack:disabled { opacity: .5; cursor: default; }
-.wa-check-ok { font-size: 13px; font-weight: 700; color: #1a7f37; white-space: nowrap; }
 .wa-cart .cart-table .wa-check-row td { padding: 0 8px 12px 72px; }
 .wa-flagged > tr:first-child > td:first-child { box-shadow: inset 4px 0 0 #f0b400; }
-.wa-review-hint { margin: 8px 0 0; font-size: 13px; font-weight: 700; color: #8a5a00; text-align: center; }
 
 .wa-review { margin-top: 16px; padding: 16px; border-radius: 4px; background: #fff; }
 .wa-review h4 { margin: 0 0 8px; font: 400 22px/1.1 National, sans-serif; color: var(--petrol); }
@@ -96,9 +84,6 @@ button.wa-qty:disabled { cursor: default; opacity: .6; }
   .wa-origin { margin-bottom: 16px; }
   .wa-note td { padding-top: 12px !important; }
   .wa-cart .cart-table .wa-check-row td { padding: 12px 0 0 !important; }
-  .wa-check { flex-wrap: wrap; }
-  .wa-check p { flex: 1 1 calc(100% - 28px); }
-  .wa-ack, .wa-check-ok { margin-left: 28px; }
   button.wa-qty { width: 124px; height: 36px; }
 }
 @media (max-width: 600px) {
@@ -106,5 +91,5 @@ button.wa-qty:disabled { cursor: default; opacity: .6; }
   .wa-cart .main-nav span { font-size: 16px; }
 }
 @media print {
-  .wa-origin, .wa-alert, .wa-review, .wa-retry, .wa-demo-note, .wa-ack, .wa-review-hint { display: none !important; }
+  .wa-origin, .wa-alert, .wa-review, .wa-retry, .wa-demo-note { display: none !important; }
 }

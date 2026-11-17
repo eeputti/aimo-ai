@@ -138,9 +138,7 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
         if (typeof input?.text !== 'string' || !input.text.trim() || input.text.length > 4000
             || typeof input.messageId !== 'string' || !/^[a-f0-9-]{36}$/i.test(input.messageId)
             || input.expectedList?.id !== draftId || !Number.isSafeInteger(input.expectedList?.revision) || input.expectedList.revision < 0
-            || (input.confirm !== undefined && typeof input.confirm !== 'boolean')
-            || (input.acknowledged !== undefined && (!Array.isArray(input.acknowledged) || input.acknowledged.length > 50
-              || !input.acknowledged.every((k) => typeof k === 'string' && k.length <= 300)))) {
+            || (input.confirm !== undefined && typeof input.confirm !== 'boolean')) {
           throw fail(400, 'Tarkista viesti ja ostoskorin versio.');
         }
         // Tilauksen vahvistus vain SIIRRY MAKSAMAAN -painikkeesta (se pyytää ensin yhteenvedon ja vahvistaa sen perään).
@@ -158,16 +156,6 @@ export function createCartLink({ store, ordering, baseUrl, secret, now = Date.no
         for (const [binding, window] of daily) if (window.until <= now()) daily.delete(binding);
         limit.count++; requests.set(member.binding, limit);
         day.count++; daily.set(member.binding, day);
-        // "Tarkista nämä ensin": jokainen korisivulla näkyvä huomio pitää kuitata ennen vahvistusta. Tarkistus käyttää samaa
-        // välimuistissa olevaa vientiä kuin sivu. Jos vienti ei onnistu tai kori ei ole valmis (esim. kadonneen vastauksen uusinta
-        // jo suljetulle korille), tarkistus ohitetaan: tilausmoottori ja mandaatti päättävät kuten ennenkin.
-        if (input.confirm === true && typeof ordering.getStorefrontCart === 'function') {
-          let cart = null;
-          try { cart = await ordering.getStorefrontCart(member, draftId); } catch { cart = null; }
-          const seen = new Set(input.acknowledged || []);
-          const open = cart?.state === 'ready' && cart.id === draftId && cart.revision === input.expectedList.revision ? (cart.notes || []).filter((n) => !seen.has(n.key)) : [];
-          if (open.length) throw fail(400, `Tilausta ei tehty. Kuittaa ensin ${open.length === 1 ? 'huomio' : `${open.length} huomiota`} kohdassa Tarkista nämä ensin.`);
-        }
         // A server-owned binding and expected draft version go through the existing serialized,
         // idempotent ordering bridge. An old link cannot edit or confirm a replacement draft.
         const result = await ordering.chat({ member, messageId: `cart:${member.binding}:${input.messageId}`, receivedAt: now(),

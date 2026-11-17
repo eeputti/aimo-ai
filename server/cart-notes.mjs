@@ -1,7 +1,7 @@
-// "Tarkista nämä ensin" -huomiot WhatsApp-korisivulle (Eelis 17.11., malli Mankelin S.I.MO:n vahvistussivusta).
+// Huomioita ostoskorista WhatsApp-korisivulle (Eelis 17.11., idea Mankelin S.I.MO:n vahvistussivusta).
 // Jokainen huomio lasketaan tarkistetusta tarjouksesta, Valion tuotetiedoista tai ostajan omista tilauksista: ei kielimallia
-// eikä arvauksia. Huomio ei estä tilausta palvelimella itsessään, vaan ostaja kuittaa sen ennen SIIRRY MAKSAMAAN -vaihetta;
-// kuittauksen puute estää vahvistuksen korilinkin rajapinnassa (cart-link.mjs). Mandaatti ja hyväksyntä toimivat kuten ennen.
+// eikä arvauksia. Huomiot ovat pelkkää tietoa: Eeliksen päätöksellä niitä ei kuitata erikseen, vaan ostaja näkee korin ja
+// hyväksyy sen SIIRRY MAKSAMAAN -painikkeella. Mandaatti ja hyväksyntä toimivat kuten ennen.
 import { amountPhrase, packWord, readableName } from './order-conversation/wording.mjs';
 
 // OLETUS: demon kynnykset. Määrää verrataan saman tuotteen tavalliseen (mediaani) määrään vähintään kahdessa
