@@ -1,227 +1,231 @@
-# Valio Aimo -tilausapuri
+# Aimo Agent Gateway
 
-[![Testit](https://github.com/eeputti/aimo-ai/actions/workflows/test.yml/badge.svg)](https://github.com/eeputti/aimo-ai/actions/workflows/test.yml)
+Junction 2026, Valio Aimo challenge "Trusted Trade Agents".
 
-**Ammattikeittiö tilaa Valio Aimon tuotteet kirjoittamalla, puhumalla tai lähettämällä kuvan WhatsAppiin, kuten myyjälle.** Apuri kysyy ensin toimituspäivän, näyttää sille päivälle tilattavat Valion tuotteet numeroituina ja kokoaa ostoskorin. Kokki tarkistaa korin kaupan näköisellä sivulla ja vahvistaa tilauksen itse. Jokainen tilaus kulkee agenttiportin läpi: hinnat lukitaan allekirjoitettuun tarjoukseen, ostajan valtuudet tarkistetaan koodilla ja jokainen päätös jää lokiin.
+**The Agent Gateway is the Aimo-side interface through which an external purchasing agent searches products, gets a signed fixed-price offer, places an order within the buyer's own mandate and sends everything else to a human, with a hash-chained audit trail of every step.** One contract (`server/gateway/contract.mjs`) serves REST, MCP and OpenAPI 3.1, so the interface is not tied to one platform.
 
-Tehty Valion Junction 2026 -haasteeseen. Tämä on kehitysrepo, josta botti julkaistaan. Sama koodi ilman työlokeja ja kehitysraportteja: [eeputti/valioaimo-tilausapuri](https://github.com/eeputti/valioaimo-tilausapuri).
+The gateway is the product, not a chatbot in place of the web shop. Everything below is a client of the same contract:
 
-**Kokeile selaimessa:** [aimo-order-demo.aimo-demo-41cfac.workers.dev](https://aimo-order-demo.aimo-demo-41cfac.workers.dev). Keskustele-välilehti käyttää samaa apuria kuin WhatsApp.
+| Client | What it shows |
+|---|---|
+| Any MCP or REST agent | `npm run demo` sends the challenge's example request and nine more scenarios (exceptions, approvals, additions, a recipe) as real HTTP calls, against the challenge mock API when `VALIO_API_KEY` is set. Your own agent connects to `/mcp` with a demo buyer key ([Connect your own agent](#connect-your-own-agent)). The gateway runs locally; it is not exposed at a public address. |
+| Storefront (`/`) | The existing web shop look. The basket's **Tarkista ja tilaa** requests signed offers and places the order through the gateway; the mandate decides whether it is confirmed or waits for approval. |
+| WhatsApp assistant | A buyer writes the need in WhatsApp; the assistant keeps a draft, asks for missing details, proposes products and links to a basket where the buyer confirms. The order is a gateway order under that buyer's mandate ([WhatsApp-tilausapuri](#whatsapp-tilausapuri)). |
+| Kitchen demo (`/kitchen.html`) | A kitchen ordering agent that proposes next week's order from history, bookings and recipes. |
 
-<p align="center">
-  <img src="docs/kuvat/keskustele-vaihtoehdot-1280.webp" alt="Selainkeskustelu: kokki pyytää 20 l laktoositonta maitoa ja 5 kg voita perjantaiksi, apuri näyttää kolme numeroitua maitovaihtoehtoa hintoineen, ja oikealla näkyy, mitä agentti ymmärsi" width="100%">
-</p>
-
-## Kenelle ja miksi
-
-Ravintolan, henkilöstöravintolan tai keskuskeittiön kokki tilaa usein kiireessä puhelimella. Verkkokaupassa hän joutuu hakemaan jokaisen tuotteen, laskemaan pakkauskoot ja tarkistamaan toimituspäivät itse. Apuri tekee tämän keskustelussa:
-
-- **Puhekieli ja kirjoitusvirheet:** "20 l laktoositonta maitoo perjantaiks", "pottu", "jätski".
-- **Ääniviestit:** puhe litteroidaan ja käsitellään kuten kirjoitettu viesti.
-- **Kuvat:** ostoslistasta, lähetteestä tai hyllystä luetut rivit menevät samaan koriin.
-- **Reseptilinkit:** ainekset ja määrät luetaan sivulta. Jos aines ei ehdi toimituspäivälle, apuri ehdottaa korvaajaa.
-- **"Se tavallinen" ja "sama kuin viimeksi":** ostajan toistuvat tuotteet aiemmista tilauksista uusilla hinnoilla.
-- **Vertailu:** halvin, pienin hiilijalanjälki tai varmin toimitus Valion tuotetiedoista.
-- **Puuttuvat määrät:** arvioidaan annetusta määrästä suurkeittiön annoskoilla, ja apuri kertoo, miten arvio laskettiin.
-
-Tuotetiedot (allergeenit, alkuperä, kuvat, vertailuhinnat) tulevat vain Valion datasta. Kielimalli ei keksi tuotteita, hintoja eikä saatavuutta, eikä se päätä tilauksesta.
-
-## Koko kulku
-
-1. [Kokki kertoo tarpeen](#1-kokki-kertoo-tarpeen) tekstinä, ääniviestinä, kuvana tai reseptilinkkinä.
-2. [Toimituspäivä ensin.](#2-toimituspäivä-ensin)
-3. [Numeroidut Valion tuotevaihtoehdot](#3-numeroidut-vaihtoehdot) sille päivälle.
-4. [Korilinkki kaupan näköiseen koriin.](#4-korilinkki-kaupan-näköiseen-koriin)
-5. [Tarkistus ja demotilaus](#5-tarkistus-ja-demotilaus) agenttiportin kautta.
-6. [Demomaksu.](#6-demomaksu)
-7. [Vahvistussähköposti.](#7-vahvistussähköposti)
-8. ["Näin agentti kokosi tilauksen" -jälki.](#8-näin-agentti-kokosi-tilauksen)
-
-### 1. Kokki kertoo tarpeen
-
-Tekstinä, ääniviestinä, kuvana tai reseptilinkkinä. Apuri kuittaa, mitä listalle tuli, ja kysyy puuttuvat tiedot yhdellä kysymyksellä.
-
-### 2. Toimituspäivä ensin
-
-Tuotteita ei haeta ennen päivää, koska saatavuus ja tilausaika riippuvat siitä. "Huomiseksi" tai "ensi tiistaina" riittää. Jos päivä ei ehdi, apuri kertoo aikaisimman mahdollisen päivän eikä lupaa mitään, mitä rajapinta ei vahvista.
-
-### 3. Numeroidut vaihtoehdot
-
-Jokaiselle tuotteelle kolme sille päivälle tilattavaa Valion tuotetta: pakkausmäärä, toimitettava kokonaismäärä ja hinta. Kokki vastaa numerolla, ja 4 näyttää lisää vaihtoehtoja. Ruokavalio (esim. laktoositon) rajaa vaihtoehdot, ja allergeenikiellot tarkistetaan koodilla.
-
-### 4. Korilinkki kaupan näköiseen koriin
-
-Kun kaikki on valittu, kokki vastaa "ok" ja saa yksityisen linkin ostoskoriin. Kori näyttää samalta kuin Valio Aimon verkkokauppa ja käyttää samaa luonnosta kuin keskustelu, joten muutokset näkyvät molemmissa. Huomiot, kuten "Hinta ei ole ajantasainen" tai "Saldoa ei vahvistettu", näkyvät korin yläpuolella.
-
-<p align="center">
-  <img src="docs/kuvat/keskustele-korilinkki-1280.webp" alt="Keskustelussa tilausluonnos ja Avaa ostoskori -painike" width="100%">
-</p>
-<p align="center">
-  <img src="docs/kuvat/kori-1280.webp" alt="Kaupan näköinen ostoskori: kaksi tuoteriviä, huomiot ja yhteenveto 69,35 euroa verollisena" width="72%">
-  <img src="docs/kuvat/kori-375.webp" alt="Sama ostoskori puhelimen leveydellä" width="24%">
-</p>
-
-### 5. Tarkistus ja demotilaus
-
-**Siirry maksamaan** pyytää agenttiportilta tuoreen, allekirjoitetun tarjouksen ja vahvistaa tilauksen samalla. Portti tarkistaa hinnan ja saatavuuden uudelleen, ostajan valtuudet (tilaus- ja päiväkatto, ruokavalio, allergeenit) ja estää kaksoistilaukset. Valtuudet ylittävä tilaus jää odottamaan ihmisen hyväksyntää.
-
-### 6. Demomaksu
-
-Maksusivu näyttää tilauksen, toimituspäivän ja summan. Maksutapana on testikortti tai lasku. Rahaa ei siirry, eikä sivulla kysytä oikeita korttitietoja. Linkki on henkilökohtainen: tilaus näkyy vain sille, jolla linkki on.
-
-<p align="center">
-  <img src="docs/kuvat/maksu-1280.webp" alt="Maksusivu: testikortti, Maksa 61,10 euroa ja tilauksen yhteenveto" width="72%">
-  <img src="docs/kuvat/maksu-onnistui-375.webp" alt="Maksu onnistui -näkymä puhelimella" width="24%">
-</p>
-
-### 7. Vahvistussähköposti
-
-Maksun jälkeen Worker lähettää vahvistusviestin demon testiosoitteeseen (`ORDER_EMAIL_TO`), kerran tilausta kohden.
-
-<p align="center">
-  <img src="docs/kuvat/sahkoposti.webp" alt="Vahvistussähköposti: tilausnumero, tuotteet, summa ja toimituspäivä" width="55%">
-</p>
-
-### 8. Näin agentti kokosi tilauksen
-
-Samalla henkilökohtaisella linkillä aukeaa tilauksen jälki: keskustelu vasemmalla ja agentin ajo oikealla koodina. Siitä näkee, mitä agentti ymmärsi, mitkä vaihtoehdot se näytti ja miksi, tarjouspyynnöt portille ja portin päätösketjun. Puhelinnumerot, nimet ja linkit eivät lähde jäljen mukana.
-
-<p align="center">
-  <img src="docs/kuvat/agentti-1280.webp" alt="Agentin jälki: WhatsApp-keskustelu ja agentin ajo rinnakkain" width="72%">
-  <img src="docs/kuvat/agentti-375.webp" alt="Agentin jälki puhelimella" width="24%">
-</p>
-
-<details>
-<summary>Etusivu</summary>
-<p align="center">
-  <img src="docs/kuvat/etusivu-1280.webp" alt="Demosivuston etusivu" width="72%">
-  <img src="docs/kuvat/etusivu-375.webp" alt="Etusivu puhelimella" width="24%">
-</p>
-</details>
-
-## Arkkitehtuuri
-
-```mermaid
-flowchart TB
-  WA["Kokki WhatsAppissa"] <--> META["Meta WhatsApp<br/>Cloud API"]
-  WEB["Kokki selaimessa"] --> WORKER
-  TICK["Cloudflare-ajastin<br/>aimo-whatsapp-tick"]
-  META -- "webhook" --> BOT
-  WORKER["Cloudflare Worker ja D1<br/>aimo-order-demo:<br/>sivusto, maksu, jälki, sähköposti"] -- "selainkeskustelu ja kori" --> BOT
-  TICK -- "kerran minuutissa<br/>POST /internal/tick" --> BOT
-  BOT["Vercel-funktio, fra1:<br/>kanava ja jono, tilauskeskustelu,<br/>tuotetyökalut, korisivu"] -- "vahvistetut tilaukset<br/>ja jäljet" --> WORKER
-  BOT --> GW["Agenttiportti:<br/>allekirjoitetut tarjoukset,<br/>mandaatit, päätösloki"]
-  BOT <--> TURSO[("Turso, Frankfurt:<br/>5 SQLite-kantaa")]
-  BOT --> HAIKU["Claude Haiku 5.5"]
-  BOT --> GROQ["Groq Whisper:<br/>ääniviestit"]
-  GW --> VALIO["Valion hinta- ja<br/>saatavuusrajapinta"]
+```
+buyer's agent ──► search_products ──► request_quote ──► place_order ──► confirmed
+ (REST or MCP)     static catalogue    live price +       mandate            │
+                   17 546 products     availability,      decides ──► pending_approval ──► human: one button
+                                       signed offer                  └─► rejected (reason codes)
+                                                    every step ──► hash-chained audit trail
 ```
 
-| Osa | Missä | Tehtävä |
+## Run it
+
+Requires Node 22.13+ (uses built-in `node:sqlite`, no native dependencies).
+
+```bash
+npm install
+cp .env.example .env        # add VALIO_API_KEY (from the Junction platform)
+npm run fetch-data          # downloads the challenge data into data/raw (not in the repo)
+npm run catalog             # builds the compact search index
+npm start                   # http://localhost:4747
+```
+
+| URL | What |
+|---|---|
+| `/` or `/gateway.html` | Static local copy of the Toimitustukku homepage, based on the 14 Nov 2026 reference |
+| `/cart.html` | Editable storefront cart based on the user's Toimitustukku cart; separate from kitchen proposals and agent orders |
+| `/recipes.html` | Own recipes and menus: image/Excel/text import, editable portions and ingredients, product alternatives for the chosen delivery date |
+| `/agent` or `/agent.html` | Opens the same storefront shopping assistant and shared basket |
+| `/console.html` | Gateway diagnostics: run demo scenarios, approve, edit the mandate, read the audit trail |
+| `/approve.html?order=…` | The human approval view, built for a phone: what was asked, what is proposed, why it stopped, Approve / Reject |
+| `/openapi.json` | The contract (OpenAPI 3.1) |
+| `/mcp` | The same contract as MCP tools (Streamable HTTP, JSON-RPC) |
+| `/.well-known/agent-gateway.json` | Discovery: operations, reason codes, clock |
+| `/.well-known/jwks.json` | Public key for verifying offers |
+| `/kitchen.html` | Demo client: a kitchen ordering agent (Ravintola Kulma) |
+| `/assistant.html` | Tilausapuri: chat with Daniel's shopping agent (Python MCP server on Render) through the Claude API MCP connector. Answers with one table: earliest delivery, order deadline, price, substitute. Needs `ANTHROPIC_API_KEY`, `ASSISTANT_MCP_URL`, `ASSISTANT_MCP_TOKEN` |
+
+Start at `/`: the storefront keeps its existing appearance and search. Its **Tilaukset** menu opens orders, approvals, mandate limits and the audit trail inside the storefront. In the basket, **Tarkista ja tilaa** requests signed gateway offers for the selected buyer and delivery date. Review prices, substitutions and delivery dates, then explicitly send the order. The existing mandate determines whether it is confirmed or waits for human approval. All orders are demo commitments; no external order or payment is made. Changes to products, quantities, date, reference or buyer require a new quote. Interrupted order requests retry with the same idempotency key, including after a reload. The separate `/console.html` console remains available for debugging; legacy agent links open the storefront.
+
+The homepage uses local images, fonts and a fixed product snapshot. The signed offer is the authoritative price and availability check before ordering. Asset sources are recorded in `public/storefront-assets/sources.json`. A single quote supports 1–20 basket lines. **Tarkista tuoterivit ja korvaajat** retains the inline basket review.
+
+Check the basket bridge with `node --test test/storefront-order.test.mjs test/storefront-cart.test.mjs`. The optional `scripts/check-storefront-order.mjs` browser check requires an installed Playwright module in `AIMO_PLAYWRIGHT_MODULE` and Chrome. It starts its own simulated server and temporary databases, tests quote → order → approval → audit → mandate → homepage orders, and never uses the running demo's databases or live API keys.
+
+Reference product photos use small 400 px WebP copies with fingerprinted filenames. Photos and fonts are cached by the browser; HTML, scripts, styles and JSON stay fresh during development. Regenerate the reference copies with `python3 scripts/optimize-storefront-images.py` (requires Pillow); originals and source checksums are preserved.
+
+Before presenting, run `npm run images` to prepare the current kitchen proposal and the first 12 catalogue matches for common demo searches. Use `npm run images -- --query "laktoositon kerma"` for a custom search or pass product/category IDs. This only downloads public photos into the ignored `data/img/` cache, without price API or language model calls. Running servers see newly cached photos without a restart once the updated image service is loaded. Previously unseen products can still need a slower first download, and some products have no public image.
+
+The header and search panel open the same browser-local storefront cart (`aimo.storefront.cart.v1`). Quantity edits, removal, delivery-date moves and the order reference persist in that browser. The cart never imports the kitchen proposal or existing gateway orders. Product-card buttons, collection pages, recipe selections and the shopping assistant all use the same fresh-review basket update. Kokoa ostoskori opens a missing quantity field when needed, or continues with products explicitly selected by the user. The working cart starts empty and is filled through search. The real cart snapshot is retained separately as `referenceCart` for visual comparison; its product IDs may be absent from the challenge catalogue. An untouched legacy reference basket is retired automatically, while user edits and additions are preserved. After review, **Vahvista demotilaus** records a signed, idempotent demo order in the existing gateway ledger and displays its order number. Payment processing and real fulfilment are not connected. The cart's **Lisää tuotteita** field uses the same AI search and microphone as the header, and the panel opens from the field that was used.
+
+The search panel's **Katso tilausehdotus** shortcut opens the history-based kitchen proposal at `/kitchen.html`. Its expandable preview reads the saved proposal even when the browser-local cart is empty. The kitchen demo combines history, ordinary bookings and recipe demand, including new ingredients, yield factors and explicitly supplied usable inventory/incoming deliveries. See [kitchen planning inputs and limitations](docs/kitchen-planning.md). Run `npm test` for isolated planning and HTTP regression tests; the local catalogue is required, and the tests do not use live API keys or the running demo databases.
+
+The header, search date picker and selected cart tab share one delivery date. Search uses it when the request has no date; a date written or dictated in the request updates the shared selection. Selecting a day keeps the other baskets intact. In the cart, **Muuta toimituspäivää** moves the whole selected basket and removes its old tab; an existing destination basket merges product quantities and preserves both references. **Poista toimituspäivä** confirms removal of that day's products and reference, then selects the next remaining day (or the previous one). One delivery day is always retained. Date changes invalidate the cart's availability/payment review.
+
+Search presents requested requirements as plain text and links to the closest supported product group, with a broader group when useful. For example, milk opens **Maidot ja piimät → Maitotaloustuotteet** and chicken breast opens **Broilerin rintafileet → Broileri ja kana**. The demo has ten curated groups in `public/aimo-collections.js`; it does not discover arbitrary production collection URLs. `/collection.html?group=…` browses a local catalogue snapshot, with search, progressive loading and a return to the original request, including edited quantities. Group browsing shows the full group without the request's dietary/brand filters; price and delivery availability are checked in product search. Regenerate the price-free snapshot after catalogue or group changes with `node scripts/build-storefront-collections.mjs`. Production integration should map these destinations to the shop's own collection hierarchy.
+
+**Recipes and menus:** “Lisää reseptistä” opens a separate page. Drop a PNG/JPG/WebP image, Excel `.xlsx`, CSV/TSV/TXT file (max 5 MB), paste an image, or enter a menu in “Mitä valmistat?”. `ANTHROPIC_API_KEY` enables image/text analysis; manual recipes and labeled example templates work without it. Source quantities and recipe estimates remain distinguishable. Unknown original portions, amounts or units must be corrected before calculating. Each dish has original and target portions; identical ingredients are summed before package rounding. Product alternatives use the storefront's delivery-date, price, stock, cutoff and dietary checks. The buyer selects each product or marks the ingredient as already in the kitchen; combined quantities (including existing cart quantities) are rechecked before cart addition. Import never places an order. Drafts persist in this tab's session storage; source files are processed in memory, not saved on the server. Legacy `.xls` and PDFs are not supported. ExcelJS's `uuid` dependency uses the patched 11.x line through `overrides` (ExcelJS uses only the compatible `v4` export).
+
+The whole chain in one command, as an outside agent sees it (real HTTP calls, live mock API):
+
+```bash
+npm run demo
+```
+
+```
+━━ 1. "I need 1,000 litres of lactose-free milk by Monday."
+   22 ms  POST /v1/products/search   25 products (type milk, FREE_FROM_LACTOSE) → 25 candidates
+  164 ms  POST /v1/quotes            3 signed options, cheapest 1010.00 € (464306 × 1000)
+                                     excluded: 15 × CUTOFF_PASSED, 1 × NOT_DELIVERABLE, 2 × INSUFFICIENT_STOCK
+   64 ms  POST /v1/orders            AGW-…-0001: pending_approval (SPEND_CAP_ORDER)
+   Human approves with one button → confirmed
+━━ 2. "100 litraa Arlan rasvatonta laktoositonta maitojuomaa maanantaiksi"
+          stock is 51 → 51 × original + 49 × substitute, same allergen profile, cheaper
+          → confirmed without a human (within mandate), human gets a notification
+━━ 3. "… today"           → earliest delivery is Monday → pending_approval (DELIVERY_DATE_SHIFT)
+━━ 4. tampered offer      → rejected (OFFER_INVALID_SIGNATURE)
+━━ 5. new buyer, default mandate → pending_approval (APPROVAL_ALWAYS)
+━━ Audit trail: chain VALID
+```
+
+Demo buyer keys (public, demo only): `demo-nordic-hotels`, `demo-ravintola-kulma`, `demo-kahvila-aalto`. Send as `Authorization: Bearer <key>`.
+
+### Connect your own agent
+
+Any MCP client works with nothing but the URL and a key:
+
+```json
+{ "mcpServers": { "aimo": { "type": "http", "url": "http://localhost:4747/mcp", "headers": { "Authorization": "Bearer demo-nordic-hotels" } } } }
+```
+
+Or plain REST:
+
+```bash
+curl -s localhost:4747/v1/products/search -H 'authorization: Bearer demo-nordic-hotels' \
+  -H 'content-type: application/json' -d '{"query":"lactose-free milk"}'
+```
+
+## WhatsApp-tilausapuri
+
+Ostaja kirjoittaa tarpeensa WhatsAppiin omin sanoin. Apuri säilyttää palvelimella tilausluonnoksen, kysyy puuttuvat tiedot (esimerkiksi toimituspäivän ja ruokavalion), ehdottaa tuotteita ja näyttää korin. Kun ostaja kuittaa yhteenvedon (esimerkiksi "ok"), apuri lähettää linkin samaan koriin selaimessa, ja lopullinen vahvistus tehdään siellä. Tilaus kulkee saman portin kautta kuin muidenkin agenttien: allekirjoitettu tarjous, tuore tarkistus, ostajan mandaatti ja päätösloki. Jokainen yhdistetty numero saa oman demo-ostajan (hyväksyntä vain poikkeuksissa, enintään 6 000 € / tilaus).
+
+- Käynnistys `npm run whatsapp`, tilaukset asetuksella `WHATSAPP_ORDERING_ENABLED=true`. Meta-asetukset, webhook, numeron yhdistäminen ja rajat: [WhatsAppin käyttöönotto](docs/whatsapp.md).
+- Oikealla puhelimella on varmennettu vastaukset, yksi vahvistettu demotilaus (14.11.) ja korilinkin avautuminen (15.11.).
+- Rajat: Metan testinumero vastaa vain Metassa vahvistetuille testivastaanottajille. Numeron yhdistäminen kutsukoodilla on testitunnistus. Tuotannossa asiakastunnistus ja tilausoikeudet kuuluvat Valion omiin järjestelmiin; sitä integraatiota ei ole varmennettu. Oikeaa Valio-tilausta, maksua tai toimitusta ei tehdä.
+
+## The contract
+
+One definition (`server/gateway/contract.mjs`) generates the REST routes, the MCP tools and the OpenAPI document, so the solution is not tied to either transport.
+
+| Operation | REST | Does |
 |---|---|---|
-| WhatsApp-palvelin | Vercel Hobby, `api/index.mjs` → `server/cloud.mjs` | Webhook kuitataan heti, ja jono käsitellään samassa kutsussa. Sama koodi toimii paikallisesti (`npm run whatsapp`). |
-| Kannat | Turso Free, Frankfurt | Viisi SQLite-kantaa: viestijono ja jäsenet, luonnokset, tarjoukset, gatewayn tilaukset ja loki sekä hinta- ja saatavuusvälimuisti. `server/sqlite.mjs` avaa `libsql://`-osoitteen samalla rajapinnalla kuin paikallisen tiedoston. |
-| Kielimalli | Claude Haiku 5.5 (`DEEP_MODEL`, `FAST_MODEL`) | Viestin tulkinta rakenteiseksi, dialogi, kuvien luku ja reseptilinkkien täsmäys. Ilman avainta viestit tulkitaan säännöillä. |
-| Ääniviestit | Groq, `whisper-large-v3-turbo` | Litterointi, kun `WHATSAPP_TRANSCRIBE=groq`. |
-| Agenttiportti | `server/gateway/` | Ed25519-allekirjoitetut tarjoukset (JWS), tuore hinta- ja saatavuustarkistus, ostajan mandaatti, ihmisen hyväksyntä, idempotenssi ja hash-ketjutettu päätösloki. Tarjoaa myös REST-, MCP- ja OpenAPI-rajapinnat muille ostoagenteille. |
-| Mandaatti | `server/gateway/mandate.mjs` | Ostajan valtuus datana: hyväksyntätaso (aina, poikkeuksissa tai itsenäisesti), tilaus- ja päiväkatto, vaaditut merkinnät, kielletyt allergeenit ja korvaussäännöt. Malli voi ehdottaa, koodi päättää. |
-| Sivusto | Cloudflare Worker `aimo-order-demo` ja D1 (`deploy/cloudflare/`) | Etusivu, selainkeskustelu, ostoskorin välitys, Näin se toimii, demomaksu, agentin jälki ja vahvistussähköposti. |
-| Ajastin | Cloudflare Worker `aimo-whatsapp-tick` (`deploy/vercel/tick/`) | Kerran minuutissa: keskeytyneet käsittelyt takaisin jonoon, lähetysten uusinta, tilausten ja jälkien välitys Workeriin sekä siivous. |
+| `search_products` | `POST /v1/products/search` | Search the static catalogue in Finnish or English. Claims in the text (lactose-free, gluten-free, vegan, organic) become classification filters. No prices here. |
+| `request_quote` | `POST /v1/quotes` | Live price and availability for the shortlisted candidates only. Up to 5 options per need, each a signed offer valid 15 minutes. Excluded candidates come back with reason codes. |
+| `place_order` | `POST /v1/orders` | Commit to signed offers. Requires an idempotency key. Returns `confirmed`, `pending_approval` or `rejected`. |
+| `add_to_order` | `POST /v1/orders/{id}/lines` | "Forgot the cream": add signed offers to an order already placed, before its cut-off. The mandate is re-evaluated on the new order total. `addition.status` is `applied`, `pending_approval` (the confirmed order stays as it was until a human decides) or `rejected`. |
+| `get_order` | `GET /v1/orders/{id}` | Status and reasons. A pending approval expires at the order cut-off. |
+| `get_audit_trail` | `GET /v1/orders/{id}/audit` | The decision chain, with chain verification. |
+| `get_mandate` | `GET /v1/mandate` | The agent's own limits, so it does not have to guess. |
 
-Selainkeskustelu ja WhatsApp käyttävät samaa bottia ja samoja kantoja. Worker välittää selaimen viestit botille jaetulla salaisuudella (`WEBCHAT_SECRET`), ja jokainen selain saa oman keksityn testiasiakkaan. Puhelimella sivusto ohjaa keskustelemaan WhatsAppissa.
+Reason codes are part of the contract (`/.well-known/agent-gateway.json`): an agent can branch on `CUTOFF_PASSED`, `INSUFFICIENT_STOCK`, `SPEND_CAP_ORDER`, `SUBSTITUTION_OUTSIDE_POLICY`, `DELIVERY_DATE_SHIFT`, `OFFER_EXPIRED` and so on without parsing prose.
 
-## Kansiot
+## Autonomy and control
 
-| Kansio | Sisältö |
+**The LLM proposes, deterministic code decides.** The mandate is data (`server/gateway/mandate.mjs`), not a prompt.
+
+| Level | The agent may | A human is asked when |
+|---|---|---|
+| `always` (default) | prepare orders | always: nothing leaves without sign-off |
+| `exceptions` | place ordinary orders | spend cap exceeded, any substitution, delivery date slips |
+| `autonomous` | also accept a substitute that stays inside the rules | spend cap exceeded, substitute outside the rules, delivery date slips |
+
+- Per-order and per-day spend caps, required claims, banned allergens, substitution limits (max unit price increase, minimum delivery reliability), allowed date shift.
+- **Never automatic and never overridable**: a product that breaks an allergen restriction. Approval cannot wave it through.
+- A substitute whose allergen data cannot be verified from the product data is treated as outside policy.
+- When the agent decides alone, the human gets a notification afterwards; when it may not, the order stops in `pending_approval` and the human gets one screen with two buttons.
+
+## Exceptions handled
+
+| Situation | What the gateway does |
 |---|---|
-| `server/whatsapp/` | Meta-kanava, jono, numeroliitos, dialogi, korilinkki ja korisivu, kuvat (`media.mjs`), ääniviestit (`transcribe.mjs`), reseptilinkit (`link-*.mjs`) ja selainkeskustelu (`web-chat.mjs`) |
-| `server/order-conversation/` | Tilausluonnos, tarkennukset, toimituspäivä, tulkinta ja vastausten sanamuoto |
-| `server/order-tools/` | Tuotevaihtoehdot ja niiden syyt, tarjoukset ja vahvistus |
-| `server/aimo/`, `server/storefront.mjs`, `server/valioApi.mjs`, `server/allergens.mjs` | Tuotehaku puhekielestä, pakkausmäärät, allergeenit, hinta ja saatavuus |
-| `server/gateway/` | Agenttiportti: tarjoukset, tilaukset, mandaatit, allekirjoitukset ja päätösloki |
-| `server/cloud.mjs`, `server/sqlite.mjs`, `api/` | Pilviajo Vercelissä ja Turso-kannat |
-| `public/` | Korisivu, hyväksyntänäkymä, paikallinen selainkokeilu ja niiden tyylit |
-| `deploy/cloudflare/` | Demosivusto Workerina: sivut, D1-skeemat, tilausten julkaisija ja Workerin testit |
-| `deploy/vercel/` | Kantojen siirto Tursoon, asetusten vienti ja minuuttiajastin |
-| `deploy/whatsapp/` | Kontti omalle palvelimelle |
-| `test/`, `eval/`, `scripts/` | Testit, keskusteluarvioinnit ja ylläpitotyökalut |
-| `docs/` | Ohjeet, `docs/kuvat/` README:n kuville ja `docs/parallel/` sessioiden raporteille |
+| Order cut-off already passed | The mock API still lists such products as available. The gateway compares `closingTime` to its own clock and excludes them (`CUTOFF_PASSED`). |
+| Partial stock | Keeps what is available and fills the rest with a substitute from the same product type with the same allergen profile; inside the mandate it confirms, otherwise it asks. |
+| No schedule line / zero stock | `NOT_DELIVERABLE`, substitute options offered. |
+| Quantity reported as 999999 | All Terminal (supplier-stocked) items and some Stock items. The real quantity is unknown. Flagged `STOCK_UNKNOWN`, never presented as confirmed stock. |
+| Requested date not possible | Offer carries the earliest date and `DELIVERY_DATE_SHIFT`; a human decides unless the mandate allows the shift. |
+| Price or stock changed after the offer | Re-checked live at `place_order`; `OFFER_STALE` → request a new quote. |
+| Tampered, expired, reused or someone else's offer | Rejected with `OFFER_INVALID_SIGNATURE`, `OFFER_EXPIRED`, `OFFER_ALREADY_USED`, `OFFER_WRONG_BUYER`. |
+| Retries | Same idempotency key returns the same order. |
 
-## Ajo paikallisesti
+## "Did you forget this?"
 
-Node.js 22.13 tai uudempi.
+The gateway notices what is missing before the buyer does. For a buyer's most recent open order, `place_order`, `add_to_order` and `get_order` return a `suggestions` list: products that were in at least half (and at least two) of that buyer's last confirmed orders, when the current order has nothing from the same product group. Each suggestion is a concrete product and the buyer's typical quantity, never an open question.
 
-```bash
-npm ci
-cp .env.example .env
-npm run fetch-data
-npm run catalog
-npm run whatsapp
+- **For the agent**: the suggestion carries a ready `next` step (`request_quote` → `add_to_order`).
+- **For the human**: the approval view shows it with one button. Pressing it runs the same chain as any addition: signed offer, live re-check, mandate, audit trail (`SUGGESTION_ACCEPTED`).
+- No language model, and only the buyer's own history (`server/gateway/suggest.mjs`, disclosed in `/.well-known/agent-gateway.json`). A suggestion never changes an order by itself.
+
+## Trust
+
+- **Signed offers**: JWS compact, EdDSA (Ed25519). Payload holds the lines, fixed net prices, delivery date, cut-off and expiry. Public key at `/.well-known/jwks.json`.
+- **Audit trail**: append-only ledger in SQLite; each row stores the hash of the previous row. `get_audit_trail` re-computes the chain and reports `chain.valid`. The same log is readable by the buyer and by Aimo.
+
+## Assumptions (stated, not hidden)
+
+1. **No order endpoint exists in the mock API.** Commitment is recorded in the gateway's own ledger. In production `place_order` would post to Aimo's order system.
+2. **Product types are curated by hand** (`milk`, `cream`, `butter`, `eggs`). Category codes in the challenge data have no names, so "drinking milk" is category 10400 minus coffee milk, buttermilk, portion packs and flavoured drinks. In production this comes from Aimo's product hierarchy.
+3. **"Lactose-free" means the classification `FREE_FROM_LACTOSE`**, not the product name and not `LOW_LACTOSE`.
+4. **Litres per sales unit** come from product data, else from the product name ("12 x 1 L", "100x2 cl"), cross-checked against net price ÷ comparison price.
+5. **`allowedLotSize` is 0.01 for almost every product**; the practical step is one sales unit (0.5 for products sold by the kilogram).
+6. **The mock API returns Monday 16 Nov as the delivery date whatever is requested.** `closingTime` is the only signal of whether an order makes it.
+7. **Missing delivery reliability or CO₂ is shown as missing**, never estimated.
+8. **Free-text understanding is the client agent's job.** The gateway takes structured requests; the bundled reference client parses text with rules so the demo is fast and repeatable. An LLM client can use the same contract through MCP.
+9. **Demo clock**: set `DEMO_NOW` to pin the gateway's clock (the mock API's stock items close on Sunday 15 Nov 17:00). Every response then says the time is simulated.
+10. **The console and approval endpoints are open in this demo.** In production they sit behind the buyer's login.
+11. The kitchen demo client's order history, bookings and menu are generated demo data. Products, allergens, substitution rules, delivery reliability and CO₂ are from the challenge data; prices and availability from the mock API.
+
+## Standards
+
+| Need | Standard |
+|---|---|
+| Contract | OpenAPI 3.1 + JSON Schema |
+| Agent interface | Model Context Protocol (same contract) |
+| Offer verifiability | JWS (RFC 7515) with EdDSA, JWKS (RFC 7517) |
+| Product identity | GS1 GTIN (returned with every product and offer line), GS1 allergen codes |
+| Agent authority | Mandate as data; the same idea as signed mandates in AP2 |
+| Order message in production | Peppol BIS Ordering (UBL) |
+
+## Path to production
+
+1. Replace the local commitment with Aimo's order API; keep the offer signature as the price guarantee.
+2. Buyer authentication with OAuth 2.0 client credentials; mandates signed by the buyer and stored per customer.
+3. Customer-specific prices: the gateway already passes a customer number to the pricing API and never prices more than the shortlisted candidates.
+4. Approval notifications by email, SMS or Teams with a deep link to the approval view.
+5. Product types and substitution groups from Aimo's own hierarchy; payment (x402 or invoice) as a later step.
+
+## Layout
+
+```
+server/gateway/   contract, service (search, quote, order), mandate, signing, store (ledger), clock, http (REST + MCP), buyerAgent (reference client)
+server/           catalog (search index), valioApi (price + availability, cached), substitutes, kitchen demo client
+public/           index.html / gateway.html (storefront), agent.html (shop entry), console.html (diagnostics), approve.html (phone), kitchen.html (kitchen demo)
+scripts/          build-catalog, fetch-data, demo-buyer
 ```
 
-`fetch-data` ja `catalog` tarvitsevat haasteen lähdeaineiston, jonka käyttö on rajattu haasteeseen. Aineistoa, katalogia ja avaimia ei tallenneta GitHubiin. Täytä Meta-asetukset ja tietokantapolut [WhatsApp-ohjeen](docs/whatsapp.md) mukaan.
+The challenge data may only be used for this event, so `data/raw/` and the API key are not in the repository. MIT licence.
 
-| Asetus | Vaikutus |
-|---|---|
-| `WHATSAPP_ORDERING_ENABLED=true` | Tilauspolku käyttöön (muuten vain lukeva apuri) |
-| `ANTHROPIC_API_KEY` | Kielimalli käyttöön; ilman sitä viestit tulkitaan säännöillä |
-| `VALIO_API_KEY` | Haasteen hinta- ja saatavuusrajapinta; ilman sitä hinnat ja saatavuus simuloidaan |
-| `VALIO_FALLBACK=last-known` | Rajapinnan katkoksessa käytetään viimeisimpiä oikeita hintoja, ja kori kertoo, ettei hinta ole ajantasainen |
-| `WHATSAPP_TRANSCRIBE=groq`, `GROQ_API_KEY` | Ääniviestit käyttöön |
-| `DEMO_NOW`, `DEMO_NOW_LOOP_MINUTES` | Demokello. Haasteen testirajapinta on jäädytetty (toimitus ma 16.11.2026, tilausaika päättyy su 15.11. klo 17.00), joten esimerkiksi `DEMO_NOW=2026-11-15T09:00:00+02:00` ja `DEMO_NOW_LOOP_MINUTES=420` pitävät kellon tilausajan sisällä |
+## Development
 
-Paikallisen palvelimen osoitteet:
+Shared development context for Codex and Claude Code: [working instructions](AGENTS.md), [current status and work log](TYOLOKI.md), and [competition plan](SUUNNITELMA.md). Claude Code loads the shared instructions through [CLAUDE.md](CLAUDE.md). Record each completed work stage and its checks in the work log, then commit and push it to GitHub.
 
-| Osoite | Käyttö |
-|---|---|
-| `/webhooks/whatsapp` | Metan allekirjoitettu webhook |
-| `/whatsapp/cart#…` | Yksityinen korilinkki |
-| `/healthz` | Terveystarkistus; tilaustilassa `ordering-demo` |
-| `/demo` | Sama keskustelu selaimessa omalla testiasiakkaalla, vain palvelinkoneelta |
+### Tiimin yhteinen MCP
 
-`npm start` käynnistää lisäksi paikallisen kaupan ja agenttiportin rajapinnat: `POST /v1/products/search`, `POST /v1/quotes`, `POST /v1/orders`, `GET /v1/orders/{id}`, `/mcp` ja `/openapi.json`. Sopimus on tiedostossa `server/gateway/contract.mjs`. Pilvessä nämä reitit eivät näy ulos.
+**Yhteinen MCP-linkki: <https://bench-butter-save-marsh.trycloudflare.com/mcp>** (tilapäinen Cloudflare-tunneli). Kopioi koko osoite Clauden tai ChatGPT:n MCP-liittimen URL-kenttään ja kirjaudu omalla tiimiavaimellasi.
 
-Korisivu ja sivusto käyttävät Valio Aimon Matter- ja National 2 -fontteja kansioista `public/storefront-assets/` ja `deploy/cloudflare/public/fonts/`. Siistissä kopiossa niitä ei jaeta; ilman niitä sivut käyttävät järjestelmän fonttia.
+**Tiimiläiselle: [liittymisohje, yhteinen MCP-osoite ja omat avustajatunnisteet](docs/team-mcp-join.md).** Eeliksen, Aleksin ja Peetun Claude- ja ChatGPT-tunnisteet on luotu. Oma avain toimitetaan yksityisesti.
 
-## Testit
+**Jatkuva seuranta ja API-agentti:** [OpenAI-koordinaattorin käyttöohje](docs/team-coordinator.md). Erillinen prosessi näyttää avustajien raportoiman työn ja voi vastata sille osoitettuihin koordinointipyyntöihin. Se käynnistetään yhteisen MCP-palvelimen rinnalle samalla koneella ja samalla kannalla.
 
-```bash
-npm test
-npm --prefix deploy/cloudflare test
-npm run aimo:eval
-npm run aimo:eval:spoken
-```
-
-Testit käyttävät omia tilapäisiä kantoja ja simuloituja ulkoisia palveluita, eivätkä ne kutsu Metaa, Valiota tai kielimallia. Katalogia tarvitsevat testit ohitetaan, jos `data/catalog.json` puuttuu, joten GitHub Actions ajaa kaiken muun jokaisesta pushista. `npm run eval` käyttää haasteen oikeaa mock-rajapintaa ja kuluttaa sen kiintiötä. Keskusteluarvioinnit (`scripts/whatsapp-*`) käyttävät oikeaa kielimallia ja ajetaan käsin.
-
-## Rajat
-
-- **Metan testinumero:** WhatsAppissa apurille voi viestiä vain numero, jonka ylläpitäjä on lisännyt Metan testivastaanottajaksi ja yhdistänyt testiasiakkaaksi kutsukoodilla. Kaikille avoin käyttö vaatii oman yritysnumeron. Selainkeskustelu toimii kaikille.
-- **Demotilaukset:** tilaukset, maksut ja sähköpostit ovat demoja. Oikeaa Valio-tilausta, maksua tai toimitusta ei tehdä. Sähköposti lähtee vain demon testiosoitteeseen ja vain, kun lähettäjä (Cloudflare Email tai Resend) on asetettu.
-- **Valion oikeat rajapinnat puuttuvat:** hinnat ja saatavuus tulevat haasteen jäädytetystä testirajapinnasta ja sen katkoksessa viimeisimmistä tunnetuista arvoista. Tuotannossa asiakastunnistus, asiakaskohtaiset hinnat, tilausrajapinta ja ostovaltuudet tulevat Valion järjestelmistä; tässä ne korvataan testiasiakkailla ja demomandaateilla.
-- **Kielimalli voi erehtyä:** siksi tilauksen sisällön, hinnat ja hyväksynnän ratkaisee koodi, ja kokki tarkistaa korin aina itse ennen tilausta.
-
-## Ohjeet
-
-- [WhatsAppin asetukset](docs/whatsapp.md)
-- [Pilvijulkaisu: Vercel ja Turso](docs/vercel.md)
-- [Itse ajettava tekstimalli: Ollama](docs/self-hosted-model.md)
-- [Selainkeskustelu](docs/web-chat.md)
-- [Agentin jälki](docs/agent-trace.md)
-- [WhatsApp-palvelin omalle koneelle](docs/whatsapp-deploy.md)
-- [Tilauspolun kokeilu](docs/ordering-demo.md)
-- [Cloudflare-osuus](docs/cloudflare.md)
-- [Tilaustapahtumat ja sähköposti](docs/order-events.md)
-- [Hakukerros ja kielimalli](docs/aimo-malli.md)
-
-## Kuvista
-
-Kuvat on otettu 17.11.2026 julkiselta demosivustolta 1280 ja 375 pikselin leveydellä. Keskustelu ja kori ovat selainkeskustelun keksityltä testiasiakkaalta (Testikeittiö), eikä niistä tehty tilausta. Maksusivu ja sähköposti on kuvattu samasta koodista paikallisesti keksityllä demotilauksella, koska maksulinkki on aina henkilökohtainen. Agentin jälki on demon julkinen esimerkkitilaus.
-
-## Kehitys
-
-Projektia kehitetään rinnakkain usealla Claude Code- ja Codex-sessiolla. Yhteiset työohjeet ovat tiedostossa [AGENTS.md](AGENTS.md), ja jokainen valmis työvaihe kirjataan tiedostoon [TYOLOKI.md](TYOLOKI.md) samaan committiin. Sessioiden tarkemmat raportit ovat kansiossa `docs/parallel/`. Muutokset tuodaan siistiin kopioon synkkausskriptillä, eikä samaa muutosta tehdä käsin molempiin repoihin.
-
-## Tekijät
-
-Junction 2026 -tiimi: [eeputti](https://github.com/eeputti), [DanielTurkkinen](https://github.com/DanielTurkkinen), [KarvaMaki-create](https://github.com/KarvaMaki-create) ja [Wonderlust-gi](https://github.com/Wonderlust-gi). MIT-lisenssi.
+Claude-, ChatGPT- ja muiden MCP-avustajien projektiviestit, tehtävävaraukset ja yhteinen tilannekuva toimivat erillisessä [Team MCP -palvelussa](services/team-mcp/README.md). Yhteinen testipalvelin on käytössä tilapäisen Cloudflare-tunnelin kautta; osoite ja käytön ehdot ovat liittymisohjeessa. Palvelulla on oma OAuth-kirjautuminen, avustajakohtaiset tunnukset ja SQLite-kanta. Pysyvä hosting on vielä valitsematta. Palvelu ei tarvitse verkkokaupan tuotekatalogia tai malliavaimia eikä käynnistä muiden avustajien keskusteluja automaattisesti. Samalla koneella työskentelevät avustajat voivat käyttää samaa paikallista kantaa komentoriviltä: varaus, este, luovutus ja valmistuminen on kuvattu [AGENTS.md](AGENTS.md):ssä.
