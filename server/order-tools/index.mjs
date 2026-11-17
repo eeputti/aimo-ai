@@ -7,6 +7,7 @@ import { openSqlite } from '../sqlite.mjs';
 import { clock } from '../gateway/clock.mjs';
 import { touchesBanned, verifiedFree, bannedHits } from '../allergens.mjs';
 import { explainPicks } from './why.mjs';
+import { itemsPerSalesUnit } from '../itemQuantities.mjs';
 
 const CLAIM_WORD = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
 const UNIT_WORD = { L: 'l', KG: 'kg', PCS: 'kpl' };
@@ -16,6 +17,14 @@ const issue = (code, fi, extra = {}) => ({ code, message: fi, ...extra });
 const validQuantity = (q) => q && Number.isFinite(q.value) && q.value > 0 && q.value <= 100000 && ['L', 'KG', 'PCS'].includes(q.unit);
 const dayLabel = (iso) => new Intl.DateTimeFormat('fi-FI', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'numeric' }).format(new Date(`${iso}T12:00:00Z`));
 const validDate = (d) => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d);
+
+// Vaihtoehdot haetaan hakutekstillä, jossa kappalemäärä on kappaleita vain munille (quantityBasisFor). Tarjous käyttää samaa
+// tulkintaa: malli merkitsi "5 sipulia" kappaleiksi, vaihtoehdot näytettiin myyntierinä ("5 säkkiä, yhteensä 50 kg"), mutta
+// tarjous laski kappaleina eikä säkin sipulimäärää tiedetä: UNIT_NOT_CONVERTIBLE jokaiselle valinnalle (puhelinkuva 17.11.).
+export function quotedQuantity(line, p) {
+  const q = line.quantity;
+  return q?.unit === 'PCS' && q.basis === 'items' && !itemsPerSalesUnit(p) ? { value: q.value, unit: 'PCS', basis: 'sales' } : q;
+}
 
 /** Tarjous sidotaan sisältöön: sama hash vain, jos asiakas, päivä, toimituspaikka, tuotteet ja määrät ovat samat. */
 export function draftHash(customer, draft) {
@@ -320,7 +329,7 @@ export function createOrderingTools(deps = {}) {
     if (bad.length) return fail(...bad.map((l) => issue('ALLERGEN_CONFLICT', `Valittu tuote ei täytä allergiavaatimusta: ${l.productTerm}.`, { ref: l.ref })));
     let q;
     try {
-      q = await requestQuote(b, { deliveryDate: draft.deliveryDate, maxOptions: 1, needs: draft.lines.map((l) => ({ ref: l.ref, candidates: [String(l.selectedProductId)], quantity: l.quantity, allowSubstitutes: false })) });
+      q = await requestQuote(b, { deliveryDate: draft.deliveryDate, maxOptions: 1, needs: draft.lines.map((l) => ({ ref: l.ref, candidates: [String(l.selectedProductId)], quantity: quotedQuantity(l, product(l.selectedProductId)), allowSubstitutes: false })) });
     } catch { return fail(issue('QUOTE_FAILED', 'Hinnan ja saatavuuden tarkistus ei onnistunut. Tilausta ei voi vielä hyväksyä.')); }
     const issues = []; const lines = []; const offers = []; let expires = Infinity;
     for (const need of q.needs) {
