@@ -44,7 +44,7 @@ test('virheellistä päivämäärää ei normalisoida toiseksi päiväksi', () =
   for (const d of ['2026-02-30', '2026-13-01', '16.11.2026', null]) assert.equal(validDeliveryDate(d), false);
 });
 
-test('ostoslista palauttaa vain hinnoitellut ja riittävät tuotteet ja säilyttää ruokavalion', async () => {
+test('ostoslista palauttaa vain hinnoitellut ja riittävät tuotteet ja säilyttää ruokavalion', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const r = await searchStorefront('20 l laktoositonta maitoa 16.11.2026', { llm: false });
   assert.equal(r.deliveryDate, date);
   assert.ok(r.cards[0].list.length > 0);
@@ -61,12 +61,12 @@ test('ostoslista palauttaa vain hinnoitellut ja riittävät tuotteet ja säilytt
   if (r.cards[0].list[0].availability.stock != null) assert.equal(review.ok, false);
 });
 
-test('puuttuva ruokavalio-osuma ei palauta ehtoja rikkovaa lähiosumaa', async () => {
+test('puuttuva ruokavalio-osuma ei palauta ehtoja rikkovaa lähiosumaa', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const r = await searchStorefront('vegaanista maitoa 20 l 16.11.2026', { llm: false });
   for (const p of r.cards.flatMap((c) => c.list)) assert.ok(p.labels.includes('VEGAN'));
 });
 
-test('korin osasaldon korvaaja kattaa koko tarpeen, eikä osatoimitus katoa laskennasta', async () => {
+test('korin osasaldon korvaaja kattaa koko tarpeen, eikä osatoimitus katoa laskennasta', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const r = await reviewStorefront([{ id: '460131', qty: 10 }], date);
   assert.equal(r.ok, false);
   const line = r.lines[0];
@@ -81,7 +81,7 @@ test('korin osasaldon korvaaja kattaa koko tarpeen, eikä osatoimitus katoa lask
   }
 });
 
-test('puuttuvan kerman korvaaja säilyttää laktoosittomuuden ja näyttää pakkauskoon muutoksen', async () => {
+test('puuttuvan kerman korvaaja säilyttää laktoosittomuuden ja näyttää pakkauskoon muutoksen', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const r = await reviewStorefront([{ id: '465193', qty: 10 }], date);
   assert.equal(r.ok, false);
   assert.ok(r.lines[0].alternatives.length > 0);
@@ -92,7 +92,7 @@ test('puuttuvan kerman korvaaja säilyttää laktoosittomuuden ja näyttää pak
   }
 });
 
-test('munamäärä muuttuu hakutuloksessa pakkauksiksi, mutta korin tarkistus ei jaa määrää uudestaan', async () => {
+test('munamäärä muuttuu hakutuloksessa pakkauksiksi, mutta korin tarkistus ei jaa määrää uudestaan', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const r = await searchStorefront('100 kananmunaa 16.11.2026', { llm: false });
   const p = r.cards[0].list[0];
   assert.ok(p.quantityExplanation.providedItems >= 100);
@@ -102,7 +102,7 @@ test('munamäärä muuttuu hakutuloksessa pakkauksiksi, mutta korin tarkistus ei
   assert.equal(review.lines[0].product.qty, p.qty);
 });
 
-test('hintajärjestys pitää tuoreen kurkun ennen kurkkusalaatteja', async () => {
+test('hintajärjestys pitää tuoreen kurkun ennen kurkkusalaatteja', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const r = await searchStorefront('5 kg kurkkua 16.11.2026', { llm: false });
   assert.match(r.cards[0].list[0].name, /^kurkku/i);
   assert.ok(!/salaatti/i.test(r.cards[0].list[0].name));

@@ -19,7 +19,7 @@ function render(order) {
   $('delivery').textContent = `Toimituspäivä: ${order.deliveryDate || '–'}`;
   $('lines').replaceChildren(...(order.lines || []).map((line) => {
     const item = document.createElement('li');
-    item.textContent = `${line.name || line.productId}: ${line.quantity} ${line.salesUnitLabel || 'myyntiyksikköä'} · ${euro(line.lineNet)} (alv 0 %)`;
+    item.textContent = `${line.name || line.productId}: ${line.quantity} ${line.salesUnitLabel || 'myyntiyksikköä'}, ${euro(line.lineNet)} (alv 0 %)`;
     return item;
   }));
   $('total').textContent = `Yhteensä (alv 0 %): ${euro(order.totals?.net)}`;

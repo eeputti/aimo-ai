@@ -2,6 +2,7 @@
 // korin ja kysyy "Lisätäänkö tämä vanhaan ostoskoriin?". Oikea tilausmoottori, sääntötulkki ja WhatsApp-silta; tuotetyökalut ja
 // dialogimallin reititys ovat testin omia, joten testi ei tee malli-, Valio- tai Meta-kutsuja.
 import test from 'node:test';
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { openWhatsAppStore } from '../server/whatsapp/store.mjs';
 import { createOrderingDialogue, staleCartChoice, staleCartMinutes } from '../server/whatsapp/dialogue.mjs';
@@ -57,7 +58,7 @@ async function oldCart(f) {
   return before;
 }
 
-test('tauon jälkeen uusi tuote ei mene hiljaa vanhaan koriin: vanha kori näytetään ja kysytään, lisätäänkö siihen', async (t) => {
+test('tauon jälkeen uusi tuote ei mene hiljaa vanhaan koriin: vanha kori näytetään ja kysytään, lisätäänkö siihen', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   const before = await oldCart(f);
   f.wait(3 * HOUR);
@@ -78,7 +79,7 @@ test('tauon jälkeen uusi tuote ei mene hiljaa vanhaan koriin: vanha kori näyte
   assert.match(kept.messages.at(-1), /\*Maito 20 l:\*\n1\) maito 1/);
 });
 
-test('vastaus "uusi" aloittaa uuden korin ja vie odottaneen viestin siihen; vanha kori suljetaan', async (t) => {
+test('vastaus "uusi" aloittaa uuden korin ja vie odottaneen viestin siihen; vanha kori suljetaan', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   const before = await oldCart(f);
   f.wait(5 * HOUR);
@@ -92,7 +93,7 @@ test('vastaus "uusi" aloittaa uuden korin ja vie odottaneen viestin siihen; vanh
   assert.match(fresh.text, /Mille päivälle/u); // uuden korin päivä kysytään, vanhaa ei peritä
 });
 
-test('pelkkä tervehdys tauon jälkeen saa "No moikka!" ja kysymyksen; "2" tyhjentää ja kysyy mitä tarvitaan', async (t) => {
+test('pelkkä tervehdys tauon jälkeen saa "No moikka!" ja kysymyksen; "2" tyhjentää ja kysyy mitä tarvitaan', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   const before = await oldCart(f);
   f.wait(26 * HOUR);
@@ -105,7 +106,7 @@ test('pelkkä tervehdys tauon jälkeen saa "No moikka!" ja kysymyksen; "2" tyhje
   assert.equal(await f.list(), null);
 });
 
-test('"1" ilman odottavaa viestiä näyttää vanhan korin seuraavan vaiheen', async (t) => {
+test('"1" ilman odottavaa viestiä näyttää vanhan korin seuraavan vaiheen', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   await oldCart(f);
   f.wait(3 * HOUR);
@@ -115,7 +116,7 @@ test('"1" ilman odottavaa viestiä näyttää vanhan korin seuraavan vaiheen', a
   assert.match(one.text, /\*Maito 20 l:\*/u);
 });
 
-test('epäselvä vastaus kysyy uudelleen eikä muuta koria; mukana tullut määrä säilyy odottavassa viestissä', async (t) => {
+test('epäselvä vastaus kysyy uudelleen eikä muuta koria; mukana tullut määrä säilyy odottavassa viestissä', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   const before = await oldCart(f);
   f.wait(3 * HOUR);
@@ -128,7 +129,7 @@ test('epäselvä vastaus kysyy uudelleen eikä muuta koria; mukana tullut määr
   assert.deepEqual((await f.list()).lines.map((l) => l.productTerm), ['maito', 'voi', 'kerma', 'juusto']);
 });
 
-test('ilman taukoa uusi tuote menee nykyiseen koriin kysymättä, ja siirtymäviesti tulee ennen vaihtoehtoja', async (t) => {
+test('ilman taukoa uusi tuote menee nykyiseen koriin kysymättä, ja siirtymäviesti tulee ennen vaihtoehtoja', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   await oldCart(f);
   f.wait(30 * 60_000);
@@ -137,7 +138,7 @@ test('ilman taukoa uusi tuote menee nykyiseen koriin kysymättä, ja siirtymävi
   assert.equal((await f.list()).lines.length, 3);
 });
 
-test('tuotekysymys, vaihtoehdon numero, kiitos tai selainkori tauon jälkeen eivät kysy korin kohtaloa', async (t) => {
+test('tuotekysymys, vaihtoehdon numero, kiitos tai selainkori tauon jälkeen eivät kysy korin kohtaloa', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   await oldCart(f);
   for (const text of ['onko teillä laktoositonta voita?', '1', 'kiitos']) {
@@ -151,7 +152,7 @@ test('tuotekysymys, vaihtoehdon numero, kiitos tai selainkori tauon jälkeen eiv
   assert.doesNotMatch(inCart.text, /jäi kesken/u);
 });
 
-test('tauon jälkeinen tuotekysymys ei tee vanhasta korista tuoretta: heti perään tuleva lisäys kysyy silti', async (t) => {
+test('tauon jälkeinen tuotekysymys ei tee vanhasta korista tuoretta: heti perään tuleva lisäys kysyy silti', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   await oldCart(f);
   f.wait(3 * HOUR);
@@ -161,7 +162,7 @@ test('tauon jälkeinen tuotekysymys ei tee vanhasta korista tuoretta: heti perä
   assert.match(asked.text, /Edellinen ostoskorisi jäi kesken[^]*Lisätäänkö tämä vanhaan ostoskoriin\?/u);
 });
 
-test('mennyt toimituspäivä: kysymys kertoo sen, ja vanhaa koria jatkettaessa päivä kysytään uudelleen', async (t) => {
+test('mennyt toimituspäivä: kysymys kertoo sen, ja vanhaa koria jatkettaessa päivä kysytään uudelleen', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   await oldCart(f);
   f.wait(7 * 24 * HOUR); // la 21.11., perjantai 20.11. on mennyt
@@ -175,7 +176,7 @@ test('mennyt toimituspäivä: kysymys kertoo sen, ja vanhaa koria jatkettaessa p
   assert.match(kept.text, /Mille päivälle/u);
 });
 
-test('vanha tila ilman aikaleimaa ei kysy (käyttöönoton jälkeinen ensimmäinen viesti), ja 0 minuuttia ottaa kysymyksen pois', async (t) => {
+test('vanha tila ilman aikaleimaa ei kysy (käyttöönoton jälkeinen ensimmäinen viesti), ja 0 minuuttia ottaa kysymyksen pois', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = fixture(t);
   await oldCart(f);
   const row = f.store.db.prepare('SELECT json FROM wa_dialogue').get();

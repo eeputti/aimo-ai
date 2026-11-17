@@ -3,6 +3,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+// Kaupalliset fontit (Matter, National 2) eivät ole julkisessa repossa; ne tarkistetaan, kun ne on kopioitu paikallisesti.
+const hasFonts = fs.existsSync(new URL('../public/storefront-assets/Matter-Bold.otf', import.meta.url));
+const checked = (ref) => hasFonts || !ref.endsWith('.otf');
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
@@ -56,17 +59,17 @@ test('serves the storefront-styled cart page and only allowlisted styles, fonts,
   // The strict CSP blocks inline styles and handlers, so the markup must not rely on them.
   assert.doesNotMatch(html, /\sstyle=|\son[a-z]+=/i);
   assert.doesNotMatch(html, /\/storefront-assets\/|https?:\/\//);
-  for (const [, ref] of html.matchAll(/(?:href|src)="(\/[^"#]+)"/g)) assert.equal((await fetch(base + ref)).status, 200, ref);
+  for (const [, ref] of [...html.matchAll(/(?:href|src)="(\/[^"#]+)"/g)].filter(([, r]) => checked(r))) assert.equal((await fetch(base + ref)).status, 200, ref);
 
   for (const css of ['/whatsapp/cart/storefront.css', '/whatsapp/cart/storefront-cart.css', '/whatsapp/cart/shop.css']) {
     const response = await fetch(base + css);
     assert.match(response.headers.get('content-type'), /^text\/css/);
     const text = await response.text();
     assert.doesNotMatch(text, /\/storefront-assets\//, `${css} viittaa tunnelin ulkopuoliseen polkuun`);
-    for (const [, ref] of text.matchAll(/url\('([^']+)'\)/g)) assert.equal((await fetch(base + ref)).status, 200, `${css}: ${ref}`);
+    for (const [, ref] of [...text.matchAll(/url\('([^']+)'\)/g)].filter(([, r]) => checked(r))) assert.equal((await fetch(base + ref)).status, 200, `${css}: ${ref}`);
   }
   const font = await fetch(`${base}/whatsapp/cart/assets/Matter-Bold.otf`);
-  assert.equal(font.headers.get('content-type'), 'font/otf');
+  if (hasFonts) assert.equal(font.headers.get('content-type'), 'font/otf'); else assert.equal(font.status, 404);
   assert.equal((await fetch(`${base}/whatsapp/cart/assets/icons/trash.svg`)).headers.get('content-type'), 'image/svg+xml');
 
   const cached = await fetch(`${base}/whatsapp/cart/img/123`);

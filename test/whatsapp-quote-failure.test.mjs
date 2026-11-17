@@ -25,7 +25,7 @@ const NOW = Date.parse('2026-11-17T09:00:00+02:00');
 const opt = (id, name, net) => ({ productId: id, name, salesUnits: 5, salesUnitLabel: 'kpl', covers: null, lineNet: net, labels: [] });
 const ALL = [opt('A', 'SIPULI 1KG PUSSI HOLLANTI', 4.3), opt('B', 'SIPULI NIPPU SUOMI', 6.95), opt('C', 'SIPULI 10KG SÄKKI NL/EG', 36.25)];
 
-test('kaatunut valinta nimetään, muistetaan rivillä ja jää pois seuraavista vaihtoehdoista', async () => {
+test('kaatunut valinta nimetään, muistetaan rivillä ja jää pois seuraavista vaihtoehdoista', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const seenLines = [];
   const tools = {
     // Jäljittelee order-toolsin sääntöä: rivin failedOptions pudottaa samalle päivälle ja määrälle kaatuneet tuotteet.

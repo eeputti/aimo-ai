@@ -112,7 +112,7 @@ test('#2 WhatsAppin numeroitu vaihtoehtolista ja tarjous pitävät pähkinäkiel
   assert.equal(quoted, 0, 'kiellettyä tuotetta ei edes hinnoitella');
 });
 
-test('#3 maapähkinä tunnistetaan ennen yleistä pähkinää, ja erillinen kielto koskee edellistä riviä', () => {
+test('#3 maapähkinä tunnistetaan ennen yleistä pähkinää, ja erillinen kielto koskee edellistä riviä', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, () => {
   const peanut = understand('maapähkinätöntä suklaata 2 kg').items[0];
   assert.deepEqual(peanut.excludeAllergens, ['AP'], 'maapähkinätön on maapähkinätön, ei pähkinätön');
   assert.ok(understand('suklaata 2 kg ilman maapähkinää').items[0].excludeAllergens.includes('AP'));
@@ -124,7 +124,7 @@ test('#3 maapähkinä tunnistetaan ennen yleistä pähkinää, ja erillinen kiel
   assert.ok(nut.excludeAllergens.includes('AN'));
 });
 
-test('#5 desimaalipilkku: 0,125 kg on 0,125 kg eikä 125 kg, myös hakulauseen muotoilun jälkeen', () => {
+test('#5 desimaalipilkku: 0,125 kg on 0,125 kg eikä 125 kg, myös hakulauseen muotoilun jälkeen', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, () => {
   const kg = (text) => understand(text).items[0].quantity;
   assert.deepEqual(kg('0,125 kg voita'), { value: 0.125, unit: 'KG' });
   assert.deepEqual(kg('0,750 kg voita'), { value: 0.75, unit: 'KG' });
@@ -161,7 +161,7 @@ test('#17 tuotetyyppi: kasviliemi, merisuola, suola ja kanaliemi löytävät oik
   assert.match(chicken[0], /kanaliemi/i);
 });
 
-test('#19 päivämäärät ilman loppupistettä ja "ensi viikon tiistaina"', () => {
+test('#19 päivämäärät ilman loppupistettä ja "ensi viikon tiistaina"', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, () => {
   const sunday = new Date('2026-11-15T09:00:00+02:00');
   const monday = new Date('2026-11-16T09:00:00+02:00');
   const date = (text, now = sunday) => understand(text, { now }).deliveryDate;
@@ -179,7 +179,7 @@ test('#19 päivämäärät ilman loppupistettä ja "ensi viikon tiistaina"', () 
   assert.equal(u.items[0].productTerm.includes('viikon'), false);
 });
 
-test('#22 kananmunat: kenno on 30 munaa, ja Vapaan kanan munat muuntuvat kappaleiksi', () => {
+test('#22 kananmunat: kenno on 30 munaa, ja Vapaan kanan munat muuntuvat kappaleiksi', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, () => {
   const q = understand('3 kennoa kananmunia').items[0].quantity;
   assert.deepEqual(q, { value: 90, unit: 'PCS', basis: 'items' });
   const egg = (name, extra = {}) => itemsPerSalesUnit({ name, category: '10590', salesUnit: 'RAS', baseUnit: 'RAS', perSales: 1, ...extra })?.value ?? null;

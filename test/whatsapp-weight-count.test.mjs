@@ -38,7 +38,7 @@ function setup(optionsFor) {
   return { say, asked, list: () => store.active('conv') };
 }
 
-test('kappalerivi ja pelkät kiloina myytävät vaihtoehdot: kilot kysytään, ja vastaus "30" on 30 kg', async () => {
+test('kappalerivi ja pelkät kiloina myytävät vaihtoehdot: kilot kysytään, ja vastaus "30" on 30 kg', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const f = setup((l) => (l.quantity.unit === 'KG' ? [kg('462306', 'Kariniemen Kananpojan fileesuikale maustamaton 2 kg', 8.99 * l.quantity.value)]
     : [kg('462306', 'Kariniemen Kananpojan fileesuikale maustamaton 2 kg', 899), kg('462270', 'Kariniemen Kananpojan fileesuikale hunaja 4 kg', 928)]));
   const first = await f.say('100 kpl kanan fileesuikaletta tiistaiksi');
@@ -54,7 +54,7 @@ test('kappalerivi ja pelkät kiloina myytävät vaihtoehdot: kilot kysytään, j
   assert.match(next.text, /\*Kanan fileesuikale 30 kg:\*\n1\) Kariniemen Kananpojan fileesuikale maustamaton 2 kg/u);
 });
 
-test('enimmäkseen kiloina myytävä tuote kysyy kilot; enimmäkseen kappaletavarasta jäävät kappaleina myytävät', async () => {
+test('enimmäkseen kiloina myytävä tuote kysyy kilot; enimmäkseen kappaletavarasta jäävät kappaleina myytävät', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const f = setup(() => [kg('A', 'Fileesuikale 2 kg', 899), pcs('B', 'Fileesuikale kypsä 3 kg', 1200), kg('C', 'Fileesuikale hunaja 4 kg', 928)]);
   const r = await f.say('100 kpl kanan fileesuikaletta tiistaiksi');
   assert.match(r.text, /myydään kiloina/u); assert.doesNotMatch(r.text, /1200|300 kg/u);

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { openWhatsAppStore } from '../server/whatsapp/store.mjs';
 import { createOrderingDialogue, isFreshStart } from '../server/whatsapp/dialogue.mjs';
 import { normalizeOrderUnits, presentCollectingCart } from '../server/whatsapp/cart-presentation.mjs';
@@ -180,7 +181,7 @@ function cartFixture(t, copy = { acknowledgement: 'Joo, laitetaan!', quantityQue
   return { turn, calls, list: () => bridge.getShoppingList(member) };
 }
 
-test('the real saved cart gets a natural acknowledgement, exact bullet rows and one question for only the missing quantities', async (t) => {
+test('the real saved cart gets a natural acknowledgement, exact bullet rows and one question for only the missing quantities', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = cartFixture(t);
   await f.turn('50 l maitoa, kananmunia ja kermaa');
   await f.turn('ei');
@@ -202,7 +203,7 @@ test('the real saved cart gets a natural acknowledgement, exact bullet rows and 
   assert.equal(f.calls.length, before);
 });
 
-test('a natural follow-up fills quantities in the same cart, and show does not pretend to update anything', async (t) => {
+test('a natural follow-up fills quantities in the same cart, and show does not pretend to update anything', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   const f = cartFixture(t);
   await f.turn('50 l maitoa, kananmunia ja kermaa');
   const before = await f.list();
@@ -218,7 +219,7 @@ test('a natural follow-up fills quantities in the same cart, and show does not p
   assert.doesNotMatch(shown.text, /laitetaan!|päivitin/); assert.equal((await f.list()).revision, after.revision);
 });
 
-test('a failed or ungrounded copy model cannot change rows, invent quantities or claim order success', async (t) => {
+test('a failed or ungrounded copy model cannot change rows, invent quantities or claim order success', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
   for (const copy of [new Error('model unavailable'), { acknowledgement: 'Tilaus lähetetty, kaikki varmasti saatavilla!', quantityQuestion: 'Laitetaanko kermaa 50 l?' }]) {
     const f = cartFixture(t, copy);
     const result = await f.turn('50 l maitoa, kananmunia ja kermaa');

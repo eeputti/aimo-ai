@@ -37,7 +37,7 @@ test('kalenteri alkaa Helsingin tästä päivästä ja kertoo viikonpäivän sek
   assert.notEqual(new Date(TUESDAY_NIGHT).toISOString().slice(0, 10), '2026-11-17');
 });
 
-test('säännöt lukevat suhteelliset päivät oikeasta päivästä', () => {
+test('säännöt lukevat suhteelliset päivät oikeasta päivästä', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, () => {
   const now = new Date(TUESDAY_NIGHT);
   const day = (text) => understand(text, { now }).deliveryDate;
   assert.equal(day('20 kananmunaa huomiseksi'), '2026-11-18');
@@ -72,7 +72,7 @@ test('malli saa kalenterin, ja väärin laskettu päivä korjataan viestin päiv
   assert.equal((await turn('samalle päivälle kuin viimeksi', '2026-11-19')).deliveryDate, '2026-11-19');
 });
 
-test('keskustelu tiistaiyönä: "huomiseksi" on ke 18.11. ja haku tehdään sille päivälle', async () => {
+test('keskustelu tiistaiyönä: "huomiseksi" on ke 18.11. ja haku tehdään sille päivälle', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const t = TUESDAY_NIGHT;
   const searched = [];
   const customer = { customerId: 'c1', buyerId: 'b1', bindingVersion: 'v1', deliverySites: [{ id: 's1', label: 'Keittiö' }], permissions: { readProducts: true, placeOrders: true } };

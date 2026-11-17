@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { itemsPerSalesUnit, explainItemQuantity } from '../server/itemQuantities.mjs';
 import { unitSizeFor } from '../server/gateway/quantity.mjs';
 import { understand } from '../server/aimo/understand.mjs';
 import { loadCatalog } from '../server/catalog.mjs';
 
-test('100 kananmunaa lasketaan munina; myyntipakkausten vanha PCS-merkitys s채ilyy', () => {
+test('100 kananmunaa lasketaan munina; myyntipakkausten vanha PCS-merkitys s채ilyy', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, () => {
   for (const text of ['100 kananmunaa', '100 kpl kananmunia', 'sata kananmunaa', 'kaksi tusinaa kananmunia']) {
     const r = understand(text); assert.equal(r.items[0].quantity.basis, 'items', text);
     assert.ok(!r.assumptions.some((n) => n.code === 'UNIT_ASSUMED'), text);
@@ -41,7 +42,7 @@ test('pakkauksen painosta ei arvata kappalem채채r채채 ja tuntematon muunnos j채�
   assert.equal(itemsPerSalesUnit({ name: 'Kananmuna M6', salesUnit: 'KI', baseUnit: 'RAS', perSales: 20 }).value, 120);
 });
 
-test('oikean katalogin Kieku M10/M6/M90 tuottaa 100/102/180 munaa, ei sataa pakkausta', () => {
+test('oikean katalogin Kieku M10/M6/M90 tuottaa 100/102/180 munaa, ei sataa pakkausta', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, () => {
   const cat = loadCatalog();
   for (const [id, count, qty, provided] of [['468121', 10, 10, 100], ['472535', 6, 17, 102], ['463883', 90, 2, 180]]) {
     const p = cat.get(id);

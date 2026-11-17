@@ -53,7 +53,7 @@ function rawStatus(port, target, { method = 'GET', headers = '', body = '' } = {
 }
 
 for (const entry of ['server/whatsapp-server.mjs', 'server/index.mjs']) {
-  test(`${entry} answers a malformed request target with 400 and keeps serving`, async (t) => {
+  test(`${entry} answers a malformed request target with 400 and keeps serving`, { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async (t) => {
     const { child, port } = await serve(t, entry);
     const malformed = `//${'host'}:not-a-port/path`;
     assert.throws(() => new URL(malformed, 'http://localhost'));

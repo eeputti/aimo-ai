@@ -325,7 +325,7 @@ test('vahvistus palauttaa rakenteisen tilaustunnuksen ja tilan, myös uusinnassa
   assert.equal(legacy.status, 'confirmed'); assert.equal(legacy.orderId, undefined);
 });
 
-test('yksi vastaus kattaa sekä päivän että määrän: "perjantaiks 5 kg" sääntötulkilla', async () => {
+test('yksi vastaus kattaa sekä päivän että määrän: "perjantaiks 5 kg" sääntötulkilla', { skip: !fs.existsSync(new URL('../data/catalog.json', import.meta.url)) && 'data/catalog.json puuttuu' }, async () => {
   const { understand } = await import('../server/aimo/understand.mjs');
   const { say, store, calls } = setup({}, createRuleInterpreter({ understand }));
   const first = await say('tarviin voita');
