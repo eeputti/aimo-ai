@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — tuotekysymysten jatkoviestit tuotantoon: botti b8035bc (Claude Code, sessio E)
+
+- **Käyttäjän lupa:** sessio A pyysi, Eelis vahvisti tässä sessiossa ("Kyllä, julkaise"). 04ddcdd:n erillinen julkaisupyyntö kuitattiin jo hoidetuksi (7079c24).
+- **Julkaisu:** botti mainista b8035bc (`dialogue.mjs`, `product-facts.mjs`: nimetön jatkokysymys koskee juuri kysyttyä tuotetta, kiitokseen ei vastata "Kerro tuotteen nimi", maitoallergikolle kerrotaan, ettei laktoositon ole maidoton), deployment aimo-whatsapp-1ulix07mr. Mukana myös README- ja CI-commitit d2f7a7f, b8bb766.
+- **Tarkistukset:** `npm test` 450/450, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54, tuoteajo 611 vaihtoehtoa ilman tarjouksen kaatumista. Julkaisun jälkeen healthz `host: cloud`, webhookin vahvistus 200, tick 200. Worker ennallaan (32cc6312).
+
 ## 17.11.2026 — reseptistä puuttuva määrä arvioidaan annosta kohti ja syy kerrotaan (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
 
 - **Käyttäjän pyyntö:** "korjaa seuraavaks se spagetin määrä reseptissä". Aiemmin Eelis kysyi, miksi botti ei antanut spagetille painoa tai määrää, kun sitä ei ollut reseptissä. Vapaasti kirjoitetun tilauksen määräarvio tehtiin jo 515632c:ssä. Reseptilinkin lista näytti silti "spagetti, määrä tarkennettava" ilman syytä, vaikka annosmäärä (20) oli tiedossa. Toistettu oikealla Haikulla ennen muutosta.
