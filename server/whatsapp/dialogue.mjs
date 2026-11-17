@@ -6,7 +6,7 @@ import { safeModelText } from './model-guard.mjs';
 import { factKinds, factProducts, factsReply, namedInMessage, withoutProductClaims } from './product-facts.mjs';
 // Käyttötapakysymys tuotefaktan rinnalla ("sopiiko grilliin", "mihin käytän"): mallin neuvo jää vastaukseen.
 const USAGE_QUESTION = /(?<![\p{L}\d])(?:mihin|miten\s+(?:käytä|valmist|teen|teke)|käyttö\p{L}*|resepti\p{L}*|ruoka\p{L}*|sopi\p{L}*\s+(?!keliaak|allerg|maitoallerg)\p{L}+|kannattaa|vinkk\p{L}*)/iu;
-import { CANCEL_ALL, DEADLINE_QUESTION, REPEAT_LAST, compareKind, RELIST } from '../order-conversation/index.mjs';
+import { CANCEL_ALL, DEADLINE_QUESTION, REPEAT_LAST, USUAL_ORDER, compareKind, RELIST } from '../order-conversation/index.mjs';
 // Ihmisen, valituksen tai laskun pyyntö: koodi liittää kanavan tukiyhteystiedon (mallin teksti ei saa sisältää yhteystietoja).
 const SUPPORT_QUESTION = /(?<![\p{L}\d])(?:ihmise\p{L}*|asiakaspalvelu\p{L}*|asiakastu\p{L}*|tukeen|tuesta|yhteystie\p{L}*|yhteyshenkilö\p{L}*|puhelinnumer\p{L}*|soitt\p{L}*|reklamaa\p{L}*|valitu\p{L}*|valitta\p{L}*|lasku\p{L}*|hyvit\p{L}*|palaut(?:e|teen|etta)|rikki|rikkinäi\p{L}*|myyjä\p{L}*|vanhentu\p{L}*|pilaantu\p{L}*|pilalla|homee\p{L}*|homehtu\p{L}*|sula(?:nu|ne)\p{L}*|myöhästy\p{L}*|puuttu(?:i|ivat))(?![\p{L}\d])/iu;
 // Väite, ettei yhteystietoja ole, on väärä, kun kanavalle on määritetty tukiyhteys.
@@ -315,6 +315,8 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
       if (plan && DEADLINE_QUESTION.test(text)) plan = { ...plan, route: ['chat', 'order'].includes(plan.route) ? 'order' : plan.route, text: '' };
       // "Sitä samaa ku viimeks": tilausmoottori kopioi edellisen tilauksen tai kertoo, ettei sitä löydy, ja kysyy päivän (S030).
       if (plan && REPEAT_LAST.test(text)) plan = { ...plan, route: ['chat', 'order'].includes(plan.route) ? 'order' : plan.route, text: '' };
+      // "Se tavallinen" tyhjään koriin: tilausmoottori kokoaa ostajan toistuvat tuotteet tai kertoo, ettei niitä ole.
+      if (plan && USUAL_ORDER.test(text) && !getShoppingList({ epoch: state.epoch || '' })?.lines?.length) plan = { ...plan, route: ['chat', 'order'].includes(plan.route) ? 'order' : plan.route, text: '' };
       // Vertailu (halvin, hiilijalanjälki, toimitusvarmuus) ja vaihtoehtojen uudelleen näyttäminen: tilausmoottori vastaa näytetyistä
       // vaihtoehdoista. Malli ei vastaa itse eikä pahoittele valintaa, jota ei tehty väärin (V025).
       // Myös ensimmäinen viesti, jossa on tilaus ja kysymys samassa ("30 l maitoa ke. Mikä näistä toimitetaan varmimmin?"): ilman tätä

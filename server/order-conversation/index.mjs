@@ -31,6 +31,15 @@ const START_QUESTION = 'Mille päivälle toimitus, ja mitä tarvitset? Esim. "20
 // "Sitä samaa ku viimeks": edellisen tilauksen rivit uuteen luonnokseen, päivä kysytään uudelleen.
 const REPEAT_FILLER = /(?<![\p{L}\d])(?:sitä|se|ne|niitä|joo|ok|okei|kiitos|vaan|vain|nyt|taas|uudestaan|uudelleen|mut|mutta|ja|tilaa|laita|otetaan|please)(?![\p{L}\d])/giu;
 export const REPEAT_LAST = /(?:sama\p{L}*|samanlai\p{L}*)\s+(?:tilaus\s+)?(?:kuin|ku|ko|kun)\s+(?:viimeks\p{L}*|viime\s+kerra\p{L}*|viimeksi|edelli\p{L}*|viimeisin\p{L}*|viime\s+viiko\p{L}*)|(?:toista|tilaa\s+uudelleen|uusi)\s+(?:viime\p{L}*|edelli\p{L}*|viimeisin)\s+tilau\p{L}*/iu;
+// "Se tavallinen": ostajan toistuvat tuotteet tavallisella määrällä (usualOrder). Pelkkä "tavallinen" tai "se tavallinen maito"
+// ei ole tilaus vaan tuotteen tarkennus (laktoosikysymyksen "tavallinen käy"), joten "se tavallinen" kelpaa vain yksinään tai
+// päivän, kiitoksen tai tervehdyksen kanssa. Tunnistetaan vain tyhjään luonnokseen.
+const USUAL_DAY = String.raw`(?:ma|ti|ke|to|pe|la|su)\b|maanantai|tiistai|keskiviik|torstai|perjantai|lauantai|sunnuntai|huomise|ylihuomise|huomenna|ensi\s+viik|\d{1,2}\.\d{1,2}`;
+export const USUAL_ORDER = new RegExp(String.raw`(?<![\p{L}\d])(?:tavalli\p{L}*|normaali\p{L}*|normi|vakio|perus)\s+(?:tilaus\p{L}*|tilaukse\p{L}*|setti\p{L}*|satsi\p{L}*)`
+  + String.raw`|(?<![\p{L}\d])(?:vakio|perus|normi)tilau\p{L}*`
+  + String.raw`|(?<![\p{L}\d])(?:sama\p{L}*|samat|tilaa)\s+(?:niin\s*)?(?:kuin|ku|ko|kun|kuten)\s+(?:aina|yleensä|tavallisesti)(?![\p{L}\d])`
+  + String.raw`|(?<![\p{L}\d])tavalliseen\s+tapaan`
+  + String.raw`|^(?:(?:moi\p{L}*|hei|moro|morjes|terve|no|joo|juu)[,!.]?\s+)?(?:se|sitä|ne|niitä|mun|meidän|meiän)\s+tavalli\p{L}*(?=\s*$|\s*[.,!?]|\s+(?:kiitos|kiitti|vaan|taas|pliis|please|${USUAL_DAY}))`, 'iu');
 // Toimituspäivä kysytään ensin ja yksin: saatavuus ja vaihtoehdot riippuvat päivästä.
 const DATE_QUESTION = 'Mille päivälle toimitus? Haen sen jälkeen sille päivälle toimitettavat vaihtoehdot.';
 // Vaihtoehtolistan vastaukset tunnistetaan koodissa, jotta numero viittaa aina viimeksi näytettyyn listaan.
@@ -276,22 +285,63 @@ const timeWishNote = (draft) => `Toivoit toimitusta "${draft.timeWish}": kellona
 export function lastConfirmedOrder(orders, termOf = () => ({})) {
   const order = (orders || []).find((o) => o?.status === 'confirmed' && o.lines?.length);
   if (!order) return null;
-  const byProduct = new Map();
-  for (const l of order.lines) {
-    const id = String(l.productId || ''); const qty = Number(l.quantity);
-    if (!id || !(qty > 0)) continue;
-    const prior = byProduct.get(id);
-    if (prior) { prior.quantity.value += qty; continue; }
-    const name = String(l.name || id).slice(0, 120); const term = termOf(name) || {};
-    byProduct.set(id, { productTerm: String(term.productTerm || name).slice(0, 60), quantity: { value: qty, unit: 'PCS', basis: 'sales' },
-      claims: term.claims || [], excludeAllergens: [], selectedProductId: id, selectedName: name, selectedWarning: null,
-      ...(l.salesUnitLabel ? { packLabel: String(l.salesUnitLabel).slice(0, 12), packFor: id } : {}) });
-  }
-  const lines = [...byProduct.values()].slice(0, 20);
+  const lines = [...perProduct(order).values()].map((p) => draftLineFrom(p.line, p.qty, termOf)).slice(0, 20);
   return lines.length ? { orderId: order.orderId, lines } : null;
 }
 
-export function createOrderingConversation({ store, tools, interpretTurn, now = Date.now, lastOrder = null }) {
+// Tilauksen rivit tuotteittain: saman tuotteen rivit yhdistetään, rikkinäiset ja nollamäärät ohitetaan.
+function perProduct(order) {
+  const byProduct = new Map();
+  for (const l of order.lines || []) {
+    const id = String(l.productId || ''); const qty = Number(l.quantity);
+    if (!id || !(qty > 0)) continue;
+    const prior = byProduct.get(id);
+    if (prior) prior.qty += qty; else byProduct.set(id, { qty, line: l });
+  }
+  return byProduct;
+}
+
+// Gatewayn tilausrivi luonnosriviksi: valittu tuote ja myyntierämäärä säilyvät, hakusana tuotenimestä.
+function draftLineFrom(l, qty, termOf) {
+  const id = String(l.productId); const name = String(l.name || id).slice(0, 120); const term = termOf(name) || {};
+  return { productTerm: String(term.productTerm || name).slice(0, 60), quantity: { value: qty, unit: 'PCS', basis: 'sales' },
+    claims: term.claims || [], excludeAllergens: [], selectedProductId: id, selectedName: name, selectedWarning: null,
+    ...(l.salesUnitLabel ? { packLabel: String(l.salesUnitLabel).slice(0, 12), packFor: id } : {}) };
+}
+
+// OLETUS: sama sääntö kuin portin "Unohtuiko tämä?" -ehdotuksissa (gateway/suggest.mjs SUGGEST): tuote kuuluu tavalliseen
+// tilaukseen, kun se on mukana vähintään kahdessa ja vähintään puolessa ostajan 8 viime vahvistetussa tilauksessa.
+export const USUAL = { minOrders: 2, minShare: 0.5, lookback: 8 };
+const median = (xs) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+
+/**
+ * "Se tavallinen": ostajan toistuvat tuotteet luonnosriveiksi tavallisella (mediaani) myyntierämäärällä. Päivää ei kopioida.
+ * Jos vahvistettuja tilauksia on vasta yksi, kopioidaan se (single). Ei kielimallia: rivit voi laskea uudelleen tilauksista.
+ * @param {object[]} orders saman ostajan tilaukset uusin ensin (gatewayn orders.list)
+ * @returns {{lines: object[], ofOrders: number, single?: string}}
+ */
+export function usualOrder(orders, termOf = () => ({})) {
+  const past = (orders || []).filter((o) => o?.status === 'confirmed' && o.lines?.length).slice(0, USUAL.lookback);
+  if (past.length < USUAL.minOrders) {
+    const last = lastConfirmedOrder(past, termOf);
+    return last ? { lines: last.lines, ofOrders: past.length, single: last.orderId } : { lines: [], ofOrders: past.length };
+  }
+  const seen = new Map(); // productId → määrät tilauksittain ja uusin rivi (tilaukset uusin ensin)
+  past.forEach((o, index) => {
+    for (const [id, { qty, line }] of perProduct(o)) {
+      const s = seen.get(id) || { quantities: [], line, index };
+      s.quantities.push(qty); seen.set(id, s);
+    }
+  });
+  const lines = [...seen.values()]
+    .filter((s) => s.quantities.length >= USUAL.minOrders && s.quantities.length / past.length >= USUAL.minShare)
+    .sort((a, b) => b.quantities.length - a.quantities.length || a.index - b.index)
+    .slice(0, 20)
+    .map((s) => draftLineFrom(s.line, Math.max(1, Math.round(median(s.quantities))), termOf));
+  return { lines, ofOrders: past.length };
+}
+
+export function createOrderingConversation({ store, tools, interpretTurn, now = Date.now, lastOrder = null, usualOrder: usualFor = null }) {
   // Tilausaikaraja verrataan keskustelun omaan kelloon (tuotannossa portin kello, testeissä kiinnitetty aika).
   const cutoffPassed = (closingTime) => { const t = parseApiTime(closingTime); return t ? t.getTime() <= now() : null; };
   // Aikaisin vielä voimassa oleva raja näytetyistä vaihtoehdoista. Mennyttä rajaa ei luvata; jos kaikki ovat menneet, se sanotaan.
@@ -618,7 +668,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         const own = repeat ? store.lastOrdered(conversationId) : null;
         let confirmed = null;
         if (repeat && lastOrder) { try { confirmed = await lastOrder(customer); } catch { confirmed = null; } }
-        const last = confirmed?.lines?.length && own?.orderId !== confirmed.orderId ? confirmed : own;
+        // "Se tavallinen" tyhjään luonnokseen: ostajan toistuvat tuotteet gatewayn vahvistetuista tilauksista (usualOrder).
+        const usual = !draft.lines.length && !repeat && USUAL_ORDER.test(t);
+        let usualFound = null;
+        if (usual && usualFor) { try { usualFound = await usualFor(customer); } catch { usualFound = null; } }
+        const last = usual ? usualFound : confirmed?.lines?.length && own?.orderId !== confirmed.orderId ? confirmed : own;
         if (last?.lines?.length) {
           for (const l of last.lines.slice(0, 20)) {
             draft.lines.push({ ref: `L${++draft.seq}`, productTerm: l.productTerm, quantity: l.quantity, claims: l.claims || [], excludeAllergens: l.excludeAllergens || [],
@@ -629,9 +683,17 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         }
         // Toistopyyntö ei ole tuote: sääntötulkki teki fraasista "sitä samaa ku viimeks" rivin "sima". Tulkille annetaan vain
         // muu osa viestistä ("sama ku viimeks, mut 10 l maitoa lisää" → "mut 10 l maitoa lisää"); pelkkä toisto ei tulkita.
-        const toInterpret = repeat ? t.replace(REPEAT_LAST, ' ') : t;
-        const onlyRepeat = repeat && !/\p{L}{2}/u.test(toInterpret.replace(REPEAT_FILLER, ' '));
-        const repeatNote = last?.lines?.length ? `Kopioin edellisen tilauksen${last.orderId ? ` ${last.orderId}` : ''} tuotteet. Hinnat ja saatavuus tarkistetaan uudelle toimituspäivälle.` : '';
+        const toInterpret = repeat ? t.replace(REPEAT_LAST, ' ') : usual ? t.replace(USUAL_ORDER, ' ') : t;
+        const onlyRepeat = (repeat || usual) && !/\p{L}{2}/u.test(toInterpret.replace(REPEAT_FILLER, ' '));
+        const recheck = 'Hinnat ja saatavuus tarkistetaan uudelle toimituspäivälle.';
+        const repeatNote = !last?.lines?.length ? ''
+          : !usual ? `Kopioin edellisen tilauksen${last.orderId ? ` ${last.orderId}` : ''} tuotteet. ${recheck}`
+            : last.single ? `Löysin vasta yhden aiemman tilauksen (${last.single}), joten kopioin sen tuotteet tavalliseksi tilaukseksi. ${recheck}`
+              : `Kokosin tavallisen tilauksesi ${last.ofOrders} viime tilauksesta: tuotteet, jotka ovat olleet mukana vähintään puolessa niistä, tavallisella määrällä. ${recheck}`;
+        // Tavallista tilausta ei löytynyt: kerrotaan miksi. Muuten viestin muut tuotteet lisätään kuten ennenkin.
+        const usualMissing = usual && !last?.lines?.length ? (usualFound?.ofOrders
+          ? 'Aiemmissa tilauksissasi ei ole toistuvia tuotteita, joten tavallista tilausta ei voi koota. Kirjoita "sama kuin viimeksi", niin kopioin viimeisimmän tilauksen.'
+          : 'En löydä aiempia tilauksia, joten tavallista tilausta ei vielä ole.') : '';
         // Tulkki ajetaan silti: samassa viestissä voi olla lisäyksiä ("sama ku viimeks, mut 10 l maitoa lisää").
         // Vastaus kilokysymykseen ("30", "30 kg"): kilot suoraan kysyttyyn riviin ilman tulkkia (kiloina myytävä tuote).
         const weightLine = draft.pending?.kind === 'checklist' && draft.pending.asks?.includes('quantity') ? draft.lines.find((l) => l.ref === draft.pending.refs?.[0] && l.byWeight) : null;
@@ -676,6 +738,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         // Kaikki rivit poistettu: luonnos suljetaan, myös sen päivä (pilotti X016).
         if (linesBefore.length && !draft.lines.length) draft.state = 'cancelled';
         if (repeatNote) notes.unshift(repeatNote);
+        if (usualMissing && draft.lines.length) notes.unshift(usualMissing);
         // Pyyntö näyttää tai vertailla vaihtoehtoja jo valitulle riville: valinta avataan ja sama lista näytetään uudelleen,
         // ostaja valitsee numerolla (V025: "listaa vaihtoehdot hintoineen" toisti valitun yhteenvedon neljästi).
         // Tässä viestissä tehtyä valintaa ei pureta.
@@ -691,6 +754,8 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         } else if (turn.intent === 'other' && !notes.length && !draft.lines.length) {
           result = { status: 'collecting', text: `Olen Valio Aimon tilausapuri. ${draft.deliveryDate ? HELP : START_QUESTION}` };
         }
+        // Tavallista tilausta ei löytynyt eikä viestissä ollut muita tuotteita: syy ja seuraava kysymys (myös kun päivä kirjattiin).
+        if (!result && usualMissing && !draft.lines.length) result = { status: 'collecting', text: `${usualMissing} ${draft.deliveryDate ? HELP : START_QUESTION}` };
         if (!result) {
           const asksDeadline = DEADLINE_QUESTION.test(t);
           // Muuttumaton luonnos: sama lista uudelleen (virheellinen numero) tai seuraavat vaihtoehdot ilman uutta alkuhakua.

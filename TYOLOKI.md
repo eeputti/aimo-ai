@@ -2,6 +2,23 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — "se tavallinen": ostajan toistuvat tuotteet koriin tavallisella määrällä (Claude Code, Junction 2026 -vertailu)
+
+- **Käyttäjän pyyntö:** Eelis pyysi lisäämään seuraavaksi Mankelin S.I.MO:n "my usual" -idean: "lisää seuraavaksi se tavallinen tilaus koriin". Koodia ei kopioitu, vain idea.
+- **Muutos (`server/order-conversation/index.mjs`, `runtime.mjs`, `server/whatsapp/dialogue.mjs`):**
+  - Tyhjään luonnokseen kirjoitettu "se tavallinen", "tavallinen tilaus", "vakiotilaus", "normi setti" tai "samaa ku aina" kokoaa ostajan tavallisen tilauksen vahvistetuista gateway-tilauksista. Malli ei osallistu.
+  - Tavalliseen tilaukseen tulee tuote, joka on mukana vähintään kahdessa ja vähintään puolessa ostajan 8 viimeisestä vahvistetusta tilauksesta. Määrä on mediaani myyntierinä. Sääntö on sama kuin portin "Unohtuiko tämä?" -ehdotuksissa (`gateway/suggest.mjs`).
+  - Päivää ei kopioida: toimituspäivä kysytään ensin, ja hinnat ja saatavuus tarkistetaan uudelle päivälle, kuten "sama kuin viimeksi" -toiminnossa (uusi `usualOrder` käyttää samaa rivimuunnosta kuin `lastConfirmedOrder`).
+  - Jos vahvistettuja tilauksia on vasta yksi, botti kopioi sen ja kertoo sen. Ilman tilauksia se sanoo, ettei tavallista tilausta vielä ole. Jos tilauksissa ei ole toistuvia tuotteita, se ehdottaa "sama kuin viimeksi".
+  - Samassa viestissä voi olla päivä tai lisätuotteita ("se tavallinen perjantaiks", "tavalliseen tapaan ja 5 kg voita").
+  - "Tavallinen käy", pelkkä "tavallinen" ja "se tavallinen maito" eivät käynnistä tavallista tilausta, joten laktoosikysymyksen vastaukset toimivat kuten ennen. Tunnistetaan vain tyhjään koriin.
+  - Dialogi ohjaa ilmauksen tilausmoottorille samoin kuin "sama kuin viimeksi".
+- **Tarkistukset:**
+  - Uusi `test/whatsapp-usual-order.test.mjs` 3/3: sääntö ja mediaani, odottavat ja hylätyt ohitetaan, vain 8 viimeisintä, ilmaukset kumpaankin suuntaan, sekä koko WhatsApp-ketju oikealla katalogilla, simuloiduin hinnoin ja säännöillä. Ketju: ei tilauksia → yksi tilaus kopioitu → kaksi tilausta, joissa vain molemmissa ollut maito → päivä → hinnoiteltu luonnos ke 18.11., ei uutta tilausta.
+  - Koko `npm test` 421/421 erillisessä työkopiossa origin/mainin e6c95b9 päällä ja 420/420 jaetussa kansiossa 4741cff:n päällä. `aimo:eval` 26/26.
+  - Oikealla kielimallilla ei ajettu; reititys mallin rinnalla on testattu vain koodista.
+- **Käyttöönotto kesken:** tarvitsee botin Vercel-julkaisun (sessio E). Worker-julkaisua ei tarvita.
+
 ## 17.11.2026 aamu — korisivun huomiot ilman kuittausta: riittää, että näkee korin ja hyväksyy (Claude Code, Mankeli-vertailu)
 
 - **Käyttäjän päätös:** Eelis ei halua, että huomioita kuitataan yksitellen ("ei tarvii jokasta tuotetta eriksee checkaa, riittää et vaa näkee mitä ostoskoriin on tullut ja sitte hyväksyy ne"). Tämä kumoaa 9609308:n kuittauslukon, joka ehti tuotantoon (aimo-whatsapp-5wlnx0w9b klo 9.33).

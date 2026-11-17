@@ -4,7 +4,7 @@ import { storefrontCartProjection } from '../storefront-whatsapp-sync.mjs';
 import { cartNotes } from '../cart-notes.mjs';
 import { shoppingListView } from '../shopping-list/index.mjs';
 import { openDraftStore } from './store.mjs';
-import { createOrderingConversation, lastConfirmedOrder } from './index.mjs';
+import { createOrderingConversation, lastConfirmedOrder, usualOrder } from './index.mjs';
 import { createRuleInterpreter, createModelInterpreter } from './interpret.mjs';
 import { createOrderingTools } from '../order-tools/index.mjs';
 
@@ -43,7 +43,12 @@ export async function createConfiguredOrdering({ draftDb = ':memory:', quoteDb =
     const { orders } = await import('../gateway/store.mjs');
     return lastConfirmedOrder(orders.list(customer.buyerId, 20), termOf);
   };
-  const handleTurn = createOrderingConversation({ store, tools, interpretTurn, now: time, lastOrder });
+  // "Se tavallinen": saman ostajan toistuvat tuotteet vahvistetuista gateway-tilauksista tavallisella määrällä.
+  const usual = async (customer) => {
+    const { orders } = await import('../gateway/store.mjs');
+    return usualOrder(orders.list(customer.buyerId, 50), termOf);
+  };
+  const handleTurn = createOrderingConversation({ store, tools, interpretTurn, now: time, lastOrder, usualOrder: usual });
   const cachedExport = createExportCache({ now: time });
   // Korisivun huomiot samasta tarjouksesta, Valion tuotetiedoista ja ostajan omista gateway-tilauksista (ei mallia).
   const notesFor = async (list, quote, customer) => {
