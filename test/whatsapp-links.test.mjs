@@ -135,8 +135,9 @@ test('page suggestions use real catalogue names and code scaling, and adding req
   assert.doesNotMatch(out.text, /Testi lohifilee|katalog|ei löytynyt valikoimasta/); assert.match(out.text, /tilli, määrä tarkennettava/);
   assert.equal(f.orders.length, 0);
   const replay = await f.links.respond({ binding: f.member.binding, messageId: 'l1', text: 'https://example.com/recipe' });
-  assert.deepEqual(replay, out); assert.deepEqual(f.stats(), { reads: 1, asks: 2 });
-  const resized = await f.turn('20 hengelle'); assert.match(resized.text, /lohifilee, 2 kg/); assert.deepEqual(f.stats(), { reads: 1, asks: 2 });
+  // Kolme mallikutsua: luku, täsmäys ja määrää vailla olevan tillin annosarvio (17.11.). Uusinta ja annosmuutos eivät kutsu uudelleen.
+  assert.deepEqual(replay, out); assert.deepEqual(f.stats(), { reads: 1, asks: 3 });
+  const resized = await f.turn('20 hengelle'); assert.match(resized.text, /lohifilee, 2 kg/); assert.deepEqual(f.stats(), { reads: 1, asks: 3 });
   assert.match((await f.turn('joo lisää ne')).text, /Mille päivälle/);
   assert.equal(f.orders.length, 1); assert.match(f.orders[0], /lohifilee 2 kg/); assert.match(f.orders[0], /ruokakerma 1 l/);
   assert.doesNotMatch(f.orders[0], /https:/);

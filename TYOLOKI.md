@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — reseptistä puuttuva määrä arvioidaan annosta kohti ja syy kerrotaan (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
+
+- **Käyttäjän pyyntö:** "korjaa seuraavaks se spagetin määrä reseptissä". Aiemmin Eelis kysyi, miksi botti ei antanut spagetille painoa tai määrää, kun sitä ei ollut reseptissä. Vapaasti kirjoitetun tilauksen määräarvio tehtiin jo 515632c:ssä. Reseptilinkin lista näytti silti "spagetti, määrä tarkennettava" ilman syytä, vaikka annosmäärä (20) oli tiedossa. Toistettu oikealla Haikulla ennen muutosta.
+- **Muutos (`server/whatsapp/link-advice.mjs`):** kun reseptin aineelta puuttuu paino tai tilavuus ("spagettia", "2 valkosipulinkynttä"), nopea mallikutsu (`whatsapp_link_estimate`, täsmäyksen rinnalla) arvioi ostomäärän annosta kohti. Kokonaismäärä lasketaan koodissa annosmäärästä, ja se laskee uudelleen, kun annosmäärä muuttuu. Rivillä lukee "spagetti, noin 2 kg, arvio", ja listan alla syy: "Arvioin määrät, joita reseptissä ei ollut painona tai tilavuutena: spagetti 100 g annokselle (reseptissä ei ole määrää) ja valkosipuli 2 g annokselle (reseptissä "2 valkosipulinkynttä")." Arvio käytetään saatavuustarkistuksessa ja hyväksynnän jälkeen ostoslistalla.
+- **Rajat:** koodi hyväksyy vain 0,5 g–500 g tai 0,5 ml–6 dl annosta kohti. Epäuskottava tai epäonnistunut arvio jättää rivin tarkennettavaksi. Ilman annosmäärää arviota ei näytetä kokonaismääränä. Silloin rivillä lukee "määrä tarkennettava, reseptissä ei ole määrää", kun reseptin tekstissä ei ole lukua. Valmistetun aineen (liemi) ostomäärän tarkennus ennallaan.
+- **Tarkistukset:**
+  - Uusi `test/whatsapp-link-estimate.test.mjs` 4/4: arvio, syy ja hyväksytty lista, annosmäärän muutos, epäuskottava ja epäonnistunut arvio sekä tuntematon annosmäärä.
+  - `whatsapp-links`-testin mallikutsujen määrä 2 → 3, koska tillillä ei ole määrää. Uusinta ja annosmuutos eivät kutsu mallia uudelleen.
+  - Koko `npm test` 455/455 origin/mainin cb05b5a päällä, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54.
+  - Oikea Haiku koko pinossa (valesivu, välimuistikannan kopio, ei tilausta, ei Metaa): kermainen kanapasta 4 → 20 annosta perjantaiksi antoi spagetille noin 2 kg ja syyn. Paikallisessa välimuistiaineistossa spagetti ja broilerin fileesuikale eivät olleet tilattavissa pe 20.11., joten ne jäivät pois. Tämä johtuu aineistosta, ei tästä muutoksesta.
+- **Käyttöönotto kesken:** tarvitsee botin Vercel-julkaisun (sessio E, Eeliksen luvalla). Worker-julkaisua ei tarvita.
+
 ## 17.11.2026 — vastaavat tuotteet: raaka-aine ei korvaa valmista tuotetta (Claude Code, Aimo-tilausapuri verkossa -chat)
 
 - **Käyttäjän pyyntö:** "korjaa myös toi pakastemansikka-ehdotus". Live-kokeessa jäätelön tilalle tarjottiin leivosten lisäksi "Polproduct Nordics Oy pakastettu mansikka 2.5kg".

@@ -36,6 +36,42 @@ const servingsOf = (text) => {
 };
 const count = (n) => n.toLocaleString('fi-FI', { maximumFractionDigits: 6, useGrouping: false });
 const fingerprint = (list) => JSON.stringify([list?.id || null, list?.revision ?? null]);
+// Reseptissä ei ole ostettavaa määrää (spagettia, 2 valkosipulinkynttä): arvio annosta kohti, jotta lista ei jää
+// "määrä tarkennettava" -tilaan ilman syytä (Eelis 17.11.). Arvio näytetään arviona ja siitä kerrotaan syy.
+const ESTIMATE_SCHEMA = { type: 'object', additionalProperties: false, required: ['rows'], properties: { rows: { type: 'array', items: {
+  type: 'object', additionalProperties: false, required: ['index', 'perPortion', 'unit'], properties: {
+    index: { type: 'integer' }, perPortion: { type: 'number' }, unit: { type: 'string', enum: ['KG', 'L', ''] } } } } } };
+const ESTIMATE_SYSTEM = `Arvioit suurkeittiön reseptin raaka-aineille ostomäärän annosta kohti, kun reseptissä ei ole määrää painona tai tilavuutena.
+Saat ruoan nimen, alkuperäisen annosmäärän (servings, 0 jos ei tiedossa), aineet, joiden määrä tiedetään (known, koko reseptille), ja rivit, joilta määrä puuttuu (source on reseptin oma teksti).
+perPortion on ostettavan muodon määrä yhtä annosta kohti: KG kiloina (kuiva pasta, raaka liha, kasvikset) tai L litroina (nesteet). Esimerkiksi kuiva spagetti pääruoan lisukkeena noin 0.1 KG annokselle.
+Jos source kertoo kappaleita tai muun yksikön (2 valkosipulinkynttä, 1 nippu tilliä, 1 purkki) ja servings on annettu, muunna se painoksi annosta kohti.
+Käytä known-aineiden suhdetta apuna. Jos ainetta käytetään vain maun mukaan tai koristeeksi etkä osaa arvioida luotettavasti, unit on tyhjä ja perPortion 0. Älä lisää rivejä.`;
+const PER_PORTION_MAX = { kg: 0.5, l: 0.6 };
+const portionsOf = (s) => (s.target && s.servings ? s.target : s.servings && s.multiplier ? s.servings * s.multiplier : s.target || s.servings || null);
+const roundAmount = (v) => (v >= 10 ? Math.round(v * 2) / 2 : v >= 1 ? Math.round(v * 10) / 10 : v >= 0.1 ? Math.round(v * 100) / 100 : Math.round(v * 1000) / 1000);
+const estimateTotal = (item, s) => { const n = portionsOf(s); return item.estimate && n ? { value: roundAmount(item.estimate.perPortion * n), unit: item.estimate.unit } : null; };
+const perPortionText = (e) => (e.unit === 'kg' ? (e.perPortion < 1 ? `${count(Math.round(e.perPortion * 1000))} g` : `${count(e.perPortion)} kg`)
+  : e.perPortion < 0.1 ? `${count(Math.round(e.perPortion * 1000))} ml` : `${count(Math.round(e.perPortion * 100) / 10)} dl`);
+async function estimateAmounts(ask, state) {
+  const rows = state.items.map((item, index) => ({ index, term: item.term, source: item.source })).filter(({ index }) => !state.items[index].quantity && !state.items[index].needsQuantityCheck);
+  if (!ask || !rows.length) return;
+  let data = null;
+  try { data = (await ask({ purpose: 'whatsapp_link_estimate', tier: 'fast', system: ESTIMATE_SYSTEM, schema: ESTIMATE_SCHEMA, maxTokens: 1500, timeoutMs: 30000, retries: 0,
+    user: JSON.stringify({ dish: state.title, servings: state.servings || 0, known: state.items.filter((i) => i.quantity).map((i) => ({ term: i.term, amount: `${count(i.quantity.value)} ${i.quantity.unit}` })), rows }) })).json; } catch { return; }
+  for (const r of Array.isArray(data?.rows) ? data.rows : []) {
+    const item = rows.some((x) => x.index === r?.index) ? state.items[r.index] : null;
+    const unit = { KG: 'kg', L: 'l' }[r?.unit];
+    // Vain järkevä annoskoko kelpaa: muuten määrä jää tarkennettavaksi kuten ennen.
+    if (item && unit && Number.isFinite(r.perPortion) && r.perPortion >= 0.0005 && r.perPortion <= PER_PORTION_MAX[unit]) item.estimate = { perPortion: r.perPortion, unit };
+  }
+}
+// Arvion syy listan alle: reseptissä ei ollut määrää tai se oli muuna yksikkönä.
+function estimateNote(s) {
+  const est = s.items.filter((i) => i.estimate && !i.quantity && !i.needsQuantityCheck && portionsOf(s) && scalable(s));
+  if (!est.length) return '';
+  const what = (i) => { const plain = norm(i.source) === norm(i.term) || !/\d/u.test(i.source); return `${i.term} ${perPortionText(i.estimate)} annokselle (${plain ? 'reseptissä ei ole määrää' : `reseptissä "${clean(i.source, 50)}"`})`; };
+  return `Arvioin määrät, joita reseptissä ei ollut painona tai tilavuutena: ${joinFi(est.map(what))}. Voit muuttaa niitä listalla myöhemmin.`;
+}
 const COMMAND = /(?:^|\s)(?:tilaa|vahvista|poista|peru|peruuta|tyhjennä|aloita|ohita|muuta|lisää|suorita|maksu|oikeudet|kaikki)(?:\s|$)/iu;
 
 export function ingredientQuantity(amount, source) {
@@ -63,7 +99,14 @@ const multiplierOf = (text) => { const m = String(text || '').match(MULTIPLIER);
 const scaleOf = (s) => (s.target && s.servings ? s.target / s.servings : s.multiplier || 1);
 const amountOf = (q, s) => `${count(q.value * scaleOf(s))} ${q.unit}`;
 const scalable = (s) => !s.target || s.servings;
-const quantityText = (item, s) => (item.quantity && scalable(s) ? amountOf(item.quantity, s) : 'määrä tarkennettava');
+const quantityText = (item, s) => {
+  if (item.quantity && scalable(s)) return amountOf(item.quantity, s);
+  const est = scalable(s) && estimateTotal(item, s);
+  if (est) return `noin ${count(est.value)} ${est.unit}, arvio`;
+  return item.quantity || /\d/u.test(item.source || '') ? 'määrä tarkennettava' : 'määrä tarkennettava, reseptissä ei ole määrää';
+};
+// Tilattava määrä annosmäärälle: reseptin oma määrä skaalattuna tai arvio.
+const orderAmount = (item, s) => (item.quantity && scalable(s) ? amountOf(item.quantity, s) : scalable(s) && estimateTotal(item, s) ? `${count(estimateTotal(item, s).value)} ${estimateTotal(item, s).unit}` : '');
 const cap = (s) => s.charAt(0).toLocaleUpperCase('fi-FI') + s.slice(1);
 const joinFi = (xs) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} ja ${xs.at(-1)}`);
 const fiDate = (iso) => { const [y, m, d] = iso.split('-').map(Number); return `${d}.${m}.${y}`; };
@@ -174,21 +217,21 @@ export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, n
   function present(state, shoppingList, lead = '') {
     if (state.date && state.checked) {
       const open = openSubstitute(state);
-      return reply([lead, header(state), sizeLine(state), availabilityText(state), open ? substituteQuestion(open, state) : confirmQuestion(state)].filter(Boolean).join('\n\n'));
+      return reply([lead, header(state), sizeLine(state), availabilityText(state), estimateNote(state), open ? substituteQuestion(open, state) : confirmQuestion(state)].filter(Boolean).join('\n\n'));
     }
     // Hakuosumia ei listata: tuote valitaan tilauksessa. Valikoimasta kokonaan puuttuva merkitään sulkeisiin.
     const lines = state.items.map((item) => `- ${item.term}, ${item.needsQuantityCheck ? 'ostomäärä tarkennetaan' : quantityText(item, state)}${item.found === false ? ' (ei löytynyt valikoimasta)' : ''}`);
     const question = state.target && !state.servings ? 'Kerro alkuperäinen annosmäärä, niin lasken tarpeen.'
       : state.awaiting === 'date' ? 'Mille päivälle tarvitset toimituksen? Tarkistan sitten, mitä aineksista saa sille päivälle, ja ehdotan korvaavan tuotteen puuttuville.'
         : confirmQuestion(state);
-    return reply([lead, header(state), sizeLine(state), `Ainekset:\n${lines.join('\n')}`, question].filter(Boolean).join('\n\n'));
+    return reply([lead, header(state), sizeLine(state), `Ainekset:\n${lines.join('\n')}`, estimateNote(state), question].filter(Boolean).join('\n\n'));
   }
 
   // Saatavuus valitulle päivälle ja korvaajat puuttuville. Mitään ei valita asiakkaan puolesta.
   async function assess(state, customer, shoppingList) {
     const rules = restrictions(state.request, shoppingList);
     const need = (q) => (q && scalable(state) ? { value: q.value * scaleOf(state), unit: q.unit } : null);
-    const checked = await mapLimited(state.items, 4, (item) => checkAvailability({ suggest, customer, date: state.date, term: item.term, quantity: item.needsQuantityCheck ? null : need(item.quantity), rules }));
+    const checked = await mapLimited(state.items, 4, (item) => checkAvailability({ suggest, customer, date: state.date, term: item.term, quantity: item.needsQuantityCheck ? null : need(item.quantity) || (scalable(state) ? estimateTotal(item, state) : null), rules }));
     state.items.forEach((item, i) => { item.availability = checked[i]; delete item.choice; delete item.substitutes; delete item.autoDropped; });
     const missing = state.items.map((item, index) => ({ index, term: item.term, source: item.source })).filter(({ index }) => MISSING.includes(state.items[index].availability.status));
     const found = await findSubstitutes({ ask, suggest, customer, date: state.date, dish: state.title, rules, missing, quantityOf: (amount) => need(ingredientQuantity(amount, amount)) });
@@ -244,8 +287,10 @@ export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, n
     // Täsmäys ratkaisee enää vain, onko aines valmistettu (liemi), jolloin ostomäärä tarkennetaan: tuotenimiä ei näytetä.
     // Nopea taso ilman ajattelua: syvällä tasolla Haikun ajattelu täytti 3000 tokenia, kutsu katkesi ja jokainen aines
     // näytti puuttuvalta (17.11.), ja onnistuessaankin se kesti 17 s. Nopea taso vastaa noin 3 sekunnissa.
+    const estimating = estimateAmounts(ask, state);
     try { matches = (await ask({ purpose: 'whatsapp_link_match', tier: 'fast', system: MATCH_SYSTEM, schema: MATCH_SCHEMA, maxTokens: 4000, timeoutMs: 60000, retries: 0,
       user: JSON.stringify({ request: state.request, rules, rows: candidates }) })).json; } catch { /* Ingredients remain readable when matching fails. */ }
+    await estimating;
     const rows = Array.isArray(matches?.rows) ? matches.rows : [];
     for (const [index, item] of state.items.entries()) {
       const match = rows.find((r) => r.index === index);
@@ -335,7 +380,8 @@ export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, n
         if (state.cart !== fingerprint(shoppingList)) { forget(binding); return saveResult(messageId, binding, reply('Ostoslista muuttui linkin lukemisen jälkeen. Lähetä linkki uudelleen, niin sovitan ehdotukset nykyiseen listaan.')); }
         const lines = state.items.filter((i) => i.choice !== 'drop').map((i) => {
           if (typeof i.choice === 'object') { const q = ingredientQuantity(i.choice.amount, i.choice.amount); return `${i.choice.term}${q && scalable(state) ? ` ${amountOf(q, state)}` : ''}`; }
-          return `${i.term}${i.quantity && !i.needsQuantityCheck ? ` ${amountOf(i.quantity, state)}` : ''}`;
+          const amount = i.needsQuantityCheck ? '' : orderAmount(i, state);
+          return `${i.term}${amount ? ` ${amount}` : ''}`;
         });
         const orderText = `Lisää ostoslistalle: ${lines.join(', ')}.${state.date ? ` Toimitus ${fiDate(state.date)}.` : ''}\nAsiakkaan toive: ${state.request}`;
         const result = await runOrder(orderText);
