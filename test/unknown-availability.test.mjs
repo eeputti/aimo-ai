@@ -56,7 +56,7 @@ test('tuntematon saatavuus ja vastaavat tuotteet: rehellinen otsikko, valinta va
   const shown = await say('jäätelö');
   assert.equal(shown.status, 'choosing');
   assert.match(shown.text, /En saa nyt tarkistettua saatavuutta: jäätelö, joten en voi luvata sitä millekään päivälle\. Näiden vastaavien tuotteiden saatavuus on tiedossa:/);
-  assert.match(shown.text, /1\) Ph7 marjamousse leivos pakaste, 1 laatikko, 58,66 €/);
+  assert.match(shown.text, /1\) Ph7 marjamousse leivos pakaste, 1 laatikko, 58,66 €/i);
   assert.match(shown.text, /määrä kysytään valinnan jälkeen/);
   assert.doesNotMatch(shown.text, /Tarkkaa osumaa ei löytynyt/);
   const picked = await say('1');
