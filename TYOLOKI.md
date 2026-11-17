@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — Worker julkaistu mainista: henkilökohtaiset tilauslinkit, kassanäkymä ja maksusivu puhelimella (Claude Code, puhelinkori-chat)
+
+- **Käyttäjän kysymys ja lupa:** Eelis kysyi, viekö WhatsAppin ostoskori puhelimella perille. Tarkistus iPhonen selaintunnisteella: korisivu (`aimo-whatsapp.vercel.app/whatsapp/cart`) aukeaa puhelimella, mutta SIIRRY MAKSAMAAN vei Workerin maksusivulle, jossa puhelinesto peitti maksun. Maksusivuchat oli jo korjannut eston mainissa (1beade4), joten tämän chatin oma samanlainen korjaus jätettiin pushaamatta. Eelis pyysi jatkamaan Workerin ja botin yhteiseen julkaisuun ("jatka").
+- **Tilanne ennen julkaisua:** toinen sessio julkaisi botin Verceliin klo 9.10 tilannevedoksesta `aimo-vercel-ab467a9`, jossa on bdee619 (allekirjoitetut henkilökohtaiset maksulinkit). Live-Worker oli tuolloin f241485, joka ei avaa uusia linkkejä, joten noin klo 9.10–9.12 vahvistettujen tilausten maksulinkit eivät aukea. bdee619:n ohjeen mukaan Worker ja botti julkaistaan samassa ikkunassa.
+- **Julkaisu:** Worker tilannevedoksesta d9a08f6 (Worker-tiedostot samat kuin mainin 32c5c0b:ssä), Worker-testit 69/69, `cf deploy --dry-run` ja `cf deploy`. Versio **27a20019-d376-4551-bca5-4aec83df46a7**, 10 tiedostoa vaihtui. Mukana bdee619 (tilaukset vain omistajalle), 1beade4 (kassanäkymä, maksusivu ilman puhelinestoa) ja d9a08f6 (agentin jälki: vaihtoehtojen syyt). Ei D1-migraatiota. Botin julkaisua ei tehty tästä chatista.
+- **Varmennettu livenä:** `mobile-gate.js`, `demo-payment.js/.css`, `agentti.js`, `agent-options.js` ja `app.js` vastaavat vedosta. `/`, `/keskustele`, `/ostoskori`, `/miten`, `/tilaukset`, `/agentti`, `/demo-payment` ja `/healthz` 200, `/api/chat` `available: true`, `/api/sync` ilman avainta 401, `/api/orders` henkilökohtainen ja tyhjä. Selaimessa puhelinkoossa (Android-tunniste, 375 px): maksusivulla ei estoa eikä vaakaylivuotoa, Tilaukset-sivulla esto näkyy. Botin healthz `host: cloud`.
+- **Ei varmennettu:** oikeaa tilausta ja maksua puhelimella uudella linkillä ei tehty. Bot–Worker-linkin yhteensopivuus on katettu `personal-orders`-testillä. Ensimmäinen oikea tilaus puhelimesta on varsinainen koe.
+
 ## 17.11.2026 — V023: toimitusvarmuuskysymys ensimmäisessä tilausviestissä tilausmoottorille (Claude Code, sessio A)
 
 - **Pyyntö:** Eelis pyysi korjaamaan session F:n Haiku-mittauksen V023:n: "30 l maitoa keskiviikoks. Mikä näistä toimitetaan varmimmin?" sai välillä mallin vastauksen "En pysty itse arvioimaan, mikä toimii varmimmin", vaikka katalogissa on toimitusvarmuus.
