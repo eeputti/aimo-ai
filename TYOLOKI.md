@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — reseptilinkin vastaus selkeäksi: ainekset listana, puuttuvat sulkeissa, täsmäys ei enää katkea (Claude Code, sessio H)
+
+- **Käyttäjän havainto:** kuva ja linkki toimivat puhelimella, mutta linkin vastaus listasi "Katalogista sopivia vaihtoehtoja" ja jokaiselle ainekselle "Sopivaa katalogiosumaa ei löytynyt", mikä oli vaikea lukea. Eelis: jos tuotetta ei ole, riittää "ei saatavilla juuri nyt" vaikka sulkeissa, jotta lista pysyy selkeänä. Lisäksi: miksei "spaghetti" tunnistunut pastaksi tai spagetiksi.
+- **Syy:** tuotannon kannan viimeisin linkkivastaus (kermainen kanapasta) näytti kaikki kymmenen ainesta puuttuvina, myös pastan, sipulin ja mustapippurin. Paikallinen toisto samoilla aineksilla: täsmäyskutsu (`whatsapp_link_match`, syvä taso) katkesi virheeseen "Vastaus katkesi (max_tokens)", koska Haikun ajattelu käytti koko 3000 tokenin varauksen. Silloin yksikään aines ei saanut tuotetta. Lisäksi linkin haku oli pelkkä katalogin tekstihaku: "parmesaani" ja "spagettipasta" eivät löytäneet mitään.
+- **Muutos (`server/whatsapp/link-advice.mjs`):** ennen päivää vastaus on "Ainekset:" ja rivit "- aines, määrä", eikä hakuosumien tuotenimiä näytetä (tuote valitaan tilauksessa). "(ei löytynyt valikoimasta)" tulee vain, kun haku ei löydä ainekselle mitään. Päivän jälkeen saatavuus on yksi lista, jossa merkintä on sulkeissa: ei löytynyt valikoimasta, ei saatavilla pe 20.11. (aikaisintaan …), ei tilattavana tarkalleen tätä, saatavuus tarkistetaan tilauksessa tai jätetään pois. Täsmäys on nyt nopea taso ilman ajattelua: sitä tarvitaan enää vain valmistetun aineksen (liemi) ostomäärän tarkentamiseen. Oikea Haiku-koe samoilla aineksilla: syvä taso 16 000 tokenin varauksella onnistui 17 sekunnissa, nopea taso 2,8 sekunnissa, ja kalaliemi merkittiin tarkennettavaksi. Haku kokeilee lisäksi Aimo-jäsentimen perusmuodon ja gh-kirjoitusasun (`lookupForms`): parmesaani → parmesan, spaghetti ja spagettipasta → spagetti ja spaghetti.
+- **Tarkistukset:** uusi `test/whatsapp-link-list.test.mjs` 4/4 (katkennut täsmäys ei merkitse löytyneitä puuttuviksi, lista ilman tuotenimiä, hakumuodot, oikea katalogi). Linkki- ja korvaajatestien odotukset päivitetty uuteen listaan. `npm test` 424/424.
+- **Käyttöönotto:** E julkaisee (Eeliksen päätös 17.11.). Muutos koskee vain bottia, ei Workeria.
+
 ## 17.11.2026 aamu — botin julkaisut 23d29cc, 43e87ae, 4741cff ja 75f5edb (Claude Code, sessio E)
 
 - **Käyttäjän luvat:** jokainen julkaisu pyydettiin toisesta sessiosta Eeliksen sanoin ja vahvistettiin tässä sessiossa ("Kyllä, julkaise"): ilmoittautumisen poisto botista (ca96393), siirtymäviestin rajaus (43e87ae), korin huomiot pelkkinä tietoina (4741cff) ja "se tavallinen" -tilaus (8357e11).

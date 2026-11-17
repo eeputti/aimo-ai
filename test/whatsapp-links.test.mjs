@@ -131,7 +131,8 @@ test('page suggestions use real catalogue names and code scaling, and adding req
   const out = await f.turn('Katso https://example.com/recipe 40 hengelle');
   assert.match(out.text, /Luin sivun: Testikeitto/);
   assert.match(out.text, /lohifilee, 4 kg/); assert.match(out.text, /ruokakerma, 2 l/);
-  assert.match(out.text, /Testi lohifilee/); assert.match(out.text, /tilli, määrä tarkennettava/);
+  // Hakuosumien tuotenimiä ei listata (tuote valitaan tilauksessa), eikä löytynyttä ainesta merkitä puuttuvaksi.
+  assert.doesNotMatch(out.text, /Testi lohifilee|katalog|ei löytynyt valikoimasta/); assert.match(out.text, /tilli, määrä tarkennettava/);
   assert.equal(f.orders.length, 0);
   const replay = await f.links.respond({ binding: f.member.binding, messageId: 'l1', text: 'https://example.com/recipe' });
   assert.deepEqual(replay, out); assert.deepEqual(f.stats(), { reads: 1, asks: 2 });
@@ -154,7 +155,7 @@ test('hallucinated ingredients and amounts are dropped, free-text claims never r
 test('unknown base servings are asked before scaling and transfer, dietary constraints filter candidates', async (t) => {
   const f = fixture(t, { ask: async () => ({ json: { ...analysis, servings: 0, servingsEvidence: '' } }) });
   const out = await f.turn('https://example.com 40 hengelle, maidoton');
-  assert.match(out.text, /Alkuperäinen annosmäärä puuttuu/); assert.match(out.text, /Sopivaa katalogiosumaa ei löytynyt/);
+  assert.match(out.text, /Alkuperäinen annosmäärä puuttuu/); assert.match(out.text, /\(ei löytynyt valikoimasta\)/); assert.doesNotMatch(out.text, /katalogiosuma/);
   assert.doesNotMatch(out.text, /Testi ruokakerma|lohifilee, 4 kg/);
   await f.turn('joo'); assert.equal(f.orders.length, 0);
   assert.match((await f.turn('4')).text, /lohifilee, 4 kg/);
@@ -179,7 +180,7 @@ test('prepared broth never transfers the recipe weight as a concentrate order an
       ? { rows: [{ index: 0, productIds: ['powder', 'invented'], needsQuantityCheck: false }] }
       : { ...analysis, ingredients: [{ term: 'kalaliemi', source: '2 kg kalalientä', amount: '2 kg' }] } }) });
   const out = await f.turn('https://example.com 40 hengelle');
-  assert.match(out.text, /kalaliemi, 20 kg/); assert.match(out.text, /määrä täsmennetään erikseen/);
+  assert.match(out.text, /- kalaliemi, ostomäärä tarkennetaan\n/); assert.doesNotMatch(out.text, /kalaliemi, 20 kg/);
   assert.doesNotMatch(out.text, /Testi Kalaliemi|invented/);
   await f.turn('joo'); assert.match(f.orders[0], /kalaliemi/); assert.doesNotMatch(f.orders[0], /kalaliemi 20 kg/);
 });

@@ -82,7 +82,7 @@ const header = (s) => `${s.source === 'copy' ? 'Luin reseptin' : 'Luin sivun'}${
 
 function reason(item, s) {
   const a = item.availability || {};
-  if (a.status === 'notInCatalog') return 'ei löydy Aimon valikoimasta';
+  if (a.status === 'notInCatalog') return 'ei löytynyt valikoimasta';
   if (a.status === 'notForDate') return `ei saatavilla ${dateLabel(s.date)}${a.next ? ` (aikaisintaan ${dateLabel(a.next)})` : ''}`;
   return 'tarkalleen tätä tuotetta ei ole tilattavana';
 }
@@ -106,24 +106,22 @@ function confirmQuestion(s) {
   return s.date ? `Lisätäänkö nämä ostoslistalle toimitukselle ${dateLabel(s.date)}? Tuotevalinnat ja hinnat käydään läpi sen jälkeen.`
     : 'Lisätäänkö nämä ainekset ostoslistalle? Tuotteet ja toimitus tarkistetaan sen jälkeen.';
 }
+// Yksi lista, jossa jokainen aines on kerran ja puuttuva tai tarkistamaton merkitään sulkeisiin (Eeliksen toive 17.11.:
+// "ei saatavilla juuri nyt vaiks suluis, et lista pysyis selkeenä"). Tuote valitaan vasta tilauksessa, joten hakuosumia ei näytetä.
+function availabilityMark(i, s) {
+  const a = i.availability || {};
+  const what = a.status === 'ok' ? ''
+    : a.status === 'notInCatalog' ? 'ei löytynyt valikoimasta'
+      : a.status === 'notForDate' ? `ei saatavilla ${dateLabel(s.date)}${a.next ? `, aikaisintaan ${dateLabel(a.next)}` : ''}`
+        : a.status === 'inexact' ? 'ei tilattavana tarkalleen tätä'
+          // Ei tietoa (rajapinta ei vastaa, ei välimuistissa) ei ole "ei saatavilla": aines pysyy listalla.
+          : 'saatavuus tarkistetaan tilauksessa';
+  return [what, i.autoDropped ? 'jätetään pois' : ''].filter(Boolean).join(', ');
+}
 function availabilityText(s) {
-  const line = (i) => `- ${i.term}, ${i.needsQuantityCheck ? 'ostomäärä tarkennetaan' : quantityText(i, s)}`;
-  const ok = s.items.filter((i) => i.availability?.status === 'ok');
-  const unknown = s.items.filter((i) => !MISSING.includes(i.availability?.status) && i.availability?.status !== 'ok');
-  const missing = (status) => s.items.filter((i) => i.availability?.status === status);
-  const parts = [`Tarkistin saatavuuden toimitukselle ${dateLabel(s.date)}`];
-  // Tuote valitaan vasta tilauksessa, joten tässä ei näytetä haun ensimmäistä osumaa (se voi olla maustettu tai erikoistuote).
-  if (ok.length) parts.push(`Saatavilla:\n${ok.map(line).join('\n')}`);
-  // Ei tietoa (rajapinta ei vastaa, ei välimuistissa) ei ole "ei saatavilla": aines pysyy listalla ja tarkistetaan tilauksessa.
-  if (unknown.length) parts.push(`Saatavuutta ei saatu nyt tarkistettua, tarkistetaan tilauksessa:\n${unknown.map(line).join('\n')}`);
-  const notes = [];
-  if (missing('notInCatalog').length) notes.push(`Ei Aimon valikoimassa: ${joinFi(missing('notInCatalog').map((i) => i.term))}.`);
-  if (missing('notForDate').length) notes.push(`Ei saatavilla ${dateLabel(s.date)}: ${joinFi(missing('notForDate').map((i) => `${i.term}${i.availability.next ? ` (aikaisintaan ${dateLabel(i.availability.next)})` : ''}`))}.`);
-  if (missing('inexact').length) notes.push(`Ei tilattavana tarkalleen tätä tuotetta: ${joinFi(missing('inexact').map((i) => i.term))}.`);
-  const dropped = s.items.filter((i) => i.autoDropped).map((i) => i.term);
-  if (dropped.length) notes.push(`En löytänyt näille tilattavaa korvaajaa, joten jätän ne pois listalta: ${joinFi(dropped)}. Voit lisätä ne myöhemmin itse.`);
-  if (notes.length) parts.push(notes.join('\n'));
-  return parts.join('\n\n');
+  const line = (i) => { const mark = availabilityMark(i, s); return `- ${i.term}, ${i.needsQuantityCheck ? 'ostomäärä tarkennetaan' : quantityText(i, s)}${mark ? ` (${mark})` : ''}`; };
+  const dropped = s.items.some((i) => i.autoDropped);
+  return [`Tarkistin saatavuuden toimitukselle ${dateLabel(s.date)}:`, ...s.items.map(line), ...(dropped ? ['Pois jätetyille ei löytynyt tilattavaa korvaajaa. Voit lisätä ne myöhemmin itse.'] : [])].join('\n');
 }
 function substituteChoice(text, item) {
   const t = norm(text); const subs = item.substitutes;
@@ -178,15 +176,12 @@ export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, n
       const open = openSubstitute(state);
       return reply([lead, header(state), sizeLine(state), availabilityText(state), open ? substituteQuestion(open, state) : confirmQuestion(state)].filter(Boolean).join('\n\n'));
     }
-    const rules = restrictions(state.request, shoppingList);
-    const lines = state.items.map((item) => {
-      const products = (item.products || []).filter((p) => fits(p, rules));
-      return `- ${item.term}, ${quantityText(item, state)}\n  ${products.length ? products.map((p) => clean(p.name)).join(' / ') : 'Sopivaa katalogiosumaa ei löytynyt.'}${item.needsQuantityCheck ? '\n  Reseptin määrä on valmistetulle ainekselle. Ostettavan tuotteen määrä täsmennetään erikseen.' : ''}`;
-    });
+    // Hakuosumia ei listata: tuote valitaan tilauksessa. Valikoimasta kokonaan puuttuva merkitään sulkeisiin.
+    const lines = state.items.map((item) => `- ${item.term}, ${item.needsQuantityCheck ? 'ostomäärä tarkennetaan' : quantityText(item, state)}${item.found === false ? ' (ei löytynyt valikoimasta)' : ''}`);
     const question = state.target && !state.servings ? 'Kerro alkuperäinen annosmäärä, niin lasken tarpeen.'
       : state.awaiting === 'date' ? 'Mille päivälle tarvitset toimituksen? Tarkistan sitten, mitä aineksista saa sille päivälle, ja ehdotan korvaavan tuotteen puuttuville.'
         : confirmQuestion(state);
-    return reply([lead, header(state), sizeLine(state), `Katalogista sopivia vaihtoehtoja:\n${lines.join('\n')}`, question].filter(Boolean).join('\n\n'));
+    return reply([lead, header(state), sizeLine(state), `Ainekset:\n${lines.join('\n')}`, question].filter(Boolean).join('\n\n'));
   }
 
   // Saatavuus valitulle päivälle ja korvaajat puuttuville. Mitään ei valita asiakkaan puolesta.
@@ -242,10 +237,14 @@ export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, n
     for (const [index, item] of state.items.entries()) {
       let products = [];
       try { products = (await lookup(item.term)).filter((p) => p?.id && clean(p.name) && fits(p, rules)).slice(0, 8); } catch { /* No candidate means no recommendation. */ }
+      item.found = products.length > 0;
       candidates.push({ index, term: item.term, source: item.source, candidates: products });
     }
     let matches;
-    try { matches = (await ask({ purpose: 'whatsapp_link_match', tier: 'deep', system: MATCH_SYSTEM, schema: MATCH_SCHEMA, maxTokens: 3000, timeoutMs: 60000, retries: 0,
+    // Täsmäys ratkaisee enää vain, onko aines valmistettu (liemi), jolloin ostomäärä tarkennetaan: tuotenimiä ei näytetä.
+    // Nopea taso ilman ajattelua: syvällä tasolla Haikun ajattelu täytti 3000 tokenia, kutsu katkesi ja jokainen aines
+    // näytti puuttuvalta (17.11.), ja onnistuessaankin se kesti 17 s. Nopea taso vastaa noin 3 sekunnissa.
+    try { matches = (await ask({ purpose: 'whatsapp_link_match', tier: 'fast', system: MATCH_SYSTEM, schema: MATCH_SCHEMA, maxTokens: 4000, timeoutMs: 60000, retries: 0,
       user: JSON.stringify({ request: state.request, rules, rows: candidates }) })).json; } catch { /* Ingredients remain readable when matching fails. */ }
     const rows = Array.isArray(matches?.rows) ? matches.rows : [];
     for (const [index, item] of state.items.entries()) {
@@ -352,6 +351,17 @@ export function createLinkAdvice({ db, ask, lookup, readPage = readPublicPage, n
   };
 }
 
+/**
+ * Hakumuodot linkin ainekselle. Sivun kirjoitusasu ei aina ole katalogin: Aimo-jäsennin antaa perusmuodon
+ * (parmesaani → parmesan, spaghetti ja spagettipasta → spagetti), ja italialainen gh-muoto haetaan molemmin päin,
+ * koska katalogissa on sekä "Spaghetti" että "Spagetti". Alkuperäinen muoto ensin.
+ */
+export function lookupForms(query, parse = () => null) {
+  let parsed = null; try { parsed = parse(query); } catch { /* jäsennin ei tunnistanut */ }
+  const forms = [query, query.replace(/^pakaste/iu, '').trim(), parsed].filter(Boolean);
+  return [...new Set([...forms, ...forms.map((q) => q.replace(/gh/giu, 'g')), ...forms.map((q) => q.replace(/(?<!g)getti/giu, 'ghetti'))])];
+}
+
 export async function createConfiguredLinkAdvice(store) {
   const [{ askAgent, agentEnabled }, { loadCatalog, publicProduct }, { createOrderingTools }, { understand }, { clock }] = await Promise.all([
     import('../aimoAgent.mjs'), import('../catalog.mjs'), import('../order-tools/index.mjs'), import('../aimo/understand.mjs'), import('../gateway/clock.mjs')]);
@@ -360,7 +370,7 @@ export async function createConfiguredLinkAdvice(store) {
   return createLinkAdvice({ db: store.db, ask: agentEnabled() ? askAgent : null, suggest: tools.suggest,
     parseDate: (text) => understand(text).deliveryDate || null, today: () => helsinkiDate(clock.now().getTime()),
     lookup: async (query) => {
-      const queries = [...new Set([query, query.replace(/^pakaste/iu, '').trim()])];
+      const queries = lookupForms(query, (q) => understand(q).items[0]?.productTerm);
       const products = queries.flatMap((q) => loadCatalog().search(q, { limit: 8 }).filter((hit) => hit.match === 'core').map((hit) => publicProduct(hit.product)));
       return [...new Map(products.map((p) => [p.id, p])).values()];
     } });

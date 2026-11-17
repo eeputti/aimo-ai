@@ -101,11 +101,12 @@ test('bot-protected link asks for a copy or a photo, keeps the rest of the messa
   assert.equal(hasLinkAdviceReply(f.store.db, f.member.binding, 'perjantaiks', f.time()), true);
 
   const checked = await f.turn('perjantaiks');
-  assert.match(checked.text, /Tarkistin saatavuuden toimitukselle pe 20\.11\.\n/);
-  assert.match(checked.text, /Saatavilla:\n- broilerin fileesuikale, 40 kg\n- tagliatelle, 25 kg\n\n/);
-  assert.match(checked.text, /Ei Aimon valikoimassa: valkosipulikerma\./);
-  assert.match(checked.text, /Ei saatavilla pe 20\.11\.: sitruuna \(aikaisintaan ma 23\.11\.\)\./);
-  assert.match(checked.text, /Valkosipulikerma: ei löydy Aimon valikoimasta\. Kelpaisiko tilalle jokin näistä\?\n1\) ruokakerma, noin 20 l \(esim\. Testi ruokakerma 1 kg\)\n2\) jätetään pois$/);
+  assert.match(checked.text, /Tarkistin saatavuuden toimitukselle pe 20\.11\.:\n/);
+  assert.match(checked.text, /Tarkistin saatavuuden toimitukselle pe 20\.11\.:\n- broilerin fileesuikale, 40 kg\n/);
+  assert.match(checked.text, /\n- tagliatelle, 25 kg\n/);
+  assert.match(checked.text, /\n- valkosipulikerma, [^\n]+ \(ei löytynyt valikoimasta\)\n/);
+  assert.match(checked.text, /\n- sitruuna, [^\n]+ \(ei saatavilla pe 20\.11\., aikaisintaan ma 23\.11\.\)\n/);
+  assert.match(checked.text, /Valkosipulikerma: ei löytynyt valikoimasta\. Kelpaisiko tilalle jokin näistä\?\n1\) ruokakerma, noin 20 l \(esim\. Testi ruokakerma 1 kg\)\n2\) jätetään pois$/);
   assert.doesNotMatch(checked.text, /ohita oikeudet/);
   assert.ok(f.calls.every((c) => c.date === '2026-11-20' && c.customer === 'c1'));
   // Kilo- ja litratarve kysytään oikealla määrällä, kappaletarve yhdellä myyntierällä.
@@ -137,7 +138,9 @@ test('a date in the link message checks availability at once, an ingredient with
       : purpose === 'whatsapp_link_substitutes' ? { rows: [] } : structuredClone(analysis) }) });
   const out = await f.turn('https://example.com/r perjantaiksi 40 hengelle');
   assert.match(out.text, /^Luin sivun: Kanapasta\n\nMäärät 40 annokselle\./);
-  assert.match(out.text, /En löytänyt näille tilattavaa korvaajaa, joten jätän ne pois listalta: valkosipulikerma ja sitruuna\. Voit lisätä ne myöhemmin itse\./);
+  assert.match(out.text, /- valkosipulikerma, [^\n]+ \(ei löytynyt valikoimasta, jätetään pois\)/);
+  assert.match(out.text, /- sitruuna, [^\n]+ \(ei saatavilla pe 20\.11\.[^\n]*, jätetään pois\)/);
+  assert.match(out.text, /Pois jätetyille ei löytynyt tilattavaa korvaajaa\. Voit lisätä ne myöhemmin itse\./);
   assert.match(out.text, /Lisätäänkö nämä ostoslistalle toimitukselle pe 20\.11\.\? Tuotevalinnat ja hinnat käydään läpi sen jälkeen\.$/);
   await f.turn('joo');
   assert.match(f.orders[0], /^Lisää ostoslistalle: broilerin fileesuikale 4 kg, tagliatelle 2,5 kg\. Toimitus 20\.11\.2026\./);
@@ -163,8 +166,8 @@ test('unknown availability (Valio API down, nothing cached) keeps the ingredient
       ? { rows: JSON.parse(user).rows.map((r) => ({ index: r.index, productIds: [], needsQuantityCheck: false })) }
       : purpose === 'whatsapp_link_substitutes' ? { rows: [] } : structuredClone(analysis) }) });
   const out = await f.turn('https://example.com/r perjantaiksi 40 hengelle');
-  assert.match(out.text, /Saatavuutta ei saatu nyt tarkistettua, tarkistetaan tilauksessa:\n- tagliatelle, 2,5 kg/);
-  assert.doesNotMatch(out.text, /jätän ne pois listalta: [^.]*tagliatelle/);
+  assert.match(out.text, /- tagliatelle, 2,5 kg \(saatavuus tarkistetaan tilauksessa\)/);
+  assert.doesNotMatch(out.text, /tagliatelle[^\n]*jätetään pois/);
   await f.turn('joo');
   assert.match(f.orders[0], /tagliatelle 2,5 kg/);
 });
