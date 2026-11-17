@@ -1,7 +1,7 @@
 // Pilviversio (Vercel): sama WhatsApp-palvelin ilman jatkuvasti käynnissä olevaa prosessia.
 // - Webhook kuitataan heti, ja jono käsitellään samassa kutsussa vastauksen jälkeen (waitUntil).
 // - Ajastettu /internal/tick (Cloudflaren cron kerran minuutissa) palauttaa keskeytyneet käsittelyt, uusii
-//   epäonnistuneet lähetykset, liittää landingin ilmoittautumiset ja välittää vahvistetut tilaukset tilausnäkymään.
+//   epäonnistuneet lähetykset, välittää vahvistetut tilaukset tilausnäkymään.
 // Kannat ovat Tursossa (server/sqlite.mjs), joten mikä tahansa instanssi näkee saman jonon, korit ja tilaukset.
 import crypto from 'node:crypto';
 import '@libsql/client/web'; // Varmistaa, että Vercel paketoi Turso-säikeen tarvitseman kirjaston.
@@ -25,18 +25,6 @@ const json = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 const same = (a, b) => a.length === b.length && crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
-
-let signups;
-async function linkSignups(store) {
-  const env = process.env;
-  if (!env.CLOUDFLARE_DEMO_URL || !env.CLOUDFLARE_DEMO_SYNC_TOKEN) return null;
-  if (!signups) {
-    const { createSignupApi, createSignupLinker, resolveChatUrl } = await import('../scripts/whatsapp-signups.mjs');
-    signups = createSignupLinker({ store, api: createSignupApi({ baseUrl: env.CLOUDFLARE_DEMO_URL, token: env.CLOUDFLARE_DEMO_SYNC_TOKEN }),
-      chatUrl: await resolveChatUrl(env), autoReady: env.WHATSAPP_SIGNUP_AUTO_READY === 'true' });
-  }
-  return (await signups.tick()).map(({ status }) => status);
-}
 
 /** Vahvistetut tilaukset tilausnäkymään ja maksusivulle. Worker käsittelee samat tilaukset vain kerran. */
 export async function publishOrders() {
@@ -68,10 +56,9 @@ export async function tick() {
   const channel = load();
   const recovered = channel.store.recoverStale();
   const processed = await drain(120_000);
-  const linked = await step('signups', () => linkSignups(channel.store));
   const published = await step('publish', publishOrders);
   if (new Date().getUTCMinutes() % 15 === 0) await step('prune', () => channel.prune());
-  return { recovered, processed, linked, published };
+  return { recovered, processed, published };
 }
 
 /** Vercel-funktion käsittelijä. waitUntil pitää kutsun elossa vastauksen jälkeen. */
