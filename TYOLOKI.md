@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — reseptilinkin korjaus tuotantoon (Claude Code, sessio E)
+
+- **Käyttäjän lupa:** sessio H pyysi julkaisua, Eelis vahvisti tässä sessiossa ("Kyllä, julkaise").
+- **Julkaisu:** botti Verceliin mainista 21fd780 (`server/whatsapp/link-advice.mjs`: täsmäys nopealla tasolla, ainekset selkeänä listana, puuttuvat sulkeissa, haku kokeilee perusmuodon), deployment aimo-whatsapp-68stiwnvs. Worker ennallaan (32cc6312).
+- **Tarkistukset:** `npm test` 424/424 ennen julkaisua; julkaisun jälkeen healthz `host: cloud`, webhookin GET-vahvistus 200, tick 200. Reseptilinkkiä ei kokeiltu puhelimella tässä sessiossa.
+
 ## 17.11.2026 — itsepeli V001–V035 uudelleen Haikulla V023-korjauksen jälkeen (Claude Code, sessio A)
 
 - **Pyyntö:** Eelis pyysi ajamaan itsepelin V-joukolle uudelleen. Lähde origin/main 8357e11 (mukana A:n, C:n ja V023-korjaukset). Apuri, simuloitu asiakas ja arvioija Haikulla (`DEEP_MODEL=claude-haiku-5-5`), eristetyt kannat, simuloidut hinnat, ei Meta-lähetyksiä, 0 tilausta. 283 mallikutsua, joista 2 epäonnistui, noin 0,09 USD, 4,4 min. Raportti vain paikallisesti (`data/selfplay/2026-11-17T07-35-58-734Z/`).
