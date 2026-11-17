@@ -1,0 +1,15 @@
+**
+!package.json
+!package-lock.json
+!server/
+!server/**
+!deploy/
+!deploy/selfhost-demo/
+!deploy/selfhost-demo/**
+**/.state
+**/.state/**
+**/.env
+**/.env.*
+**/*.db
+**/*.db-*
+**/*.pem

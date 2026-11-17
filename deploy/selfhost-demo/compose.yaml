@@ -1,0 +1,44 @@
+name: aimo-selfhost-demo
+services:
+  demo:
+    build:
+      context: ../..
+      dockerfile: deploy/selfhost-demo/Dockerfile
+    environment:
+      DEMO_CONTAINER: "true"
+      DEMO_PORT: "4765"
+      DEMO_STATE_DIR: /app/demo-state
+      DEMO_OLLAMA_URL: http://model:11434
+      DEMO_MODEL: ${DEMO_MODEL:-qwen3:14b}
+      DEMO_CONTEXT_TOKENS: ${DEMO_CONTEXT_TOKENS:-8192}
+      DEMO_TIMEOUT_MS: ${DEMO_TIMEOUT_MS:-180000}
+    ports:
+      - "127.0.0.1:${DEMO_PORT:-4765}:4765"
+    volumes:
+      - demo-state:/app/demo-state
+    depends_on:
+      model:
+        condition: service_healthy
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 300s
+  model:
+    image: ollama/ollama:0.40.16
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    volumes:
+      - demo-models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "env", "OLLAMA_HOST=http://127.0.0.1:11434", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+volumes:
+  demo-state:
+  demo-models:

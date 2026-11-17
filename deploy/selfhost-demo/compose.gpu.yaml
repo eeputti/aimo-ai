@@ -1,0 +1,4 @@
+# Optional NVIDIA GPU overlay for this demo only; requires NVIDIA Container Toolkit.
+services:
+  model:
+    gpus: all

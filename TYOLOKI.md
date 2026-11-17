@@ -2,6 +2,27 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — erillinen suuremman mallin demoversio valmis (Codex, Danielin chatti)
+
+- Käyttäjän pyytämä kokeiltava rinnakkaisversio deploy/selfhost-demo-hakemistossa. Oletus qwen3:14b, valittavissa muu omalla Ollamalla ajettava malli. Selain http://localhost:4765, oma tila, puhdas lapsiprosessin ympäristö ja oma Compose-projekti/levyt. Synteettiset tuotteet ja hinnat, ei tilauslähetystä. Nykyisiin server-/public-tiedostoihin, tuotannon asetuksiin, asiakkaisiin, kantoihin tai Meta-liitokseen ei tehty muutoksia.
+- Tarkistukset valmiit: laaja npm test 471: 388 läpi, 0 virhettä, 83 katalogiriippuvaista ohitusta; erilliset demo-/eristystestit 2/2; Chromiumin viesti→20 L→tuotevalinta→30 L→reload ja eri selainistunto läpi. Selainkoe käyttää käsikirjoitettua mallia. Syntaksit, Compose/GPU-overlay ja git diff --check läpi.
+- Oikea qwen3:8b-koe onnistui omassa CPU-kontissa: 20 L laktoositonta maitoa, muutos 30 L samalle riville ja rajoituksen säilyminen, valinta 5 × 6 L sekä rivin poisto. Ensimmäinen onnistunut kutsu noin 140 s, muutos noin 36 s ja poisto noin 41 s. Malli 14B/32B ja GPU-ajo eivät ole testattuja. Hakukorjaus/restart ja CPU-kokeen erityisasetukset rajattu näkyvästi raporttiin; ei väitettä koko keskustelun laadusta.
+- Uuden demon Docker-image rakennettu ja käynnistetty node-käyttäjänä read-only-juurella: sivu 200, oma qwen3:14b-asetus sekä mallin puuttumisen tila oikein ilman inferenssiä. Ensimmäisen konttikokeen COPY-oikeusvirhe korjattu vain uudessa imagessa. Levytilan loppuminen ratkaistiin käyttämättömän rakennusvälimuistin vapautuksella; ei sovelluskantojen tai Docker-levyjen poistoja. Kaikki tämän kokeen palvelimet pysäytetty.
+- Käynnistys, GPU-palvelimen suuntaa antava kapasiteetti ja SSH-porttivälitys deploy/selfhost-demo/README.md; tarkat tulokset TEST-REPORT.md. Ei henkilökohtaisten maksullisten tekoälyrajapintojen kutsuja, julkaisua tai nykyisen palvelun restarttia. Seuraava käyttöönoton vaihe on demon ajaminen omalla riittävän suurella palvelimella ja 14B-/32B-laatukoe.
+
+## 17.11.2026 — suuremman mallin demopaketti ja eristysketju toteutettu (Codex, Danielin chatti)
+
+- Uusi deploy/selfhost-demo: Node-käynnistin, oma selain-UI ja seitsemän synteettistä tuotetta, omat ostoslistat, oma Compose-projekti/levyt/portti ja valinnainen NVIDIA-overlay. Oletus qwen3:14b; malli ja pidempi CPU-kokeen timeout valittavissa. Nykyisen palvelimen lähdekoodia tai ympäristöasetuksia ei muutettu.
+- Eristetty oikean Node-prosessin/HTTP:n testiketju 2/2 läpi: ympäristön puhdistus, vieraan tilahakemiston torjunta, 20→30 l samalle riville, viestin uusinnan idempotenssi, selainten eristys, mallikatkon säilyttämä kori, tilaamisen esto ja restartin yli säilyvä oma kanta. Mallivastaukset tässä käsikirjoitettuja.
+- Demon Docker-image saatiin rakennettua ympäristön julkisen CA-varmenteen build-secretillä; TLS-tarkistus säilyi. Ensimmäinen build pysähtyi testiympäristön levytilaan, minkä jälkeen poistettiin vain aiemman oman, pysäytetyn mallikokeen kontti (sen tulokset olivat jo GitHubissa). Ei muiden konttien tai tuotannon muutoksia.
+- Oikea qwen3:8b ladattu erilliseen CPU-konttiin. Latausyritykset osuivat muistirajaan ennen vastausta: demo palautti käsittelyvirheen ja tyhjän korin. CPU-ajon lisävarauksen pienentämistä ja oikeaa selain-/mallikoetta jatketaan; laatutulosta ei väitetä valmiiksi.
+
+## 17.11.2026 — suuremman mallin erillinen selaindemo aloitettu (Codex, Danielin chatti)
+
+- Käyttäjä pyysi kokeiltavaa suuremman avoimen mallin demoversiota nykyistä toteutusta muuttamatta. Toteutetaan uusi deploy/selfhost-demo-kokonaisuus: oma käynnistin, puhdistetut ympäristöasetukset, oma tila ja selainkäyttöliittymä. Tuotannon palvelintiedostoihin, avaimiin tai kantoihin ei kosketa; hyödynnetään nykyistä keskustelumoottoria kirjastona.
+- Demolla on synteettiset tuotteet ja hinnat, tilausten lähetys estetään. Malli on vapaasti valittava omalta Ollama-palvelimelta; oletusehdokas qwen3:14b sopivalle GPU-palvelimelle. Yritetään erillinen qwen3:8b-mallikoe käytettävissä olevilla CPU-resursseilla. Tuotantoon soveltuvaa laatua ei luvata mallin koon perusteella.
+- Varattu vain uusi demohakemisto, sen testit ja työloki. Ei Metan asetuksia, julkista julkaisua tai nykyisten palvelinten restarttia. Seuraavat vaiheet: toimiva viesti→kori, eristys-/häiriötestit ja oikean mallin koe.
+
 ## 17.11.2026 — oikeat paikalliset mallikokeet valmiit: 0/12 ja 2/12 (Codex, Danielin chatti)
 
 - Ajettu qwen3:0.6b ja qwen3:1.7b samalla 12 synteettisen tapauksen tuotantotulkin kokeella. Lopulliset tulokset 0/12 ja 2/12. Suurempi osasi määränmuutoksen ja poiston; muissa tapauksissa mm. väärä tuote, keksitty määrä/päivä tai väärä operaatio. Normaali WhatsApp-tuotanto ja Anthropic-agentti eivät muuttuneet. 8B-mallia ei ajettu eikä mitään mallia hienosäädetty.
