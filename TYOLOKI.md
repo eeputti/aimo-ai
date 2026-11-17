@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 yö — pilvisiirron siivous: testikannat pois ja Macin tunneli suljettu (Claude Code, sessio E)
+
+- **Käyttäjän lupa ("Yes, clean up"):** Turso-testikannat `aimo-t-*` (viisi kopiota keskusteluista) poistettu; tuotantokannat `aimo-*` tarkistettu listasta ennallaan. Macin pikatunneli PID 94071 suljettu TERMillä sen jälkeen, kun Metan callback ja D1 `bot_backend_url` oli luettu takaisin Vercel-osoitteeksi; pilven healthz 200 sulkemisen jälkeen.
+- Session väliaikaiset kantakopiot, testiasetukset ja vanhat tilannevedokset poistettu. Muiden sessioiden vedoksiin (7262563, 8b29cff) ja Macin `data/`-kantoihin ei koskettu. `caffeinate` (PID 5780) jäi päälle.
+- Paluu Maciin vaatii nyt uuden pikatunnelin (päivitetty `docs/parallel/cloud-cutover.md`).
+
 ## 17.11.2026 yö — selainkeskustelu vastaa ja näyttää kuten WhatsApp: tuki-komento ja ajatusviivat (Claude Code, keskustele-chat)
 
 - **Käyttäjän pyyntö:** Eeliksen mukaan Workers-sivun Keskustele-botin pitää olla täsmälleen sama kuin WhatsAppin botti. Tarkistettu: kumpikin käyttää samaa `cartLink.chat`-polkua, samaa Vercel-julkaisua ja samoja Turso-kantoja (D1 `bot_backend_url` → Vercel 16.11. klo 23.50). Live-sivun "moi" sai vastauksen pilvibotilta 3 s:ssa. Tilausta ei tehty, mutta botin kantaan syntyi yksi selaimen testiasiakas. Eelis hyväksyi kahden jäljellä olevan eron yhtenäistämisen ("Kyllä, yhtenäistä").

@@ -12,7 +12,7 @@ Botti pyörii Vercelissä, ja Eeliksen Macia ei enää tarvita sen ajamiseen.
 | Metan webhook | `https://aimo-whatsapp.vercel.app/webhooks/whatsapp`, samat 10 kenttää | takaisinluku: oikea osoite, active |
 | Worker-sivuston botti | D1 `landing_settings.bot_backend_url` = Vercel-osoite | takaisinluku, `/whatsapp/cart.js` Workerin kautta 200 |
 
-Käytössä oleva versio: main **94c62f3** (sisältää A, B, C, D, F, H, I ja maksunapin korjaukset). Worker-sivusto julkaistu samasta commitista.
+Vaihdon jälkeinen versio: main **94c62f3** (myöhemmät Vercel-julkaisut ovat muiden sessioiden, ks. työloki) (sisältää A, B, C, D, F, H, I ja maksunapin korjaukset). Worker-sivusto julkaistu samasta commitista.
 D1:ssä ajettu `signup-verify.sql` (5 saraketta ja indeksi, 14 ilmoittautumisriviä säilyi).
 
 ## Mitä tehtiin
@@ -47,9 +47,8 @@ D1:ssä ajettu `signup-verify.sql` (5 saraketta ja indeksi, 14 ilmoittautumisriv
 
 ## Paluu Maciin (jos pilvi ei toimi)
 
-1. Metan callback takaisin tunneliin: tunneli `cloudflared` PID 94071 (`ridge-photographers-prospective-monitor.trycloudflare.com`)
-   jätettiin päälle vaihdon jälkeen. Jos se on suljettu, tarvitaan uusi pikatunneli ja sen osoite kolmeen paikkaan.
-2. D1 `bot_backend_url` takaisin tunnelin osoitteeseen.
+1. Uusi pikatunneli Macilla (`cloudflared tunnel --no-autoupdate --url http://localhost:4749`, ohjelma `/private/tmp/aimo-whatsapp-tools/cloudflared`): vanha tunneli suljettiin 17.11. Eeliksen luvalla. Uusi osoite `.env.whatsapp`:n `WHATSAPP_PUBLIC_URL`:iin ja Metan callbackiin.
+2. D1 `bot_backend_url` uuden tunnelin osoitteeseen.
 3. Botti snapshotista `/private/tmp/aimo-whatsapp-runtime-671b9a1` samalla komennolla
    (`node --disable-warning=ExperimentalWarning --env-file=.env --env-file=.env.whatsapp deploy/whatsapp/start.mjs`) ja julkaisija
    sen omalla komennolla (`--watch --order-events --agent-traces --include-web-chat`).
@@ -57,8 +56,11 @@ D1:ssä ajettu `signup-verify.sql` (5 saraketta ja indeksi, 14 ilmoittautumisriv
    `turso db shell aimo-<kanta> .dump > kanta.sql` ja `sqlite3 kanta.db < kanta.sql` ennen paluuta.
 5. Pysäytä ajastin (Worker `aimo-whatsapp-tick`), ettei pilvi julkaise samaan aikaan.
 
-## Siivottavaa (Eeliksen päätös)
+## Siivous (Eeliksen luvalla 17.11.)
 
-- Turso-testikannat `aimo-t-*` (sisältävät kopion keskusteluista) ja testiasetukset session scratchpadissa.
-- Tunneli PID 94071 ja `caffeinate` PID 5780, kun pilvi on todettu toimivaksi.
-- `deploy/vercel/tick/wrangler.jsonc` on vanha, ajastin julkaistaan nyt `cf`-työkalulla.
+- Turso-testikannat `aimo-t-*` poistettu; tuotantokannat `aimo-*` ennallaan.
+- Macin pikatunneli (PID 94071) suljettu. Meta ja D1 osoittivat jo Verceliin, pilven healthz 200 sulkemisen jälkeen.
+- Session omat väliaikaiset kantakopiot, testiasetukset ja vanhat tilannevedokset (9744f42, 5d6ae75) poistettu.
+  Macin alkuperäiset `data/`-kannat jäivät ennalleen (pysäytyshetken tila).
+- Jäljellä: `caffeinate` (PID 5780) on yhä päällä; sitä ei tarvita botille. `deploy/vercel/tick/wrangler.jsonc` on vanha,
+  ajastin julkaistaan nyt `cf`-työkalulla.
