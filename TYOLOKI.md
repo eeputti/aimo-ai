@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — Worker julkaistu: puhelimella kaikki sivut paitsi Keskustele (Claude Code, puhelinesto-chat)
+
+- **Käyttäjän pyyntö:** Eelis pyysi tässä chatissa "julkaise nyt" 47b42fd:n jälkeen. Julkaisut tekee muuten sessio E (taulu #319); E kuittasi, ettei julkaise Workeria rinnalle, ja julkaisu varattiin taululla (6dbe048c).
+- **Julkaisu:** Worker puhtaasta työpuusta mainista 4741cff, versio **32cc6312-8bf1-4209-88b1-c6561922e778**. Ennen julkaisua Worker-testit 58/58, typecheck, build ja `cf deploy --dry-run` (59 tiedostoa). Vaihtui 5 tiedostoa (index.html, miten.html, site.css, mobile-gate.js, kori/shop.css), 48 ennallaan, bindingit samat (DB, DEMO_PAYMENTS_ENABLED). 4748547:n (edellinen Worker-julkaisu) jälkeen Workeriin oli tullut vain 47b42fd ja 4741cff:n shop.css-synkka. Ei D1-muutoksia.
+- **Varmennettu livenä:** muuttuneet tiedostot tavulleen samat kuin build; /, /keskustele, /ostoskori, /miten, /agentti, /tilaukset, /demo-payment, /healthz ja /api/chat 200 (`available: true`), /api/sync ilman avainta 401. Puhelinkäytös (Keskustele-linkit piiloon, esto vain Keskustele-sivulla) varmennettiin paikallisesti samoilla tiedostoilla puhelinemulaatiolla; oikealla puhelimella ei vielä kokeiltu.
+- **Avoinna:** 4741cff muuttaa myös bottia (korin huomiot pelkkinä tietoina); sessio E kysyy Eelikseltä botin julkaisun, jotta botti ja Worker vastaavat toisiaan.
+
 ## 17.11.2026 aamu — "se tavallinen": ostajan toistuvat tuotteet koriin tavallisella määrällä (Claude Code, Junction 2026 -vertailu)
 
 - **Käyttäjän pyyntö:** Eelis pyysi lisäämään seuraavaksi Mankelin S.I.MO:n "my usual" -idean: "lisää seuraavaksi se tavallinen tilaus koriin". Koodia ei kopioitu, vain idea.
