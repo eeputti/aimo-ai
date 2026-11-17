@@ -74,6 +74,8 @@ docker compose --env-file deploy/selfhost-demo/.env -f deploy/selfhost-demo/comp
 | DEMO_PORT | 4765 | Demon oma selainportti |
 | DEMO_CONTEXT_TOKENS | 8192 | Mallin kontekstiraja |
 | DEMO_TIMEOUT_MS | 180000 | Demon mallikutsun enimmäisaika, 1000–300000 ms |
+| DEMO_KEEP_ALIVE | 30m | Ollaman mallin muistissa säilytys viimeisen mallikutsun jälkeen, 1m–60m |
+| DEMO_FAST_EDITS | true | Selkeät yksittäisen olemassa olevan rivin määrämuutokset ja poistot ilman mallikutsua; false poistaa optimoinnin |
 | DEMO_STATE_DIR | tämän hakemiston .state/ | Tyhjä tai tämän demon tunnistama hakemisto |
 | DEMO_OLLAMA_TOKEN | tyhjä | Mahdollisen oman HTTPS-mallivälityksen Bearer-tunnus |
 
@@ -83,7 +85,9 @@ Käynnistin luo lapsiprosessille puhtaan ympäristön. Tuotannon API-avaimia, Tu
 
 Käyttöliittymässä näkyy valittu malli sekä viestin käsittelyaika. Mallin puuttuminen, väärä tulkinta ja palvelinkatko ovat eri asioita: testaa määrät, yksiköt, rajoitteiden säilyminen ja poistot. Käytä lisäksi repon `scripts/ollama-eval.mjs`-ajuria erilliseen kiinteään tulkintakokeeseen, kun mallin kapasiteetti on riittävä. Se käyttää tuotantotulkin 60 s aikarajaa; tämän selainversion oma raja on pidempi CPU-kokeiden mahdollistamiseksi.
 
-Demon testit: `node --test test/selfhost-demo.test.mjs`. Ne käyttävät oikeaa HTTP-palvelinta ja keskustelumoottoria mutta käsikirjoitettua mallivastausta; näin testataan eristys, korimuutos, uudelleenyritys ja tallennuksen säilyminen. Todellisen mallin laatu raportoidaan erikseen työlokissa ja tämän demon testiraportissa.
+Demon testit: `node --test test/selfhost-demo.test.mjs test/selfhost-fast-edit.test.mjs`. Ne käyttävät oikeaa HTTP-palvelinta ja keskustelumoottoria mutta käsikirjoitettua mallivastausta; näin testataan eristys, korimuutos, uudelleenyritys ja tallennuksen säilyminen. Todellisen mallin laatu raportoidaan erikseen työlokissa ja tämän demon testiraportissa.
+
+Selkeä komento kuten **Muuta maidon määrä 30 litraan** tai **Poista maito** käsitellään ilman mallia, kun kohteena on täsmälleen yksi olemassa oleva rivi ja yksikkö sopii siihen. Ruokavaliota, toimituspäivää tai tuotevalintaa ei päätellä uudelleen. Epäselvät, yhdistetyt ja uusia tuotteita lisäävät viestit käyttävät edelleen valittua mallia. Malli pidetään muistissa 30 minuuttia viimeisen mallikutsun jälkeen; muistin riittävyys pitää varmistaa omalla palvelimella. CPU-ajossa uusien tilausten tulkinta voi edelleen kestää minuutteja. [Vasteaikakokeen rajaukset ja tulokset](../../docs/evaluations/aimo-speed-20261117.md).
 
 Tämän työvaiheen varmennukset ja oikean 8B-mallin koe: [TEST-REPORT.md](TEST-REPORT.md). 14B-/32B-malleja tai GPU-overlayta ei vielä ajettu tässä ympäristössä.
 

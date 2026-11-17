@@ -2,6 +2,23 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — live-demon selkeät korimuutokset noin 3 sekuntiin (Codex, Danielin chatti)
+
+- Käyttäjä pyysi nopeampia vastauksia. Dockerin oikean malliajon loki: kylmän syötteen käsittely noin 77 s ja generointi 53 s (2,47 tokenia/s). Suurin viive on kahden CPU-ytimen mallilaskenta; jonon pollaus ei selitä minuutteja.
+- Toteutetaan vain erilliseen demoon tarkasti rajattu nopea määrämuutos-/poistopolku sekä 30 minuutin mallin muistissa säilytys. Tuote, rivi ja yksikkö pitää tunnistaa yksiselitteisesti; epäselvä tai yhdistetty pyyntö jää samalle 8B-mallille. Ruokavaatimuksia tai toimituspäivää ei muuteta nopeassa polussa, eikä nykyisen WhatsApp-tuotannon koodiin kosketa.
+- Ensin regressiot ja eristetyn palvelimen mittaus. Live-demon hallittu päivitys säilyttää sen nykyiset istunnot ja tietokannan; kesken olevia viestejä ei keskeytetä. GPU-siirtoa tai mallin vaihtoa ei ole tehty.
+
+### Toteutettu ja varmennettu
+
+- Demo käyttää nyt rajattua `fast-edit.mjs`-polkua olemassa olevan yksiselitteisen rivin määrämuutokseen tai poistoon. Tuntematon tuote, useampi mahdollinen rivi, yhdistetty pyyntö, uusi ruokavaliorajoite, päivämäärä ja epäselvä yksikkö menevät mallille. Päivä, rajoitteet ja tuotevalinta säilyvät nykyisen keskustelumoottorin käsittelyssä. Optimoinnin voi poistaa `DEMO_FAST_EDITS=false`-asetuksella.
+- `DEMO_KEEP_ALIVE=30m` lähetetään Ollamaan mallikutsun mukana (sallittu 1m–60m). Tämän ajon mallille tehtiin myös tyhjän syötteen latauspyyntö ilman vastaustokenien generointia; `/api/ps` vahvisti pidennetyn muistissaoloajan. Ei pienennetty mallia tai kontekstia eikä otettu maksullista mallia käyttöön.
+- Eristetyn oikean Node-/HTTP-palvelimen määrämuutokset 48 ms ja 4 ms (HTTP 69 ms / 6 ms), 0 mallikutsua. Päivä ja laktoosittomuus säilyivät. Nämä ovat ohjelmalogiikan vasteita, eivät nopeutettua malligenerointia.
+- Käynnissä ollut live-sivun välitysprosessi oli pysähtynyt. Palautettu se irrotettuna prosessina; runner-salaisuus vaihdettu Sitesin salaisuusasetuksena ja sama aiemmin julkaistu lähdeversio 2 otettu käyttöön. Omistajan yksityinen yleisö ja URL säilyivät. Kahden olemassa olevan käyttäjän neljä viestiä yhdistettiin niiden tarkkojen job-id-tunnusten perusteella paikallisiin istuntoihin. Runnerin vain muistiin annettavat `sessionAliases` säilyttävät korien tunnisteet salaisuuden vaihdon yli; jaettu tai virheellinen alias estää käynnistyksen. Ei vanhan salaisuuden lukemista tai kannan nollausta.
+- Paikallinen palvelin pysäytettiin hallitusti ja käynnistettiin samalla demotilalla. Ennen/jälkeen-taulutiivisteet täsmäsivät: 2 luonnosta ja 4 viestitulosta säilyivät muuttumatta. Mallikonttia ei pysäytetty.
+- Julkaistun yksityisen sivun HTTP-koe erillisessä olemassa olevassa service-test-istunnossa: 30 L → 24 L → 30 L. Palvelin 42 ms / 5 ms, koko Site–jono–runner–vastaus 3253 ms / 2952 ms. Sama tuote, laktoosittomuus ja päivä, ei duplikaattia samalla viesti-id:llä, 0 mallikutsua. Käyttäjän omaa ostoskoria ei käytetty kokeeseen. Välitysyhteys jäi käyntiin. Selain-QA:ta ei tehty.
+- Kohdistetut testit **8/8**. Koko `npm test`: **478 yhteensä, 395 läpi, 0 virhettä, 83 katalogiriippuvaista ohitusta**. Compose-asetusten validointi ja `git diff --check` läpi. Ei nykyisen WhatsApp-tuotannon lähdekoodimuutoksia.
+- Tarkemmat mittausrajaukset: [docs/evaluations/aimo-speed-20261117.md](docs/evaluations/aimo-speed-20261117.md). Uusien vapaamuotoisten tilausten mallipäättely on edelleen hidasta kahdella CPU-ytimellä; seuraava suuri nopeutus olisi GPU-palvelin. Väliaikainen pilvitestikone ei takaa ympärivuorokautista saatavuutta.
+
 ## 17.11.2026 — reseptin valkosipuliarvio toimii myös, kun malli jättää yksikön tyhjäksi (Claude Code, Aimo-tilausapuri verkossa -chat)
 
 - **Pyyntö:** pääsessio kertoi Eeliksen pyynnöstä, ettei valkosipulin arvio toimi tuotannossa c78e73b:n jälkeen. Liitetty resepti (Kermainen kanapasta, 4 annosta, 2 valkosipulinkynttä, 20 annokselle) näytti "valkosipuli, määrä tarkennettava". Odotettu noin 0,05 kg.

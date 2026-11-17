@@ -33,7 +33,7 @@ test('isolated browser demo: real core updates carts, retries safely, isolates b
     if (req.url === '/api/tags') { res.end(JSON.stringify({ models: [{ name: 'qwen3:14b' }] })); return; }
     let raw = ''; for await (const part of req) raw += part;
     const request = JSON.parse(raw); modelCalls++;
-    assert.equal(request.model, 'qwen3:14b'); assert.equal(request.options.use_mmap, true);
+    assert.equal(request.model, 'qwen3:14b'); assert.equal(request.options.use_mmap, true); assert.equal(request.keep_alive, '30m');
     if (fail) { res.writeHead(503); res.end(); return; }
     const content = request.messages[1].content;
     const state = JSON.parse(content.split('Luonnoksen tila:\n')[1].split('\n\nOstajan viesti:')[0]);
@@ -70,7 +70,7 @@ test('isolated browser demo: real core updates carts, retries safely, isolates b
   await say('same retry', id); assert.equal(modelCalls, 1);
   const ready = await say('1'); assert.doesNotMatch(ready.text, /TILAA/);
   const selected = await getCart(); assert.equal(selected.lines[0].selectedProductId, 'demo-milk-lf');
-  const change = await say('maitoa 30 litraa'); assert.equal(change.cart.lines.length, 1); assert.equal(change.cart.lines[0].quantity.value, 30);
+  const change = await say('maitoa 30 litraa'); assert.equal(modelCalls, 1, 'explicit quantity edit must not call a model'); assert.equal(change.cart.lines.length, 1); assert.equal(change.cart.lines[0].quantity.value, 30);
   const other = (await fetch(base)).headers.get('set-cookie').split(';')[0]; assert.equal(await getCart(other), null);
   fail = true; await say('mallipalvelin poikki'); assert.equal((await getCart()).lines[0].quantity.value, 30);
   const calls = modelCalls; const order = await say('TILAA'); assert.doesNotMatch(order.status, /confirmed/); assert.equal(modelCalls, calls);

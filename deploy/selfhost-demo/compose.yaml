@@ -12,6 +12,8 @@ services:
       DEMO_MODEL: ${DEMO_MODEL:-qwen3:14b}
       DEMO_CONTEXT_TOKENS: ${DEMO_CONTEXT_TOKENS:-8192}
       DEMO_TIMEOUT_MS: ${DEMO_TIMEOUT_MS:-180000}
+      DEMO_KEEP_ALIVE: ${DEMO_KEEP_ALIVE:-30m}
+      DEMO_FAST_EDITS: ${DEMO_FAST_EDITS:-true}
     ports:
       - "127.0.0.1:${DEMO_PORT:-4765}:4765"
     volumes:

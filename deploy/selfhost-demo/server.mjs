@@ -4,6 +4,7 @@ import http from 'node:http';
 import crypto from 'node:crypto';
 import { demoSettings, ownState } from './settings.mjs';
 import { PRODUCTS, demoTools } from './catalog.mjs';
+import { fastEdit } from './fast-edit.mjs';
 // Import application modules only after start.mjs has created the isolated child environment.
 if (process.env.DEMO_CHILD !== 'true' || process.env.AIMO_MODEL_PROVIDER !== 'ollama') throw new Error('Käynnistä demo start.mjs-tiedostolla.');
 const cfg = demoSettings(); ownState(cfg.stateDir);
@@ -18,17 +19,18 @@ const [{ openDraftStore }, { createOrderingConversation }, { createModelInterpre
 ]);
 const store = openDraftStore(path.join(cfg.stateDir, 'drafts.db'));
 const tools = demoTools(); let modelCalls = 0;
-const interpret = createModelInterpreter({
+const modelInterpret = createModelInterpreter({
   ask: async (args) => {
     modelCalls++;
     const msg = await askOllama({ ...args, settings: cfg, model: cfg.ollamaModel, timeoutMs: cfg.timeout,
       // CPU demo weights can be memory-mapped; no copy of a multi-GB model is required in RAM.
-      fetchImpl: (url, opts) => { const body = JSON.parse(opts.body); body.options.use_mmap = true; return fetch(url, { ...opts, body: JSON.stringify(body) }); } });
+      fetchImpl: (url, opts) => { const body = JSON.parse(opts.body); body.options.use_mmap = true; body.keep_alive = cfg.keepAlive; return fetch(url, { ...opts, body: JSON.stringify(body) }); } });
     const text = msg.content[0].text;
     return { text, json: args.schema ? JSON.parse(text) : null };
   },
   fallback: () => { throw new Error('Mallin vastaus ei valmistunut.'); },
 });
+const interpret = (input) => (cfg.fastEdits && fastEdit(input)) || modelInterpret(input);
 const handleTurn = createOrderingConversation({ store, tools, interpretTurn: interpret });
 const queues = new Map();
 const json = (res, status, value) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(value)); };
@@ -74,6 +76,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(fs.readFileSync(new URL(url.pathname.slice(1), import.meta.url)));
     }
     if (req.method === 'GET' && url.pathname === '/api/status') return json(res, 200, { ...await modelStatus(), modelCalls,
+      fastEdits: cfg.fastEdits, keepAlive: cfg.keepAlive,
       isolated: true, sendsOrders: false, products: PRODUCTS.map(({ name }) => name) });
     if (req.method === 'GET' && url.pathname === '/api/cart') return json(res, 200, { cart: session(req, res).cart() });
     if (req.method === 'POST' && url.pathname === '/api/chat') {

@@ -1,6 +1,6 @@
 // Outbound-only bridge from a private Site queue to this isolated local demo.
 // Feed runtime access through hidden stdin; never pass it in argv or write it to disk.
-import { createHmac } from 'node:crypto';
+import { createRunnerCookie } from './runner-session.mjs';
 if(process.stdin.isTTY)process.stdin.setRawMode(true);
 process.stdout.write('Ready for private Site runner settings on stdin (hidden).\n');
 let input='';process.stdin.on('data',async chunk=>{
@@ -15,7 +15,7 @@ let input='';process.stdin.on('data',async chunk=>{
   if(!r.ok)throw new Error(`Site HTTP ${r.status}`);return r.json();
  };
  const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
- const cookie=user=>{const h=createHmac('sha256',cfg.runnerToken).update(user).digest('hex');return 'selfhost_demo='+[h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20,32)].join('-');};
+ const cookie=createRunnerCookie(cfg);
  let ready=false,heartbeatBusy=false,stopping=false;
  const heartbeat=async()=>{
   if(heartbeatBusy)return;heartbeatBusy=true;

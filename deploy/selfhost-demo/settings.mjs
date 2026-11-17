@@ -11,7 +11,10 @@ export function demoSettings(env = process.env) {
   const port = Number(env.DEMO_PORT || 4765); const timeout = Number(env.DEMO_TIMEOUT_MS || 180000);
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('DEMO_PORT: 1024–65535.');
   if (!Number.isInteger(timeout) || timeout < 1000 || timeout > 300000) throw new Error('DEMO_TIMEOUT_MS: 1000–300000.');
-  return { ...model, port, timeout, stateDir: path.resolve(env.DEMO_STATE_DIR || DEFAULT_STATE), container: env.DEMO_CONTAINER === 'true' };
+  const keepAlive = env.DEMO_KEEP_ALIVE || '30m';
+  if (!/^([1-9]|[1-5][0-9]|60)m$/.test(keepAlive)) throw new Error('DEMO_KEEP_ALIVE: 1m–60m.');
+  if (env.DEMO_FAST_EDITS && !['true','false'].includes(env.DEMO_FAST_EDITS)) throw new Error('DEMO_FAST_EDITS: true tai false.');
+  return { ...model, port, timeout, keepAlive, fastEdits: env.DEMO_FAST_EDITS !== 'false', stateDir: path.resolve(env.DEMO_STATE_DIR || DEFAULT_STATE), container: env.DEMO_CONTAINER === 'true' };
 }
 export function ownState(dir) {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -29,6 +32,7 @@ export function demoEnvironment(input = process.env) {
   const env = Object.fromEntries(['PATH', 'SystemRoot', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE'].filter((k) => input[k]).map((k) => [k, input[k]]));
   return { ...env, TZ: 'Europe/Helsinki', DEMO_CHILD: 'true', DEMO_PORT: String(cfg.port), DEMO_STATE_DIR: cfg.stateDir,
     DEMO_MODEL: cfg.ollamaModel, DEMO_OLLAMA_URL: cfg.ollamaUrl, DEMO_OLLAMA_TOKEN: cfg.ollamaToken,
+    DEMO_KEEP_ALIVE: cfg.keepAlive, DEMO_FAST_EDITS: String(cfg.fastEdits),
     DEMO_CONTEXT_TOKENS: String(cfg.ollamaContext), DEMO_TIMEOUT_MS: String(cfg.timeout), DEMO_CONTAINER: String(cfg.container),
     AIMO_MODEL_PROVIDER: 'ollama', OLLAMA_BASE_URL: cfg.ollamaUrl, OLLAMA_MODEL: cfg.ollamaModel, OLLAMA_CONTEXT_TOKENS: String(cfg.ollamaContext),
     OLLAMA_AUTH_TOKEN: cfg.ollamaToken, AIMO_CATALOG: path.join(cfg.stateDir, 'catalog.json'), AIMO_LEARNED: path.join(cfg.stateDir, 'learned.json'),
