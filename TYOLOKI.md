@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — Eeliksen pääsy erilliseen live-demoon (Codex, Danielin chatti)
+
+- Käyttäjä pyysi Eelikselle testilinkin ja antoi tämän ChatGPT-sähköpostiosoitteen käyttöoikeuden lisäämiseksi. Lisätty vain nimetylle osoitteelle Sitesin ulkopuolinen viewer-oikeus. Sähköpostiosoite on käyttöoikeusasetuksissa, ei tässä julkisessa lokissa. Omistajan oikeudet säilyivät, yleisö edelleen custom eikä julkinen, ei muokkausoikeuksia.
+- Sites get_site varmisti ulkopuolisten kutsujen olevan sallittuja ennen muutosta. Päivitys ja uusi get_site vahvistivat omistajan sekä yhden ulkopuolisen viewerin (käyttöoikeusrevision 2). Linkki säilyi samana. Käyttäjä kirjautuu omaan ChatGPT-tiliinsä; jokaisella on oma kori.
+- Paikallisen demopalvelimen tilakysely ready=true, qwen3:8b ja tilauslähetys estetty. Ei uutta mallikoetta, Eeliksen kirjautumista ei voitu testata hänen puolestaan. Ei lähdekoodin julkaisua, palvelinten restarttia, kanta- tai WhatsApp-tuotantomuutoksia. Päivitetty demon kaksi README-ohjetta, git diff --check läpi.
+
 ## 17.11.2026 — GPU-palvelimen kustannukset ja käyttöönoton suunnitelma (Codex, Danielin chatti)
 
 - Käyttäjä kysyi järkevää tapaa luoda GPU-palvelin. Tarkistettu valmistajien julkiset hinnastot ja ohjeet: Scaleway L4-1-24G (24 Gt VRAM, 8 vCPU, 48 Gt RAM) noin 0,79 €/h, hinnaston kk-arvio 575 € ilman veroja; Runpod RTX A5000 0,27 $/h ja RTX 4090 0,89 $/h hinnastossa. Levy/IP/verot ja saatavuus tarkistetaan tilaushetkellä. Kuusi tuntia Scaleway-laskentaa noin 4,74 €, ehdotettu kokonaisbudjettivaraus 10–15 €; käyttäjä ei vielä hyväksynyt vuokrausta tai budjettia.

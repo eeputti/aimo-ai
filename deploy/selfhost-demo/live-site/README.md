@@ -1,8 +1,8 @@
 # Yksityinen live-käyttöliittymä
 
-Julkaistu omistajalle: https://aimo-live-8b-demo-1711.daniel-turkkinen.chatgpt.site
+Julkaistu omistajalle ja erikseen kutsutulle testaajalle: https://aimo-live-8b-demo-1711.daniel-turkkinen.chatgpt.site
 
-Tämä hakemisto on Sites-lähdekoodin GitHub-kopio. Kanonisen Sites-repositorion julkaistu commit on 961990ac3634cd61e15a0f7fab1f3305c0920a11. Julkaisu on yksityinen ja vaatii omistajan ChatGPT-kirjautumisen; yleisöä ei avattu julkiseksi. Mallia ei ajeta Workerissa: se on erillisen pilvitestikoneen Ollamassa.
+Tämä hakemisto on Sites-lähdekoodin GitHub-kopio. Kanonisen Sites-repositorion julkaistu commit on 961990ac3634cd61e15a0f7fab1f3305c0920a11. Julkaisu vaatii käyttöoikeuden saaneen käyttäjän ChatGPT-kirjautumisen; yleisöä ei avattu julkiseksi. Omistajan lisäksi Eelis sai käyttäjän pyynnöstä viewer-oikeuden 17.11.2026. Tarkat sähköpostiosoitteet ovat Sitesin käyttöoikeusasetuksissa. Mallia ei ajeta Workerissa: se on erillisen pilvitestikoneen Ollamassa.
 
 ## Polku
 
