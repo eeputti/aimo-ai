@@ -94,4 +94,4 @@ Ei yhtään. Tämä selittää, miksi kansio jäi jälkeen: chatit tallensivat t
 
 Gitin ohittamat tiedostot (`.env*`, `data/`, `deploy/cloudflare/.env.publisher`, `.claude/worktrees/`, `node_modules/`) jäivät koskematta. Botti ja julkaisija PID 21794 ajavat omista snapshoteistaan, eikä tämä työ käynnistänyt niitä uudelleen. Tilannechat vaihtoi samaan aikaan botin versioon 671b9a1 (PID 94487 → 34645), ja sen merkinnän mukaan taulu puuttui sillä hetkellä; palautuksen jälkeen taulu toimii taas. `.local-archive/`, jonka `.gitignore` mainitsee, ei ole tässä kansiossa; sitä ei ole tässä työssä luotu eikä poistettu.
 
-Wip-haara `wip/shared-tree-2026-11-16` jää GitHubiin varmuuskopioksi. Sen voi poistaa, kun sitä ei enää tarvita.
+Wip-haara `wip/shared-tree-2026-11-16` (`2fb0b91`) poistettiin GitHubista ja paikallisesti Eeliksen pyynnöstä 17.11.2026. Sen kaikki 43 tiedostoa ovat sisällöltään mainin historiassa (luokittelu yllä), joten poisto ei hävittänyt mitään.
