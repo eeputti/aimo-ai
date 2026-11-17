@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — itse ajettavan mallin tuki, työ aloitettu (Codex, Danielin chatti)
+
+- Käyttäjä pyysi rakentamaan itse ajettavan mallin ja päivittämään työlokia tasaisesti. Toteutetaan Ollama-sovitin nykyisen keskitetyn askAgent-rajapinnan taakse; käytetään valmista avoimen mallin painotiedostoa, ei kouluteta perusmallia alusta.
+- Oletuksena nykyinen Anthropic-polku säilyy. Erikseen valittu Ollama ei saa siirtyä henkilökohtaiseen maksulliseen API:in virhetilanteessa. Tekstikeskustelu ja JSON-skeemaiset tulkinnat ensimmäiseksi; Anthropic-MCP-connector ja kuvamalli eivät kuulu tähän sovittimeen. Äänentunnistus on erillinen valinta.
+- Seuraavat vaiheet: asetukset ja sovitin, eristetyt HTTP-/integraatiotestit, Docker-palvelupaketti ja käyttöönotto-ohje. Oikean mallin laatu, palvelimen kapasiteetti ja tuotantosiirto jäävät erikseen varmennettaviksi. Ei tuotannon restarttia, mallilatausta tai maksullisia kutsuja tämän aloitusvaiheen aikana.
+
 ## 17.11.2026 — koneista riippumaton ajo ja projektin oma tekoälylaskutus (Codex, Danielin chatti)
 
 - Käyttäjän tavoite: WhatsApp-agentti toimii ilman kummankaan kehittäjän konetta eikä kuluta heidän henkilökohtaisia tekoälytilejään. Päivitetty puhdas klooni origin/main 34eed26:een ennen selvitystä.
