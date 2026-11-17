@@ -38,7 +38,7 @@ test('pakkauksen kappaleet Valion yksikkömuunnoksesta, nimi vain vahvistaa', ()
   assert.equal(unitSizeFor({ name: 'Kananmuna irto', category: '10590', salesUnit: 'KG' }, null, 'PCS', 'items'), null, 'kilomunat eivät tule munamäärälle');
 });
 
-test('kpl ja paljas luku ovat kappaleita kaikille tuotteille, pakkaussanat myyntieriä', () => {
+test('kpl ja paljas luku ovat kappaleita kaikille tuotteille, pakkaussanat myyntieriä', { skip: !fs.existsSync(CATALOG) && 'paikallinen katalogi puuttuu' }, () => {
   const q = (t) => understand(t).items[0].quantity;
   assert.deepEqual(q('10 kpl leivoksia'), { value: 10, unit: 'PCS', basis: 'items' });
   assert.deepEqual(q('10 leivosta'), { value: 10, unit: 'PCS', basis: 'items' });
@@ -71,7 +71,7 @@ const box = (id, name, perBox, need, price) => {
   return { productId: id, name, salesUnits: units, salesUnitLabel: 'ltk', covers: { value: units * perBox, unit: 'PCS' }, lineNet: +(units * price).toFixed(2), unitPriceNet: price };
 };
 
-test('10 kpl leivoksia: yksi 30 leivoksen laatikko ja ylijäämä kerrotaan', async () => {
+test('10 kpl leivoksia: yksi 30 leivoksen laatikko ja ylijäämä kerrotaan', { skip: !fs.existsSync(CATALOG) && 'paikallinen katalogi puuttuu' }, async () => {
   const f = setup((l) => [box('472410', LEIVOS.name, 30, l.quantity.value, 55.55)]);
   const r = await f.say('10 kpl vadelma-valkosuklaaleivoksia tiistaiksi');
   assert.deepEqual(f.asked.at(-1), { value: 10, unit: 'PCS', basis: 'items' });
@@ -82,7 +82,7 @@ test('10 kpl leivoksia: yksi 30 leivoksen laatikko ja ylijäämä kerrotaan', as
   assert.match(r.text, /Tarve on 10 kpl; pienin näistä myyntieristä kattaa 30 kpl\./u);
 });
 
-test('12 kpl hilloa: kaksi kuuden purkin laatikkoa; "2 laatikkoa" pysyy myyntierinä', async () => {
+test('12 kpl hilloa: kaksi kuuden purkin laatikkoa; "2 laatikkoa" pysyy myyntierinä', { skip: !fs.existsSync(CATALOG) && 'paikallinen katalogi puuttuu' }, async () => {
   const f = setup((l) => [l.quantity.basis === 'items' ? box('H1', HILLO.name, 6, l.quantity.value, 18) : { ...box('H1', HILLO.name, 1, l.quantity.value, 18), covers: null }]);
   const r = await f.say('12 kpl vadelmahilloa tiistaiksi');
   assert.match(r.text, /2 laatikkoa à 6 kpl, yhteensä 12 kpl, 36,00 €/u);
@@ -91,7 +91,7 @@ test('12 kpl hilloa: kaksi kuuden purkin laatikkoa; "2 laatikkoa" pysyy myyntier
   assert.equal(g.asked.at(-1).basis ?? 'sales', 'sales');
 });
 
-test('vastaava tuote valittu ja määrä kysytty: vastaus "10 kpl" on kappaleita, ei laatikoita', async () => {
+test('vastaava tuote valittu ja määrä kysytty: vastaus "10 kpl" on kappaleita, ei laatikoita', { skip: !fs.existsSync(CATALOG) && 'paikallinen katalogi puuttuu' }, async () => {
   // Jäätelön tilalle tarjottu leivos (eri mittayksikkö): hinta yhdestä laatikosta, määrä kysytään valinnan jälkeen.
   const f = setup((l) => (l.quantity?.unit === 'L' ? [{ ...box('472410', LEIVOS.name, 1, 1, 55.55), covers: null, askQuantity: true, replaceTerm: 'vadelma-valkosuklaaleivos' }]
     : [box('472410', LEIVOS.name, 30, l.quantity.value, 55.55)]));
@@ -102,7 +102,7 @@ test('vastaava tuote valittu ja määrä kysytty: vastaus "10 kpl" on kappaleita
   assert.deepEqual(f.list().lines[0].quantity, { value: 10, unit: 'PCS', basis: 'items' });
 });
 
-test('pakkauksen kappalemäärä tuntematon: hinta yhdestä myyntierästä, määrä kysytään myyntierinä', async () => {
+test('pakkauksen kappalemäärä tuntematon: hinta yhdestä myyntierästä, määrä kysytään myyntierinä', { skip: !fs.existsSync(CATALOG) && 'paikallinen katalogi puuttuu' }, async () => {
   const f = setup((l) => (l.quantity?.basis === 'sales' ? [{ ...box('X1', 'Sekalaiset leivokset', 1, l.quantity.value, 40), covers: null }]
     : [{ ...box('X1', 'Sekalaiset leivokset', 1, 1, 40), covers: null, askQuantity: true, countUnknown: true }]));
   const r = await f.say('10 kpl leivoksia tiistaiksi');
