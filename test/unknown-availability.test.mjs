@@ -90,3 +90,30 @@ test('pelkkä päivävastaus valintalistan aikana menee tilausmoottorille ilman 
   assert.doesNotMatch(r.text, /Tarkoitatko/);
   assert.match(r.text, /Toimitus pe 20\.11\./);
 });
+
+test('rivi ilman tilattavaa tuotetta ei ole "Sen jälkeen valitaan" -listassa, vaan sille kerrotaan vaihtoehdot (spagetti pe 20.11.)', async () => {
+  const opt = (name, i) => ({ productId: `${name}-${i}`, name: `${name} ${i}`, salesUnits: 1, salesUnitLabel: 'kpl', lineNet: 10 * i, labels: [] });
+  const script = { 'spagettia kanaa ja kastiketta': { intent: 'order', deliveryDate: '2026-11-20', ops: ['spagetti', 'kanafilee', 'valkosipulikastike'].map((productTerm) => ({ op: 'add', productTerm, quantity: { value: 2, unit: 'KG' }, claims: [], excludeAllergens: [] })) } };
+  const store = openDraftStore(':memory:', () => clock);
+  const tools = {
+    async suggest({ draft, exclude }) {
+      const l = draft.lines[0];
+      if (l.productTerm === 'spagetti') return { issues: [{ code: 'NO_ORDERABLE_PRODUCT', ref: l.ref, nextDeliveryDate: null, message: `Ei tilattavaa tuotetta päivälle pe 20.11.: ${l.productTerm}.` }], lines: [] };
+      const shown = exclude?.[l.ref] || [];
+      const list = [1, 2, 3, 4, 5].map((i) => opt(l.productTerm, i)).filter((o) => !shown.includes(o.productId));
+      return { issues: [], lines: [{ ref: l.ref, total: list.length, more: list.length > 3, exact: true, clarify: [], options: list.slice(0, 3).map((o) => ({ ...o, covers: l.quantity })) }] };
+    },
+    async quote() { return { issues: [], lines: [] }; }, async submit() { return { status: 'confirmed', orderId: 'X' }; },
+  };
+  const handleTurn = createOrderingConversation({ store, tools, now: () => clock, interpretTurn: async ({ text }) => script[text] || { intent: 'other', ops: [] } });
+  let n = 0; const say = (text) => handleTurn({ messageId: `m${++n}`, conversationId: 'c', customer, text, receivedAt: clock });
+  const first = await say('spagettia kanaa ja kastiketta');
+  assert.match(first.text, /Ei tilattavaa tuotetta päivälle pe 20\.11\.: spagetti\./);
+  assert.match(first.text, /\*Kanafilee 2 kg:\*/);
+  assert.match(first.text, /Sen jälkeen valitaan valkosipulikastike\./);
+  assert.doesNotMatch(first.text, /valitaan[^.\n]*spagetti/);
+  assert.match(first.text, /Spagetti jää ilman tuotetta tälle päivälle\. Vaihda päivä tai tuote, tai poista se kirjoittamalla "poista spagetti"\./);
+  // "Näytä lisää" samalle riville ei palauta spagettia valittavien listaan.
+  const more = await say('näytä lisää');
+  assert.doesNotMatch(more.text, /valitaan[^.\n]*spagetti/);
+});

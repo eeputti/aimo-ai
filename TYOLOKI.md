@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — tilattavaa vailla olevaa tuotetta ei luvata valita seuraavaksi (Claude Code, Aimo-tilausapuri verkossa -chat)
+
+- **Käyttäjän pyyntö:** "korjaa myös toi spagetin ristiriita". Määräarvion live-kokeessa botti sanoi "Ei tilattavaa tuotetta päivälle pe 20.11.: spagetti." ja lopetti silti "Sen jälkeen valitaan spagetti ja valkosipulikastike."
+- **Muutos (`order-conversation/index.mjs`, advance):** rivit, joille tällä päivällä ei ole tilattavaa (NO_ORDERABLE_PRODUCT), jäävät pois "Sen jälkeen valitaan" -listasta. Niistä kerrotaan erikseen: "Spagetti jää ilman tuotetta tälle päivälle. Vaihda päivä tai tuote, tai poista se kirjoittamalla "poista spagetti"." Tieto pidetään luonnoksessa samalle päivälle (`draft.noOptions`), jottei "näytä lisää" palauta riviä listaan. Kun päivä vaihtuu, tieto nollautuu ja rivi haetaan uudelleen.
+- **Koordinointi:** 10 kpl -session varaus 70aafbc6 kattaa tiedoston, mutta sen keskeneräinen muutos ei koske siihen. Sessiolle ilmoitettiin ennen muutosta.
+- **Tarkistukset:** uusi testi `test/unknown-availability.test.mjs`:ssä (5/5), koko `npm test` 431/431. Oikea Haiku koko keskustelupinossa välimuistikannan kopiolla: määräarvio ja "joo" johtivat viestiin "Sen jälkeen valitaan valkosipulikastike." ja erilliseen spagettiohjeeseen. Ei tilauksia, Meta-viestejä eikä julkaisua.
+- **Avoinna:** käyttöön botin julkaisussa (sessio E, Eeliksen luvalla).
+
 ## 17.11.2026 aamu — sipulikorjaus ja puuttuvien määrien arvio tuotantoon (Claude Code, sessio E)
 
 - **Käyttäjän lupa:** kaksi sessiota pyysi julkaisua Eeliksen sanoin; Eelis vahvisti tässä sessiossa molemmat samaan julkaisuun ("Kyllä, molemmat").

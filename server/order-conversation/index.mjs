@@ -443,12 +443,15 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       const urgent = draft.rush || draft.deliveryDate <= addDays(today, 1);
       // Saatavuutta ei saatu tarkistettua (rajapinta alhaalla, tuotteesta ei aiempaa tietoa): sama koskee kaikkia päiviä.
       const unknownTerms = []; let blocked = 0;
+      // Rivit, joille tällä päivällä ei ole tilattavaa: niitä ei luvata valita seuraavaksi (spagetti pe 20.11., 17.11.).
+      // Tieto säilyy luonnoksessa samalle päivälle, jotta "näytä lisää" ei palauta niitä "Sen jälkeen valitaan" -listaan.
+      const blockedRefs = new Set(x && draft.noOptions?.date === draft.deliveryDate ? draft.noOptions.refs : []);
       if (!x) {
         for (const l of open) {
           const s = await tools.suggest({ customer, draft: { ...draft, lines: [l] } });
           if (s.lines[0]?.options?.length) { problems.push(...s.issues.map((i) => i.message)); x = s.lines[0]; line = l; draft.seen[l.ref] = x.options.map((o) => o.productId); break; }
           const none = s.issues.find((i) => i.code === 'NO_ORDERABLE_PRODUCT' && i.ref === l.ref);
-          if (none) blocked += 1;
+          if (none) { blocked += 1; blockedRefs.add(l.ref); }
           if (none?.availabilityUnknown) unknownTerms.push(l.productTerm);
           // Tuntematonta saatavuutta ei kannata kokeilla seuraaville päiville: tieto puuttuu niiltäkin.
           if (none && !none.availabilityUnknown && urgent && !(draft.keptDates || []).includes(draft.deliveryDate)) {
@@ -534,7 +537,10 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       // Lisävaihtoehtojen numero kuuluu ohjeeseen, kun se näkyy listassa (C1: "Vastaa 1, 2 tai 3" ja rivi 4).
       const numbers = [...x.options.map((_, i) => String(i + 1)), ...(moreNo ? [String(moreNo)] : [])];
       const how = numbers.length === 1 ? 'Vastaa 1.' : `Vastaa ${numbers.slice(0, -1).join(', ')} tai ${numbers.at(-1)}.`;
-      const later = open.filter((l) => l.ref !== x.ref).map((l) => l.productTerm);
+      draft.noOptions = { date: draft.deliveryDate, refs: [...blockedRefs].filter((ref) => ref !== x.ref) };
+      const blockedTerms = open.filter((l) => l.ref !== x.ref && blockedRefs.has(l.ref)).map((l) => l.productTerm);
+      const later = open.filter((l) => l.ref !== x.ref && !blockedRefs.has(l.ref)).map((l) => l.productTerm);
+      const blockedNote = blockedTerms.length ? `\n${cap(joinFi(blockedTerms))} jää ilman tuotetta tälle päivälle. Vaihda päivä tai tuote, tai poista ${blockedTerms.length > 1 ? 'ne' : 'se'} kirjoittamalla "poista ${blockedTerms[0]}".` : '';
       const diet = dietLabel(draft.diet);
       // Myyntierä voi olla tarvetta suurempi: kerrotaan, ettei tarvetta ole muutettu. Pelkät luomuvaihtoehdot mainitaan.
       const covered = x.options.filter((o) => o.covers?.unit === line.quantity.unit).map((o) => o.covers.value);
@@ -555,7 +561,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
           : `Tarkkaa osumaa ei löytynyt: ${line.productTerm}. Lähimmät tilattavat vaihtoehdot:`] : []),
         `*${cap(lineLabel(line))}:*`, ...x.options.map((o, i) => `${i + 1}) ${optionLabel(o, line)}`),
         ...(moreNo ? [`${moreNo}) Näytä lisää vaihtoehtoja`] : []), ...notes,
-        `${how}${later.length ? ` Sen jälkeen valitaan ${joinFi(later)}.` : ''}`].join('\n');
+        `${how}${later.length ? ` Sen jälkeen valitaan ${joinFi(later)}.` : ''}${blockedNote}`].join('\n');
       return { status: 'choosing', text: [...problems, block].join('\n\n') };
     }
 
