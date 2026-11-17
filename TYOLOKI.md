@@ -2,6 +2,16 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — botti tuotantoon mainista b988f0e: valkosipulin kappaleyksikkö ja X041 (Claude Code, sessio E)
+
+- **Käyttäjän lupa:** sessio "10 kpl tarkoittaa kappaleita" pyysi julkaisemaan 9480a54:n Eeliksen hyväksynnällä, ja Eelis vahvisti julkaisun myös tässä sessiossa ("Kyllä, julkaise").
+- **Julkaisu:** botti mainista b988f0e, deployment aimo-whatsapp-6j0effhsi. Botin koodi on sama kuin 9480a54:ssä, koska sen jälkeiset commitit koskevat vain `deploy/selfhost-demo`-kansiota ja dokumentteja. Mukana:
+  - 9480a54: reseptin kappalerivin yksikkö päätellään aineesta, kun malli jättää sen tyhjäksi.
+  - a8c0fbc: epäselvä ensiviesti, jossa on määriä, kysyy toimituspäivän.
+  - Ollama-mallisovitin (6402f11, 10db416) ja uusi riippuvuus `ajv`.
+- **Malli ennallaan:** Vercelissä ei ole `AIMO_MODEL_PROVIDER`-asetusta. Oletus on anthropic, joten DEEP_MODEL ja FAST_MODEL ovat samat kuin ennen. Kuvien luku säilyy päällä.
+- **Tarkistukset:** ennen julkaisua `npm test` 478/478, Worker 58/58, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54 ja tuoteajo 611 vaihtoehtoa ilman tarjouksen kaatumista. Julkaisun jälkeen healthz `host: cloud`, webhookin vahvistus 200 ja tick 200 (12 tilausta), ja tuotantoalias osoittaa uuteen julkaisuun. Worker ennallaan (32cc6312), `/whatsapp/cart.js` Workerin kautta 200.
+
 ## 17.11.2026 — Eeliksen pääsy erilliseen live-demoon (Codex, Danielin chatti)
 
 - Käyttäjä pyysi Eelikselle testilinkin ja antoi tämän ChatGPT-sähköpostiosoitteen käyttöoikeuden lisäämiseksi. Lisätty vain nimetylle osoitteelle Sitesin ulkopuolinen viewer-oikeus. Sähköpostiosoite on käyttöoikeusasetuksissa, ei tässä julkisessa lokissa. Omistajan oikeudet säilyivät, yleisö edelleen custom eikä julkinen, ei muokkausoikeuksia.
