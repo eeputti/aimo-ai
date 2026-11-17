@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — GPU-vuokran ja Anthropicin API:n kustannusvertailu (Codex, Danielin chatti)
+
+- Käyttäjä pyysi hintavertailua. Valmistajien ajantasaiset hinnastot tarkistettu: Haiku 5.5 syöte/tuloste 0,10/0,50 $, Sonnet 5.5 2/10 $, Opus 5.5 4/20 $ miljoonalta tokenilta. Haikun perushinta enintään 100 000 tokenin syötteelle. Runpod A5000 0,27 $/h, 4090 0,89 $/h, Scaleway L4 noin 0,79 €/h + lisäkulut.
+- Vertailuoletus 3000 syötetokenia + 500 tulostokenia per mallikutsu, ei mitattu nykyisen käytön keskiarvo. 10 000 kutsua: Haiku 5,50 $, Sonnet 110 $, Opus 220 $. Yksi WhatsApp-viesti voi tarvita useita kutsuja, ja ajattelu-/työkalutokenit sekä historia vaikuttavat. Repossa on jo prompt-välimuistimerkintöjä; niiden todellisia osumia ei tässä mitattu.
+- 730 h GPU-vuokra: A5000 197,10 $, 4090 649,70 $. A5000:n pelkän laskentavuokran tasapiste noin 18 000 Sonnet-kutsua kuussa tällä oletuksella; mallien samaa laatua, GPU-kapasiteettia tai viivettä ei ole varmennettu. Veroja, ylläpitotyötä ja yhteisiä sovellus-/WhatsApp-kuluja ei sekoiteta laskelmaan. Euroa ja dollaria ei rinnasteta ilman kurssia.
+- Suositus: kevyelle käytölle projektin oma API-organisaatio, avain ja kuluraja todennäköisesti edullisempi kuin jatkuva GPU. Tämä erottaa laskutuksen henkilökohtaisesta organisaatiosta; pelkkä uusi workspace saman maksajan alla ei tee sitä. Ei käyttäjän päätöstä vaihtaa mallia tai luopua GPU-kokeesta.
+- Laskelma ja lähteet [docs/gpu-api-costs.md](docs/gpu-api-costs.md), luvut JSON-raportissa. Ei mallikutsuja, palvelinhankintaa, live-asetusten muutoksia tai testiasiakkaiden tietojen lukua.
+- Tarkistukset: Pythonilla kaikki tokeniskenaariot, 730 tunnin GPU-summat ja tasapisteiden molemmat rajat läpi; git diff --check läpi. Vain dokumentaatio ja laskelman luvut, ei sovellustestien uusintaa.
+
 ## 17.11.2026 — Eeliksen live-testin sähköpostiosoitteen korjaus (Codex, Danielin chatti)
 
 - Käyttäjä korjasi aiemmin antamansa testikäyttäjän osoitteen. Poistettu väärän osoitteen käyttöoikeus ja lisätty viimeksi vahvistetulle osoitteelle viewer-oikeus. Osoitteet säilyvät vain Sitesin käyttöoikeusasetuksissa. Omistajan oikeudet, custom-yleisö ja testilinkki säilyivät.

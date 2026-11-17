@@ -2,6 +2,8 @@
 
 Tilanne ja julkiset hinnastot tarkistettu 17.11.2026. Tämä on käyttöönottoa varten valmisteltu suunnitelma, ei tilattu palvelin tai varmennettu GPU-ajo. Nykyistä WhatsApp-tuotantoa ja käynnissä olevaa live-demoa ei muuteta tällä työvaiheella.
 
+Kustannukset suhteessa Anthropicin API:in ja tarvittava käyttömäärä: [gpu-api-costs.md](gpu-api-costs.md). Kevyessä käytössä API voi olla jatkuvaa GPU-vuokraa huomattavasti edullisempi.
+
 ## Suositus ensimmäiseen kokeeseen
 
 Vuokrataan yksi 24 Gt:n NVIDIA-GPU muutamaksi tunniksi. Nykyiseen Docker Compose -pakettiin suoraviivainen vaihtoehto on **Scaleway L4-1-24G -virtuaalikone**: 1 × L4, 24 Gt näyttömuistia, 8 vCPU:ta ja 48 Gt RAMia. GPU-käyttöjärjestelmäkuvassa on NVIDIA-ajurit ja Docker-ympäristö valmiina. Levyksi varataan esimerkiksi 60 Gt pysyvää tilaa.

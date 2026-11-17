@@ -1,0 +1,69 @@
+{
+  "assumptions": {
+    "inputTokens": 3000,
+    "outputTokens": 500,
+    "apiCallsPerMessage": 1,
+    "hoursPerMonth": 730,
+    "cachedInputTokens": 0,
+    "allPricesBeforeTaxAndOtherServices": true
+  },
+  "models": {
+    "Haiku 5.5": {
+      "inputUsdPerMillion": 0.1,
+      "outputUsdPerMillion": 0.5,
+      "usdPerCall": 0.00055,
+      "usdPer1000Calls": 0.55,
+      "usdPer10000Calls": 5.5,
+      "usdPer100000Calls": 55.0,
+      "threeCallsPerMessage_usdPer10000Messages": 16.5
+    },
+    "Sonnet 5.5": {
+      "inputUsdPerMillion": 2.0,
+      "outputUsdPerMillion": 10.0,
+      "usdPerCall": 0.011,
+      "usdPer1000Calls": 11.0,
+      "usdPer10000Calls": 110.0,
+      "usdPer100000Calls": 1100.0,
+      "threeCallsPerMessage_usdPer10000Messages": 330.0
+    },
+    "Opus 5.5": {
+      "inputUsdPerMillion": 4.0,
+      "outputUsdPerMillion": 20.0,
+      "usdPerCall": 0.022,
+      "usdPer1000Calls": 22.0,
+      "usdPer10000Calls": 220.0,
+      "usdPer100000Calls": 2200.0,
+      "threeCallsPerMessage_usdPer10000Messages": 660.0
+    }
+  },
+  "gpu": {
+    "Runpod RTX A5000": {
+      "usdPerHour": 0.27,
+      "usdPer6Hours": 1.62,
+      "usdPerMonth730Hours": 197.1,
+      "breakEvenCallsPerMonth": {
+        "Haiku 5.5": 358364,
+        "Sonnet 5.5": 17919,
+        "Opus 5.5": 8960
+      }
+    },
+    "Runpod RTX 4090": {
+      "usdPerHour": 0.89,
+      "usdPer6Hours": 5.34,
+      "usdPerMonth730Hours": 649.7,
+      "breakEvenCallsPerMonth": {
+        "Haiku 5.5": 1181273,
+        "Sonnet 5.5": 59064,
+        "Opus 5.5": 29532
+      }
+    }
+  },
+  "checkedDate": "2026-11-17",
+  "sources": [
+    "https://claude.com/pricing",
+    "https://platform.claude.com/docs/en/about-claude/pricing",
+    "https://www.runpod.io/pricing",
+    "https://www.scaleway.com/en/pricing/gpu/"
+  ],
+  "scope": "Illustrative list-price model-compute comparison; no observed traffic or quality equivalence."
+}
