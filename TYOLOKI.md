@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — agentin jälki -sivun rinnakkainen näkymä julkaistu Workeriin (Claude Code, agentin jälki -sivu)
+
+- **Käyttäjän lupa ("Yes, deploy"):** Workerin julkaisu, jotta keskustelu vasemmalla ja agentin ajo oikealla (f241485) näkyvät live-sivulla.
+- **Julkaistu commitista f241485, ei mainin kärjestä.** Ennen julkaisua live vastasi tiedosto tiedostolta f241485:n pohjaa. Mainissa on sen jälkeen kaksi julkaisematonta Worker-muutosta: bdee619 (tilaukset vain omistajalle, sen commit-viestin mukaan Worker ja botti julkaistava yhdessä) ja 1beade4 (maksusivun kassanäkymä). Ne eivät ole tässä julkaisussa, joten **seuraava Worker-julkaisu mainista vie ne molemmat liveen** ja pitää sovittaa botin julkaisuun.
+- **Julkaisu:** erillinen työpuu commitista f241485 (riippuvuudet yhteisestä kansiosta, samat paketit), Worker-testit 59/59, `cf deploy --dry-run` ja `cf deploy`. Worker-versio **23233b46-406d-4a42-8a28-5a58ac832db7**; vain kolme tiedostoa vaihtui (agentti.html/css/js), 48 ennallaan.
+- **Varmennettu livenä:** agenttisivun tiedostot vastaavat f241485:tä ja muut (maksusivu, tilaukset, yhteinen koodinäkymä) ovat ennallaan. `/`, `/keskustele`, `/ostoskori`, `/miten`, `/tilaukset`, `/healthz` ja esimerkkijälki 200, `/api/chat` `available: true` (salaisuudet säilyivät), `/api/sync` ilman avainta 401. Selaimessa `/agentti#esimerkki` 1440 px: keskustelu 543 px ja koodi 761 px rinnakkain, 9 viestiä/korin toimintoa kytkeytyi koodiriveihin, korostus molemmin puolin, ei konsolivirheitä eikä vaakavieritystä.
+
 ## 17.11.2026 yö — pilvisiirron siivous: testikannat pois ja Macin tunneli suljettu (Claude Code, sessio E)
 
 - **Käyttäjän lupa ("Yes, clean up"):** Turso-testikannat `aimo-t-*` (viisi kopiota keskusteluista) poistettu; tuotantokannat `aimo-*` tarkistettu listasta ennallaan. Macin pikatunneli PID 94071 suljettu TERMillä sen jälkeen, kun Metan callback ja D1 `bot_backend_url` oli luettu takaisin Vercel-osoitteeksi; pilven healthz 200 sulkemisen jälkeen.
