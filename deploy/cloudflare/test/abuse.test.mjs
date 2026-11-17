@@ -42,7 +42,7 @@ test('publisher routes reject missing, wrong, truncated or extended tokens, wron
     assert.equal((await s.fetcher(path, { method: 'POST', headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'text/plain' }, body: '{}' })).status, 415);
     assert.equal((await s.fetcher(path, { method: 'POST', headers: { authorization: `Bearer ${TOKEN}`, 'content-type': 'application/json' }, body: 'x'.repeat(300_000) })).status, 400);
   }
-  assert.equal((await s.fetcher('/api/signups', { method: 'GET' })).status, 401);
+  assert.equal((await s.fetcher('/api/signups', { method: 'GET' })).status, 404);
   assert.equal(s.db.prepare('SELECT count(*) n FROM order_events').get().n, 0);
   assert.equal(s.sent.length, 0);
 });

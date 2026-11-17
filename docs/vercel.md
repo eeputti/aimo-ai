@@ -86,7 +86,7 @@ palvelimen kannoista.
 Hallintakomennot toimivat Macilta suoraan Turso-kantaa vasten, kun `.env.cloud` annetaan viimeisenä:
 
 ```bash
-node --env-file=.env --env-file=.env.whatsapp --env-file=deploy/cloudflare/.env.publisher --env-file=deploy/vercel/.env.cloud scripts/whatsapp-signups.mjs list
+node --env-file=.env --env-file=.env.whatsapp --env-file=deploy/vercel/.env.cloud scripts/whatsapp-member.mjs invite --phone +358401234567 --company "Ravintola A" --person "Anna"
 ```
 
 Uusi versio: `vercel deploy --prod` projektikansiosta. Lokit: Vercelin projektin Logs-näkymä tai `vercel logs`.

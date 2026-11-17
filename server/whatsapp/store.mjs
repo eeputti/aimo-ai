@@ -9,7 +9,7 @@ export const MESSAGES_PER_DAY = 400;
 // Pilven yksi kutsu kestää enintään 300 s; tätä vanhempi käsittelyvaraus on keskeytynyt.
 export const PROCESSING_LEASE_MS = 6 * 60_000;
 export const codeHash = (code) => crypto.createHash('sha256').update(code.trim()).digest('hex');
-// Landing page link code (deploy/cloudflare/src/signup.ts, normalizeLinkCode): 8 symbols without I, L, O, 0, 1.
+// Landing page link code: 8 symbols without I, L, O, 0, 1. The landing sign-up API that issued these codes was removed on 17.11.2026.
 // "abcd-efgh" and "ABCD EFGH" are the same code. Returns the canonical form, or null for anything else.
 export function landingCode(value) {
   const code = String(value ?? '').replace(/[\s-]/g, '').toUpperCase();

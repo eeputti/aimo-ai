@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — ilmoittautumisen API pois Workerista ja botin ilmoittautumisskriptit pois (Claude Code, etusivu-chat)
+
+- **Käyttäjän pyyntö:** Eelis pyysi poistamaan ilmoittautumisen API:n Workerista sen jälkeen, kun etusivun lomake oli poistettu (962f0fa).
+- **Muutos:** poistettu `deploy/cloudflare/src/signup.ts`, sen reitti `src/index.ts`:stä, `signup-verify.sql` ja `test/signup.test.mjs`; `/api/signups` vastaa nyt 404 (abuse-testi tarkistaa). `signup.sql` → `landing-settings.sql`, jossa vain `landing_settings` (selainkeskustelun `bot_backend_url` ja esimerkkijäljen `example_trace_order`). Botin puolelta poistettu API:a kysellyt `scripts/whatsapp-signups.mjs` ja `whatsapp-signup-alerts.mjs` testeineen, `.vercelignore`-rivi ja `docs/vercel.md`:n esimerkki (nyt `whatsapp-member.mjs invite`). D:n linkkikoodin vertailutesti (Worker vs. botti) poistettu `test/audit-fixes-d.test.mjs`:stä; botin oma `YHDISTA`-koodin käsittely (`store.mjs`, `channel.mjs`) jäi paikalleen, mutta ilman API:a sille ei synny uusia kutsuja.
+- **Kesken, toisten varauksissa:** `server/cloud.mjs`:n `linkSignups` ja `step('signups')` (varaus ed5f4cc6, Pääsessio) sekä `vercel.json`:n `includeFiles`-rivin `scripts/whatsapp-signups.mjs` (varaus 5285af56, H). Pyydetty omistajilta (taulu #318, viestit). Ennen niitä pilvibotin jokainen tick lokittaa `tick_failed signups`, mutta `step` sieppaa virheen ja julkaisu jatkuu.
+- **D1:n vanhat ilmoittautumiset:** livekannan `signups`-taulussa on 14 riviä (8 linked, 6 ready, 14.–15.11.). Seitsemän päivän poisto ajettiin API:n sisällä, joten se ei enää tapahdu. Poistosta kysytty Eelikseltä; tauluun ei koskettu.
+- **Tarkistukset:** Worker-testit 57/57 ja typecheck läpi. Koko `npm test` worktreessä 398/404: kuusi libsql-/pilvitestiä kaatui yhteisajossa, mutta niiden neljä tiedostoa menivät erikseen ajettuina 19/19 läpi. Workeria ei ole vielä julkaistu: H julkaisee parhaillaan bottia ja Workeria (5285af56), ja julkaisu tehdään sen jälkeen.
+
 ## 17.11.2026 aamu — Worker julkaistu mainista: henkilökohtaiset tilauslinkit, kassanäkymä ja maksusivu puhelimella (Claude Code, puhelinkori-chat)
 
 - **Käyttäjän kysymys ja lupa:** Eelis kysyi, viekö WhatsAppin ostoskori puhelimella perille. Tarkistus iPhonen selaintunnisteella: korisivu (`aimo-whatsapp.vercel.app/whatsapp/cart`) aukeaa puhelimella, mutta SIIRRY MAKSAMAAN vei Workerin maksusivulle, jossa puhelinesto peitti maksun. Maksusivuchat oli jo korjannut eston mainissa (1beade4), joten tämän chatin oma samanlainen korjaus jätettiin pushaamatta. Eelis pyysi jatkamaan Workerin ja botin yhteiseen julkaisuun ("jatka").

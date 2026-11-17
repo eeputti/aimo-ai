@@ -20,7 +20,6 @@
 !/deploy/cloudflare/src/protocol.ts
 !/deploy/cloudflare/src/agent-trace.ts
 /scripts/*
-!/scripts/whatsapp-signups.mjs
 /data/*
 !/data/catalog.json
 # Korisivun Valion tuotekuvat (server/whatsapp/storefront-cart.mjs lukee data/img/_meta.json).

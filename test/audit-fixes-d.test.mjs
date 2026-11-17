@@ -7,7 +7,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { openWhatsAppStore, codeHash, landingCode, PROCESSING_LEASE_MS } from '../server/whatsapp/store.mjs';
 import { createWhatsAppChannel, SIGNUP_ATTEMPTS, workerCount } from '../server/whatsapp/channel.mjs';
-import { normalizeLinkCode } from '../deploy/cloudflare/src/signup.ts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-audit-d-'));
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -196,10 +195,4 @@ test('#14: the code pairs only its own number, before the invitation it is retri
     store.enqueue({ id: 'm1', phone: B, sentAt: Date.now(), kind: 'image', text: 'YHDISTA ABCD-EFGH' });
     assert.equal(store.db.prepare("SELECT kind FROM inbox WHERE id='m1'").get().kind, 'image');
   } finally { store.close(); }
-});
-
-test('#14: the WhatsApp server and the Worker read the link code the same way', () => {
-  for (const value of ['ABCD-EFGH', 'abcd efgh', 'AbCdEfGh', ' k7q2-9xpa ', 'ABCD-EFG', 'ABCD-EFGI', 'ABCD-EFG0', 'ABCD-EFGL', 'ABCDEFGHJ', '', null]) {
-    assert.equal(landingCode(value), normalizeLinkCode(value), String(value));
-  }
 });

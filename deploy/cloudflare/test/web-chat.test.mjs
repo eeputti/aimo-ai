@@ -36,7 +36,7 @@ async function bot() {
 function worker_(backendUrl) {
   const db = new DatabaseSync(':memory:');
   db.exec(fs.readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'));
-  db.exec(fs.readFileSync(new URL('../signup.sql', import.meta.url), 'utf8'));
+  db.exec(fs.readFileSync(new URL('../landing-settings.sql', import.meta.url), 'utf8'));
   if (backendUrl) db.prepare("INSERT INTO landing_settings VALUES('bot_backend_url',?)").run(backendUrl);
   const DB = { prepare(sql) { let p = []; return { bind(...v) { p = v; return this; }, async first() { return db.prepare(sql).get(...p) || null; },
     async run() { await null; return { meta: { changes: db.prepare(sql).run(...p).changes } }; } }; } };

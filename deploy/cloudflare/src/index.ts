@@ -3,7 +3,6 @@ import { parseOrderEvent, type OrderEvent } from "./order-event.ts";
 import { renderOrderEmail } from "./email.ts";
 import { registerDemoPayment, demoPaymentEmailAllowed, handleDemoPayment, verifyDemoPaymentLink, ownOrders } from "./demo-payment.ts";
 import { TRACE_PREFIX, parseAgentTrace, storeAgentTrace, handleAgentTraceRead } from "./agent-trace.ts";
-import { handleSignup } from "./signup.ts";
 import { handleWebChat, type WebChatEnv } from "./web-chat.ts";
 
 // A sender is optional: without one orders are stored and e-mail waits. Either the Cloudflare
@@ -208,9 +207,6 @@ export default {
     // Selainkeskustelu botin kanssa ja saman keskustelun ostoskori tällä sivustolla.
     const chat = await handleWebChat(request, env as WebChatEnv);
     if (chat) return chat;
-    // Landing page sign-ups: the browser sees only its own status; the publisher token lists the numbers.
-    const signup = await handleSignup(request, env);
-    if (signup) return signup;
     const payment = await handleDemoPayment(request, env as OrderEnv, orderId => deliverEmail(env as OrderEnv, orderId, url.origin));
     if (payment) return payment;
     // Payment actions only simulate a payment. Publishing order events still needs the server's token.
