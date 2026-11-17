@@ -29,7 +29,12 @@
 
 **Tarkistukset:** `test/unknown-availability.test.mjs` 4/4: uusi testi tarkistaa, että valintalistan aikana "perjantai?" menee tilausmoottorille, dialogimallia ei kutsuta eikä vastakysymys näy, ja että tunnistus erottaa päivävastauksen muista viesteistä. `npm test` 427/427. Oikealla mallitulkilla (Haiku, oikea päivämäärä ti 17.11., välimuistikannan kopio, ratkeamaton rajapinta) luonnoksen päivä vaihtui ke 18.11. → "perjantai?" pe 20.11. → "entä torstaiksi" to 19.11., ja jokaiselle päivälle näytettiin tilattava leivos. Ei Meta-, tilaus- eikä julkaisukutsuja.
 
-**Käyttöönotto:** tarvitsee botin Vercel-julkaisun. Worker ei muutu.
+**Käyttöönotto:** sessio E julkaisi botin mainista c087af2 (`aimo-whatsapp-16hrxpzc4`, 17.11. noin klo 9.25). Eelis päätti, että kaikki botin ja Workerin julkaisut tekee sessio E, joten tämä chatti ei julkaissut rinnalle. Worker ei muuttunut.
+
+**Live-varmennus heti julkaisun jälkeen:** `/healthz` `host: cloud`, webhookin GET-vahvistus 200 haasteineen. Selainkeskustelussa (oma testiasiakas, ei tilausta) "tarviin 1000 litraa jäätelöä keskiviikoksi" antoi ke 18.11. ja kaksi tilattavaa leivosta. Sen jälkeen "perjantai?" vastasi "Toimituspäivä nyt pe 20.11." ja listan uudelle päivälle ilman vastakysymystä, ja "entä torstaiksi" vastasi "Toimituspäivä nyt to 19.11.".
+
+**Avoinna:**
+- Jokaisen päivänvaihdon jälkeen toistuu siirtymäviesti "Nyt olisi aika valita vaihtoehtoja, niin käydään ostoskorisi pikaisesti läpi!" (keskeneräinen kori -chatin 3b51b3d). Sama vaihtoehtolista ei tarvitse sitä uudelleen.
 - "10 kpl" tulkitaan myyntieriksi (10 laatikkoa), ei kappaleiksi: vanha käytös.
 - Kun viimeinen rivi poistetaan, luonnoksen toimituspäivä unohtuu.
-- `TYOLOKI.md` oli toisen session varauksessa sekä korjauksen että julkaisun aikaan, joten merkintä on vain tässä raportissa.
+- `TYOLOKI.md` oli toisten sessioiden varauksessa korjausten ja julkaisun aikaan, joten merkintä on vain tässä raportissa.
