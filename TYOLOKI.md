@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — valkosipuliarvio varmennettu livenä b988f0e:n jälkeen (Claude Code, Aimo-tilausapuri verkossa -chat)
+
+- **Käyttäjän pyyntö:** "tarkista valkosipuli livenä kun se on julkaistu". Eelis hyväksyi 9480a54:n julkaisun tässä chatissa ("Yes, ask E"), ja sessio E julkaisi sen b988f0e:ssä (aimo-whatsapp-6j0effhsi).
+- **Ennen korjausta:** c78e73b:n jälkeen tämän chatin live-koe antoi 3/3 kertaa "valkosipuli, määrä tarkennettava". Alempi sivusession merkintä, jonka mukaan valkosipuli toimi c78e73b:llä, oli siis vaihteleva tulos. Haiku jättää välillä yksikön tyhjäksi, ja silloin arvio hylättiin.
+- **Live-koe selainkeskustelussa omilla testiasiakkailla, ei tilausta, 3 ajoa:** k-ruoka.fi-linkki "20 annokselle perjantaiksi" ja liitetty kermainen kanapasta 4 annokselle. Kaikissa kolmessa "Määrät 20 annokselle.", "valkosipuli, noin 0,05 kg, arvio" ja "valkosipuli 2,5 g annokselle (reseptissä "2 valkosipulinkynttä")" sekä "spagetti, noin 2 kg, arvio".
+- **Huomio, ei korjattu:** broilerin fileesuikale 2 kg merkittiin "ei tilattavana tarkalleen tätä, jätetään pois" pe 20.11.:lle välimuistin tiedoilla. Spagetille tarjottiin korvaajaksi pennettä yhdessä ajossa, muissa ei korvaajaa.
+
 ## 17.11.2026 — botti tuotantoon mainista b988f0e: valkosipulin kappaleyksikkö ja X041 (Claude Code, sessio E)
 
 - **Käyttäjän lupa:** sessio "10 kpl tarkoittaa kappaleita" pyysi julkaisemaan 9480a54:n Eeliksen hyväksynnällä, ja Eelis vahvisti julkaisun myös tässä sessiossa ("Kyllä, julkaise").
