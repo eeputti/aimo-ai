@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — itsepeli V001–V035 uudelleen Haikulla V023-korjauksen jälkeen (Claude Code, sessio A)
+
+- **Pyyntö:** Eelis pyysi ajamaan itsepelin V-joukolle uudelleen. Lähde origin/main 8357e11 (mukana A:n, C:n ja V023-korjaukset). Apuri, simuloitu asiakas ja arvioija Haikulla (`DEEP_MODEL=claude-haiku-5-5`), eristetyt kannat, simuloidut hinnat, ei Meta-lähetyksiä, 0 tilausta. 283 mallikutsua, joista 2 epäonnistui, noin 0,09 USD, 4,4 min. Raportti vain paikallisesti (`data/selfplay/2026-11-17T07-35-58-734Z/`).
+- **Tulos:** perusvaatimukset 31/35, uusi vaatimus 35/35. F:n edellinen ajo f7b779b:llä oli 31/35. **V023** (toimitusvarmuus), **V019** ja **V020** menevät nyt läpi, ja polku data-reliability on 3/3. Alkuperä, allergeenit, säilytys ja hiilijalanjälki ovat kaikki läpi.
+- **Jäljellä:** V026 (asiakas sekoitti yksiköt, kuten F:n ajossa). V028 (asiakas pyysi yhä lisää vaihtoehtoja, ei korilinkkiä). V032: tiistaille ei ole gluteenitonta kaurajuomaa, ja apuri ei osaa kertoa lähintä päivää, jolle on tilattavaa ("En näe itse, mikä päivä on lähin saatavilla"). V033: maitoallergiselle lapselle näytettiin ensimmäisenä jäätelö, jolta allergeenitieto puuttuu ("tarkista itse"), ja asiakkaan "kelpaa 1" -vastauksen jälkeen se meni koriin.
+- **Huomio V033:sta:** koko tilauksen allergiakielto (`draft.diet.excludeAllergens`) päästää läpi tuotteen ilman allergeenitietoa varoituksella. Rivin oma kielto on tiukka. Gatewayn mandaatti ei näe WhatsAppin ruokavaliota, joten tällainen tilaus vahvistuisi ilman ihmistä. Arvioija moitti lisäksi suorien vastausten muotoa "Ei: sisältää kananmunaa" epäselväksi; parempi on "Ei ole munaton: sisältää kananmunaa". Kumpaakaan ei korjattu tässä vaiheessa.
+
 ## 17.11.2026 — kolmas 30 persoonan Haiku-otos (Claude Code, sessio C)
 
 - **Käyttäjän pyyntö:** Eelis pyysi ajamaan otoksen uudelleen X064-korjauksen (e13cb54) jälkeen. Samat asetukset, main 8357e11.
