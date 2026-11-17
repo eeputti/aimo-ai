@@ -432,7 +432,8 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
             ? `Saatavuutta ei vieläkään saada tarkistettua: ${what}. Se puuttuu kaikilta päiviltä, joten päivän vaihto ei auta. ${how} Tilausta ei ole tehty.`
             : `${problems.join('\n')}\nToinen päivä ei auta, koska tieto puuttuu kaikilta päiviltä, enkä löytänyt vastaavaa tuotetta, jonka saatavuus olisi tiedossa. ${how} Tilausta ei ole tehty.` };
         }
-        const hint = e ? `Aikaisin toimitettava päivä on ${dateLabel(e.date)}. Kirjoita "${dateLabel(e.date)}", jos se käy.` : 'Kokeile toista päivää tai tarkenna tuotetta.';
+        // dateLabel päättyy pisteeseen ("ti 17.11."), joten perään ei tule toista (Haiku-otos X064: "ti 17.11..").
+        const hint = e ? `Aikaisin toimitettava päivä on ${dateLabel(e.date)} Kirjoita "${dateLabel(e.date)}", jos se käy.` : 'Kokeile toista päivää tai tarkenna tuotetta.';
         return { status: 'collecting', text: `${problems.join('\n')}\n${hint} Tilausta ei ole tehty.` };
       }
       // Kappalemäärä ei kerro kiloja (puhelinkuva 17.11.: "kanan fileesuikale 100 kpl" → 100 kg, 899 €). Kiloina myytävää
@@ -704,7 +705,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
             draft.compare = null;
             if (compare && next.status === 'ready' && draft.lines.length > 1) compared = `Kerro, minkä tuotteen vaihtoehdot näytän: ${joinFi(draft.lines.map((l) => l.productTerm))}.`;
           }
-          result = { ...next, text: [...notes, ...(asksDeadline ? [await deadlineAnswer(draft, customer, next.text)] : []), compared, next.text].filter(Boolean).join('\n'),
+          const deadline = asksDeadline ? await deadlineAnswer(draft, customer, next.text) : '';
+          // Tilausaikavastaus kertoi jo aikaisimman päivän: samaa virkettä ei toisteta saman viestin lopussa (X064).
+          const earliest = deadline.match(/Aikaisin toimitettava päivä on \p{L}+ \d{1,2}\.\d{1,2}\./u)?.[0];
+          const body = earliest ? next.text.replace(`${earliest} `, '') : next.text;
+          result = { ...next, text: [...notes, deadline, compared, body].filter(Boolean).join('\n'),
             ...(removed.length && draft.lines.length ? { removedNote: removedNote(removed) } : {}) };
         } else if (DEADLINE_QUESTION.test(t)) result = { ...result, text: `${await deadlineAnswer(draft, customer, result.text)}\n${result.text}` };
       }

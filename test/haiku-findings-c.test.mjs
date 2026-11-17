@@ -75,6 +75,10 @@ test('C2: sanallinen kielto päivänsiirtoon pitää päivän eikä toista kysym
     const deadline = await say('mikä on viimeinen tilausaika?');
     assert.match(deadline.text, /^Huomiselle \(ma 16\.11\.\) ei enää ehdi tilata\. Aikaisin toimitettava päivä on ti 17\.11\., ja sille ehtii tilata ma 16\.11\. klo 12\.00 asti\./);
     assert.doesNotMatch(deadline.text, /en saanut tilausaikarajaa|Vaihdetaanko/);
+    // Haiku-otos X064: ei kahta pistettä päivämäärän perässä eikä aikaisinta päivää kahdesti samassa viestissä.
+    for (const reply of [kept, deadline]) assert.doesNotMatch(reply.text, /\d\.\./, reply.text);
+    assert.equal(deadline.text.split('Aikaisin toimitettava päivä on ti 17.11.').length - 1, 1, deadline.text);
+    assert.match(deadline.text, /Kirjoita "ti 17\.11\.", jos se käy\. Tilausta ei ole tehty\.$/);
   }
 });
 

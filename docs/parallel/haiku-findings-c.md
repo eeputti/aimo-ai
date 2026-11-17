@@ -33,6 +33,8 @@ Persoonittain (vain muuttuneet):
 - **X041** (`date_not_asked_first`): emojiavaukseen "🥛🥛🥛 20? 🧈 5 🙏" malli kysyi määrät ennen päivää. Mallin satunnaisuutta, F:n ajossa läpi.
 - **S002, S014** (`more_requested_before_options`): simuloitu asiakas pyysi "4" ennen kuin vaihtoehtoja näytettiin; apuri toimi oikein. Asiakaspuolen satunnaisuutta.
 
+**X064:n tekstivirheet korjattu (17.11.2026):** päivämäärän perään ei enää tule toista pistettä, ja kun tilausaikavastaus kertoo jo aikaisimman päivän, samaa virkettä ei toisteta saman viestin lopussa. Vastaus on nyt esim. "Huomiselle (ma 16.11.) ei enää ehdi tilata. Aikaisin toimitettava päivä on ti 17.11., ja sille ehtii tilata ma 16.11. klo 12.00 asti. / Ei tilattavaa tuotetta päivälle ma 16.11.: maito. / Kirjoita "ti 17.11.", jos se käy. Tilausta ei ole tehty." C2-testi laajennettu (kaatui ennen korjausta), koko `npm test` 410/410. Toistuva sama vastaus, kun asiakas hylkää ainoan mahdollisen päivän uudelleen ja uudelleen, jäi ennalleen: tieto on oikea, eikä muuta vaihtoehtoa ole.
+
 Yhden ajon otos ei erota satunnaisuutta muutoksista: F:n raportin mukaan kahdeksan perusvirhettä 18:sta meni läpi pelkällä uusinnalla.
 
 ## Testit

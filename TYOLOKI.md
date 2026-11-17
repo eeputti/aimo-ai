@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — päivänsiirron kieltovastauksen tekstivirheet korjattu (Claude Code, sessio C)
+
+- **Käyttäjän pyyntö:** Eelis pyysi korjaamaan Haiku-otoksen X064:ssä näkyneet C2-vastauksen tekstivirheet.
+- **Muutos (`server/order-conversation/index.mjs`):** "Aikaisin toimitettava päivä on ti 17.11.." ilman toista pistettä, ja aikaisinta päivää ei toisteta, kun tilausaikavastaus kertoi sen jo samassa viestissä. Raportin lisäys `docs/parallel/haiku-findings-c.md`.
+- **Tarkistukset:** C2-testin uudet ehdot kaatuivat vanhalla koodilla, koko `npm test` 410/410 3476026:n päällä. Käyttöön botin seuraavassa sovitussa restartissa (sessio E). V032 (gluteeniton kaurajuoma) on yhä A:n työlistalla.
+
 ## 17.11.2026 — F:n 30 persoonan Haiku-otos C-korjausten jälkeen (Claude Code, sessio C)
 
 - **Käyttäjän pyyntö:** Eelis pyysi ajamaan F:n 30 persoonan Haiku-otoksen uudelleen. Samat asetukset kuin F:llä (Haiku apurille ja simuloidulle asiakkaalle, tyhjä `VALIO_API_KEY`, eristetyt kannat, ei Meta-lähetyksiä, 0 tilausta), lähde main 56fe2df.
