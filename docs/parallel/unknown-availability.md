@@ -13,9 +13,11 @@
 
 **Tarkistukset:** uusi `test/unknown-availability.test.mjs` 3/3, `whatsapp-link-substitutes` -testin viestiodotus päivitetty. `npm test` 405/411: kuusi libsql-testiä kaatuu, koska yhteisestä `node_modules`ista puuttuu `@libsql/client`. Muutos ei liity niihin. Toisto Macin välimuistikannan kopiolla, ratkeamattomalla rajapinnalla, `VALIO_FALLBACK=last-known` ja pilven demokello: ilman mallia rehellinen vastaus ja lyhyt toisto. Oikealla Haikulla ke 18.11. kaksi leivosta, pe 20.11. kolme, ja valinta "1" + "10 kpl" johti valmiiseen luonnokseen 555,50 €. Mallikutsuja noin 15, yhteensä alle 0,10 USD. Ei Meta-, tilaus- eikä julkaisukutsuja.
 
+**Julkaistu Eeliksen luvalla ("Yes, deploy") 17.11. klo 9.08:** Vercel `aimo-whatsapp`, julkaisu `aimo-whatsapp-7fkukca7d`. Tilannevedos `/private/tmp/aimo-vercel-7262563` oli silloinen tuotanto 8b29cff, jonka päälle oli poimittu 56fe2df ja testin kirjainkokokorjaus (32c5c0b). Koko mainia ei julkaistu, koska bdee619 (henkilökohtaiset tilauslinkit) pitää julkaista yhtä aikaa Workerin kanssa. Sessio E vahvisti, ettei sillä ollut julkaisua kesken. Sessio H julkaisee koko mainin (botti ja Worker) tämän päälle, ja se sisältää saman korjauksen; asiasta ilmoitettiin H:lle ja E:lle. Vedos erosi edellisestä tuotantovedoksesta vain tämän korjauksen osalta. Vedoksen testit 397/403, ja kaatuvat ovat samat kuusi libsql-testiä. Varmennettu: `/healthz` `host: cloud` ja webhookin GET-vahvistus 200 haasteineen. Selainkeskustelu live-sivulla (oma testiasiakas, ei tilausta): "tarviin 1000 litraa jäätelöä keskiviikoksi" sai vastaukseksi kaksi tilattavaa leivosta, tiedon tarkistamattomasta saatavuudesta ja ohjeen "poista jäätelö". "millo saa jäätelöö?" sai mallin vastauksen ja saman listan, ei kehotusta kokeilla toista päivää.
+
 **Avoinna:**
-- Käyttöön vasta Vercel-julkaisussa (sessio E, Eeliksen luvalla).
-- Pilven demokello on su 15.11., joten "huomenna" on bottille ma 16.11., vaikka oikeasti on ti 17.11. (oma sessio "Huomisen päivämäärä").
+- Pilven demokello poistettiin jo 8b29cff:n julkaisussa klo 0.26 (`docs/parallel/whatsapp-real-date.md`), eli "huomenna on maanantai 16.11." -sekaannus koski vain sitä edeltänyttä kokeilua.
+- Live-kokeessa "perjantai?" sai valintalistan aikana mallilta vastakysymyksen ("Tarkoitatko toimitusta perjantaille 20.11.?"), eikä päivä vaihtunut: dialogi ei tulkitse kysymysmuotoista päivää valinnan aikana.
 - "10 kpl" tulkitaan myyntieriksi (10 laatikkoa), ei kappaleiksi: vanha käytös.
 - Kun viimeinen rivi poistetaan, luonnoksen toimituspäivä unohtuu.
-- `TYOLOKI.md` oli toisen session varauksessa, joten tätä merkintää ei kirjattu lokiin.
+- `TYOLOKI.md` oli toisen session varauksessa sekä korjauksen että julkaisun aikaan, joten merkintä on vain tässä raportissa.
