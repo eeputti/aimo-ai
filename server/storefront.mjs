@@ -7,7 +7,7 @@ import { clock, cutoffPassed } from './gateway/clock.mjs';
 import { unitSizeFor } from './gateway/quantity.mjs';
 import { PRODUCT_TYPES } from './gateway/contract.mjs';
 import { explainItemQuantity, isEggItem } from './itemQuantities.mjs';
-import { typeInfo, compareKeys, TIER } from './aimo/match.mjs';
+import { typeInfo, compareKeys, TIER, RAW_INGREDIENT } from './aimo/match.mjs';
 import { verifiedFree } from './allergens.mjs';
 
 export function validDeliveryDate(date) {
@@ -171,9 +171,13 @@ export async function knownAlternatives(item, date, { unknownIds = [], knownIds,
   const refCats = refs.map((p) => String(p.category || ''));
   const temps = refs.map((p) => p.temp).filter(Boolean);
   const temp = temps.sort((a, b) => temps.filter((t) => t === b).length - temps.filter((t) => t === a).length)[0] || null;
+  // Valmiin tuotteen (jäätelö, leivos, kastike) tilalle ei tarjota raaka-ainetta: pakastemansikka ehdotettiin jäätelölle (17.11.).
+  // Raaka-ainetta pyydettäessä (mustikka) toinen raaka-aine kelpaa. Pyydetyn tuotteen kategoria tunnetaan unknownIds-tuotteista.
+  const rawWanted = refs.some((p) => RAW_INGREDIENT.test(String(p.category || '')));
   const scored = (knownIds || lastKnownOkIds()).flatMap((id) => {
     const p = cat.get(String(id));
     if (!p || skip.has(String(p.id)) || NON_FOOD.test(String(p.category || '')) || !fitsDiet(p, item)) return [];
+    if (refs.length && !rawWanted && RAW_INGREDIENT.test(String(p.category || ''))) return [];
     const near = refCats.length ? Math.max(...refCats.map((c) => sharedDigits(c, String(p.category || '')))) : 0;
     return [{ p, near, sameTemp: temp && p.temp === temp ? 1 : 0 }];
   }).sort((a, b) => b.near - a.near || b.sameTemp - a.sameTemp || a.p.name.localeCompare(b.p.name, 'fi'));

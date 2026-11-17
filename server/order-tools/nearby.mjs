@@ -14,7 +14,8 @@ kasvipohjainen ruoanvalmistusvalmiste, jälkiruoan tilalle toinen jälkiruoka.
 Ehdotus on asiakkaalle vaihtoehto, jonka hän voi hylätä: tuote kelpaa, jos se täyttää saman roolin ateriassa tai menussa,
 vaikka se olisi eri tuotetyyppiä (jäätelön tilalle esimerkiksi leivos tai mousse jälkiruoaksi).
 Älä valitse tuotetta, joka vain sisältää samaa raaka-ainetta mutta on eri ruokaa, äläkä tuotetta, jonka rooli on eri
-(perunat, leivät, siivoustarvikkeet jälkiruoan tilalle). Jos mikään listan tuote ei sovi samaan rooliin, palauta tyhjä lista.
+(perunat, leivät, siivoustarvikkeet jälkiruoan tilalle). Älä ehdota raaka-ainetta valmiin tuotteen tilalle: pakastemarjat, tuoreet hedelmät,
+vihannekset tai jauhot eivät korvaa jäätelöä, leivosta tai valmista kastiketta. Jos mikään listan tuote ei sovi samaan rooliin, palauta tyhjä lista.
 Kirjoita ensin role: pyydetyn tuotteen rooli keittiössä yhdellä lauseella (esim. "jälkiruoka, tarjoillaan kylmänä").
 Käy sitten lista läpi ja valitse tuotteet, joilla on sama rooli. Käytä vain listan tunnisteita. term on lyhyt yleisnimi suomeksi pienillä kirjaimilla ilman merkkiä ja pakkauskokoa
 (esim. "marjamousse-leivos"). reason on yksi lyhyt lause suomeksi siitä, miksi tuote käy tilalle.`;

@@ -2,6 +2,15 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — vastaavat tuotteet: raaka-aine ei korvaa valmista tuotetta (Claude Code, Aimo-tilausapuri verkossa -chat)
+
+- **Käyttäjän pyyntö:** "korjaa myös toi pakastemansikka-ehdotus". Live-kokeessa jäätelön tilalle tarjottiin leivosten lisäksi "Polproduct Nordics Oy pakastettu mansikka 2.5kg".
+- **Muutos:**
+  - `storefront.mjs` `knownAlternatives`: kun pyydetty tuote ei ole raaka-ainetta, raaka-ainekategoriat (`RAW_INGREDIENT`: tuoreet ja pakastetut marjat, hedelmät, vihannekset, yrtit ja kuivamausteet) jäävät pois mallin ehdokkaista. Raaka-ainetta pyydettäessä (mustikka) toinen raaka-aine kelpaa edelleen.
+  - `order-tools/nearby.mjs`: valitsijan ohjeessa sama sääntö sanallisesti.
+- **Tarkistukset:** uusi testi `test/unknown-availability.test.mjs`:ssä (6/6), koko `npm test` 451/451. Oikea Haiku kolme kertaa jäätelölle välimuistikannan kopiolla: joka kerta vain marjamousse- ja sitruunajuustoleivos, ei pakastemarjoja.
+- **Avoinna:** käyttöön botin julkaisussa (sessio E, Eeliksen luvalla).
+
 ## 17.11.2026 — tuotekysymyksen jatko- ja kiitosviestit: ei enää "Kerro tuotteen nimi" (Claude Code, sessio A)
 
 - **Pyyntö:** Eelis pyysi korjaamaan V-itsepelin löydöksen. Jatko- tai kiitosviestiin, jossa toistuu tuotefaktan sana ("Eli pakaste, mutta tarkkaa lämpötilaa ei ole? Ok, kiitos", "Sisältää siis maitoa, joten ei käy meille. Kiitos."), vastattiin "Kerro tuotteen nimi", vaikka tuote oli juuri nimetty (V011, V014).

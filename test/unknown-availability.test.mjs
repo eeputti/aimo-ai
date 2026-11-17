@@ -117,3 +117,17 @@ test('rivi ilman tilattavaa tuotetta ei ole "Sen jälkeen valitaan" -listassa, v
   const more = await say('näytä lisää');
   assert.doesNotMatch(more.text, /valitaan[^.\n]*spagetti/);
 });
+
+test('valmiin tuotteen (jäätelö) tilalle ei tarjota raaka-ainetta, raaka-aineen tilalle kelpaa raaka-aine', async (t) => {
+  const { existsSync } = await import('node:fs');
+  if (!existsSync(new URL('../data/catalog.json', import.meta.url))) { t.skip('katalogi puuttuu'); return; }
+  const { knownAlternatives } = await import('../server/storefront.mjs');
+  // 466172 jäätelö (418xx), 470792 marjamousse-leivos (41763), 473427 pakastemustikka (41740, raaka-aine).
+  const seen = [];
+  const pick = async ({ candidates }) => { seen.push(candidates.map((c) => c.id)); return []; };
+  const item = { productTerm: 'jäätelö', quantity: { value: 1000, unit: 'L' }, claims: [], excludeAllergens: [] };
+  await knownAlternatives(item, '2026-11-20', { unknownIds: ['466172'], knownIds: ['470792', '473427'], pick });
+  assert.deepEqual(seen.at(-1), ['470792']);
+  await knownAlternatives({ ...item, productTerm: 'mustikka', quantity: { value: 5, unit: 'KG' } }, '2026-11-20', { unknownIds: ['465273'], knownIds: ['470792', '473427'], pick });
+  assert.ok(seen.at(-1).includes('473427'));
+});
