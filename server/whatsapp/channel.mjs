@@ -144,7 +144,10 @@ export function workerCount(env = process.env) {
 export const SIGNUP_ATTEMPTS = 4;
 
 export function createWhatsAppChannel({ settings, store, chat, send, typing, media = null, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now, onPrune = () => {},
-  concurrency = workerCount(), typingRefreshMs = 20_000 }) {
+  concurrency = workerCount(), typingRefreshMs = 20_000, diagnostics = Boolean(process.env.VERCEL) }) {
+  // Pilvessä (Vercel) kirjataan myös onnistunut ilmaisin ja vastauksen viive, jotta puhelimen havainnon voi verrata lokiin.
+  // Rivit eivät sisällä viestin tekstiä, numeroa tai tunnuksia.
+  const diag = (event, fields) => { if (diagnostics) console.info(JSON.stringify({ event, ...fields })); };
   store.db.exec('CREATE TABLE IF NOT EXISTS wa_link_progress (message_id TEXT PRIMARY KEY, created INTEGER NOT NULL)');
   // One slow customer no longer stops the others (audit #12): up to `concurrency` jobs run at once. The store
   // claims one job at a time atomically and never a second job of a number whose earlier job is still open.
@@ -155,11 +158,11 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
     if (!typing || stopped) return Promise.resolve();
     const prior = typingUpdates.get(id);
     if (!force && prior && now() - prior.at < typingRefreshMs) return prior.work;
-    let work;
+    let work; const started = now();
     // Ilmaisin on kosmeettinen: virhe ei koskaan estä vastausta, mutta se kirjataan, jotta katkos näkyy lokista.
     const failed = (err) => console.warn(JSON.stringify({ event: 'typing_failed',
       error: err?.name === 'TimeoutError' ? 'TIMEOUT' : String(err?.message || err).slice(0, 120) }));
-    try { work = Promise.resolve(typing(id)).catch(failed); } catch (err) { failed(err); work = Promise.resolve(); }
+    try { work = Promise.resolve(typing(id)).then(() => diag('typing_sent', { ms: now() - started, refresh: Boolean(prior) }), failed); } catch (err) { failed(err); work = Promise.resolve(); }
     typingUpdates.set(id, { at: now(), work });
     // Cancelled queued work may never be selected by the worker; keep receipt bookkeeping bounded.
     if (typingUpdates.size > 1000) typingUpdates.delete(typingUpdates.keys().next().value);
@@ -285,6 +288,7 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
         store.saveReplyPart(job.id, part.part, replyId);
       }
       store.finish(job.id, 'done', replyId);
+      diag('reply_sent', { sinceReceiptMs: now() - Number(job.received) });
       return true;
     } catch (err) {
       if (job) {

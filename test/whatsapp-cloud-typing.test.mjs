@@ -10,11 +10,11 @@ const settings = { phoneId: '1', verifyToken: 'v', appSecret: 's', supportContac
   apiVersion: 'v25.0', accessToken: 'test-token' };
 const PHONE = '358401000001';
 
-function setup({ typing, events }) {
+function setup({ typing, events, diagnostics = false }) {
   const store = openWhatsAppStore(':memory:');
   const { code } = store.invite(PHONE, 'Testikeittiö', 'Testaaja');
   store.pair(PHONE, codeHash(code));
-  const channel = createWhatsAppChannel({ settings, store, typing, concurrency: 2,
+  const channel = createWhatsAppChannel({ settings, store, typing, concurrency: 2, diagnostics,
     chat: async () => { events.push('chat'); return { text: 'Mille päivälle toimitus?' }; },
     send: async () => { events.push('send'); return `out-${events.length}`; } });
   return { store, channel };
@@ -67,5 +67,32 @@ test('aikakatkaisu kirjataan lyhyesti TIMEOUT-tunnuksella', async (t) => {
   await webhook(channel, 'wamid.3', 'moi');
   await channel.typingSettled();
   assert.deepEqual(warnings.map((w) => JSON.parse(w)), [{ event: 'typing_failed', error: 'TIMEOUT' }]);
+  await channel.stop();
+});
+
+test('pilven diagnostiikka kirjaa onnistuneen ilmaisimen ja vastauksen viiveen ilman viestin sisältöä', async (t) => {
+  const lines = [];
+  t.mock.method(console, 'info', (line) => lines.push(String(line)));
+  const events = [];
+  const { channel } = setup({ events, diagnostics: true, typing: async () => {} });
+  await webhook(channel, 'wamid.4', 'salainen tilaus');
+  await channel.typingSettled();
+  assert.equal(await channel.drain(2000), 1);
+  const logged = lines.map((l) => JSON.parse(l));
+  assert.deepEqual(logged.map((l) => l.event), ['typing_sent', 'reply_sent']);
+  assert.equal(typeof logged[0].ms, 'number');
+  assert.ok(Number.isFinite(logged[1].sinceReceiptMs) && logged[1].sinceReceiptMs >= 0);
+  assert.ok(lines.every((l) => !l.includes('salainen') && !l.includes(PHONE) && !l.includes('wamid')));
+  await channel.stop();
+});
+
+test('ilman diagnostiikkaa onnistumista ei kirjata (Mac ja testit)', async (t) => {
+  const lines = [];
+  t.mock.method(console, 'info', (line) => lines.push(String(line)));
+  const { channel } = setup({ events: [], typing: async () => {} });
+  await webhook(channel, 'wamid.5', 'moi');
+  await channel.typingSettled();
+  await channel.drain(2000);
+  assert.deepEqual(lines, []);
   await channel.stop();
 });

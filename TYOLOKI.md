@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — kirjoittaa-ilmaisimen diagnostiikka pilveen (Claude Code, pääsessio)
+
+- **Havainto:** Eeliksen puhelintestissä pisteitä ei näkynyt, vaikka 2de0839 oli julkaistu (Vercel dpl …PSn9Lozi klo 9.13, snapshot 32c5c0b/61199c0 sisältää korjauksen) eikä lokissa ollut `typing_failed`-riviä. Lokista ei voinut päätellä, lähtikö ilmaisin, koska onnistumista ei kirjattu. Lisäksi Vercel kirjaa pyynnön vain, jos se tulostaa jotain. Pilvikannan suora luku estettiin käyttöoikeustarkistuksessa, eikä estoa kierretty.
+- **Muutos:** pilvessä (`VERCEL`-ympäristö) lokiin tulee `typing_sent` (pyynnön kesto ms, uusinta vai ensimmäinen) ja `reply_sent` (viive vastaanotosta ms). Rivit eivät sisällä tekstiä, numeroa tai tunnuksia. Macilla ja testeissä ei lokiriviä. `test/whatsapp-cloud-typing.test.mjs` 5/5, koko `npm test` 413/413.
+- **Seuraavaksi:** julkaisu (E, Eeliksen luvalla), puhelintesti ja `vercel logs`. Jos `typing_sent` näkyy ja vastaus tulee sekunteja myöhemmin, Meta hyväksyi ilmaisimen ja syy on WhatsAppin näytössä. Muuten loki kertoo, missä ketju katkeaa.
+
 ## 17.11.2026 — päivänsiirron kieltovastauksen tekstivirheet korjattu (Claude Code, sessio C)
 
 - **Käyttäjän pyyntö:** Eelis pyysi korjaamaan Haiku-otoksen X064:ssä näkyneet C2-vastauksen tekstivirheet.
