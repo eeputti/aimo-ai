@@ -2,6 +2,8 @@
 
 16.11.2026, Claude Code, sessio D. Lähde: `docs/parallel/code-audit-2026-11-15-ilta.md`, rivit #12 ja #14. Pohja origin/main 5d6ae75.
 
+> **Päivitys 17.11.2026:** Eelis pyysi poistamaan ilmoittautumisen kokonaan. Etusivu-chat poisti Workerin `/api/signups`-reitit, `signup.ts`:n, migraatiot ja seurantaskriptit testeineen (8ba07b0, Worker 76a76337). D tarkisti livenä, että `/api/signups` ja `/api/signups/invites` vastaavat 404. **Kertakoodia (`linkCode`), `verified`-tilaa ja kutsulistaa ei siis enää ole**, eikä #14:n reikää voi enää käyttää, koska reittiä ei ole. Uusi käyttäjä liittyy nyt vain ylläpitäjän kutsulla puhelun aikana: Metan testivastaanottaja ja `whatsapp:member invite`, jonka `YHDISTA`-koodin hän lähettää omasta puhelimestaan. Botin puolelle jäivät käyttämättöminä `landing_invites`, `inviteLanding`, viestityyppi `signup` ja itse ilmoittautuneiden 300 €:n raja; ne eivät haittaa ja ovat valmiina, jos itseilmoittautuminen palaa. #12:n rinnakkainen jono on käytössä ennallaan. Alla oleva teksti kuvaa tilannetta 16.11.
+
 ## #14 Ilmoittautuminen todistaa nyt numeron
 
 **Ennen:** kuka tahansa pystyi rekisteröimään kenen tahansa numeron, ja seuranta (`scripts/whatsapp-signups.mjs watch` tai pilven tick) liitti sen heti tilaavaksi jäseneksi 6 000 €:n mandaatilla. Nopeusrajat laskettiin ennen lisäystä, joten rinnakkaiset pyynnöt ohittivat ne. Myöhempi ilmoittautuminen saman numeron kanssa ylikirjoitti nimen esittelijän listassa, ja lista näytti 100 vanhinta.
