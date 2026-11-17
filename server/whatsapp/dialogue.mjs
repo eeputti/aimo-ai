@@ -96,6 +96,14 @@ export function staleCartMessages(list, { today, withText, again = false }) {
 }
 // Vaihtoehtolistan vastaukset (numero, näytä lisää, halvin) menevät suoraan tilausmoottorille ilman dialogimallia.
 const CONTROL = /^(?:(?:(?:joo|kyllä|ok|okei)[,\s]+)?(?:tilaa|vahvista|vahvistan|hyväksy|hyväksyn|peru|peruuta|tyhjennä|aloita alusta|näytä|lista)|\d+(?:\s+\d+)*|(?:(?:näytä|anna|hae)\s+)?(?:lisää|muita)\s+vaihtoehtoja|näytä\s+(?:lisää|muita)|onko\s+muita(?:\s+vaihtoehtoja)?|(?:se\s+)?(?:halvin|halvinta|edullisin))[.!?\s]*$/iu;
+// Pelkkä toimituspäivä vastaukseksi ("perjantai?", "entä torstaiksi", "pe 20.11.", "huomiseks sit"): tilausmoottori
+// vaihtaa päivän ja hakee vaihtoehdot sille. Dialogimalli luki kysymysmerkin kysymykseksi ja kysyi "Tarkoitatko toimitusta
+// perjantaille 20.11.?" päivää vaihtamatta (selainkokeilu 17.11.). Muuta sisältöä viestissä ei saa olla.
+const DAY_WORD = '(?:(?:ensi\\s+(?:viikon\\s+)?)?(?:maanantai|tiistai|keskiviikko|torstai|perjantai|lauantai|sunnuntai)\\p{L}*|(?:yli)?huom(?:enna|is\\p{L}*)|tänää\\p{L}*|(?:ma|ti|ke|to|pe|la|su)(?=\\s+\\d)|\\d{1,2}\\.\\d{1,2}\\.?(?:\\d{2,4})?)';
+const DATE_LEAD = '(?:entä|entäs|entäpä|no|ok|okei|joo|juu|sit|sitten|mites|kävis\\p{L}*|käykö|käyks|onnistu\\p{L}*|kokeil\\p{L}*|vaihde\\p{L}*|vaihda|siirre\\p{L}*|siirrä|laita|pistä|toimitu\\p{L}*)';
+const DATE_TAIL = '(?:sitten|sit|vaan|vain|käykö|käyks|kävisikö|onnistuuko|onnistuisko|kiitos|toimitus\\p{L}*)';
+const DATE_ONLY = new RegExp(`^(?:${DATE_LEAD}[,\\s]+){0,3}${DAY_WORD}(?:\\s+\\d{1,2}\\.\\d{1,2}\\.?)?(?:[,\\s]+${DATE_TAIL}){0,2}[.!?\\s]*$`, 'iu');
+export const isDateOnly = (text) => DATE_ONLY.test(String(text || '').trim());
 // Saman tuotteen variantti ei ole lisäidea: ruokakerma kerman rinnalla, voi voin rinnalla.
 const stem = (word) => (word.length > 4 ? word.slice(0, -1) : word);
 export function sameFamily(term, names) {
@@ -280,7 +288,7 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
         result = { ...shown, text: reply }; messages = [reply];
         state.lastOrder = result;
       }
-      if (!result && !positive && !CONTROL.test(text) && ask) {
+      if (!result && !positive && !CONTROL.test(text) && !isDateOnly(text) && ask) {
         try {
           plan = (await ask({ purpose: 'whatsapp_dialogue', tier: 'deep', system: SYSTEM, schema: SCHEMA, maxTokens: 2000, timeoutMs: 60000, retries: 0,
             user: JSON.stringify(GREETING.test(text)

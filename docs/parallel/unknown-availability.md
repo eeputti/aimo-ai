@@ -17,7 +17,19 @@
 
 **Avoinna:**
 - Pilven demokello poistettiin jo 8b29cff:n julkaisussa klo 0.26 (`docs/parallel/whatsapp-real-date.md`), eli "huomenna on maanantai 16.11." -sekaannus koski vain sitä edeltänyttä kokeilua.
-- Live-kokeessa "perjantai?" sai valintalistan aikana mallilta vastakysymyksen ("Tarkoitatko toimitusta perjantaille 20.11.?"), eikä päivä vaihtunut: dialogi ei tulkitse kysymysmuotoista päivää valinnan aikana.
+- Korjattu (Eeliksen pyyntö "korjaa toi perjantai-päivänvaihto myös"), katso alla.
+
+## Jatko 17.11. aamulla: päivävastaus valintalistan aikana ja valitsijan uusinta
+
+**Havainto:** live-kokeessa "perjantai?" sai valintalistan aikana dialogimallilta vastakysymyksen "Tarkoitatko toimitusta perjantaille 20.11.?", eikä päivä vaihtunut. Syy: vain numerot, "näytä lisää" ja "halvin" ohittavat dialogimallin (`CONTROL`), ja malli luki kysymysmerkin kysymykseksi (route chat).
+
+**Muutos:**
+- `whatsapp/dialogue.mjs`: `isDateOnly` tunnistaa viestin, jossa on pelkkä toimituspäivä ja enintään muutama täytesana: "perjantai?", "entä torstaiksi", "pe 20.11.", "huomiseks sit", "käykö keskiviikko?", "siirretään perjantaille". Sellainen viesti menee suoraan tilausmoottorille kuten numerovalinta, ilman mallikutsua. Viestit, joissa on muutakin sisältöä ("perjantaina tarvitaan 10 l maitoa", "miksi perjantai?", "millo saa jäätelöö?"), kulkevat ennallaan.
+- `order-tools/nearby.mjs`: sama valitsijan kysymys antoi jäätelölle leivokset kahdesti kolmesta ja kerran tyhjän listan. Tyhjä tulos kysytään nyt kerran uudelleen, eikä sitä tallenneta 30 minuutin välimuistiin.
+
+**Tarkistukset:** `test/unknown-availability.test.mjs` 4/4: uusi testi tarkistaa, että valintalistan aikana "perjantai?" menee tilausmoottorille, dialogimallia ei kutsuta eikä vastakysymys näy, ja että tunnistus erottaa päivävastauksen muista viesteistä. `npm test` 427/427. Oikealla mallitulkilla (Haiku, oikea päivämäärä ti 17.11., välimuistikannan kopio, ratkeamaton rajapinta) luonnoksen päivä vaihtui ke 18.11. → "perjantai?" pe 20.11. → "entä torstaiksi" to 19.11., ja jokaiselle päivälle näytettiin tilattava leivos. Ei Meta-, tilaus- eikä julkaisukutsuja.
+
+**Käyttöönotto:** tarvitsee botin Vercel-julkaisun. Worker ei muutu.
 - "10 kpl" tulkitaan myyntieriksi (10 laatikkoa), ei kappaleiksi: vanha käytös.
 - Kun viimeinen rivi poistetaan, luonnoksen toimituspäivä unohtuu.
 - `TYOLOKI.md` oli toisen session varauksessa sekä korjauksen että julkaisun aikaan, joten merkintä on vain tässä raportissa.

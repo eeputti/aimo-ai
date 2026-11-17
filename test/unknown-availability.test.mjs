@@ -71,3 +71,22 @@ test('mallin vapaasta tekstistä pudotetaan sisäinen sana tilausmoottori', () =
   assert.equal(r.text, 'Joo, tarkistetaan perjantai 20.11. toimitukselle.');
   assert.deepEqual(r.blocked, ['jargon']);
 });
+
+test('pelkkä päivävastaus valintalistan aikana menee tilausmoottorille ilman dialogimallia ("perjantai?")', async (t) => {
+  const { openWhatsAppStore } = await import('../server/whatsapp/store.mjs');
+  const { createOrderingDialogue, isDateOnly } = await import('../server/whatsapp/dialogue.mjs');
+  for (const text of ['perjantai?', 'entä perjantaiksi', 'pe 20.11.', 'huomiseks sit', 'käykö keskiviikko?']) assert.equal(isDateOnly(text), true, text);
+  for (const text of ['perjantaina tarvitaan 10 l maitoa', 'miksi perjantai?', 'millo saa jäätelöö?', 'pe']) assert.equal(isDateOnly(text), false, text);
+  const store = openWhatsAppStore(':memory:'); t.after(() => store.close());
+  store.db.prepare('INSERT INTO members VALUES(?,?,?,?)').run('358401234567', 'Testikeittiö', 'Testaaja', 'one');
+  let asked = 0; const ordered = [];
+  // Malli kysyisi tarkennusta ("Tarkoitatko toimitusta perjantaille 20.11.?"), mutta sitä ei kutsuta.
+  const dialogue = createOrderingDialogue({ db: store.db, timeOf: () => clock,
+    ask: async () => { asked += 1; return { json: { route: 'chat', text: 'Tarkoitatko toimitusta perjantaille 20.11.?', lookupQuery: '', suggestionTerm: '', openCart: false } }; } });
+  const choosing = { status: 'choosing', draftId: 'd1', revision: 3, text: 'Toimitus pe 20.11., hinnat alv 0 %.\n*Jäätelö 1000 l:*\n1) Leivos, 1 laatikko, 58,66 €\nVastaa 1.' };
+  const r = await dialogue.respond({ binding: 'one', messageId: 'm1', text: 'perjantai?', runOrder: async (input) => { ordered.push(input); return choosing; } });
+  assert.equal(asked, 0);
+  assert.deepEqual(ordered, ['perjantai?']);
+  assert.doesNotMatch(r.text, /Tarkoitatko/);
+  assert.match(r.text, /Toimitus pe 20\.11\./);
+});

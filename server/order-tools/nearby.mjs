@@ -35,11 +35,16 @@ export function createNearbyPicker({ ask = askAgent, enabled = agentEnabled, now
     const hit = memo.get(key);
     if (hit && now() - hit.at < TTL_MS) return hit.picks;
     const list = candidates.map((c) => `${c.id}: ${c.name}`).join('\n');
-    const r = await ask({ purpose: 'unknown_availability_alternatives', tier: 'fast', system: SYSTEM, schema: SCHEMA, maxTokens: 600, timeoutMs: 10000, retries: 0,
-      user: `Pyydetty tuote: ${term}\nMäärä: ${qtyText(quantity)}\n\nTuotteet, joiden saatavuus on tiedossa:\n${list}` });
-    const picks = Array.isArray(r?.json?.picks) ? r.json.picks : [];
-    memo.set(key, { at: now(), picks });
-    if (memo.size > 200) memo.delete(memo.keys().next().value);
+    const once = async () => {
+      const r = await ask({ purpose: 'unknown_availability_alternatives', tier: 'fast', system: SYSTEM, schema: SCHEMA, maxTokens: 600, timeoutMs: 10000, retries: 0,
+        user: `Pyydetty tuote: ${term}\nMäärä: ${qtyText(quantity)}\n\nTuotteet, joiden saatavuus on tiedossa:\n${list}` });
+      return Array.isArray(r?.json?.picks) ? r.json.picks : [];
+    };
+    // Sama kysymys antoi jäätelölle leivokset kahdesti kolmesta ja kerran tyhjän listan (17.11.). Tyhjä tulos kysytään
+    // siksi kerran uudelleen, eikä tyhjää tallenneta välimuistiin, jotta yksi tyhjä vastaus ei jää voimaan puoleksi tunniksi.
+    let picks = await once();
+    if (!picks.length) picks = await once();
+    if (picks.length) { memo.set(key, { at: now(), picks }); if (memo.size > 200) memo.delete(memo.keys().next().value); }
     return picks;
   };
 }
