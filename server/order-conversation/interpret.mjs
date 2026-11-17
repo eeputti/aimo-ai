@@ -49,16 +49,20 @@ export function createRuleInterpreter({ understand }) {
     }
     // Ruokavalio ilman tuotetta koskee koko tilausta ("kaikki laktoosittomana", vastaus allergiakysymykseen).
     const asked = pending?.kind === 'checklist' ? pending.asks : [];
-    const diet = !u.items.length && dietOf(t);
+    // Myös kielto ("ei mittää laktoosittomii hommii", "EI laktoositonta") ja "laktoosillinen" (WhatsApp-koe 17.11.).
+    // Kielto ei saa muuttua laktoosittomuusvaatimukseksi: koko tilauksen tai rivin laktoositon-merkintä jää pois.
+    const plain = /\b(?:tavallinen|tavallista|tavalliset|normaali|normaalia|normi)\w*(?:\s+\p{L}+)?\s+(?:käy|kelpaa|riittää)\b|\bei\s+(?:tarvi\w*|tarvitse)\s+(?:olla\s+)?laktoosit|\bei\s+(?:(?:mit\p{L}*|yht\p{L}*|mitään)\s+)?laktoosit(?:on|tom)|\blaktoosilli/iu.test(t);
+    const diet = !plain && !u.items.length && dietOf(t);
     if (diet) ops.push(diet);
     else if (asked.includes('diet') && NO_DIET.test(t)) ops.push({ op: 'diet', addClaims: [], excludeAllergens: [] });
-    for (const it of u.items) {
+    for (const raw of u.items) {
+      const it = plain ? { ...raw, claims: (raw.claims || []).filter((c) => c !== 'FREE_FROM_LACTOSE') } : raw;
       const line = draft.lines.find((l) => sameTerm(l.productTerm, it.productTerm));
       if (line) ops.push({ op: 'update', ref: line.ref, ...(it.quantity ? { quantity: it.quantity } : {}), addClaims: it.claims || [], excludeAllergens: it.excludeAllergens || [] });
       else ops.push({ op: 'add', productTerm: it.productTerm, quantity: it.quantity || null, claims: it.claims || [], excludeAllergens: it.excludeAllergens || [] });
     }
     // "tavallinen käy" jo ensiviestissä: tuotteiden laktoositarkennusta ei kysytä myöhemmin.
-    if (/\b(?:tavallinen|tavallista|tavalliset|normaali|normaalia|normi)\w*(?:\s+\p{L}+)?\s+(?:käy|kelpaa|riittää)\b|\bei\s+(?:tarvi\w*|tarvitse)\s+(?:olla\s+)?laktoosit/iu.test(t)) ops.push({ op: 'no_preference' });
+    if (plain) ops.push({ op: 'no_preference' });
     // "eikun 30 litraa": pelkkä määrä kohdistuu kysyttyyn riviin tai viimeksi käsiteltyyn riviin.
     const q = !u.items.length && bareQuantity(t);
     // Viimeksi käsitelty rivi kelpaa vain edellisestä viestistä. Muuten monen rivin luonnoksessa kysytään, ei arvata.
@@ -101,7 +105,7 @@ Säännöt:
 - slang luettelee viestin puhekieliset sanat ja Aimon sanaston sanan, jota ne tarkoittavat ("jauhis" = jauheliha). Käytä productTerm-kentässä tätä sanaa, älä samannäköistä toista tuotetta.
 - Tunnista puhekieli ja oikea yksikkö: "5 desii" = 5 DL, "pari desiä" = 2 DL, 250 ml = 250 ML, 500 g = 500 G. Palauta alkuperäisen yksikön arvo; palvelin muuntaa DL/CL/ML litroiksi ja G kiloiksi. Älä koskaan vaihda 5 desiä 5 litraksi.
 - context.history kertoo aiemman keskustelun, myös apurin tarkentavan kysymyksen. Ymmärrä siihen annettu vastaus ("sitä", "molemmat", "ihan normina") nykyisten ref-rivien avulla. Ajantasainen luonnos ratkaisee, ei vanha määrä historiassa.
-- Jos ostaja sanoo jo itse, että tavallinen käy tai ettei laktoosittomuutta tarvita ("tavallinen maito käy", "ei tarvi olla laktoositonta"), lisää no_preference-operaatio (ref tyhjä) ja jätä laktoositon-vaatimus pois. Näin samaa ei kysytä myöhemmin.
+- Jos ostaja sanoo jo itse, että tavallinen käy tai ettei laktoosittomuutta tarvita ("tavallinen maito käy", "ei tarvi olla laktoositonta", "ei mitään laktoosittomia", "laktoosillista kermaa"), lisää no_preference-operaatio (ref tyhjä) ja jätä laktoositon-vaatimus pois. Kielto "ei laktoositonta" ei koskaan tarkoita laktoositonta. Näin samaa ei kysytä myöhemmin.
 - pendingQuestion.kind=preference on vain nimettyjen refs-rivien tuoteominaisuuden tarkennus. "ei väliä", "tavallinen käy" tai "ihan normina" on no_preference oikeille riveille. Myöntävä vastaus lisää pendingQuestion.claim-vaatimuksen vain kysyttyihin riveihin. Pelkkä "ei" tähän kysymykseen ei ole kaikkien ruokarajoitusten nollaus.
 - excludeAllergens vain, kun ostaja itse kieltää allergeenin (maidoton, pähkinätön, gluteeniton allergian vuoksi). Tuotteen oma ainesosa ei ole kielto: kananmunalle ei tule AE-kieltoa.
 - Laktoositon on FREE_FROM_LACTOSE. Maidoton ei ole väittämä vaan allergeenikielto AM. Älä sekoita näitä.

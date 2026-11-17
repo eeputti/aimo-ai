@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { openWhatsAppStore } from '../server/whatsapp/store.mjs';
 import { createOrderingDialogue, staleCartChoice, staleCartMinutes } from '../server/whatsapp/dialogue.mjs';
-import { CHOOSE_TRANSITION } from '../server/whatsapp/cart-presentation.mjs';
+import { CHOOSE_TRANSITIONS } from '../server/whatsapp/cart-presentation.mjs';
 import { createDemoOrderingChat } from '../server/whatsapp/ordering.mjs';
 import { openDraftStore } from '../server/order-conversation/store.mjs';
 import { createOrderingConversation } from '../server/order-conversation/index.mjs';
@@ -75,7 +75,7 @@ test('tauon jälkeen uusi tuote ei mene hiljaa vanhaan koriin: vanha kori näyte
   assert.deepEqual(after.lines.map((l) => [l.productTerm, l.quantity.value]), [['maito', 20], ['voi', 5], ['kerma', 10]]);
   assert.equal(kept.messages[0], 'Selvä, jatketaan vanhaa ostoskoria. Listalle tuli kerma 10 l.');
   // Siirtymä valintaan omana viestinään ennen vaihtoehtoja (Eelis 17.11.).
-  assert.equal(kept.messages[1], CHOOSE_TRANSITION);
+  assert.ok(CHOOSE_TRANSITIONS.includes(kept.messages[1]), kept.messages[1]);
   assert.match(kept.messages.at(-1), /\*Maito 20 l:\*\n1\) maito 1/);
 });
 
@@ -134,7 +134,8 @@ test('ilman taukoa uusi tuote menee nykyiseen koriin kysymättä, ja siirtymävi
   await oldCart(f);
   f.wait(30 * 60_000);
   const r = await f.turn('10 l kermaa');
-  assert.deepEqual(r.messages.slice(0, 2), ['Listalle tuli kerma 10 l.', CHOOSE_TRANSITION]);
+  assert.equal(r.messages[0], 'Listalle tuli kerma 10 l.');
+  assert.ok(CHOOSE_TRANSITIONS.includes(r.messages[1]), r.messages[1]);
   assert.equal((await f.list()).lines.length, 3);
 });
 

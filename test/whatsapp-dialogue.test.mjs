@@ -250,7 +250,8 @@ test('quantity questions for arbitrary product labels stay grammatical and prese
   const messages = await presentCollectingCart({ result, shoppingList,
     ask: async () => ({ json: { acknowledgement: 'Selvä, laktoositon ruokakerma kirjattu.', quantityQuestion: 'Paljonko tarvitset näitä: {{products}}?' } }) });
   assert.equal(messages[0], 'Selvä, laktoositon ruokakerma kirjattu.');
-  assert.equal(messages.at(-1), 'Paljonko tarvitset näitä: laktoositon ruokakerma?');
+  // Yksi tuote ilman partitiivia: ei "näitä:"-muotoa (WhatsApp-koe 17.11.: "Paljonko tarvitset näitä: jogurtti?").
+  assert.equal(messages.at(-1), 'Kuinka paljon tarvitset tuotetta laktoositon ruokakerma?');
 });
 
 test('a conversational question receives the current saved cart and can clarify without mutating the order', async (t) => {

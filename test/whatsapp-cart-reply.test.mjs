@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { openWhatsAppStore } from '../server/whatsapp/store.mjs';
 import { createOrderingDialogue } from '../server/whatsapp/dialogue.mjs';
-import { CHOOSE_TRANSITION, FALLBACK_ACKNOWLEDGEMENT, groundedAcknowledgement, presentCollectingCart, selectionAcknowledgement } from '../server/whatsapp/cart-presentation.mjs';
+import { CHOOSE_TRANSITIONS, FALLBACK_ACKNOWLEDGEMENT, groundedAcknowledgement, presentCollectingCart, selectionAcknowledgement } from '../server/whatsapp/cart-presentation.mjs';
 
 const CAKE = 'tarvittisin 1000 littaa maitoo ja sitte kananmunii ja vaiks kermaa kans, teen kakkua keskiviikoks ni onnistuisko?';
 const line = (ref, productTerm, quantity = null, extra = {}) => ({ ref, productTerm, quantity, claims: [], excludeAllergens: [], selectedProductId: null, selectedName: null, ...extra });
@@ -61,19 +61,20 @@ test('choosing and ready replies say what was just picked, added or moved, witho
   assert.deepEqual(selectionAcknowledgement({ previousList: before, shoppingList: picked, status: 'choosing' }), ['Selvä, valitaan Valio kevytmaito 1 l laktoositon UHT.']);
   const added = { ...before, revision: 6, lines: [...before.lines, line('L3', 'kerma', { value: 2, unit: 'L' })] };
   // Lisäyksen jälkeen siirtymä valintaan omana viestinään (Eelis 17.11.).
-  assert.deepEqual(selectionAcknowledgement({ previousList: before, shoppingList: added, status: 'choosing' }), ['Listalle tuli kerma 2 l.', CHOOSE_TRANSITION]);
+  const transition = (out, first) => { assert.equal(out.length, first ? 2 : 1); if (first) assert.equal(out[0], first); assert.ok(CHOOSE_TRANSITIONS.includes(out.at(-1)), out.at(-1)); };
+  transition(selectionAcknowledgement({ previousList: before, shoppingList: added, status: 'choosing' }), 'Listalle tuli kerma 2 l.');
   const moved = { ...before, revision: 7, deliveryDate: '2026-11-17' };
   assert.deepEqual(selectionAcknowledgement({ previousList: before, shoppingList: moved, status: 'ready' }), ['Toimituspäivä nyt ti 17.11.']);
   const claimOnly = { ...before, revision: 3, lines: [{ ...before.lines[0], claims: ['FREE_FROM_LACTOSE'] }, before.lines[1]] };
-  assert.deepEqual(selectionAcknowledgement({ previousList: before, shoppingList: claimOnly, status: 'choosing' }), [CHOOSE_TRANSITION]);
+  transition(selectionAcknowledgement({ previousList: before, shoppingList: claimOnly, status: 'choosing' }));
   // Jo valintavaiheessa ollut kori ei toista siirtymää.
   assert.deepEqual(selectionAcknowledgement({ previousList: { ...before, status: 'needs_product_selection' }, shoppingList: claimOnly, status: 'choosing' }), ['Selvä! Tässä sopivat vaihtoehdot:']);
   // Auki olevan valintalistan päivänvaihto ("perjantai?") tai määrän muutos kuitataan ilman toistuvaa siirtymää (17.11.).
   const open = { ...before, status: 'needs_product_selection' };
   assert.deepEqual(selectionAcknowledgement({ previousList: open, shoppingList: { ...before, revision: 8, deliveryDate: '2026-11-20' }, status: 'choosing' }), ['Toimituspäivä nyt pe 20.11.']);
-  assert.deepEqual(selectionAcknowledgement({ previousList: open, shoppingList: { ...before, revision: 9, lines: [line('L1', 'maito', { value: 500, unit: 'L' }), before.lines[1]] }, status: 'choosing' }), ['Päivitetty: maito 500 l.']);
+  assert.deepEqual(selectionAcknowledgement({ previousList: open, shoppingList: { ...before, revision: 9, lines: [line('L1', 'maito', { value: 500, unit: 'L' }), before.lines[1]] }, status: 'choosing' })[0].replace(/^(?:Joo|Selvä|Okei), nyt /u, ''), 'maito 500 l.');
   // Uusi tuote kesken valinnan saa siirtymän, jotta seuraavan tuotteen lista ei näytä lisätyn tuotteen vaihtoehdoilta.
-  assert.deepEqual(selectionAcknowledgement({ previousList: open, shoppingList: added, status: 'choosing' }), ['Listalle tuli kerma 2 l.', CHOOSE_TRANSITION]);
+  transition(selectionAcknowledgement({ previousList: open, shoppingList: added, status: 'choosing' }), 'Listalle tuli kerma 2 l.');
   assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: before, status: 'choosing' }), null);
   assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: picked, status: 'collecting' }), null);
   for (const text of [selectionAcknowledgement({ previousList: before, shoppingList: picked, status: 'choosing' }),

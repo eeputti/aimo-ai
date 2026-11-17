@@ -3,6 +3,7 @@
 import { normalizeOrderUnits, presentCollectingCart, selectionAcknowledgement } from './cart-presentation.mjs';
 import { withCartHandoffHint } from './cart-handoff.mjs';
 import { safeModelText } from './model-guard.mjs';
+import { announcedChoice, optionsPrompt, unchangedReply } from './unchanged-reply.mjs';
 import { factKinds, factProducts, factsReply, namedInMessage, withoutProductClaims } from './product-facts.mjs';
 // Kiitos tai kuittaus ilman kysymystä ("Sisältää siis maitoa, joten ei käy meille. Kiitos."): ei uusi tuotekysymys (itsepeli V011).
 const CLOSING = /(?<![\p{L}])(?:kiitos|kiitti|kiitoksia|kiitokset|thanks|thank you|selvä|selvä\s+homma|okei|ok|jees)(?![\p{L}])/iu;
@@ -433,8 +434,23 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
       if (!result) {
         touched = true;
         const previousList = getShoppingList({ epoch: state.epoch || '' });
+        const shownBefore = state.lastOrder?.text || '';
         result = await runOrder(normalizeOrderUnits(orderText), { epoch: state.epoch || '', context: { history: state.history || [], lastReply: state.lastOrder?.text || '' } });
-        messages = ask ? orderMessages(result) : [result.text];
+        // Viesti ei muuttanut vaihtoehtolistaa: sama lista sanasta sanaan ei vastaa mitään (WhatsApp-koe 17.11.: kysymys
+        // vaihtoehtojen eroista ja "EI laktoositonta" kolmesti). Mallin ilmoittama valinta ("Valitsen vaihtoehdon 3") tehdään,
+        // muuten asiakas saa vastauksen viestiinsä ja lyhyen ohjeen ilman koko listaa.
+        let unchangedAnswer = null;
+        const afterList = getShoppingList({ epoch: state.epoch || '' });
+        if (ask && shownBefore && result.status === 'choosing' && result.text === shownBefore && previousList && afterList
+          && previousList.id === afterList.id && previousList.revision === afterList.revision && !CONTROL.test(text.trim()) && !RELIST.test(text) && !compareKind(text)) {
+          const choice = announcedChoice(plan?.text);
+          if (choice) result = await runOrder(String(choice), { epoch: state.epoch || '', context: { history: state.history || [], lastReply: shownBefore } });
+          else {
+            unchangedAnswer = plan?.text?.trim() || await unchangedReply({ ask, message: text, options: shownBefore, history: state.history || [] });
+            if (plan) plan = { ...plan, text: '' };
+          }
+        }
+        messages = unchangedAnswer ? [unchangedAnswer, optionsPrompt(shownBefore)] : ask ? orderMessages(result) : [result.text];
         if (ask && allowed()) {
           const current = getShoppingList({ epoch: state.epoch || '' });
           // Dialogimallin vastaus asiakkaan kysymykseen on jo viestin alku: ei toista kuittausta perään.

@@ -1,5 +1,6 @@
 // The model supplies tone around a saved cart. The engine's rows and required checks stay intact.
 import { guardModelText } from './model-guard.mjs';
+import { readableName } from '../order-conversation/wording.mjs';
 const PRODUCTS = '{{products}}';
 const DATE_PREFIX = 'Mille päivälle toimitus?';
 // Canonical physical units before interpretation: the model must not turn 5 dl into 5 L
@@ -17,8 +18,18 @@ export function normalizeOrderUnits(text) {
 }
 const PARTITIVE = { maito: 'maitoa', kananmuna: 'kananmunia', kananmunat: 'kananmunia', kerma: 'kermaa',
   voi: 'voita', juusto: 'juustoa', peruna: 'perunoita', riisi: 'riisiä', pasta: 'pastaa',
-  jauho: 'jauhoja', vehnäjauho: 'vehnäjauhoja', sokeri: 'sokeria', suola: 'suolaa', kahvi: 'kahvia' };
+  jauho: 'jauhoja', vehnäjauho: 'vehnäjauhoja', sokeri: 'sokeria', suola: 'suolaa', kahvi: 'kahvia',
+  // WhatsApp-koe 17.11.: "Paljonko tarvitset näitä: jogurtti?" kuulosti lomakkeelta, joten yleisimmille partitiivi.
+  jogurtti: 'jogurttia', rahka: 'rahkaa', kermaviili: 'kermaviiliä', jäätelö: 'jäätelöä', suklaa: 'suklaata', lohi: 'lohta',
+  kala: 'kalaa', kana: 'kanaa', broileri: 'broileria', jauheliha: 'jauhelihaa', liha: 'lihaa', ruokakerma: 'ruokakermaa',
+  kuohukerma: 'kuohukermaa', vispikerma: 'vispikermaa', piimä: 'piimää', margariini: 'margariinia', öljy: 'öljyä',
+  porkkana: 'porkkanoita', sipuli: 'sipulia', tomaatti: 'tomaatteja', kurkku: 'kurkkuja', omena: 'omenoita', banaani: 'banaaneja',
+  leipä: 'leipää', makaroni: 'makaronia', spagetti: 'spagettia', kaurahiutale: 'kaurahiutaleita', hiutale: 'hiutaleita',
+  mehu: 'mehua', vesi: 'vettä', tee: 'teetä', kahvimaito: 'kahvimaitoa', kauramaito: 'kauramaitoa', kaurajuoma: 'kaurajuomaa',
+  ruisjauho: 'ruisjauhoja', kaurajauho: 'kaurajauhoja', jäävuorisalaatti: 'jäävuorisalaattia', salaatti: 'salaattia' };
 const join = (names) => names.length < 2 ? names[0] : `${names.slice(0, -1).join(', ')} ja ${names.at(-1)}`;
+// Yksi tuote, jolle ei ole partitiivia: "näitä: jogurtti?" ei sovi yhteen tuotteeseen.
+const SINGLE_LABEL_QUESTION = `Kuinka paljon tarvitset tuotetta ${PRODUCTS}?`;
 const QUESTION_FORMS = [
   `Kuinka paljon laitetaan ${PRODUCTS}?`, `Kuinka paljon laitettais ${PRODUCTS}?`,
   `Paljonko laitetaan ${PRODUCTS}?`, `Minkä verran tarvitset ${PRODUCTS}?`,
@@ -74,6 +85,12 @@ export function groundedAcknowledgement(value, { facts, userText = '' }) {
 // Oma viesti ennen vaihtoehtolistaa, kun lisäyksen jälkeen siirrytään valitsemaan tuotteita (Eelis 17.11.): muuten
 // "Listalle tuli maito 10 l. Tässä vaihtoehdot:" ja perään toisen tuotteen vaihtoehdot näytti siltä, että maidon vaihtoehdot puuttuvat.
 export const CHOOSE_TRANSITION = 'Nyt olisi aika valita vaihtoehtoja, niin käydään ostoskorisi pikaisesti läpi!';
+// WhatsApp-koe 17.11.: sama siirtymä kolmesti yhden illan aikana kuulosti robotilta. Eeliksen lause on ensimmäinen vaihtoehto.
+export const CHOOSE_TRANSITIONS = [CHOOSE_TRANSITION, 'Sitten valitaan tuotteet, käydään ne nopeasti läpi!',
+  'Hyvä! Katsotaan seuraavaksi sopivat tuotteet.', 'Mennään tuotevalintoihin, tässä vaihtoehdot.'];
+// FNV-1a: sama kori saa saman siirtymän (uusinta ei vaihda tekstiä), eri korit eri.
+const hash = (s) => [...String(s || '')].reduce((h, c) => Math.imul(h ^ c.codePointAt(0), 16777619) >>> 0, 2166136261);
+const transitionFor = (list) => { const h = hash(`${list?.id}:${list?.revision}`); return CHOOSE_TRANSITIONS[((h ^ (h >>> 16)) >>> 0) % CHOOSE_TRANSITIONS.length]; };
 
 /**
  * Tuotevalinnan tai vaihtoehtolistan alku: kertoo koodissa, mitä juuri valittiin tai lisättiin, ilman mallia.
@@ -89,22 +106,24 @@ export function selectionAcknowledgement({ previousList, shoppingList, status })
   const changed = shoppingList.lines.filter((line) => before.has(line.ref) && !line.selectedProductId && lineKey(before.get(line.ref)) !== lineKey(line));
   const rotate = (options) => options[(shoppingList.revision || 0) % options.length];
   const parts = [];
-  if (picked.length) parts.push(`${rotate(['Selvä, otetaan', 'Hyvä, otetaan', 'Selvä, valitaan'])} ${join(picked.map((line) => line.selectedName))}.`);
+  // Tukkunimi luettavaksi: "Selvä, otetaan PP PESTY PERUNA 50-60MM" huusi isoilla kirjaimilla (WhatsApp-koe 17.11.).
+  if (picked.length) parts.push(`${rotate(['Selvä, otetaan', 'Hyvä, otetaan', 'Selvä, valitaan'])} ${join(picked.map((line) => readableName(line.selectedName)))}.`);
   const label = (line) => [line.productTerm, quantityLabel(line.quantity)].filter(Boolean).join(' ');
   // Myös uuden korin ensimmäiset rivit kerrotaan ("No moikka! Listalle tuli maito 10 l.", Eelis 17.11.).
   if (added.length) parts.push(`Listalle tuli ${join(added.map(label))}.`);
-  else if (changed.length) parts.push(`Päivitetty: ${join(changed.map(label))}.`);
+  // "Päivitetty: maito 15 l." oli lomakkeen kieltä.
+  else if (changed.length) parts.push(`${rotate(['Joo, nyt', 'Selvä, nyt', 'Okei, nyt'])} ${join(changed.map(label))}.`);
   if (previousList?.id === shoppingList.id && previousList.deliveryDate && shoppingList.deliveryDate
     && previousList.deliveryDate !== shoppingList.deliveryDate) parts.push(`Toimituspäivä nyt ${dateLabel(shoppingList.deliveryDate)}`);
   // Valintavaihe alkaa (uusi lista tai edellisellä kerralla puuttui vielä päivä, määrä tai tarkennus): siirtymä omana viestinään.
   const entering = !previousList || previousList.id !== shoppingList.id || previousList.status !== 'needs_product_selection';
   if (!parts.length) {
     if (status !== 'choosing') return ['Selvä!'];
-    return [entering ? CHOOSE_TRANSITION : rotate(['Selvä! Tässä sopivat vaihtoehdot:', 'Hyvä, katsotaan vaihtoehdot:', 'Selvä, tässä vaihtoehdot:'])];
+    return [entering ? transitionFor(shoppingList) : rotate(['Selvä! Tässä sopivat vaihtoehdot:', 'Hyvä, katsotaan vaihtoehdot:', 'Selvä, tässä vaihtoehdot:'])];
   }
   // Siirtymä vain, kun valintavaihe alkaa tai listalle tuli uusi tuote. Jo auki olevan listan päivän tai määrän muutos
   // ("Toimituspäivä nyt pe 20.11.") ei toista sitä: selainkokeilussa 17.11. sama siirtymä tuli joka päivänvaihdon jälkeen.
-  if (status === 'choosing' && !picked.length) return entering || added.length ? [parts.join(' '), CHOOSE_TRANSITION] : [parts.join(' ')];
+  if (status === 'choosing' && !picked.length) return entering || added.length ? [parts.join(' '), transitionFor(shoppingList)] : [parts.join(' ')];
   return [parts.join(' ')];
 }
 
@@ -198,6 +217,7 @@ export async function presentCollectingCart({ result, shoppingList, previousList
   // Dialogimallin vastaus asiakkaan kysymykseen toimii jo kuittauksena: ei kahta aloitusta peräkkäin.
   let acknowledgement = changed && !answered ? FALLBACK_ACKNOWLEDGEMENT : '';
   let quantityQuestion = productCase === 'partitive' ? QUESTION_FORMS[0] : QUESTION_FORMS[4];
+  const singleLabel = productCase === 'labels' && missing.length === 1;
   const deliveryDate = dateLabel(shoppingList.deliveryDate);
   // Arvio ajetaan rinnakkain kuittauksen kanssa, jotta viesti ei odota kahta mallikutsua peräkkäin.
   const estimating = asksQuantity && !dateFirst ? estimateMissingQuantities({ ask, shoppingList, userText, history }) : Promise.resolve(null);
@@ -224,7 +244,7 @@ export async function presentCollectingCart({ result, shoppingList, previousList
   }
   const cart = blocks[0].replace('Luonnoksessa nyt:', deliveryDate ? `Ostoskorissasi nyt (toimitus ${deliveryDate}):` : 'Ostoskorissasi nyt:');
   const rest = questions.filter((question) => !asksQuantity || question !== canonicalQuestion);
-  let quantityText = asksQuantity ? quantityQuestion.replace(PRODUCTS, () => quantityProducts) : '';
+  let quantityText = asksQuantity ? (singleLabel ? SINGLE_LABEL_QUESTION : quantityQuestion).replace(PRODUCTS, () => quantityProducts) : '';
   if (dateFirst && quantityText) {
     // "Mille päivälle tarvitset toimituksen, ja kuinka paljon laitetaan voita? Haen sen jälkeen ..."
     rest[0] = rest[0].replace(DATE_PREFIX, () => `Mille päivälle tarvitset toimituksen, ja ${quantityText[0].toLocaleLowerCase('fi-FI')}${quantityText.slice(1)}`);

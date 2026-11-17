@@ -49,3 +49,10 @@ Eelis pyysi: "koita saada se solmuun ja ole mahdollisimman hankala sille", kaikk
 - Lisälöydös: epäselvästä äänestä Whisper palautti kehotteen sellaisenaan ("Tilaus Valio Aimolle, kira, voi, ola, kiitos."). Se olisi lisännyt koriin tuotteita, joita kukaan ei sanonut.
 - Korjaus `server/whatsapp/transcribe.mjs`: sanasto ääkkösineen, teksti NFC-muotoon (hajotettu ä katkaisi katalogihaun sanan), kehotteen toisto palautetaan tyhjänä, jolloin botti vastaa "En saanut ääniviestistä selvää".
 - Rajat: koe tehtiin macOS:n synteettisellä suomenkielisellä äänellä, ei oikealla puhelimen ääniviestillä.
+
+## Korjattu samana iltana (toinen commit)
+
+- **F1, F2, F6:** viesti, joka ei muuttanut vaihtoehtolistaa, ei enää saa samaa listaa uudelleen. Botti vastaa viestiin (mallin oma vastaus, tai erillinen lyhyt Haiku-vastaus `server/whatsapp/unchanged-reply.mjs`) ja lisää vain listan ohjerivin ("Vastaa 1, 2, 3 tai 4."). Jos malli sanoo "Valitsen vaihtoehdon 3", valinta myös tehdään. Pyynnöt näyttää lista ("näytä", "listaa vaihtoehdot") ja vertailut toimivat kuten ennen. Oikea Haiku samoihin viesteihin: "Äh, harmi, nää kaikki näyttää olevan laktoosittomia. Kirjoita 4, niin katsotaan lisää vaihtoehtoja, tai kerro jokin toinen tuote, jonka haluaisit." ja "Hyvä kysymys! Ykkönen on rasvatonta isommissa pakkauksissa ja halvin litralta, kakkonen kevytmaitoa ja kolmonen rasvatonta mutta kallein."
+- **F10:** "ei mittää laktoosittomii", "EI laktoositonta" ja "laktoosillinen" eivät muutu laktoosittomuusvaatimukseksi (sääntötulkki ja mallin ohje).
+- **Fraasit:** "Päivitetty: maito 15 l." → "Joo, nyt maito 15 l."; siirtymä valintaan vaihtelee neljän lauseen välillä (Eeliksen lause yksi niistä); valitun tuotteen nimi luettavana ("PP pesty peruna 50-60mm"); saman päivän tilattavattomat tuotteet yhdessä lauseessa ("…ke 18.11.: maito, voi ja kananmuna."); yhden tuotteen määräkysymys ilman "näitä:" ja partitiivit yleisimmille tuotteille ("Kuinka paljon laitetaan jogurttia?").
+- **Ei vielä korjattu:** F4 (voin pakkauskoko katalogissa), F16 (suklaa → kaurajuoma), F9 (suosituimmat tuotteet: ei dataa Valion aineistossa), F7, F12, F17–F24.

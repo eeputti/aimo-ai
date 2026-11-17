@@ -213,6 +213,22 @@ function changeHint(draft) {
 }
 
 const joinFi = (names) => (names.length < 2 ? names[0] || '' : `${names.slice(0, -1).join(', ')} ja ${names.at(-1)}`);
+
+// Saman päivän tilattavattomat rivit yhteen lauseeseen: kolme peräkkäistä "Ei tilattavaa tuotetta päivälle ke 18.11.: maito." -riviä
+// (maito, voi, kananmuna) kuulosti robotilta (WhatsApp-koe 17.11.).
+export function mergeUnavailable(problems) {
+  const NONE = /^Ei tilattavaa tuotetta päivälle (.+?): (.+)\.$/u;
+  const byDate = new Map();
+  for (const p of problems) { const m = NONE.exec(p); if (m) byDate.set(m[1], [...(byDate.get(m[1]) || []), m[2]]); }
+  const done = new Set();
+  return problems.flatMap((p) => {
+    const m = NONE.exec(p);
+    if (!m || byDate.get(m[1]).length < 2) return [p];
+    if (done.has(m[1])) return [];
+    done.add(m[1]);
+    return [`Ei tilattavaa tuotetta päivälle ${m[1]}: ${joinFi(byDate.get(m[1]))}.`];
+  });
+}
 // Vaihtoehto ostajan ymmärtämänä: luettava nimi, myyntierät, yhden koko ja määrä yhteensä,
 // esim. "Kananmunat M10, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 12,40 €" (wording.mjs). Otsikkorivi kertoo jo pyydetyn määrän.
 const itemNounOf = (covers, line) => (covers?.unit === 'PCS' && line?.quantity?.basis === 'items' ? (/kananmun/iu.test(line.productTerm || '') ? 'munaa' : 'kpl') : undefined);
@@ -491,11 +507,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
           const how = `Voit vaihtaa tuotteen toiseen tai poistaa sen kirjoittamalla "poista ${unknownTerms[0]}".`;
           return { status: 'collecting', text: repeat
             ? `Saatavuutta ei vieläkään saada tarkistettua: ${what}. Se puuttuu kaikilta päiviltä, joten päivän vaihto ei auta. ${how} Tilausta ei ole tehty.`
-            : `${problems.join('\n')}\nToinen päivä ei auta, koska tieto puuttuu kaikilta päiviltä, enkä löytänyt vastaavaa tuotetta, jonka saatavuus olisi tiedossa. ${how} Tilausta ei ole tehty.` };
+            : `${mergeUnavailable(problems).join('\n')}\nToinen päivä ei auta, koska tieto puuttuu kaikilta päiviltä, enkä löytänyt vastaavaa tuotetta, jonka saatavuus olisi tiedossa. ${how} Tilausta ei ole tehty.` };
         }
         // dateLabel päättyy pisteeseen ("ti 17.11."), joten perään ei tule toista (Haiku-otos X064: "ti 17.11..").
         const hint = e ? `Aikaisin toimitettava päivä on ${dateLabel(e.date)} Kirjoita "${dateLabel(e.date)}", jos se käy.` : 'Kokeile toista päivää tai tarkenna tuotetta.';
-        return { status: 'collecting', text: `${problems.join('\n')}\n${hint} Tilausta ei ole tehty.` };
+        return { status: 'collecting', text: `${mergeUnavailable(problems).join('\n')}\n${hint} Tilausta ei ole tehty.` };
       }
       // Kappalemäärä ei kerro kiloja (puhelinkuva 17.11.: "kanan fileesuikale 100 kpl" → 100 kg, 899 €). Kiloina myytävää
       // tuotetta ei tarjota kappaleriville. Kun vähintään puolet vaihtoehdoista myydään kiloina, tuote on kilotavaraa ja
