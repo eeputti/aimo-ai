@@ -19,6 +19,8 @@ const withoutNoDataClaim = (text) => (NO_DATA_CLAIM.test(text) ? String(text).sp
 const YES = /^(kyllä|joo|juu|jep|sopii|lisää se|lisää vaan|otetaan)[.!\s]*$/iu;
 const NO = /^(ei|ei kiitos|ei tarvitse|ei tarvi|ei muuta)[.!\s]*$/iu;
 const QUANTITY = /^\d+(?:[.,]\d+)?\s*(?:l|litra\w*|kg|kilo\w*|kpl|pakett\w*|laatik\w*|ltk)[.!\s]*$/iu;
+// Viestissä on tilattava määrä ("30 l maitoa", "5 kg voita"): se on tilausviesti, vaikka samassa on kysymys.
+const ORDER_AMOUNT = /(?<![\p{L}\d])\d+(?:[.,]\d+)?\s*(?:l|litra\p{L}*|kg|kilo\p{L}*|g|dl|kpl|kappale\p{L}*|pakett\p{L}*|laatik\p{L}*|ltk|rasia\p{L}*|säkki\p{L}*)(?![\p{L}])/iu;
 const GREETING = /^(moi|moikka|moro|morjens|morjes|hei|heippa|terve|hello|hi|huomenta|päivää|iltaa|hyvää (huomenta|päivää|iltaa))[.!\s]*$/iu;
 // Tervehdys Helsingin ajasta (viestin vastaanottohetki tai demokello). Asiakkaan oma arkinen tervehdys peilataan;
 // vuorokaudenaikaan sidottu tervehdys tulee aina kellosta, joten väärää vuorokaudenaikaa ei sanota.
@@ -307,7 +309,9 @@ export function createOrderingDialogue({ db, ask, lookup = async () => [], produ
       if (plan && REPEAT_LAST.test(text)) plan = { ...plan, route: ['chat', 'order'].includes(plan.route) ? 'order' : plan.route, text: '' };
       // Vertailu (halvin, hiilijalanjälki, toimitusvarmuus) ja vaihtoehtojen uudelleen näyttäminen: tilausmoottori vastaa näytetyistä
       // vaihtoehdoista. Malli ei vastaa itse eikä pahoittele valintaa, jota ei tehty väärin (V025).
-      if (plan && (compareKind(text) || RELIST.test(text)) && (plan.route === 'order' || getShoppingList({ epoch: state.epoch || '' })?.lines?.length)) {
+      // Myös ensimmäinen viesti, jossa on tilaus ja kysymys samassa ("30 l maitoa ke. Mikä näistä toimitetaan varmimmin?"): ilman tätä
+      // malli reititti sen keskusteluksi ja vastasi "En pysty itse arvioimaan", koska luonnosta ei vielä ollut (Haiku-mittaus V023).
+      if (plan && (compareKind(text) || RELIST.test(text)) && (plan.route === 'order' || ORDER_AMOUNT.test(text) || getShoppingList({ epoch: state.epoch || '' })?.lines?.length)) {
         plan = { ...plan, route: ['chat', 'order'].includes(plan.route) ? 'order' : plan.route, text: '' };
       }
       if (plan?.text) plan = { ...plan, text: withoutNoDataClaim(plan.text) };

@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — V023: toimitusvarmuuskysymys ensimmäisessä tilausviestissä tilausmoottorille (Claude Code, sessio A)
+
+- **Pyyntö:** Eelis pyysi korjaamaan session F:n Haiku-mittauksen V023:n: "30 l maitoa keskiviikoks. Mikä näistä toimitetaan varmimmin?" sai välillä mallin vastauksen "En pysty itse arvioimaan, mikä toimii varmimmin", vaikka katalogissa on toimitusvarmuus.
+- **Syy:** C:n vertailukorjaus (sanajärjestys) toimi, ja tilausmoottori vastaa vertailuun näytetyistä vaihtoehdoista. Dialogi ohjasi vertailukysymyksen moottorille kuitenkin vain, jos malli reititti viestin tilaukseksi tai luonnoksessa oli jo rivejä. Kun Haiku reititti ensimmäisen viestin keskusteluksi, mallin oma teksti meni asiakkaalle (2/4 ajossa).
+- **Korjaus (`server/whatsapp/dialogue.mjs`):** vertailukysymys ohjataan tilausmoottorille myös, kun viestissä on tilattava määrä ("30 l", "5 kg"). Yleinen kysymys ilman tilausta saa yhä mallin vastauksen.
+- **Tarkistukset:** uusi `test/whatsapp-compare-first-message.test.mjs` 3/3. Reititystesti epäonnistui vanhalla koodilla. Moottorin vastaus tarkistettiin samalla viestillä ("Toimitusvarmuus: 1) 91 %, 2) 98 %, 3) ei tietoa. Paras: 2) …"). `npm test` 426/426 origin/mainin 2de0839 päällä, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54. Itsepeliä ei ajettu uudelleen. Käyttöönotto session E:n restartilla.
+
 ## 17.11.2026 — kirjoittaa-ilmaisin takaisin pilveen ja prompt-välimuisti itsekeskusteluihin (Claude Code, pääsessio)
 
 - **Käyttäjän havainto:** WhatsApp ei enää näytä kirjoittaa-ilmaisinta. Ominaisuutta ei poistettu, ja koodi lähetti sen pilvessäkin. **Todennäköinen syy:** Vercelissä Turso-kantakutsut pysäyttävät säikeen kutsun ajaksi (`server/sqlite.mjs`, Atomics.wait). Webhookin jälkeen käynnistetty ilmaisinpyyntö ei edennyt jonon käsittelyn aikana, ja sen 3 sekunnin aikaraja umpeutui ennen lähtöä. Macilla kanta oli paikallinen, joten ongelmaa ei ollut. Syytä ei ole varmennettu lokista, koska virheet nieltiin hiljaa.
