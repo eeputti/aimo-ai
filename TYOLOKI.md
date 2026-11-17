@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — kirjoittaa-ilmaisin takaisin pilveen ja prompt-välimuisti itsekeskusteluihin (Claude Code, pääsessio)
+
+- **Käyttäjän havainto:** WhatsApp ei enää näytä kirjoittaa-ilmaisinta. Ominaisuutta ei poistettu, ja koodi lähetti sen pilvessäkin. **Todennäköinen syy:** Vercelissä Turso-kantakutsut pysäyttävät säikeen kutsun ajaksi (`server/sqlite.mjs`, Atomics.wait). Webhookin jälkeen käynnistetty ilmaisinpyyntö ei edennyt jonon käsittelyn aikana, ja sen 3 sekunnin aikaraja umpeutui ennen lähtöä. Macilla kanta oli paikallinen, joten ongelmaa ei ollut. Syytä ei ole varmennettu lokista, koska virheet nieltiin hiljaa.
+- **Korjaus:** `channel.typingSettled()`, ja `server/cloud.mjs` käsittelee jonon vasta, kun ilmaisinpyyntö on valmis. Ilmaisimen virhe kirjataan lokiin (`typing_failed`, Metan virhekoodi tai `TIMEOUT`, ei viestin sisältöä, numeroa tai tunnusta), mutta se ei estä vastausta. Uusi `test/whatsapp-cloud-typing.test.mjs` 3/3.
+- **Prompt-välimuisti (commit edbf981, käyttäjän hyväksymä Haiku-mittauksen jälkeen):** Anthropicin sähköposti kertoi matalasta välimuistiosumasta. Järjestelmäohje oli jo välimuistissa, mutta itsekeskustelujen asiakas lähetti koko keskustelun yhtenä kasvavana tekstinä, joka ei osu koskaan. Nyt `askAgent({ turns })` antaa jokaisen vuoron omana lohkonaan, ja välimuistimerkintä on viimeisessä. Välimuistiin kirjoitus lasketaan kulutilastoon ja kustannusarvioon (1,25 ×). Kolmen Haiku-kutsun koe: 2. kutsu luki 1 334 ja 3. kutsu 2 198 syötetokenia välimuistista. Tulkin syötettä ei järjestetty uudelleen: Haikun hinnoilla hyöty on pieni ja laaturiski olemassa.
+- **Tarkistukset:** koko `npm test` 421/421 (ensimmäisellä ajolla kaksi lapsiprosessitestiä kaatui ECONNRESETiin; ne menivät erikseen ja uusinnassa läpi), `git diff --check`. Ei Meta-lähetyksiä eikä restarttia.
+- **Käyttöönotto kesken:** pilvibotti tarvitsee uuden julkaisun (E, Eeliksen luvalla). Sen jälkeen puhelimesta kokeillaan, että pisteet näkyvät. Jos eivät näy, Vercelin lokin `typing_failed`-rivi kertoo syyn.
+
 ## 17.11.2026 — agentin jälki: miksi juuri nämä kolme vaihtoehtoa näytettiin (Claude Code, tuotteiden näyttölogiikka -chat)
 
 - **Käyttäjän pyyntö:** agentin jälki -sivun osiossa "Vaihtoehdot, joista valittiin" (kuvassa Peruna 2 kg, kolme pussia) pitää näkyä, millä syyllä juuri nämä kolme tuotetta näytettiin.

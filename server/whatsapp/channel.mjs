@@ -126,7 +126,11 @@ export function createMetaTypingIndicator(settings, fetchImpl = fetch) {
       headers: { authorization: `Bearer ${settings.accessToken}`, 'content-type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: messageId, typing_indicator: { type: 'text' } }),
     });
-    if (!res.ok) throw new Error(`META_TYPING_HTTP_${res.status}`);
+    if (!res.ok) {
+      // Vain Metan virhekoodi lokiin, ei viestin tekstiä tai tunnuksia.
+      const code = typeof res.json === 'function' ? await res.json().then((body) => body?.error?.code, () => null) : null;
+      throw new Error(`META_TYPING_HTTP_${res.status}${code ? `_${code}` : ''}`);
+    }
   };
 }
 
@@ -152,7 +156,10 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
     const prior = typingUpdates.get(id);
     if (!force && prior && now() - prior.at < typingRefreshMs) return prior.work;
     let work;
-    try { work = Promise.resolve(typing(id)).catch(() => {}); } catch { work = Promise.resolve(); }
+    // Ilmaisin on kosmeettinen: virhe ei koskaan estä vastausta, mutta se kirjataan, jotta katkos näkyy lokista.
+    const failed = (err) => console.warn(JSON.stringify({ event: 'typing_failed',
+      error: err?.name === 'TimeoutError' ? 'TIMEOUT' : String(err?.message || err).slice(0, 120) }));
+    try { work = Promise.resolve(typing(id)).catch(failed); } catch (err) { failed(err); work = Promise.resolve(); }
     typingUpdates.set(id, { at: now(), work });
     // Cancelled queued work may never be selected by the worker; keep receipt bookkeeping bounded.
     if (typingUpdates.size > 1000) typingUpdates.delete(typingUpdates.keys().next().value);
@@ -302,6 +309,9 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
   }
   return {
     processNext,
+    // Pilvi odottaa tätä ennen jonon käsittelyä. Tursoon menevät kantakutsut pysäyttävät säikeen kutsun ajaksi
+    // (server/sqlite.mjs), joten muuten kesken jäänyt ilmaisinpyyntö ei etene ja sen 3 s aikaraja umpeutuu ennen lähtöä.
+    async typingSettled() { await Promise.all([...typingUpdates.values()].map((v) => v.work)); },
     // Cloud: work the queue in parallel until it is empty or the time is used. Several drains in one instance share the slots.
     async drain(budgetMs) {
       const until = now() + budgetMs; let processed = 0;

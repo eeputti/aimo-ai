@@ -89,7 +89,8 @@ export async function handle(req, res, { waitUntil }) {
   if (INTERNAL.test(url.pathname)) return json(res, 404, { error: 'Not found' });
   const channel = load();
   if (await channel.handle(req, res, url)) {
-    if (req.method === 'POST' && url.pathname === '/webhooks/whatsapp') waitUntil(drain().catch((err) => console.error('[drain]', err.message)));
+    // Kirjoittaa-ilmaisin lähtee ensin ja jono käsitellään vasta sen jälkeen (channel.typingSettled).
+    if (req.method === 'POST' && url.pathname === '/webhooks/whatsapp') waitUntil(channel.typingSettled().then(() => drain()).catch((err) => console.error('[drain]', err.message)));
     // Korisivun vahvistus: tilaus heti tilausnäkymään, jotta maksusivu löytää sen.
     if (req.method === 'POST' && url.pathname.startsWith('/whatsapp/cart/api')) waitUntil(step('publish', publishOrders));
     return;
