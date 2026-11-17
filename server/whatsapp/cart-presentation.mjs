@@ -116,7 +116,10 @@ export function selectionAcknowledgement({ previousList, shoppingList, status })
   if (previousList?.id === shoppingList.id && previousList.deliveryDate && shoppingList.deliveryDate
     && previousList.deliveryDate !== shoppingList.deliveryDate) parts.push(`Toimituspäivä nyt ${dateLabel(shoppingList.deliveryDate)}`);
   // Valintavaihe alkaa (uusi lista tai edellisellä kerralla puuttui vielä päivä, määrä tai tarkennus): siirtymä omana viestinään.
-  const entering = !previousList || previousList.id !== shoppingList.id || previousList.status !== 'needs_product_selection';
+  // Kun jokin tuote on jo valittu, valinnat ovat jo käynnissä: laktoosikysymyksen jälkeen ei toisteta "Nyt olisi aika valita
+  // vaihtoehtoja" toista kertaa samassa korissa (paikallinen koe 17.11.: maito valittu, voin laktoosivastaus toi siirtymän uudelleen).
+  const entering = (!previousList || previousList.id !== shoppingList.id || previousList.status !== 'needs_product_selection')
+    && !shoppingList.lines.some((line) => line.selectedProductId);
   if (!parts.length) {
     if (status !== 'choosing') return ['Selvä!'];
     return [entering ? transitionFor(shoppingList) : rotate(['Selvä! Tässä sopivat vaihtoehdot:', 'Hyvä, katsotaan vaihtoehdot:', 'Selvä, tässä vaihtoehdot:'])];
@@ -216,6 +219,12 @@ export async function presentCollectingCart({ result, shoppingList, previousList
   const changed = !previousList || shoppingList.id !== previousList.id || shoppingList.revision !== previousList.revision;
   // Dialogimallin vastaus asiakkaan kysymykseen toimii jo kuittauksena: ei kahta aloitusta peräkkäin.
   let acknowledgement = changed && !answered ? FALLBACK_ACKNOWLEDGEMENT : '';
+  // Pelkkä tuotevalinta, jonka jälkeen kysytään seuraavan rivin tarkennusta: kerrotaan koodissa mitä valittiin. Malli kirjoitti
+  // "Valinta on talletettu torstain 19.11. toimitukseen. Maito ja voi ovat korissa.", vaikka voita ei ollut vielä valittu (17.11.).
+  const prior = new Map((previousList?.id === shoppingList.id ? previousList.lines : []).map((line) => [line.ref, line]));
+  const picked = shoppingList.lines.filter((line) => line.selectedProductId && line.selectedName && prior.get(line.ref)?.selectedProductId !== line.selectedProductId);
+  const onlyPicked = picked.length > 0 && shoppingList.lines.every((line) => prior.has(line.ref) && (picked.includes(line) || lineKey(prior.get(line.ref)) === lineKey(line)));
+  const pickedText = onlyPicked && !answered ? `Selvä, valitaan ${join(picked.map((line) => readableName(line.selectedName)))}.` : '';
   let quantityQuestion = productCase === 'partitive' ? QUESTION_FORMS[0] : QUESTION_FORMS[4];
   const singleLabel = productCase === 'labels' && missing.length === 1;
   const deliveryDate = dateLabel(shoppingList.deliveryDate);
@@ -236,7 +245,7 @@ export async function presentCollectingCart({ result, shoppingList, previousList
         maxTokens: 1600, timeoutMs: 45000, retries: 0,
         user: JSON.stringify({ message: userText, changed, ...facts, recentReplies,
           next: dateFirst ? (asksQuantity ? 'date+quantity' : 'date') : asksQuantity ? 'quantity' : 'other', productCase, missingQuantityCount: asksQuantity ? missing.length : 0 }) });
-      const own = changed && !answered ? groundedAcknowledgement(json?.acknowledgement, { facts, userText }) : '';
+      const own = changed && !answered && !pickedText ? groundedAcknowledgement(json?.acknowledgement, { facts, userText }) : '';
       if (own) acknowledgement = own;
       const question = json?.quantityQuestion;
       if (QUESTION_FORMS.includes(question) && question.includes('näitä:') === (productCase === 'labels')) quantityQuestion = question;
@@ -254,6 +263,7 @@ export async function presentCollectingCart({ result, shoppingList, previousList
   const estimate = await estimating;
   if (estimate) quantityText = estimateMessage(estimate);
   const followUp = [...(quantityText ? [quantityText] : []), ...rest].join('\n');
+  if (pickedText) acknowledgement = pickedText;
   const out = [...(acknowledgement ? [acknowledgement] : []), cart, ...(followUp ? [followUp] : [])];
   if (estimate) out.estimate = { listId: shoppingList.id, revision: shoppingList.revision, orderText: estimateOrderText(estimate) };
   return out;

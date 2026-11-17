@@ -7,6 +7,7 @@ import { CLAIMS, DEADLINE_QUESTION } from './interpret.mjs';
 import { helsinkiLabel, parseApiTime } from '../gateway/clock.mjs';
 import { packWord, readableName, summaryRow, optionRow } from './wording.mjs';
 import { isEggItem } from '../itemQuantities.mjs';
+import { allative } from '../fi-words.mjs';
 
 const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
@@ -217,6 +218,13 @@ const joinFi = (names) => (names.length < 2 ? names[0] || '' : `${names.slice(0,
 // Saman päivän tilattavattomat rivit yhteen lauseeseen: kolme peräkkäistä "Ei tilattavaa tuotetta päivälle ke 18.11.: maito." -riviä
 // (maito, voi, kananmuna) kuulosti robotilta (WhatsApp-koe 17.11.).
 export function mergeUnavailable(problems) {
+  // Useampi tuote ilman saatavuustietoa yhdeksi lauseeksi: "saatavuutta banaaneille ja omenoille" (17.11.).
+  const UNKNOWN = /^En saa nyt tarkistettua saatavuutta (.+), joten en voi luvata sitä millekään päivälle\.$/u;
+  const unknown = problems.map((p) => UNKNOWN.exec(p)?.[1]).filter(Boolean);
+  if (unknown.length > 1) {
+    let merged = false;
+    problems = problems.flatMap((p) => (UNKNOWN.test(p) ? (merged ? [] : (merged = true, [`En saa nyt tarkistettua saatavuutta ${joinFi(unknown)}, joten en voi luvata niitä millekään päivälle.`])) : [p]));
+  }
   const NONE = /^Ei tilattavaa tuotetta päivälle (.+?): (.+)\.$/u;
   const byDate = new Map();
   for (const p of problems) { const m = NONE.exec(p); if (m) byDate.set(m[1], [...(byDate.get(m[1]) || []), m[2]]); }
@@ -232,8 +240,11 @@ export function mergeUnavailable(problems) {
 // Vaihtoehto ostajan ymmärtämänä: luettava nimi, myyntierät, yhden koko ja määrä yhteensä,
 // esim. "Kananmunat M10, 5 rasiaa à 10 munaa, yhteensä 50 munaa, 12,40 €" (wording.mjs). Otsikkorivi kertoo jo pyydetyn määrän.
 const itemNounOf = (covers, line) => (covers?.unit === 'PCS' && line?.quantity?.basis === 'items' ? (/kananmun/iu.test(line.productTerm || '') ? 'munaa' : 'kpl') : undefined);
+// Laktoositon maitotuote merkitään, kun nimi ei sitä kerro (Emmental-raaste): ostaja näkee sen ilman erillistä kysymystä
+// (Eelis 17.11.: "miksei tä ehottanu esin juustois laktoosittomuut?"). Ei, kun laktoosittomuus on jo rivin ehto.
 function optionLabel(o, line) {
-  return `${optionRow(o, { itemNoun: itemNounOf(o.covers, line) })}${o.warning ? ` (${o.warning})` : ''}`;
+  const lactose = o.lactoseFree && !/laktoosit/iu.test(o.name || '') && !(line?.claims || []).includes('FREE_FROM_LACTOSE');
+  return `${optionRow(lactose ? { ...o, name: `${o.name} (laktoositon)` } : o, { itemNoun: itemNounOf(o.covers, line) })}${o.warning ? ` (${o.warning})` : ''}`;
 }
 
 // Vastaus vertailukysymykseen näytetyistä vaihtoehdoista: vain työkalujen palauttamat arvot, puuttuva tieto sanotaan.
@@ -504,9 +515,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
           const what = joinFi(unknownTerms); const key = unknownTerms.join('|');
           const repeat = draft.unknownNoted === key;
           draft.unknownNoted = key;
-          const how = `Voit vaihtaa tuotteen toiseen tai poistaa sen kirjoittamalla "poista ${unknownTerms[0]}".`;
+          const how = unknownTerms.length > 1
+            ? `Voit vaihtaa tuotteet toisiin tai poistaa ne kirjoittamalla ${joinFi(unknownTerms.map((t) => `"poista ${t}"`))}.`
+            : `Voit vaihtaa tuotteen toiseen tai poistaa sen kirjoittamalla "poista ${unknownTerms[0]}".`;
           return { status: 'collecting', text: repeat
-            ? `Saatavuutta ei vieläkään saada tarkistettua: ${what}. Se puuttuu kaikilta päiviltä, joten päivän vaihto ei auta. ${how} Tilausta ei ole tehty.`
+            ? `Saatavuutta ei vieläkään saada tarkistettua ${joinFi(unknownTerms.map(allative))}. ${unknownTerms.length > 1 ? 'Tieto' : 'Se'} puuttuu kaikilta päiviltä, joten päivän vaihto ei auta. ${how} Tilausta ei ole tehty.`
             : `${mergeUnavailable(problems).join('\n')}\nToinen päivä ei auta, koska tieto puuttuu kaikilta päiviltä, enkä löytänyt vastaavaa tuotetta, jonka saatavuus olisi tiedossa. ${how} Tilausta ei ole tehty.` };
         }
         // dateLabel päättyy pisteeseen ("ti 17.11."), joten perään ei tule toista (Haiku-otos X064: "ti 17.11..").
@@ -560,20 +573,28 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       draft.pending = { kind: 'choose', refs: [x.ref], options: x.options.length, more: moreNo, ...(x.exact === false ? { exact: false } : {}), ...(x.availabilityUnknown ? { unknown: true } : {}) };
       // Lisävaihtoehtojen numero kuuluu ohjeeseen, kun se näkyy listassa (C1: "Vastaa 1, 2 tai 3" ja rivi 4).
       const numbers = [...x.options.map((_, i) => String(i + 1)), ...(moreNo ? [String(moreNo)] : [])];
-      const how = numbers.length === 1 ? 'Vastaa 1.' : `Vastaa ${numbers.slice(0, -1).join(', ')} tai ${numbers.at(-1)}.`;
-      draft.noOptions = { date: draft.deliveryDate, refs: [...blockedRefs].filter((ref) => ref !== x.ref) };
+      // Yksi vaihtoehto: "Vastaa 1." kuulosti käskyltä ilman valintaa (puhelinkuva 17.11.), joten kysytään, käykö se.
+      const single = numbers.length === 1;
+      const how = single ? (x.availabilityUnknown ? `Vastaa 1, jos tämä käy. Muuten kirjoita "poista ${line.productTerm}".` : 'Vastaa 1, jos tämä käy.')
+        : `Vastaa ${numbers.slice(0, -1).join(', ')} tai ${numbers.at(-1)}.`;
+      const unknownBefore = draft.noOptions?.date === draft.deliveryDate ? draft.noOptions.unknown || [] : [];
+      const unknownNow = [...new Set([...unknownBefore, ...unknownTerms])];
+      draft.noOptions = { date: draft.deliveryDate, refs: [...blockedRefs].filter((ref) => ref !== x.ref), unknown: unknownNow };
       const blockedTerms = open.filter((l) => l.ref !== x.ref && blockedRefs.has(l.ref)).map((l) => l.productTerm);
       const later = open.filter((l) => l.ref !== x.ref && !blockedRefs.has(l.ref)).map((l) => l.productTerm);
-      const blockedNote = blockedTerms.length ? `\n${cap(joinFi(blockedTerms))} jää ilman tuotetta tälle päivälle. Vaihda päivä tai tuote, tai poista ${blockedTerms.length > 1 ? 'ne' : 'se'} kirjoittamalla "poista ${blockedTerms[0]}".` : '';
+      // Tuntematon saatavuus puuttuu kaikilta päiviltä: päivän vaihto ei auta, joten sitä ei ehdoteta.
+      const dayHelps = blockedTerms.some((t) => !unknownNow.includes(t));
+      const many = blockedTerms.length > 1;
+      const blockedNote = blockedTerms.length ? `\n${cap(joinFi(blockedTerms))} ${many ? 'jäävät' : 'jää'} ilman tuotetta ${dayHelps ? 'tälle päivälle. Vaihda päivä tai tuote' : `toistaiseksi. Valitse ${many ? 'toiset tuotteet' : 'toinen tuote'}`}, tai poista ${many ? 'ne' : 'se'} kirjoittamalla ${joinFi(blockedTerms.map((t) => `"poista ${t}"`))}.` : '';
       const diet = dietLabel(draft.diet);
       // Myyntierä voi olla tarvetta suurempi: kerrotaan, ettei tarvetta ole muutettu. Pelkät luomuvaihtoehdot mainitaan.
       const covered = x.options.filter((o) => o.covers?.unit === line.quantity.unit).map((o) => o.covers.value);
       const smallest = covered.length ? Math.min(...covered) : null;
-      const notes = [...(smallest > line.quantity.value ? [`Tarve on ${qty(line.quantity)}; pienin näistä myyntieristä kattaa ${qty({ value: smallest, unit: line.quantity.unit })}.`] : []),
+      const notes = [...(smallest > line.quantity.value ? [`Tarve on ${qty(line.quantity)}; ${single ? 'tämä myyntierä kattaa' : 'pienin näistä myyntieristä kattaa'} ${qty({ value: smallest, unit: line.quantity.unit })}.`] : []),
         ...(!line.claims.includes('EU_ORGANIC_FARMING') && x.options.every((o) => o.labels?.includes('EU_ORGANIC_FARMING')) ? ['Näytetyt vaihtoehdot ovat luomua.'] : []),
         // Vastaavat tuotteet toisessa mittayksikössä (1000 l jäätelöä → leivokset): hinta on yhdestä myyntierästä, määrä kysytään.
         ...(x.options.some((o) => o.askQuantity) ? [`${x.options.every((o) => o.askQuantity) ? 'Hinnat ovat' : 'Määrää vailla olevien hinta on'} yhdestä myyntierästä: tarve ${qty(line.quantity)} ei muunnu ${x.options.every((o) => o.askQuantity) ? 'näihin tuotteisiin' : 'kaikkiin näistä'}, joten määrä kysytään valinnan jälkeen.`] : []),
-        ...(x.availabilityUnknown ? [`Jos mikään näistä ei käy, kirjoita "poista ${line.productTerm}".`] : [])];
+        ...(x.availabilityUnknown && !single ? [`Jos mikään näistä ei käy, kirjoita "poista ${line.productTerm}".`] : [])];
       // Kiireessä tilausaikaraja näkyy jo vaihtoehdoissa (aikaisin näytetyistä, työkalujen tiedoista). Kellonaikaa ei luvata.
       const cutoffs = urgent ? x.options.map((o) => o.cutoff).filter((c) => parseApiTime(c)).sort((a, b) => parseApiTime(a) - parseApiTime(b)) : [];
       const day = draft.deliveryDate === today ? 'Tämän päivän toimitukseen' : draft.deliveryDate === addDays(today, 1) ? 'Huomiselle' : `Päivälle ${dateLabel(draft.deliveryDate)}`;
@@ -581,12 +602,13 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       if (draft.timeWish && !draft.timeWishNoted) { notes.push(timeWishNote(draft)); draft.timeWishNoted = true; }
       const block = [`Toimitus ${dateLabel(draft.deliveryDate)}, hinnat alv 0 %.${diet ? ` Huomioitu: ${diet}.` : ''}`,
         ...(x.exact === false ? [x.availabilityUnknown
-          ? `En saa nyt tarkistettua saatavuutta: ${line.productTerm}, joten en voi luvata sitä millekään päivälle. Näiden vastaavien tuotteiden saatavuus on tiedossa:`
+          // "saatavuutta juustolle", ei "saatavuutta: juusto" (Eelis 17.11.). Yksi vaihtoehto: "Tämän", ei "Näiden".
+          ? `En saa nyt tarkistettua saatavuutta ${allative(line.productTerm)}, joten en voi luvata sitä millekään päivälle. ${single ? 'Tämän' : 'Näiden'} saatavuus on tiedossa:`
           : `Tarkkaa osumaa ei löytynyt: ${line.productTerm}. Lähimmät tilattavat vaihtoehdot:`] : []),
         `*${cap(lineLabel(line))}:*`, ...x.options.map((o, i) => `${i + 1}) ${optionLabel(o, line)}`),
         ...(moreNo ? [`${moreNo}) Näytä lisää vaihtoehtoja`] : []), ...notes,
         `${how}${later.length ? ` Sen jälkeen valitaan ${joinFi(later)}.` : ''}${blockedNote}`].join('\n');
-      return { status: 'choosing', text: [...problems, block].join('\n\n') };
+      return { status: 'choosing', text: [...mergeUnavailable(problems), block].join('\n\n') };
     }
 
     const q = await tools.quote({ customer, draft });

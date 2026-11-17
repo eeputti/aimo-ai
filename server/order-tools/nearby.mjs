@@ -15,15 +15,18 @@ Ehdotus on asiakkaalle vaihtoehto, jonka hän voi hylätä: tuote kelpaa, jos se
 vaikka se olisi eri tuotetyyppiä (jäätelön tilalle esimerkiksi leivos tai mousse jälkiruoaksi).
 Älä valitse tuotetta, joka vain sisältää samaa raaka-ainetta mutta on eri ruokaa, äläkä tuotetta, jonka rooli on eri
 (perunat, leivät, siivoustarvikkeet jälkiruoan tilalle). Älä ehdota raaka-ainetta valmiin tuotteen tilalle: pakastemarjat, tuoreet hedelmät,
-vihannekset tai jauhot eivät korvaa jäätelöä, leivosta tai valmista kastiketta. Jos mikään listan tuote ei sovi samaan rooliin, palauta tyhjä lista.
+vihannekset tai jauhot eivät korvaa jäätelöä, leivosta tai valmista kastiketta. Olomuodon pitää vastata: juoma ei korvaa lusikoitavaa
+tuotetta (kaurajuoma ei käy jogurtin, rahkan tai viilin tilalle), eikä rasva tai ruoanvalmistuskerma juustoa.
+Jos mikään listan tuote ei sovi samaan rooliin, palauta tyhjä lista. Älä lisää listaan tuotteita, jotka eivät sovi.
 Kirjoita ensin role: pyydetyn tuotteen rooli keittiössä yhdellä lauseella (esim. "jälkiruoka, tarjoillaan kylmänä").
 Käy sitten lista läpi ja valitse tuotteet, joilla on sama rooli. Käytä vain listan tunnisteita. term on lyhyt yleisnimi suomeksi pienillä kirjaimilla ilman merkkiä ja pakkauskokoa
-(esim. "marjamousse-leivos"). reason on yksi lyhyt lause suomeksi siitä, miksi tuote käy tilalle.`;
+(esim. "marjamousse-leivos"). reason on yksi lyhyt lause suomeksi siitä, miksi tuote käy tilalle. fits on true vain, kun tuote
+käy samaan rooliin; jos et ole varma, jätä tuote pois.`;
 
 const SCHEMA = {
   type: 'object', additionalProperties: false, required: ['role', 'picks'],
-  properties: { role: { type: 'string' }, picks: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'term', 'reason'],
-    properties: { id: { type: 'string' }, term: { type: 'string' }, reason: { type: 'string' } } } } },
+  properties: { role: { type: 'string' }, picks: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'term', 'reason', 'fits'],
+    properties: { id: { type: 'string' }, term: { type: 'string' }, reason: { type: 'string' }, fits: { type: 'boolean' } } } } },
 };
 
 const qtyText = (q) => (q?.value ? `${q.value} ${q.unit === 'PCS' ? 'kpl' : q.unit === 'KG' ? 'kg' : 'l'}` : 'ei annettu');
@@ -37,9 +40,12 @@ export function createNearbyPicker({ ask = askAgent, enabled = agentEnabled, now
     if (hit && now() - hit.at < TTL_MS) return hit.picks;
     const list = candidates.map((c) => `${c.id}: ${c.name}`).join('\n');
     const once = async () => {
-      const r = await ask({ purpose: 'unknown_availability_alternatives', tier: 'fast', system: SYSTEM, schema: SCHEMA, maxTokens: 600, timeoutMs: 10000, retries: 0,
+      // Syvä taso (ajattelu): nopea taso ei löytänyt 150 nimen listasta maitorahkaa jogurtin tilalle, palautti tyhjää puolet
+      // kerroista ja ehdotti kaurajuomaa tai kirnuvoita (17.11.). Syvällä tasolla 5/5 oikein, noin 5 s; tulos on muistissa 30 min.
+      const r = await ask({ purpose: 'unknown_availability_alternatives', tier: 'deep', system: SYSTEM, schema: SCHEMA, maxTokens: 4000, timeoutMs: 30000, retries: 0,
         user: `Pyydetty tuote: ${term}\nMäärä: ${qtyText(quantity)}\n\nTuotteet, joiden saatavuus on tiedossa:\n${list}` });
-      return Array.isArray(r?.json?.picks) ? r.json.picks : [];
+      // Malli listasi juustolle myös kirnuvoin perustelulla "Ei sovi juuston tilalle" (17.11.): vain fits=true kelpaa.
+      return Array.isArray(r?.json?.picks) ? r.json.picks.filter((x) => x && x.fits !== false) : [];
     };
     // Sama kysymys antoi jäätelölle leivokset kahdesti kolmesta ja kerran tyhjän listan (17.11.). Tyhjä tulos kysytään
     // siksi kerran uudelleen, eikä tyhjää tallenneta välimuistiin, jotta yksi tyhjä vastaus ei jää voimaan puoleksi tunniksi.

@@ -14,7 +14,7 @@ const clock = Date.parse('2026-11-15T09:00:00+02:00');
 const customer = { customerId: 'c1', buyerId: 'b1', bindingVersion: 'v1', deliverySites: [{ id: 's1', label: 'Keittiö' }], permissions: { readProducts: true, placeOrders: true } };
 const add = { intent: 'order', deliveryDate: '2026-11-18', ops: [{ op: 'add', productTerm: 'jäätelö', quantity: { value: 1000, unit: 'L' }, claims: [], excludeAllergens: [] }] };
 const unknown = (l) => ({ issues: [{ code: 'NO_ORDERABLE_PRODUCT', ref: l.ref, availabilityUnknown: true, nextDeliveryDate: null,
-  message: `En saa nyt tarkistettua saatavuutta: ${l.productTerm}. Siksi en voi luvata sitä millekään päivälle.` }], lines: [] });
+  message: `En saa nyt tarkistettua saatavuutta tuotteelle ${l.productTerm}, joten en voi luvata sitä millekään päivälle.` }], lines: [] });
 
 function engine(suggestFor) {
   const calls = { suggest: 0 };
@@ -37,13 +37,13 @@ function engine(suggestFor) {
 test('tuntematon saatavuus ilman vastaavia: ei "kokeile toista päivää", ei päiväkokeiluja, toisto lyhenee', async () => {
   const { say, calls } = engine(unknown);
   const first = await say('jäätelö');
-  assert.match(first.text, /En saa nyt tarkistettua saatavuutta: jäätelö/);
+  assert.match(first.text, /En saa nyt tarkistettua saatavuutta tuotteelle jäätelö/);
   assert.match(first.text, /Toinen päivä ei auta/);
   assert.match(first.text, /poista jäätelö/);
   assert.doesNotMatch(first.text, /Kokeile toista päivää/);
   assert.equal(calls.suggest, 1, 'huomisen kiirekokeilu ei hae seuraavia päiviä, kun tieto puuttuu kaikilta');
   const again = await say('perjantai');
-  assert.match(again.text, /^Saatavuutta ei vieläkään saada tarkistettua: jäätelö\. Se puuttuu kaikilta päiviltä/);
+  assert.match(again.text, /^Saatavuutta ei vieläkään saada tarkistettua jäätelölle\. Se puuttuu kaikilta päiviltä/);
   assert.notEqual(again.text, first.text);
 });
 
@@ -55,7 +55,7 @@ test('tuntematon saatavuus ja vastaavat tuotteet: rehellinen otsikko, valinta va
     : unknown(l)));
   const shown = await say('jäätelö');
   assert.equal(shown.status, 'choosing');
-  assert.match(shown.text, /En saa nyt tarkistettua saatavuutta: jäätelö, joten en voi luvata sitä millekään päivälle\. Näiden vastaavien tuotteiden saatavuus on tiedossa:/);
+  assert.match(shown.text, /En saa nyt tarkistettua saatavuutta jäätelölle, joten en voi luvata sitä millekään päivälle\. Tämän saatavuus on tiedossa:/);
   assert.match(shown.text, /1\) Ph7 marjamousse leivos pakaste, 1 laatikko, 58,66 €/i);
   assert.match(shown.text, /määrä kysytään valinnan jälkeen/);
   assert.doesNotMatch(shown.text, /Tarkkaa osumaa ei löytynyt/);

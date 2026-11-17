@@ -79,7 +79,7 @@ test('10 kpl leivoksia: yksi 30 leivoksen laatikko ja ylijäämä kerrotaan', { 
   assert.match(r.text, /1 laatikko.*30 kpl/u);
   assert.match(r.text, /55,55 €/u);
   assert.doesNotMatch(r.text, /10 laatikkoa|555,50/u);
-  assert.match(r.text, /Tarve on 10 kpl; pienin näistä myyntieristä kattaa 30 kpl\./u);
+  assert.match(r.text, /Tarve on 10 kpl; tämä myyntierä kattaa 30 kpl\./u);
 });
 
 test('12 kpl hilloa: kaksi kuuden purkin laatikkoa; "2 laatikkoa" pysyy myyntierinä', { skip: !fs.existsSync(CATALOG) && 'paikallinen katalogi puuttuu' }, async () => {

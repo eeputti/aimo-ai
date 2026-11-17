@@ -8,6 +8,7 @@ import { clock } from '../gateway/clock.mjs';
 import { touchesBanned, verifiedFree, bannedHits } from '../allergens.mjs';
 import { explainPicks } from './why.mjs';
 import { itemsPerSalesUnit } from '../itemQuantities.mjs';
+import { allative } from '../fi-words.mjs';
 
 const CLAIM_WORD = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
 const UNIT_WORD = { L: 'l', KG: 'kg', PCS: 'kpl' };
@@ -183,6 +184,8 @@ export function createOrderingTools(deps = {}) {
     for (const l of draft.lines) if (!validQuantity(l.quantity)) issues.push(issue('QUANTITY_MISSING', `Määrä puuttuu: ${l.productTerm}.`, { ref: l.ref }));
     if (issues.length) return { lines: [], issues };
     const { search, product, nearby } = await d();
+    // Laktoositon maitotuote (laktoositon-merkintä ja maitoa ainesosana): kananmunien satunnainen merkintä ei kuulu tähän.
+    const lactoseFreeDairy = (id) => { const p = product(id); return !!p && (p.labels || []).includes('FREE_FROM_LACTOSE') && bannedHits(['AM'], p.contains || []).length > 0; };
     const lines = [];
     // Koko tilauksen ruokavalio (draft.diet): allergeenia sisältävä tuote putoaa aina pois. Tuote, jolta allergeenitieto puuttuu
     // (esim. tuoreet kasvikset), näytetään varoituksen kanssa, ja merkintää vailla olevat näytetään vain, jos merkittyjä ei ole.
@@ -226,12 +229,15 @@ export function createOrderingTools(deps = {}) {
             excludeAllergens: [...new Set([...(line.excludeAllergens || []), ...diet.excludeAllergens])] }, draft.deliveryDate, found.unknownIds || []);
         } catch { alts = []; }
         if (alts.length) {
+          // Laktoosittomat maitotuotteet ensin, kun ostaja ei ole sanonut laktoosista mitään (Eelis 17.11.: juustoista
+          // laktoosittomat ensin). Järjestys muuten valitsijan.
+          if (!draft.diet?.known) alts = [...alts.filter((o) => lactoseFreeDairy(o.id)), ...alts.filter((o) => !lactoseFreeDairy(o.id))];
           lines.push({ ref: line.ref, total: alts.length, more: false, shownBefore: 0, exact: false, availabilityUnknown: true, alternatives: true, clarify: [],
             options: alts.map((o, i) => ({
               productId: String(o.id), name: o.name, brand: o.brand || null, salesUnits: o.qty, salesUnitLabel: o.unitLabel,
               covers: o.askQuantity ? null : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
               unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
-              cutoff: o.availability?.closingTime || null, stock: o.availability?.stock ?? null, labels: o.labels || [], note: null,
+              cutoff: o.availability?.closingTime || null, stock: o.availability?.stock ?? null, labels: o.labels || [], note: null, lactoseFree: lactoseFreeDairy(o.id),
               co2PerKg: Number.isFinite(product(o.id)?.co2) ? product(o.id).co2 : null,
               deliveryReliability: Number.isFinite(product(o.id)?.reliability) ? product(o.id).reliability : null,
               // Valinta vaihtaa rivin tuotteen (replaceTerm). Eri mittayksikössä määrä kysytään uudelleen (askQuantity).
@@ -246,7 +252,7 @@ export function createOrderingTools(deps = {}) {
           ? issue('NO_ORDERABLE_PRODUCT', `Pyydettyä tuotetta ei ole valikoimassa: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: null, notInCatalog: true })
           // Saatavuustietoa ei saatu (rajapinta alhaalla, ei välimuistissa): sanotaan se, ei väitetä tuotetta saatavuudettomaksi.
           : !found.length && (found.availabilityUnknown || found.requestedUnknown)
-            ? issue('NO_ORDERABLE_PRODUCT', `En saa nyt tarkistettua saatavuutta: ${line.productTerm}. Siksi en voi luvata sitä millekään päivälle.`, { ref: line.ref, nextDeliveryDate: null, availabilityUnknown: true })
+            ? issue('NO_ORDERABLE_PRODUCT', `En saa nyt tarkistettua saatavuutta ${allative(line.productTerm)}, joten en voi luvata sitä millekään päivälle.`, { ref: line.ref, nextDeliveryDate: null, availabilityUnknown: true })
           : issue('NO_ORDERABLE_PRODUCT', `Ei tilattavaa tuotetta päivälle ${dayLabel(draft.deliveryDate)}: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: found.nextDeliveryDate || null }));
         continue;
       }
@@ -325,7 +331,7 @@ export function createOrderingTools(deps = {}) {
         covers: o.countUnknown ? null : o.quantityExplanation ? { value: o.quantityExplanation.providedItems, unit: 'PCS' } : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
         unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
         cutoff: o.availability?.closingTime || null, // tilausaikaraja; ydin muotoilee sen kiireisessä tilauksessa
-        stock: o.availability?.stock ?? null, labels: o.labels || [], note: o.quantityExplanation?.text || null,
+        stock: o.availability?.stock ?? null, labels: o.labels || [], note: o.quantityExplanation?.text || null, lactoseFree: lactoseFreeDairy(o.id),
         // Pakkauksen kappalemäärä tuntematon: hinta yhdestä myyntierästä, määrä kysytään valinnan jälkeen myyntierinä.
         ...(o.countUnknown ? { askQuantity: true, countUnknown: true } : {}),
         // Katalogin hiilijalanjälki (kg CO2e/kg) ja toimitusvarmuus (0–1): ydin vastaa niillä vertailukysymykseen, ei malli.
