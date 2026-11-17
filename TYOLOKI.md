@@ -2,6 +2,11 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — valkosipuliarvio ja korvaajan esimerkki varmennettu livenä (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
+
+- **Julkaisu:** sessio E vei c78e73b:n tuotantoon, deployment aimo-whatsapp-g5b7cp5oz.
+- **Live-koe selainkeskustelussa omalla testiasiakkaalla, ei tilausta:** sama kuin 400a392:ssa (k-ruoka.fi-linkki "20 annokselle perjantaiksi", sitten liitetty kermainen kanapasta 4 annokselle). Vastaus: "valkosipuli, noin 0,05 kg, arvio" ja "valkosipuli 2,5 g annokselle (reseptissä "2 valkosipulinkynttä")" (ennen 0,1 kg ja 5 g). Broilerin fileesuikaleen korvaajaksi tarjottiin vain "kanan rintafilee" esimerkkinä Kariniemen Kananpojan rintafilee. Kanan reisifilettä ja MERIKROTTI FILEEtä ei enää näytetty. Reseptin tila tyhjennettiin lopuksi.
+
 ## 17.11.2026 — epäselvä ensiviesti määrillä saa päiväkysymyksen (Claude Code, sessio C)
 
 - **Käyttäjän pyyntö:** Eelis hyväksyi Haiku-otoksen X041-löydöksen korjauksen: emojiavaukseen "🥛🥛🥛 20? 🧈 5 🙏" malli kysyi yksiköitä mutta ei toimituspäivää (2/3 viimeisintä ajoa).
