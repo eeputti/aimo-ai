@@ -1,0 +1,1 @@
+{"name":"aimo-live-demo","private":true,"type":"module","scripts":{"build":"node scripts/build.mjs"}}

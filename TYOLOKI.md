@@ -2,6 +2,21 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — käyttäjän itse kokeiltava yksityinen live-demo julkaistu (Codex, Danielin chatti)
+
+- Käyttäjä korjasi tavoitteen: tarvitaan itse käytettävä live-sivu, ei tallenne tai oman koneen localhost. Julkaistu https://aimo-live-8b-demo-1711.daniel-turkkinen.chatgpt.site Sitesiin vain omistajalle; ChatGPT-kirjautuminen. Oikea erillinen Qwen3 8B pilvitestikoneessa, synteettiset tuotteet/hinnat, tilauslähetys estetty. Nykyisen WhatsApp-tuotannon koodia, asetuksia tai kantoja ei muutettu.
+- Suora testitunneli ei yhdistynyt. Toteutus käyttää yksityistä Sites Worker -käyttöliittymää, omaa D1-viestijonoa ja sites-runner.mjs:n ulospäin tekemää HTTPS-pollausta. 202 + tuloksen seuranta poistaa pitkän HTTP-pyynnön aikakatkaisun. Paikallisen demopalvelimen rajauksia ei poistettu. Salaisuudet vain Sites-asetuksissa ja prosessin muistissa stdin-syötteestä, ei Gitissä tai tiedostoissa.
+- Julkaistu lähdecommit 961990ac3634cd61e15a0f7fab1f3305c0920a11, projekti appgprj_6afc6964d2ac8191af2a9425a3306d35, viimeisin julkaisu appgdep_6afc6c34ad2c8191866fa60a7bcea031, natiivi succeeded. Projektin yleisö tarkistettu edelleen vain omistajaksi. GitHubissa Sites-lähteen kopio deploy/selfhost-demo/live-site; kanoninen julkaisu on Sites-repossa.
+- Julkaistun HTTP-/D1-polun oikea mallikoe läpi erillisillä suojatuilla testitunnisteilla: 20 L → tuotteen valinta → 30 L, sama laktoosittomuus ja päivä. Malliajat 127 977 ms ja 43 208 ms. Idempotentti työ, toisen testikäyttäjän 404 ja tyhjä oma kori läpi. Tavallinen API torjuu pelkän palvelupääsyn ilman vierailijan identiteettiä. Mallikoe ei siementänyt omistajan koria.
+- Syntaksit ja git diff --check läpi. Hallitun Sites-ympäristön selain-QA jätetty ohjeen mukaan tekemättä puuttuvan cua_repl-työkalun vuoksi; omistajan SSO-selainta ei väitetä testatuksi. Tarkka raportti docs/evaluations/aimo-live-20261117.md.
+- Malli ja taustakäsittelijä jätetään käyntiin tätä kokeilua varten. Linkki on oikea live-demo, mutta mallin saatavuus riippuu pilvitestikoneen elinkaaresta. Pysyvä 24/7-käyttö edellyttää omaa mallipalvelinta. Ei henkilökohtaisten maksullisten AI-API-avaimien käyttöä tai 14B-/32B-julkaisua.
+
+## 17.11.2026 — käyttäjän itse kokeiltavan live-linkin toteutus aloitettu (Codex, Danielin chatti)
+
+- Käyttäjä tarkensi tarvitsevansa itse kokeiltavan live-demon. Tallenne tai hänen koneellaan käynnistettävä localhost ei täytä tätä pyyntöä. Selvitetään väliaikainen HTTPS-linkki tämän pilvitestikoneen erilliseen 8B-demoon. Ei muutosta nykyiseen WhatsApp-tuotantoon, ei palvelinhankintaa tai maksullisia mallirajapintoja.
+- Toteutetaan erillinen avainlinkillä suojattu esikatseluvälitys ja taustalla käsiteltävät viestit/pollaus, jotta CPU-mallin pitkä vastausaika ei katkaise julkista HTTP-yhteyttä. Nykyisen paikallisen demopalvelimen rajauksia ei poisteta. Omat istunnot ja vain synteettinen katalogi; ei tilauksia. Linkki on väliaikainen ja riippuu pilvitestikoneen elinkaaresta.
+- Ensin varmennetaan julkisen yhteyden toimivuus, sitten mallin saatavuus ja koko polku ulkoisella selaimella. Live-linkkiä ei väitetä valmiiksi ennen näitä tarkistuksia.
+
 ## 17.11.2026 — yksi oikea esittelykoe läpi ja 24 s demotallenne valmis (Codex, Danielin chatti)
 
 - Käyttäjän pyytämä yksi puhdas selainkoe läpi erillisellä qwen3:8b-demolla: 20 L laktoositonta maitoa perjantaiksi → numerovalinta 1 → muutos 30 L. Yksi rivi, sama FREE_FROM_LACTOSE, sama toimituspäivä 20.11.2026 ja valittu demotuote säilyivät. Lopputulos 5 × 6 L. Ei sovelluskoodin muutoksia tai restarttia polun aikana.

@@ -99,3 +99,12 @@ node deploy/selfhost-demo/make-demo-video.mjs
 Oletustulokset tulevat Gitin ohittamaan hakemistoon `deploy/selfhost-demo/.state/recording`: täysi `raw.webm`, lyhennetty `aimo-demo.mp4`, lopputilan PNG ja vasteajat sisältävä `result.json`. Mallivastauksia ei korvata tai generoida uudelleen videota varten. Lyhyt versio poistaa vain odotusjaksoja ja näyttää tästä merkinnän videossa. Ajuri keskeyttää, jos määrät, laktoosittomuus, rivimäärä, päivä tai tuotevalinta eivät vastaa odotuksia; epäonnistuneesta kokeesta ei tehdä onnistunutta esittelyvideota.
 
 Valinnaiset ajurin asetukset: `DEMO_RECORD_URL` (vain paikallinen erillinen demo), `DEMO_RECORD_OUT`, `DEMO_CHROMIUM` (oma Chromium-binääri), `AIMO_PLAYWRIGHT_MODULE` (valmiin Playwright-asennuksen index.mjs). Lyhentimen hakemiston voi antaa ensimmäisenä komentoriviparametrina; tarvittaessa `DEMO_FFMPEG` ja `DEMO_FONT` vaihtavat FFmpegin ja fontin polut.
+
+
+## Omistajan itse kokeiltava live-sivu
+
+https://aimo-live-8b-demo-1711.daniel-turkkinen.chatgpt.site
+
+Kirjaudu samalla ChatGPT-tilillä, jolle demo julkaistiin. Kirjoita viesti, esimerkiksi 20 litraa laktoositonta maitoa perjantaiksi, ja odota vastausta. Voit sitten valita tuotteen ja muuttaa määrää. Sivu käyttää oikeaa paikallista Qwen3 8B -mallia taustalla ja näyttää odotuksen etenemisen. Kyseessä on väliaikainen pilvitestikoneen malli; sivusto ilmoittaa, jos malli ei ole yhteydessä. 14B-mallia ei ole tässä julkaisussa otettu käyttöön.
+
+Toteutus ja palvelimen jatkokäyttöönotto: live-site/README.md. Nykyinen WhatsApp-tuotanto on erillinen.
