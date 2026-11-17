@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — epäselvä ensiviesti määrillä saa päiväkysymyksen (Claude Code, sessio C)
+
+- **Käyttäjän pyyntö:** Eelis hyväksyi Haiku-otoksen X041-löydöksen korjauksen: emojiavaukseen "🥛🥛🥛 20? 🧈 5 🙏" malli kysyi yksiköitä mutta ei toimituspäivää (2/3 viimeisintä ajoa).
+- **Muutos (`server/whatsapp/dialogue.mjs`):** kun keskustelun ensimmäisessä viestissä on lukuja mutta ei tunnistettua tuotetta eikä listaa, ja mallin tarkennus ei kysy päivää, perään lisätään "Mille päivälle toimitus?". Ei myöhemmissä viesteissä, ei tuotetietokysymyksiin eikä silloin, kun malli jo kysyi päivää.
+- **Tarkistukset:** regressiotesti (kaatui ennen korjausta), koko `npm test` 458/458. Käyttöön botin seuraavassa sovitussa restartissa (sessio E).
+
 ## 17.11.2026 — kaikki valmis liveen: botti c78e73b, Worker ennallaan (Claude Code, sessio E)
 
 - **Käyttäjän pyyntö:** "ja sitte ku kaikki valmista ni heitä tää livee kaikki". Odotettiin taulun viimeisen koodivarauksen (3001849c, reseptin valkosipuliarvio) valmistumista; sen jälkeen ei ollut kesken olevaa koodityötä (ainoa avoin varaus 5f708b58 on 15.11. vanhentunut).

@@ -203,3 +203,21 @@ test('X064: aikaisimman päivän hyväksyntä merkitsee tilauksen kiireelliseksi
     assert.match(options.text, /Päivälle ti 17\.11\. ehtii tilata ma 16\.11\. klo 12\.00 asti\./, answer);
   }
 });
+
+test('X041: epäselvä ensiviesti määrillä saa päiväkysymyksen mallin tarkennuksen perään', async (t) => {
+  const clarify = 'Joo, katsotaan! Tarkoitatko 20 maitoa ja 5 voita? Kerro vielä, montako litraa tai pakkausta maitoa tarvitset.';
+  const f = dialogue(t, { plan: { route: 'chat', text: clarify } });
+  const first = await f.say('🥛🥛🥛 20? 🧈 5 🙏');
+  assert.match(first.text, /Kerro vielä, montako litraa/);
+  assert.match(first.text, /\n\nMille päivälle toimitus\?$/);
+  assert.deepEqual(f.ordered, []); // tilausmoottoria ei kutsuta tarkennukseen
+  // Ei toisteta myöhemmin keskustelussa eikä silloin, kun malli jo kysyi päivää.
+  const later = await f.say('20? 5');
+  assert.doesNotMatch(later.text, /Mille päivälle toimitus\?$/);
+  const asked = dialogue(t, { plan: { route: 'chat', text: 'Tarkoitatko 20 l maitoa? Ja mille päivälle toimitus?' } });
+  const once = await asked.say('🥛 20');
+  assert.equal((once.text.match(/mille päivälle/giu) || []).length, 1, once.text);
+  // Pelkkä kysymys ilman määriä ei saa päiväkysymystä.
+  const chat = dialogue(t, { plan: { route: 'chat', text: 'Olen Valio Aimon tilausapuri.' } });
+  assert.doesNotMatch((await chat.say('kuka sä oot?')).text, /Mille päivälle/);
+});

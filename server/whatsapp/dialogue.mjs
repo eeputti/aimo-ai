@@ -422,6 +422,13 @@ text on vain vastaus kysymykseen. suggestionTerm on yksi suosittelemasi tuotetyy
           state.pendingSuggestion = adviceTerm;
           messages.push(addQuestion || 'Lisätäänkö tämä ostoslistalle? Kerro määrä, niin lisään sen.');
         }
+        // Keskustelun ensimmäinen viesti, jossa on määriä mutta ei tunnistettua tuotetta ("🥛🥛🥛 20? 🧈 5 🙏"): mallin
+        // tarkennus kysyi yksiköitä mutta ei päivää, joten päivä kysytään koodissa heti alussa (Haiku-otos X041).
+        if (!state.history?.length && !query && !kinds.length && /\d/u.test(text) && !getShoppingList({ epoch: state.epoch || '' })?.lines?.length
+            && !/päiv|toimitu|milloin/iu.test(messages.join(' '))) {
+          messages = [...messages, 'Mille päivälle toimitus?'];
+          result = { ...result, text: messages.join('\n\n') };
+        }
       }
       if (!result) {
         touched = true;
