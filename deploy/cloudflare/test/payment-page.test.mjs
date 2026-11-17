@@ -1,4 +1,4 @@
-// Maksusivu: jokainen skriptin käyttämä elementti on sivulla, ja puhelimella maksusivu aukeaa ilman tietokone-estoa.
+// Maksusivu: jokainen skriptin käyttämä elementti on sivulla, ja puhelimella maksusivu ja sen jatkolinkit aukeavat ilman estoa.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -36,9 +36,10 @@ function gate(pathname) {
   return added;
 }
 
-test('phones open the payment page from the WhatsApp cart, other pages keep the computer gate', () => {
+test('phones open the payment page from the WhatsApp cart, only Keskustele keeps the gate', () => {
   assert.equal(gate('/demo-payment.html'), null);
   assert.equal(gate('/demo-payment'), null);
   assert.ok(gate('/keskustele'));
-  assert.ok(gate('/demo-payment.html.evil'));
+  assert.ok(gate('/keskustele.html'));
+  assert.equal(gate('/agentti.html'), null, 'the agent trace behind Katso, miten agentti kokosi tilauksen opens on a phone');
 });

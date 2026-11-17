@@ -1,14 +1,15 @@
-// Puhelimella demosivusto ei ole käytössä: kaikilla sivuilla näkyy "Käytäthän tätä tietokoneella" -ikkuna.
-// Puhelimella tilausapuria kokeillaan oikeassa WhatsAppissa, joten ikkunasta voi soittaa Eelikselle tai palata etusivulle.
+// Puhelimella kaikki sivut toimivat paitsi Keskustele: sen keskustelu käydään puhelimella oikeassa WhatsAppissa.
+// Puhelimella html saa luokan is-phone (site.css piilottaa sillä Keskustele-linkit), ja Keskustele-sivulla näkyy ikkuna,
+// josta voi soittaa Eelikselle tai palata etusivulle.
 // Ladataan <head>-osassa ennen sivun sisältöä (tavallinen skripti), jotta sivu ei ehdi välähtää. Tyylit site.css:ssä.
 (() => {
-  // Maksusivu on WhatsAppin tilauspolun viimeinen vaihe: ostoskorin Siirry maksamaan -painike avaa sen puhelimella.
-  if (/^\/demo-payment(\.html)?$/.test(location.pathname)) return;
   const ua = navigator.userAgent || '';
   const phone = navigator.userAgentData?.mobile === true
     || /iPhone|iPod|Android.+Mobile|Windows Phone|IEMobile|Opera Mini|BlackBerry/i.test(ua)
     || (matchMedia('(pointer: coarse) and (hover: none)').matches && Math.min(screen.width, screen.height) < 600);
   if (!phone) return;
+  document.documentElement.classList.add('is-phone');
+  if (!/^\/keskustele(\.html|\/)?$/.test(location.pathname)) return;
   document.documentElement.classList.add('phone-gate');
 
   const ART = `<svg class="gate-art" viewBox="0 0 260 176" aria-hidden="true">
@@ -34,7 +35,6 @@
   const PHONE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5h2.8l1.4 4.2-2 1.6a12 12 0 0 0 5.9 5.9l1.6-2 4.2 1.4v2.8a2 2 0 0 1-2.1 2A16.5 16.5 0 0 1 4.6 5.6a2 2 0 0 1 2-2.1z" fill="currentColor"/></svg>';
 
   function build() {
-    const home = location.pathname === '/' || location.pathname === '/index.html';
     const gate = document.createElement('div');
     gate.className = 'gate';
     gate.setAttribute('role', 'dialog');
@@ -42,10 +42,10 @@
     gate.setAttribute('aria-labelledby', 'gate-title');
     gate.setAttribute('aria-describedby', 'gate-text');
     gate.innerHTML = `<div class="gate-card">${ART}
-      <h2 id="gate-title">Käytäthän tätä tietokoneella</h2>
-      <p id="gate-text">Puhelimella toimii vain WhatsApp. Olethan yhteydessä Eelikseen, niin pääset kokeilemaan tilausapuria omassa WhatsAppissasi.</p>
+      <h2 id="gate-title">Keskustele WhatsAppissa</h2>
+      <p id="gate-text">Puhelimella tilausapurin kanssa jutellaan oikeassa WhatsAppissa. Olethan yhteydessä Eelikseen, niin pääset kokeilemaan sitä omassa WhatsAppissasi.</p>
       <a class="gate-call" href="tel:+358503260441">${PHONE}Soita Eelikselle 050 326 0441</a>
-      ${home ? '' : '<a class="gate-home" href="/">Etusivulle</a>'}
+      <a class="gate-home" href="/">Etusivulle</a>
     </div>`;
     for (const child of document.body.children) { child.inert = true; child.setAttribute('aria-hidden', 'true'); }
     document.body.append(gate);

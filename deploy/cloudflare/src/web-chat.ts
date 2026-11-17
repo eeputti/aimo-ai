@@ -82,7 +82,7 @@ async function proxy(request: Request, url: URL, origin: string) {
     return new Response(response.body, { status: response.status, headers: out });
   }
   // Sivuston välilehdet korisivun yläreunaan. Vain staattista HTML:ää ja saman alkuperän tiedostoja: korin CSP pysyy ennallaan.
-  // Puhelimella sama "Käytäthän tätä tietokoneella" -ikkuna kuin sivuston muilla sivuilla (mobile-gate.js, saman alkuperän skripti).
+  // Puhelimella mobile-gate.js (saman alkuperän skripti) piilottaa Keskustele-välilehden kuten sivuston muilla sivuilla.
   const html = (await response.text()).replace(/<\/head>/i, '<link rel="stylesheet" href="/site.css"><script src="/mobile-gate.js"></script></head>')
     .replace(/<body([^>]*)>/i, (tag) => `${tag}${siteHeader("ostoskori")}`);
   out.delete("content-length");

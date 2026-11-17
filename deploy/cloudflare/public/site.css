@@ -58,7 +58,9 @@ header.site-header .site-tabs a:focus-visible,header.site-header .site-logo:focu
   .site-main{padding:24px 16px 40px}
 }
 
-/* Puhelimella: "Käytäthän tätä tietokoneella" kaikilla sivuilla (mobile-gate.js lisää html.phone-gate-luokan jo <head>-osassa). */
+/* Puhelimella (mobile-gate.js lisää html.is-phone-luokan jo <head>-osassa) Keskustele on WhatsAppissa: sen linkit pois,
+   ja itse Keskustele-sivulla ikkuna (html.phone-gate). Muut sivut toimivat puhelimella sellaisenaan. */
+html.is-phone a[href^="/keskustele"],html.is-phone .no-phone{display:none!important}
 html.phone-gate,html.phone-gate body{overflow:hidden!important}
 html.phone-gate body>*:not(.gate){visibility:hidden}
 .gate{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:24px 20px;overflow-y:auto;

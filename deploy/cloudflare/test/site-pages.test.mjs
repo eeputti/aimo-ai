@@ -1,4 +1,4 @@
-// Sivuston yhteiset osat: puhelinesto kaikilla sivuilla, Keskustele-sivun live-näkymän rivit ja yhteinen koodinäkymä.
+// Sivuston yhteiset osat: puhelimella vain Keskustele estetty, Keskustele-sivun live-näkymän rivit ja yhteinen koodinäkymä.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -22,32 +22,48 @@ test('every page loads the phone gate in <head> right after the shared styleshee
 
 function gate(userAgent, pathname = '/keskustele', { coarse = false, width = 1440 } = {}) {
   const children = [{ inert: false, setAttribute() {} }];
+  const classes = [];
   let added = null;
   const element = () => ({ setAttribute() {}, querySelector: () => ({ focus() {} }), innerHTML: '' });
   const context = {
     navigator: { userAgent }, screen: { width, height: 900 }, location: { pathname },
     matchMedia: () => ({ matches: coarse }),
-    document: { documentElement: { classList: { add(c) { context.cls = c; } } }, createElement: element,
+    document: { documentElement: { classList: { add(c) { classes.push(c); } } }, createElement: element,
       body: { children, append(node) { added = node; } }, addEventListener() {} },
   };
   vm.runInNewContext(read('../public/mobile-gate.js'), context);
-  return { cls: context.cls, gate: added, hidden: children.every((c) => c.inert) };
+  return { classes, gate: added, hidden: children.every((c) => c.inert) };
 }
 
-test('phones get the "use a computer" gate with a call button, desktops and tablets do not', () => {
-  const iphone = gate('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1');
-  assert.equal(iphone.cls, 'phone-gate');
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1';
+const ANDROID = 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36';
+
+test('phones see the Keskustele page as a WhatsApp prompt with a call button, desktops and tablets do not', () => {
+  const iphone = gate(IPHONE);
+  assert.deepEqual(iphone.classes, ['is-phone', 'phone-gate']);
   assert.ok(iphone.hidden, 'page content is inert behind the gate');
-  assert.match(iphone.gate.innerHTML, /Käytäthän tätä tietokoneella/);
-  assert.match(iphone.gate.innerHTML, /Puhelimella toimii vain WhatsApp\. Olethan yhteydessä Eelikseen/);
+  assert.match(iphone.gate.innerHTML, /Keskustele WhatsAppissa/);
+  assert.match(iphone.gate.innerHTML, /jutellaan oikeassa WhatsAppissa\. Olethan yhteydessä Eelikseen/);
   assert.match(iphone.gate.innerHTML, /href="tel:\+358503260441"/);
   assert.match(iphone.gate.innerHTML, /class="gate-home" href="\/"/);
-  const android = gate('Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36', '/');
-  assert.ok(android.gate, 'Android phone is gated');
-  assert.doesNotMatch(android.gate.innerHTML, /gate-home/, 'the front page has no link to itself');
+  for (const path of ['/keskustele.html', '/keskustele/']) assert.ok(gate(ANDROID, path).gate, path);
   assert.equal(gate('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15 Safari/605.1.15').gate, null);
-  assert.equal(gate('Mozilla/5.0 (Linux; Android 15; Tab S9) AppleWebKit/537.36 Chrome/130.0 Safari/537.36', '/', { coarse: true, width: 1600 }).gate, null);
-  assert.ok(gate('Mozilla/5.0 (X11; Linux x86_64)', '/', { coarse: true, width: 390 }).gate, 'small touch screen without a phone user agent');
+  assert.equal(gate('Mozilla/5.0 (Linux; Android 15; Tab S9) AppleWebKit/537.36 Chrome/130.0 Safari/537.36', '/keskustele', { coarse: true, width: 1600 }).gate, null);
+  assert.ok(gate('Mozilla/5.0 (X11; Linux x86_64)', '/keskustele', { coarse: true, width: 390 }).gate, 'small touch screen without a phone user agent');
+});
+
+test('every other page works on a phone: no gate, only the Keskustele links are hidden', () => {
+  for (const path of ['/', '/index.html', '/ostoskori', '/miten', '/agentti.html', '/tilaukset.html', '/demo-payment.html', '/whatsapp/cart', '/keskustelee']) {
+    const phone = gate(IPHONE, path);
+    assert.equal(phone.gate, null, path);
+    assert.deepEqual(phone.classes, ['is-phone'], path);
+  }
+  assert.deepEqual(gate('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0) AppleWebKit/605.1.15 Safari/605.1.15', '/').classes, []);
+  const css = read('../public/site.css');
+  assert.match(css, /html\.is-phone a\[href\^="\/keskustele"\],html\.is-phone \.no-phone\{display:none!important\}/);
+  // The text that only introduces a Keskustele link goes with it.
+  assert.match(read('../index.html'), /<p class="try-note no-phone">/);
+  assert.match(read('../public/miten.html'), /<p class="site-lead no-phone">Juttele itse täältä:<\/p>\s*<a class="miten-cta" href="\/keskustele">/);
 });
 
 test('the live view starts as a dimmed skeleton and follows the conversation', () => {
