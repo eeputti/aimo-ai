@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — yksikköajo kaikille tuotteille ja julkaisu 64b9150 (Claude Code, sessio E)
+
+- **Käyttäjän kysymys:** "varmista onks muita ku sipuli". Ajo oikealla katalogilla, oikealla haulla ja gatewayn tarjouksella, simuloiduin hinnoin ja väliaikaisin kannoin (ei malli-, Meta- tai Valio-kutsuja): 68 yleistä tuotetta × 4 määrätapaa (kappaleet, paketit, kilot, litrat), jokaisen näytetyn vaihtoehdon valinta tarjoukseen. Ennen afb9d1f:ää 189/613 valintaa kaatui UNIT_NOT_CONVERTIBLE-virheeseen, kaikki kappalemäärillä ja lähes kaikilla tuotteilla (kananmunat toimivat). afb9d1f:n jälkeen 0/613. Tuotannon päätösketjussa viimeinen tällainen virhe klo 9.45, ennen korjauksen julkaisua.
+- **Huomiot:** "5 sipulia" voi tarjota viisi pussia, koska pakkauksen kappalemäärää ei tiedetä (näytetään ennen valintaa). Kiinteälle tuotteelle litroina annettu määrä antaa "ei tilattavaa tuotetta" eikä kysy määrää uudelleen. Ajoskripti session väliaikaistiedostoissa, ei repossa.
+- **Julkaisu (Eeliksen vahvistus, "Kyllä, julkaise"):** botti mainista 64b9150 (8a505c5: kaatunut valinta nimetään eikä sitä tarjota uudelleen; 64b9150: päivälle tilauskelvoton tuote jää pois seuraavaksi valittavista), deployment aimo-whatsapp-p7gz7dgjf. Ennen julkaisua `npm test` 433/433, `aimo:eval` 26/26 ja yksikköajo 0/613 virhettä; jälkeen healthz `host: cloud`, webhookin vahvistus 200, tick 200. Worker ennallaan (32cc6312).
+
 ## 17.11.2026 — V033 allergiaturvallinen vaihtoehtolista ja selkeämmät kyllä/ei-tuotevastaukset (Claude Code, sessio A)
 
 - **Pyyntö:** Eelis hyväksyi V-itsepelin löydösten korjauksen: V033 (maitoallergiselle lapselle tarjottiin ensin jäätelöä ilman allergeenitietoa) ja arvioijan moittima suorien vastausten muoto ("Ei: sisältää kananmunaa").
