@@ -2,6 +2,18 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — yksi oikea esittelykoe läpi ja 24 s demotallenne valmis (Codex, Danielin chatti)
+
+- Käyttäjän pyytämä yksi puhdas selainkoe läpi erillisellä qwen3:8b-demolla: 20 L laktoositonta maitoa perjantaiksi → numerovalinta 1 → muutos 30 L. Yksi rivi, sama FREE_FROM_LACTOSE, sama toimituspäivä 20.11.2026 ja valittu demotuote säilyivät. Lopputulos 5 × 6 L. Ei sovelluskoodin muutoksia tai restarttia polun aikana.
+- Kaksi oikeaa paikallista mallikutsua: 128 130 ms ja 72 884 ms; numerovalinta 6 ms ilman mallikutsua. Tallennettu Chromium-ajo, lopputilan PNG, tarkat vasteajat ja noin 24 s MP4. Videosta poistettu vain odotusjaksoja, tästä näkyvä merkintä. Ei vastauksien vaihtoa tai käsikirjoitettua mallia. Ei Metaa, Valiota, tilausta tai henkilökohtaisten maksullisten API-avaimien käyttöä.
+- Lisätty manuaaliset toisto-/tallennusajurit deploy/selfhost-demo/record-demo.mjs ja make-demo-video.mjs sekä ohje. Mallipalvelin ja tämän kokeen demopalvelin pysäytetään valmistuttua. Tulokset ja jaettavat media-artifaktit docs/evaluations/aimo-demo-20261117.md. Työympäristössä lisäksi yhden tiedoston offline-demo.html ja lyhentämätön raw.webm.
+- Tarkistukset: oikean selainkokeen sisältöehdot läpi, uusi JS-syntaksi ja git diff --check läpi, FFprobe varmisti H.264/1440×1080/24,12 s, lopputilan PNG tarkistettu. Ei koko testisarjan toistoa, koska nykyisen agentin lähdekoodia ei muutettu. Tämä on yksi demopolku 8B-mallilla, ei 14B- tai kattava laatutesti.
+
+## 17.11.2026 — yhden esittelytestin ja demotallenteen teko aloitettu (Codex, Danielin chatti)
+
+- Käyttäjä pyysi ajamaan yhden testin demon esittelyä varten. Ajetaan muuttumattoman erillisen demopaketin yksi ostoslistapolku oikealla qwen3:8b-mallilla: 20 L laktoositonta maitoa → tuotevalinta → määrä 30 L ja saman rajoituksen säilyminen. Oma tuore tila ja selainistunto, ei nykyisen palvelun muutoksia.
+- Tallennetaan oikea selainajo ja tehdään esittelyyn lyhennetty video, jossa mallin odotusaikojen lyhennys merkitään näkyvästi. Myös todelliset vasteajat ja tulos säilytetään. Ei käsikirjoitettuja mallivastauksia tai henkilökohtaisia maksullisia API-kutsuja.
+
 ## 17.11.2026 — erillinen suuremman mallin demoversio valmis (Codex, Danielin chatti)
 
 - Käyttäjän pyytämä kokeiltava rinnakkaisversio deploy/selfhost-demo-hakemistossa. Oletus qwen3:14b, valittavissa muu omalla Ollamalla ajettava malli. Selain http://localhost:4765, oma tila, puhdas lapsiprosessin ympäristö ja oma Compose-projekti/levyt. Synteettiset tuotteet ja hinnat, ei tilauslähetystä. Nykyisiin server-/public-tiedostoihin, tuotannon asetuksiin, asiakkaisiin, kantoihin tai Meta-liitokseen ei tehty muutoksia.

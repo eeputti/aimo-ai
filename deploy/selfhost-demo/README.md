@@ -86,3 +86,16 @@ Käyttöliittymässä näkyy valittu malli sekä viestin käsittelyaika. Mallin 
 Demon testit: `node --test test/selfhost-demo.test.mjs`. Ne käyttävät oikeaa HTTP-palvelinta ja keskustelumoottoria mutta käsikirjoitettua mallivastausta; näin testataan eristys, korimuutos, uudelleenyritys ja tallennuksen säilyminen. Todellisen mallin laatu raportoidaan erikseen työlokissa ja tämän demon testiraportissa.
 
 Tämän työvaiheen varmennukset ja oikean 8B-mallin koe: [TEST-REPORT.md](TEST-REPORT.md). 14B-/32B-malleja tai GPU-overlayta ei vielä ajettu tässä ympäristössä.
+
+## Yhden oikean mallikokeen tallentaminen
+
+Kun erillinen demo ja oma malli ovat käynnissä, voit tallentaa saman 20 L → tuotevalinta → 30 L -polun selaimella. Tarvitaan erikseen asennettu Playwright, sen Chromium/FFmpeg sekä lyhennysvaiheeseen järjestelmän FFmpeg. Ajuri käyttää uutta tyhjää selainistuntoa ja tarkistaa erillisen demon tunnisteen ennen viestien lähettämistä.
+
+```bash
+node deploy/selfhost-demo/record-demo.mjs
+node deploy/selfhost-demo/make-demo-video.mjs
+```
+
+Oletustulokset tulevat Gitin ohittamaan hakemistoon `deploy/selfhost-demo/.state/recording`: täysi `raw.webm`, lyhennetty `aimo-demo.mp4`, lopputilan PNG ja vasteajat sisältävä `result.json`. Mallivastauksia ei korvata tai generoida uudelleen videota varten. Lyhyt versio poistaa vain odotusjaksoja ja näyttää tästä merkinnän videossa. Ajuri keskeyttää, jos määrät, laktoosittomuus, rivimäärä, päivä tai tuotevalinta eivät vastaa odotuksia; epäonnistuneesta kokeesta ei tehdä onnistunutta esittelyvideota.
+
+Valinnaiset ajurin asetukset: `DEMO_RECORD_URL` (vain paikallinen erillinen demo), `DEMO_RECORD_OUT`, `DEMO_CHROMIUM` (oma Chromium-binääri), `AIMO_PLAYWRIGHT_MODULE` (valmiin Playwright-asennuksen index.mjs). Lyhentimen hakemiston voi antaa ensimmäisenä komentoriviparametrina; tarvittaessa `DEMO_FFMPEG` ja `DEMO_FONT` vaihtavat FFmpegin ja fontin polut.
