@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — botti ja sivusto julkaistu mainista 32c5c0b (Claude Code, sessio H)
+
+- **Käyttäjän pyyntö:** "käynnistä botti uudelleen ja julkaise sivusto". Botti pyörii Vercelissä 16.11. vaihdon jälkeen, joten uudelleenkäynnistys tehtiin Vercel-julkaisuna (`docs/vercel.md`). Taulun varaus 5285af56. E:lle, "Chatbot WhatsApp parity", "Tuotteiden näyttölogiikka" ja "Aimo tilausapuri verkossa" -sessioille kerrottu, ettei rinnakkaisia julkaisuja tehdä.
+- **Botti:** puhdas tilannevedos `/private/tmp/aimo-vercel-32c5c0b` (git archive, katalogi ja `data/img` kopiona, `.vercel` 94c62f3-vedoksesta), `vercel deploy --prod`: deployment `aimo-whatsapp-20brlkbfy`, tuotannossa klo 9.13. Ensin julkaistiin ab467a9 (klo 9.12), mutta mainiin tuli heti 2de0839 (kirjoittaa-ilmaisin ennen jonon käsittelyä pilvessä), d9a08f6 (vaihtoehtojen valintasyy) ja 32c5c0b (hotfixin kirjainkokokorjaus), joten julkaisu uusittiin. Mukana myös henkilökohtaiset tilauslinkit (bdee619), tuntemattoman saatavuuden korjaus (56fe2df), selainkeskustelun "tuki" ja ajatusviivat (77823b4) sekä H:n kuvat, ääniviestit ja sama kuin viime kerralla. Korvaa toisen session klo 9.08 julkaiseman hotfixin 7262563, jonka sisältö on mainissa. Ei asetusmuutoksia; Groq-asetukset olivat Vercelissä jo E:n viennistä.
+- **Sivusto:** `cf deploy` samasta commitista (`deploy/cloudflare`, dry-run ensin), Worker-versio **16c6a47d-8fc3-4c4f-918b-c62b72836420**. Ei D1-migraatiota (signup-verify.sql:n muutos oli vain kommentti, ajettu jo 16.11.).
+- **Tarkistukset:** ennen julkaisua `npm test` 421/423: kaksi verkkotestiä (`cloud-handler`, `ordering-e2e`) kaatui koko sarjassa ECONNRESET-virheeseen koneen kuormassa (load 24, monta sessiota) ja meni läpi yksin 3/3 kahdesti. Worker 69/69, typecheck ja build. Julkaisun jälkeen: healthz `host: cloud`, tuotantoalias osoittaa uuteen julkaisuun, Metan webhookin GET-vahvistus 200 ja haaste täsmää, allekirjoittamaton POST 403. Sivuston kaikki välilehdet, `/healthz`, `/api/orders` (henkilökohtainen tila, julkinen lista tyhjä B:n muutoksen mukaisesti, `receivedAt` tuore) ja `/whatsapp/cart.js` 200. Etusivun neljä pääominaisuutta, Keskustele-sivun ääniviesti- ja reseptilinkkimaininta sekä Näin se toimii -vaiheet näkyvät livenä. "Chatbot WhatsApp parity" varmensi Workerin kautta klo 9.15: "tuki" saa kiinteän vastauksen ja rivit alkavat ajatusviivalla.
+- **Ei kokeiltu:** oikeaa kuvaa tai ääniviestiä puhelimesta pilveen ei ole vielä lähetetty. Seuraavaksi Eelis voi lähettää yhden kuvan ostoslistasta ja yhden ääniviestin.
+
 ## 17.11.2026 — ilmoittautumisen API pois Workerista ja botin ilmoittautumisskriptit pois (Claude Code, etusivu-chat)
 
 - **Käyttäjän pyyntö:** Eelis pyysi poistamaan ilmoittautumisen API:n Workerista sen jälkeen, kun etusivun lomake oli poistettu (962f0fa).
