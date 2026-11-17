@@ -28,16 +28,14 @@ Tuotetiedot (allergeenit, alkuperä, kuvat, vertailuhinnat) tulevat vain Valion 
 
 ## Koko kulku
 
-```mermaid
-flowchart LR
-  A["Viesti, ääniviesti,<br/>kuva tai reseptilinkki"] --> B["Toimituspäivä<br/>ensin"]
-  B --> C["Numeroidut Valion<br/>tuotevaihtoehdot"]
-  C --> D["Korilinkki kaupan<br/>näköiseen koriin"]
-  D --> E["Tarkistus ja<br/>demotilaus"]
-  E --> F["Demomaksu"]
-  F --> G["Vahvistus-<br/>sähköposti"]
-  G --> H["Näin agentti<br/>kokosi tilauksen"]
-```
+1. [Kokki kertoo tarpeen](#1-kokki-kertoo-tarpeen) tekstinä, ääniviestinä, kuvana tai reseptilinkkinä.
+2. [Toimituspäivä ensin.](#2-toimituspäivä-ensin)
+3. [Numeroidut Valion tuotevaihtoehdot](#3-numeroidut-vaihtoehdot) sille päivälle.
+4. [Korilinkki kaupan näköiseen koriin.](#4-korilinkki-kaupan-näköiseen-koriin)
+5. [Tarkistus ja demotilaus](#5-tarkistus-ja-demotilaus) agenttiportin kautta.
+6. [Demomaksu.](#6-demomaksu)
+7. [Vahvistussähköposti.](#7-vahvistussähköposti)
+8. ["Näin agentti kokosi tilauksen" -jälki.](#8-näin-agentti-kokosi-tilauksen)
 
 ### 1. Kokki kertoo tarpeen
 
@@ -104,41 +102,19 @@ Samalla henkilökohtaisella linkillä aukeaa tilauksen jälki: keskustelu vasemm
 ## Arkkitehtuuri
 
 ```mermaid
-flowchart LR
-  subgraph Kokki
-    WA["WhatsApp"]
-    WEB["Selain"]
-  end
-
-  WA <--> META["Meta WhatsApp<br/>Cloud API"]
-  META -- "webhook" --> CH
-
-  subgraph VERCEL["Vercel-funktio, fra1"]
-    CH["Kanava ja jono<br/>server/whatsapp"]
-    CONV["Tilauskeskustelu<br/>server/order-conversation"]
-    TOOLS["Tuotetyökalut<br/>server/order-tools, server/aimo"]
-    GW["Agenttiportti<br/>server/gateway"]
-    CART["Korisivu<br/>/whatsapp/cart"]
-    CH --> CONV --> TOOLS --> GW
-    CART --> GW
-  end
-
-  VERCEL <--> TURSO[("Turso, Frankfurt<br/>5 SQLite-kantaa")]
-  CONV --> HAIKU["Claude Haiku 5.5"]
-  CH --> GROQ["Groq Whisper<br/>ääniviestit"]
-  TOOLS --> VALIO["Valion hinta- ja<br/>saatavuusrajapinta"]
-
-  subgraph CF["Cloudflare"]
-    WORKER["Worker aimo-order-demo<br/>sivusto, maksu, jälki, sähköposti"]
-    D1[("D1")]
-    TICK["Worker aimo-whatsapp-tick<br/>kerran minuutissa"]
-    WORKER --- D1
-  end
-
-  WEB --> WORKER
-  WORKER -- "selainkeskustelu ja kori" --> VERCEL
-  TICK -- "POST /internal/tick" --> VERCEL
-  VERCEL -- "vahvistetut tilaukset ja jäljet" --> WORKER
+flowchart TB
+  WA["Kokki WhatsAppissa"] <--> META["Meta WhatsApp<br/>Cloud API"]
+  WEB["Kokki selaimessa"] --> WORKER
+  TICK["Cloudflare-ajastin<br/>aimo-whatsapp-tick"]
+  META -- "webhook" --> BOT
+  WORKER["Cloudflare Worker ja D1<br/>aimo-order-demo:<br/>sivusto, maksu, jälki, sähköposti"] -- "selainkeskustelu ja kori" --> BOT
+  TICK -- "kerran minuutissa<br/>POST /internal/tick" --> BOT
+  BOT["Vercel-funktio, fra1:<br/>kanava ja jono, tilauskeskustelu,<br/>tuotetyökalut, korisivu"] -- "vahvistetut tilaukset<br/>ja jäljet" --> WORKER
+  BOT --> GW["Agenttiportti:<br/>allekirjoitetut tarjoukset,<br/>mandaatit, päätösloki"]
+  BOT <--> TURSO[("Turso, Frankfurt:<br/>5 SQLite-kantaa")]
+  BOT --> HAIKU["Claude Haiku 5.5"]
+  BOT --> GROQ["Groq Whisper:<br/>ääniviestit"]
+  GW --> VALIO["Valion hinta- ja<br/>saatavuusrajapinta"]
 ```
 
 | Osa | Missä | Tehtävä |
