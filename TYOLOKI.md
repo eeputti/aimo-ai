@@ -2,6 +2,17 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — tuntematon saatavuus, päivänvaihto valintalistan aikana ja toistuva siirtymäviesti (Claude Code, Aimo-tilausapuri verkossa -chat)
+
+- **Käyttäjän palaute:** Eeliksen selainkokeilussa klo 0.10 "1000 litraa jäätelöä" keskiviikoksi, perjantaiksi ja "millo saa jäätelöö?" sai joka kerta saman vastauksen "Saatavuutta ei saatu nyt tarkistettua … Kokeile toista päivää". Eelis halusi, että botti sanoo suoraan, ettei tuotetta nyt saa, ja ehdottaa jotain vastaavaa. Jatkopyynnöt: korjaa myös perjantai-päivänvaihto ja toistuva siirtymäviesti.
+- **Syy:** Valion testirajapinnan osoite `junction26.valioaimo.fi` ei enää ratkea. Botti näkee saatavuuden vain välimuistin 1 119 tuotteelle, eikä niissä ole yhtään jäätelöä.
+- **56fe2df:** tuntematon saatavuus kerrotaan kerran rehellisesti, ja toisto lyhenee. Kehotusta kokeilla toista päivää ei tule, eikä seuraavia päiviä haeta turhaan. Vastaavat tilattavat tuotteet: ehdokkaat tuotteista, joiden viimeisin oikea saatavuus oli "ok", ja Haiku valitsee samaan rooliin sopivat (`order-tools/nearby.mjs`). Koodi tarkistaa tilattavuuden. Valinta vaihtaa rivin tuotteen, ja eri mittayksikössä määrä kysytään. Mallin tekstistä pudotetaan sisäinen sana "tilausmoottori".
+- **53a7189:** pelkkä päivävastaus ("perjantai?", "entä torstaiksi", "pe 20.11.") menee suoraan tilausmoottorille ilman dialogimallia, joka oli kysynyt vastakysymyksen päivää vaihtamatta. Valitsijan tyhjä tulos kysytään kerran uudelleen, eikä sitä tallenneta välimuistiin.
+- **Tämä commit:** siirtymäviesti "Nyt olisi aika valita vaihtoehtoja…" (3b51b3d) tulee vain, kun valintavaihe alkaa tai listalle tulee uusi tuote, ei jokaisen päivän- tai määränvaihdon jälkeen (`cart-presentation.mjs`).
+- **Julkaisut:** 56fe2df julkaistiin Eeliksen luvalla klo 9.08 korjausversiona (8b29cff + korjaus), ja H:n koko mainin julkaisu tuli sen päälle. 53a7189 tuli tuotantoon session E julkaisussa c087af2. Eeliksen päätöksen mukaan kaikki botin ja Workerin julkaisut tekee sessio E. Live-varmennus: "perjantai?" vaihtoi päivän pe 20.11.:ksi ja "entä torstaiksi" to 19.11.:ksi ilman vastakysymystä.
+- **Tarkistukset:** `test/unknown-availability.test.mjs` 4/4, `whatsapp-cart-reply` uusine tapauksineen, koko `npm test` 418/418. Oikealla Haikulla ja välimuistikannan kopiolla jäätelön tilalle tuli tilattavia leivoksia, valinta ja määrä johtivat valmiiseen luonnokseen ja päivä vaihtui oikein. Mallikutsuja yhteensä alle 0,20 USD. Ei tilauksia, Meta-viestejä eikä asetusmuutoksia.
+- **Avoinna:** siirtymäviestin korjaus tarvitsee botin julkaisun (sessio E). "10 kpl" tulkitaan myyntieriksi, ja viimeisen rivin poisto unohtaa toimituspäivän (vanhaa käytöstä). Raportti `docs/parallel/unknown-availability.md`.
+
 ## 17.11.2026 aamu — korisivun "Tarkista nämä ensin" -kuittaukset tuotantoon (Claude Code, sessio E)
 
 - **Käyttäjän lupa:** Eelis pyysi julkaisua toisessa sessiossa ("pyydä E:tä julkaisemaan se") ja vahvisti sen tässä sessiossa ("Kyllä, julkaise").

@@ -68,6 +68,12 @@ test('choosing and ready replies say what was just picked, added or moved, witho
   assert.deepEqual(selectionAcknowledgement({ previousList: before, shoppingList: claimOnly, status: 'choosing' }), [CHOOSE_TRANSITION]);
   // Jo valintavaiheessa ollut kori ei toista siirtymää.
   assert.deepEqual(selectionAcknowledgement({ previousList: { ...before, status: 'needs_product_selection' }, shoppingList: claimOnly, status: 'choosing' }), ['Selvä! Tässä sopivat vaihtoehdot:']);
+  // Auki olevan valintalistan päivänvaihto ("perjantai?") tai määrän muutos kuitataan ilman toistuvaa siirtymää (17.11.).
+  const open = { ...before, status: 'needs_product_selection' };
+  assert.deepEqual(selectionAcknowledgement({ previousList: open, shoppingList: { ...before, revision: 8, deliveryDate: '2026-11-20' }, status: 'choosing' }), ['Toimituspäivä nyt pe 20.11.']);
+  assert.deepEqual(selectionAcknowledgement({ previousList: open, shoppingList: { ...before, revision: 9, lines: [line('L1', 'maito', { value: 500, unit: 'L' }), before.lines[1]] }, status: 'choosing' }), ['Päivitetty: maito 500 l.']);
+  // Uusi tuote kesken valinnan saa siirtymän, jotta seuraavan tuotteen lista ei näytä lisätyn tuotteen vaihtoehdoilta.
+  assert.deepEqual(selectionAcknowledgement({ previousList: open, shoppingList: added, status: 'choosing' }), ['Listalle tuli kerma 2 l.', CHOOSE_TRANSITION]);
   assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: before, status: 'choosing' }), null);
   assert.equal(selectionAcknowledgement({ previousList: before, shoppingList: picked, status: 'collecting' }), null);
   for (const text of [selectionAcknowledgement({ previousList: before, shoppingList: picked, status: 'choosing' }),

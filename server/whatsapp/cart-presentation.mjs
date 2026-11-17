@@ -102,7 +102,9 @@ export function selectionAcknowledgement({ previousList, shoppingList, status })
     if (status !== 'choosing') return ['Selvä!'];
     return [entering ? CHOOSE_TRANSITION : rotate(['Selvä! Tässä sopivat vaihtoehdot:', 'Hyvä, katsotaan vaihtoehdot:', 'Selvä, tässä vaihtoehdot:'])];
   }
-  if (status === 'choosing' && !picked.length) return [parts.join(' '), CHOOSE_TRANSITION];
+  // Siirtymä vain, kun valintavaihe alkaa tai listalle tuli uusi tuote. Jo auki olevan listan päivän tai määrän muutos
+  // ("Toimituspäivä nyt pe 20.11.") ei toista sitä: selainkokeilussa 17.11. sama siirtymä tuli joka päivänvaihdon jälkeen.
+  if (status === 'choosing' && !picked.length) return entering || added.length ? [parts.join(' '), CHOOSE_TRANSITION] : [parts.join(' ')];
   return [parts.join(' ')];
 }
 
