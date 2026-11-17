@@ -16,6 +16,25 @@
 
 F:n täydennys (`docs/parallel/haiku-quality-2026-11-16.md`, 63b9c55): "Mikä näistä toimitetaan varmimmin?" sai 2/4 ajossa vastauksen "En pysty itse arvioimaan", koska toimitusvarmuuskysymyksen tunnistus tunsi vain järjestyksen "varmimmin toimitetaan". Nyt kumpikin järjestys ja "luotettavimmin" tunnistetaan (`compareKind`, `server/order-conversation/index.mjs`), ja koodi vastaa näytettyjen vaihtoehtojen toimitusvarmuustiedoista. Regressiotesti `test/haiku-findings-c.test.mjs` (V023), koko `npm test` 396/396.
 
+## Mittaus korjausten jälkeen: F:n 30 persoonan Haiku-otos (17.11.2026)
+
+Eeliksen pyynnöstä sama otos kuin F:n raportissa (`--set all --ids S002,…,V032`, 12 S, 12 X, 6 V) samoilla asetuksilla: `DEEP_MODEL` ja `FAST_MODEL` claude-haiku-5-5, tyhjä `VALIO_API_KEY` (simuloidut hinnat), eristetyt kannat, ei Meta-lähetyksiä, `--source-ref` main 56fe2df (mukana C1–C7, V023, A:n f7b779b ja B:n 9bde0c8). Raakadata session väliaikaishakemistossa, ei Gitissä.
+
+| ajo | perus läpi | uusi vaatimus läpi | kutsut | kustannus |
+|---|---|---|---|---|
+| F 16.11., 671b9a1 | 29/30 | 30/30 | 301, 0 epäonnistui | noin 0,10 USD |
+| C 17.11., 56fe2df | 28/30 | 27/30 | 331, 1 epäonnistui | 0,12 USD |
+
+Persoonittain (vain muuttuneet):
+
+- **V007** läpi nyt (ennen `data_not_used:allergen`): A:n tuotevastauskorjaus.
+- **V032** kaatuu nyt (`options_never_shown`): "keliaakikko" muuttuu gluteeniviljakielloksi (AW), ja allergeenihierarkia sulkee pois kaikki kaurajuomat, myös gluteenittomiksi merkityt. Vastaus syyttää päivää. Toistettu order-toolsin suggestilla: AW-kielto 0 vaihtoehtoa, gluteeniton-merkintä 3 vaihtoehtoa. Session A:n alue, ilmoitettu taululla (#320).
+- **X064** kaatuu (`delivery_date`, `cart_link_missing`): C2-korjaus toimii (päivä pysyy, siirtoa ei kysytä uudelleen, tilausaikaan vastataan), mutta simuloitu asiakas hylkäsi tiistain joka kerta, ja apurin vastaus toistui samana kuusi kertaa. Vastauksessa on kaksi omaa virhettä: kaksi pistettä peräkkäin ("ti 17.11..") ja aikaisin päivä kahdesti samassa viestissä.
+- **X041** (`date_not_asked_first`): emojiavaukseen "🥛🥛🥛 20? 🧈 5 🙏" malli kysyi määrät ennen päivää. Mallin satunnaisuutta, F:n ajossa läpi.
+- **S002, S014** (`more_requested_before_options`): simuloitu asiakas pyysi "4" ennen kuin vaihtoehtoja näytettiin; apuri toimi oikein. Asiakaspuolen satunnaisuutta.
+
+Yhden ajon otos ei erota satunnaisuutta muutoksista: F:n raportin mukaan kahdeksan perusvirhettä 18:sta meni läpi pelkällä uusinnalla.
+
 ## Testit
 
 - Uusi `test/haiku-findings-c.test.mjs` (7) itsepelien vuoroista testityökaluilla. Ennen korjausta C1–C6 kaatuivat odotetusti, C7 läpäisi jo vartijan lisäyksen jälkeen.

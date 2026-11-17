@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — F:n 30 persoonan Haiku-otos C-korjausten jälkeen (Claude Code, sessio C)
+
+- **Käyttäjän pyyntö:** Eelis pyysi ajamaan F:n 30 persoonan Haiku-otoksen uudelleen. Samat asetukset kuin F:llä (Haiku apurille ja simuloidulle asiakkaalle, tyhjä `VALIO_API_KEY`, eristetyt kannat, ei Meta-lähetyksiä, 0 tilausta), lähde main 56fe2df.
+- **Tulos:** perusvaatimukset 28/30 ja uusi vaatimus 27/30 (F 671b9a1:llä 29/30 ja 30/30), 331 kutsua, 0,12 USD. V007 läpi nyt. V032 kaatuu: "keliaakikko" sulkee pois kaikki kaurajuomat, myös gluteenittomiksi merkityt, ja vastaus syyttää päivää (A:n alue, taulu #320). X064: C2-korjaus toimii, mutta vastaus toistuu samana ja siinä on kaksi pistettä peräkkäin ("ti 17.11..") sekä aikaisin päivä kahdesti. X041, S002 ja S014 ovat mallin tai simuloidun asiakkaan satunnaisuutta. Tarkemmin `docs/parallel/haiku-findings-c.md`.
+- **Ei koodimuutoksia** tässä vaiheessa. Avoinna: X064:n vastaustekstin korjaus (C) ja V032 (A).
+
 ## 17.11.2026 aamu — botti ja sivusto julkaistu mainista 32c5c0b (Claude Code, sessio H)
 
 - **Käyttäjän pyyntö:** "käynnistä botti uudelleen ja julkaise sivusto". Botti pyörii Vercelissä 16.11. vaihdon jälkeen, joten uudelleenkäynnistys tehtiin Vercel-julkaisuna (`docs/vercel.md`). Taulun varaus 5285af56. E:lle, "Chatbot WhatsApp parity", "Tuotteiden näyttölogiikka" ja "Aimo tilausapuri verkossa" -sessioille kerrottu, ettei rinnakkaisia julkaisuja tehdä.
