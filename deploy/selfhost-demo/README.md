@@ -34,6 +34,8 @@ Jos lähetät viestin **TILAA**, demossa ei synny oikeaa tai gatewayn demotilaus
 
 ## Oma pilvipalvelin Dockerilla
 
+GPU-palvelimen vaihtoehdot, tuntikustannukset ja nykyisen live-korin säilyttävä siirtosuunnitelma: [docs/gpu-server.md](../../docs/gpu-server.md). Ensimmäiseksi suositellaan lyhyttä vuokrakoetta; GPU-ajoa ei ole vielä varmennettu.
+
 Oma Compose-projekti on `aimo-selfhost-demo`. Omat levyt ovat `demo-state` ja `demo-models`. Niiden nimet eivät viittaa WhatsApp-tuotannon levyihin. Oletusportti on 4765, ei nykyisen kaupan tai botin portti.
 
 ```bash

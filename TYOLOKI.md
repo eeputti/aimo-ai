@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — GPU-palvelimen kustannukset ja käyttöönoton suunnitelma (Codex, Danielin chatti)
+
+- Käyttäjä kysyi järkevää tapaa luoda GPU-palvelin. Tarkistettu valmistajien julkiset hinnastot ja ohjeet: Scaleway L4-1-24G (24 Gt VRAM, 8 vCPU, 48 Gt RAM) noin 0,79 €/h, hinnaston kk-arvio 575 € ilman veroja; Runpod RTX A5000 0,27 $/h ja RTX 4090 0,89 $/h hinnastossa. Levy/IP/verot ja saatavuus tarkistetaan tilaushetkellä. Kuusi tuntia Scaleway-laskentaa noin 4,74 €, ehdotettu kokonaisbudjettivaraus 10–15 €; käyttäjä ei vielä hyväksynyt vuokrausta tai budjettia.
+- Suorin nykyisen Compose-paketin koe on GPU-virtuaalikone. Runpod GPU Pod on hallittu kontti eikä valmistajan mukaan tue Docker Composea; sen halvempi vaihtoehto vaatii erillisen paketin tai palvelujaon. Mallin, Node-demon ja runnerin pitää kaikkien siirtyä pysyvälle palvelimelle, jotta tämän työympäristön sulkeutuminen ei katkaise demoa.
+- Valmisteltu [docs/gpu-server.md](docs/gpu-server.md): 8B:n nopeus ensin samalla mallilla ja sitten 14B:n laatu, 24 Gt:n GPU, suojattu yhteys, täsmällinen Compose-käynnistys sekä säilyttävä siirtyminen ja GPU-käytön varmennus. Pelkkää nopeaa sääntömuutosta ei saa laskea GPU-mittaukseksi. Nykyiset sessionAliases pitää siirtää tai muodostaa uudelleen viestitunnisteiden avulla.
+- Ei tilattu maksullista palvelinta tai käytetty pilvipalveluntarjoajan tunnuksia. Ei tuotantokoodin muutoksia, live-palvelinten restarttia, tietokannan siirtoa tai oikeaa GPU-koetta. Vasteaikatavoite on vielä mittaamatta. Seuraava toteutusvaihe tarvitsee valitun pilvitilin käyttöoikeuden ja hyväksytyn kulurajan.
+- Tarkistukset: nykyinen demo-Compose + GPU-overlay validoitu ilman yksityisiä asetuksia; GPU-varaus mukana eikä mallin porttia julkaista. Ohjeen paikalliset tiedostopolut, koodilohkot ja `git diff --check` läpi. Vain dokumentaatiomuutos; sovelluksen testisarjaa ei toistettu.
+
 ## 17.11.2026 — live-demon selkeät korimuutokset noin 3 sekuntiin (Codex, Danielin chatti)
 
 - Käyttäjä pyysi nopeampia vastauksia. Dockerin oikean malliajon loki: kylmän syötteen käsittely noin 77 s ja generointi 53 s (2,47 tokenia/s). Suurin viive on kahden CPU-ytimen mallilaskenta; jonon pollaus ei selitä minuutteja.
