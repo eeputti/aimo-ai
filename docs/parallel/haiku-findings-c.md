@@ -33,6 +33,24 @@ Persoonittain (vain muuttuneet):
 - **X041** (`date_not_asked_first`): emojiavaukseen "🥛🥛🥛 20? 🧈 5 🙏" malli kysyi määrät ennen päivää. Mallin satunnaisuutta, F:n ajossa läpi.
 - **S002, S014** (`more_requested_before_options`): simuloitu asiakas pyysi "4" ennen kuin vaihtoehtoja näytettiin; apuri toimi oikein. Asiakaspuolen satunnaisuutta.
 
+## Kolmas otos X064-korjauksen jälkeen (17.11.2026)
+
+Sama otos ja asetukset, main 8357e11 (mukana e13cb54). Perusvaatimukset **27/30**, uusi vaatimus **28/30**, 321 kutsua, 0,11 USD.
+
+| persoona | F 671b9a1 | C ajo 2, 56fe2df | C ajo 3, 8357e11 |
+|---|---|---|---|
+| V007 | allergeenitieto puuttui | läpi | läpi |
+| V032 | läpi | vaihtoehtoja ei näytetty | vaihtoehtoja ei näytetty |
+| X064 | läpi | päivä ja korilinkki | tilausaika puuttui |
+| X041 | läpi | päivää ei kysytty ensin | läpi |
+| S002 | läpi | "4" ennen vaihtoehtoja | "4" ennen vaihtoehtoja |
+| S014 | läpi | "4" ennen vaihtoehtoja | lisää ei pyydetty |
+| S016 | läpi | läpi | riisi, päivä ja korilinkki |
+
+- **V032** kaatuu molemmissa ajoissa samalla tavalla: todellinen regressio, A:n alue (taulu #320).
+- **X064** (ajo 3): asiakas hyväksyi tiistain, mutta tiistain tilausaikaraja ei näkynyt, koska siirto ei merkitse tilausta kiireelliseksi ja asiakas pyysi korilinkin suoraan valinnan jälkeen (`rush_no_deadline`). Mahdollinen pieni korjaus: aikaisimman päivän hyväksyminen merkitsee tilauksen kiireelliseksi, jolloin vaihtoehtojen alla näkyy "ehtii tilata … asti". Ei tehty.
+- **S016**: simuloitu asiakas ensin hyväksyi jatkamisen ilman strutsinmunia ja sitten perui kaiken; apuri toimi joka vaiheessa oikein. **S002, S014**: asiakas pyysi "4" ennen vaihtoehtoja tai ei pyytänyt lisää. **X041**: mallin satunnaisuutta, läpi ajossa 3. Nämä ovat simuloidun asiakkaan tai mallin vaihtelua.
+
 **X064:n tekstivirheet korjattu (17.11.2026):** päivämäärän perään ei enää tule toista pistettä, ja kun tilausaikavastaus kertoo jo aikaisimman päivän, samaa virkettä ei toisteta saman viestin lopussa. Vastaus on nyt esim. "Huomiselle (ma 16.11.) ei enää ehdi tilata. Aikaisin toimitettava päivä on ti 17.11., ja sille ehtii tilata ma 16.11. klo 12.00 asti. / Ei tilattavaa tuotetta päivälle ma 16.11.: maito. / Kirjoita "ti 17.11.", jos se käy. Tilausta ei ole tehty." C2-testi laajennettu (kaatui ennen korjausta), koko `npm test` 410/410. Toistuva sama vastaus, kun asiakas hylkää ainoan mahdollisen päivän uudelleen ja uudelleen, jäi ennalleen: tieto on oikea, eikä muuta vaihtoehtoa ole.
 
 Yhden ajon otos ei erota satunnaisuutta muutoksista: F:n raportin mukaan kahdeksan perusvirhettä 18:sta meni läpi pelkällä uusinnalla.

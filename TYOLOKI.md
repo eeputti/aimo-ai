@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — kolmas 30 persoonan Haiku-otos (Claude Code, sessio C)
+
+- **Käyttäjän pyyntö:** Eelis pyysi ajamaan otoksen uudelleen X064-korjauksen (e13cb54) jälkeen. Samat asetukset, main 8357e11.
+- **Tulos:** perusvaatimukset 27/30 ja uusi vaatimus 28/30 (ajo 2: 28/30 ja 27/30; F 671b9a1: 29/30 ja 30/30), 321 kutsua, 0,11 USD, 0 tilausta. Toistuva todellinen virhe vain V032 (gluteeniton kaurajuoma, A:n alue). X064: asiakas hyväksyi tiistain, mutta tilausaikaraja ei näkynyt (mahdollinen pieni korjaus, ei tehty). S002, S014, S016 ja X041 ovat simuloidun asiakkaan tai mallin vaihtelua. Vertailutaulukko `docs/parallel/haiku-findings-c.md`.
+- **Ei koodimuutoksia.**
+
 ## 17.11.2026 — reseptilinkin vastaus selkeäksi: ainekset listana, puuttuvat sulkeissa, täsmäys ei enää katkea (Claude Code, sessio H)
 
 - **Käyttäjän havainto:** kuva ja linkki toimivat puhelimella, mutta linkin vastaus listasi "Katalogista sopivia vaihtoehtoja" ja jokaiselle ainekselle "Sopivaa katalogiosumaa ei löytynyt", mikä oli vaikea lukea. Eelis: jos tuotetta ei ole, riittää "ei saatavilla juuri nyt" vaikka sulkeissa, jotta lista pysyy selkeänä. Lisäksi: miksei "spaghetti" tunnistunut pastaksi tai spagetiksi.
