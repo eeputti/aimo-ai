@@ -562,8 +562,22 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
     const q = await tools.quote({ customer, draft });
     if (q.issues.length) {
       // Tilattavaksi kelpaamaton valinta puretaan, jotta ostaja valitsee uudelleen. Mitään ei vaihdeta hiljaa.
-      for (const i of q.issues) { const l = draft.lines.find((line) => line.ref === i.ref); if (l) { l.selectedProductId = null; l.selectedName = null; l.selectedWarning = null; delete draft.offered[l.ref]; } }
-      const text = `${q.issues.map((i) => i.message).join('\n')}\nTilausta ei ole tehty.`;
+      // Kaatunut tuote muistetaan rivillä (päivä ja määrä mukana), jotta samat vaihtoehdot eivät palaa uudelleen
+      // (puhelinkuva 17.11.: sipuli, valinta 3 → "Määrää ei voi muuntaa" → samat kolme vaihtoehtoa). Viesti nimeää tuotteen.
+      const said = q.issues.map((i) => {
+        const l = draft.lines.find((line) => line.ref === i.ref);
+        if (!l) return i.message;
+        const id = i.productId || (l.selectedProductId ? String(l.selectedProductId) : null);
+        const name = l.selectedName;
+        if (id) {
+          const f = l.failedOptions; const qn = l.quantity || {};
+          const same = f && f.deliveryDate === (draft.deliveryDate || null) && f.quantity?.value === qn.value && f.quantity?.unit === qn.unit && (f.quantity?.basis || 'sales') === (qn.basis || 'sales');
+          l.failedOptions = { deliveryDate: draft.deliveryDate || null, quantity: l.quantity ? { ...l.quantity } : null, ids: [...new Set([...(same ? f.ids : []), id])] };
+        }
+        l.selectedProductId = null; l.selectedName = null; l.selectedWarning = null; delete draft.offered[l.ref]; delete draft.seen?.[l.ref];
+        return name && id ? `${cap(readableName(name))} ei käy${i.reason ? `: ${String(i.reason).replace(/\.$/u, '')}` : ''}. Jätin sen pois vaihtoehdoista.` : i.message;
+      });
+      const text = `${said.join('\n')}\nTilausta ei ole tehty.`;
       if (depth < 1 && q.issues.some((i) => i.ref)) { const next = await advance(draft, customer, depth + 1); return { ...next, text: `${text}\n\n${next.text}` }; }
       return { status: 'collecting', text };
     }

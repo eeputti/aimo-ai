@@ -234,7 +234,7 @@ test('epäonnistunut tarjous tai tilaus ei tuota onnistumiskuittausta ja luonnos
   await say('maitoa ja kermaa');
   const failed = await pick(say, 1, 2);
   assert.notEqual(failed.status, 'ready');
-  assert.match(failed.text, /Ei tilattavissa: kerma\.\nTilausta ei ole tehty\./);
+  assert.match(failed.text, /Kerma 2 ei käy\. Jätin sen pois vaihtoehdoista\.\nTilausta ei ole tehty\./); // tuote nimetään, ei sama lista uudelleen
   assert.match(failed.text, /\*Kerma 5 l:\*/); // ostaja valitsee uudelleen, mitään ei vaihdeta hiljaa
   assert.equal(store.active('conv').lines[1].selectedProductId, null);
   assert.equal(store.active('conv').lines[0].selectedProductId, 'maito-1');

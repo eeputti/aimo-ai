@@ -61,12 +61,23 @@ Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude 
 - **Tarkistukset:** ennen julkaisuja `npm test` 418/418, 418/418, 417/417 ja 420/420, `aimo:eval` 26/26 (75f5edb), Worker 58/58. Jokaisen jälkeen healthz `host: cloud`, webhookin GET-vahvistus 200 ja tick 200 (12 tilausta). "Se tavallinen" -tilausta ei ole ajettu oikealla mallilla eikä puhelimella.
 - **Päällekkäisyys estetty:** maksusivusessio ja integraatiosessio pyysivät saman botin julkaisun 8b112a2:sta, joka eroaa 75f5edb:stä vain lokimerkinnöillä; molemmille kerrottu, ettei uutta julkaisua tarvita.
 
+## 17.11.2026 — tarjouksessa kaatunut valinta ei tuo samoja vaihtoehtoja uudelleen (Claude Code)
+
+- **Käyttäjän pyyntö:** "korjaa myös se ettei samat vaihtoehdot tuu uudestaan". Sipulikuvassa virheen jälkeen tuli sama lista, myös juuri kaatunut säkki.
+- **Muutos:**
+  - `server/order-conversation/index.mjs`: kun tarjous hylkää valitun tuotteen, keskustelu muistaa sen rivillä (`failedOptions`: päivä, määrä ja tuotteet).
+  - Viesti nimeää tuotteen ja syyn: "Sipuli 10 kg säkki nl/eg ei käy: Määrää ei voi muuntaa tämän tuotteen myyntiyksiköiksi. Jätin sen pois vaihtoehdoista." Ennen: "Ei tilattavissa: sipuli. …".
+  - `server/order-tools/index.mjs`: vaihtoehtohaku jättää rivin kaatuneet tuotteet pois samalle päivälle ja määrälle. Toinen päivä tai määrä voi taas käydä. Jos muita ei ole, sanotaan "Muita tilattavia vaihtoehtoja päivälle … ei löytynyt".
+  - Tarjouksen virheissä on nyt tuotenumero ja syy (`productId`, `reason`), myös toimituspäivän siirrossa.
+- **Tarkistukset:** uusi `test/whatsapp-quote-failure.test.mjs` 2/2: keskustelu ja oikea katalogi simuloiduin hinnoin, myös afb9d1f:n sipulikorjauksen regressio. Molemmat kaatuivat ennen muutosta. `order-conversation.test.mjs`:n virhetekstin odotus päivitetty uuteen muotoon. Koko `npm test` 432/432. Oikealla mallilla ei ajettu.
+- **Käyttöönotto:** botin Vercel-julkaisu (sessio E). Worker-julkaisua ei tarvita.
+
 ## 17.11.2026 — sipulin valinta jumitti: tarjous ja vaihtoehdot lukivat kappalemäärän eri tavalla (Claude Code)
 
 - **Käyttäjän havainto (kuva klo 9.40):** "Sipuli 5 kpl", valinta 3 (10 kg säkki) → "Ei tilattavissa: sipuli. Määrää ei voi muuntaa tämän tuotteen myyntiyksiköiksi" ja samat vaihtoehdot uudelleen.
 - **Syy:** mallitulkki (Haiku) tallensi "5 sipulia" kappaleiksi (`basis: 'items'`). Vaihtoehdot haetaan hakutekstillä, jossa kappaleet ovat kappaleita vain munille, joten lista laski myyntierinä ("5 säkkiä, yhteensä 50 kg"). Tarjous käytti luonnoksen kappalemäärää, eikä säkin, pussin tai nipun sipulimäärää tiedetä: jokainen valinta kaatui UNIT_NOT_CONVERTIBLE-virheeseen. Toistettu oikealla katalogilla ja simuloiduilla hinnoilla.
 - **Korjaus (`server/order-tools/index.mjs`, `quotedQuantity`):** tarjous lukee kappalemäärän myyntierinä, kun valitun tuotteen kappalemäärää pakkauksessa ei tiedetä, eli samoin kuin näytetty vaihtoehto. Munat (tunnettu kappalemäärä) ennallaan.
-- **Tarkistukset:** toisto ennen korjausta 0/3 valintaa, jälkeen 3/3 ok. `npm test` 424/424. Erillistä regressiotestiä ei vielä lisätty (käyttöraja), ei oikeaa mallia.
+- **Tarkistukset:** toisto ennen korjausta 0/3 valintaa, jälkeen 3/3 ok. `npm test` 424/424. Regressiotesti tuli seuraavassa vaiheessa (`test/whatsapp-quote-failure.test.mjs`), ei oikeaa mallia.
 - **Käyttöönotto:** botin Vercel-julkaisu (sessio E). Lisäksi kannattaa myöhemmin korjata, että tarjouksen virhe ei näytä samoja vaihtoehtoja uudelleen ilman selitystä.
 
 ## 17.11.2026 — Worker julkaistu: puhelimella kaikki sivut paitsi Keskustele (Claude Code, puhelinesto-chat)

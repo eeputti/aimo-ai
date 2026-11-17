@@ -26,6 +26,14 @@ export function quotedQuantity(line, p) {
   return q?.unit === 'PCS' && q.basis === 'items' && !itemsPerSalesUnit(p) ? { value: q.value, unit: 'PCS', basis: 'sales' } : q;
 }
 
+// Tarjouksessa kaatunut valinta ei palaa samoihin vaihtoehtoihin (puhelinkuva 17.11.: sipuli, valinta 3 → virhe → samat
+// vaihtoehdot uudelleen). Keskustelu muistaa kaatuneet tuotteet rivillä päivän ja määrän kanssa: toinen päivä tai määrä voi käydä.
+function failedIds(draft, line) {
+  const f = line.failedOptions; const q = line.quantity || {};
+  const same = f && f.deliveryDate === (draft.deliveryDate || null) && f.quantity?.value === q.value && f.quantity?.unit === q.unit && (f.quantity?.basis || 'sales') === (q.basis || 'sales');
+  return new Set(same ? (f.ids || []).map(String) : []);
+}
+
 /** Tarjous sidotaan sisältöön: sama hash vain, jos asiakas, päivä, toimituspaikka, tuotteet ja määrät ovat samat. */
 export function draftHash(customer, draft) {
   const lines = (draft.lines || []).map((l) => [l.ref, String(l.selectedProductId || ''), l.quantity?.value ?? null, l.quantity?.unit ?? null, l.quantity?.basis || 'sales']).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
@@ -200,6 +208,11 @@ export function createOrderingTools(deps = {}) {
         const has = (o) => touchesBanned(diet.excludeAllergens, product(o.id));
         fit = fit.filter((o) => !has(o));
       }
+      const failed = failedIds(draft, line);
+      if (failed.size && fit.length) {
+        fit = fit.filter((o) => !failed.has(String(o.id)));
+        if (!fit.length) { issues.push(issue('NO_ORDERABLE_PRODUCT', `Muita tilattavia vaihtoehtoja päivälle ${dayLabel(draft.deliveryDate)} ei löytynyt: ${line.productTerm}.`, { ref: line.ref, nextDeliveryDate: null })); continue; }
+      }
       let scored = scoreOptions(fit, line);
       // nextDeliveryDate: aikaisin päivä, jolle haku löytää tilattavaa, kun haku sen tietää (muuten null).
       // Valikoimassa ei ole pyydettyä tuotetta lainkaan (tuore tryffeli): sanotaan se, ei toimituspäivän ongelmaksi.
@@ -334,9 +347,9 @@ export function createOrderingTools(deps = {}) {
     const issues = []; const lines = []; const offers = []; let expires = Infinity;
     for (const need of q.needs) {
       const line = draft.lines.find((l) => l.ref === need.ref); const o = need.options[0];
-      if (!o || o.kind !== 'exact') { issues.push(issue(need.excluded?.[0]?.code || 'NOT_AVAILABLE', `Ei tilattavissa: ${line?.productTerm || need.ref}. ${need.excluded?.[0]?.message || ''}`.trim(), { ref: need.ref })); continue; }
+      if (!o || o.kind !== 'exact') { issues.push(issue(need.excluded?.[0]?.code || 'NOT_AVAILABLE', `Ei tilattavissa: ${line?.productTerm || need.ref}. ${need.excluded?.[0]?.message || ''}`.trim(), { ref: need.ref, productId: line?.selectedProductId ? String(line.selectedProductId) : null, reason: need.excluded?.[0]?.message || null })); continue; }
       // Eri toimituspäivä vaatii ostajan uuden valinnan, sitä ei hyväksytä hiljaa.
-      if (o.deliveryDate !== draft.deliveryDate) { issues.push(issue('DELIVERY_DATE_SHIFT', `${o.lines[0].name} toimitetaan vasta ${o.deliveryDate}.`, { ref: need.ref, deliveryDate: o.deliveryDate })); continue; }
+      if (o.deliveryDate !== draft.deliveryDate) { issues.push(issue('DELIVERY_DATE_SHIFT', `${o.lines[0].name} toimitetaan vasta ${o.deliveryDate}.`, { ref: need.ref, deliveryDate: o.deliveryDate, productId: String(o.lines[0].productId), reason: `toimitetaan vasta ${dayLabel(o.deliveryDate)}` })); continue; }
       const l = o.lines[0];
       lines.push({ ref: need.ref, productId: l.productId, name: l.name, salesUnits: l.quantity, salesUnitLabel: l.salesUnitLabel, covers: { value: l.covers, unit: line.quantity.unit }, unitPriceNet: l.unitPriceNet, lineNet: l.lineNet, vatRate: l.vatRate, stockKnown: l.availability.stockKnown, cutoff: o.cutoff, cutoffLabel: o.cutoffLabel,
         comparisonPrice: l.comparisonPrice ?? null, comparisonUnit: l.comparisonUnit ?? null, // Valion hintarajapinnan vertailuhinta korisivulle
