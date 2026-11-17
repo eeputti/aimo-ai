@@ -1,0 +1,442 @@
+{
+  "model": "qwen3:0.6b",
+  "total": 12,
+  "passed": 0,
+  "results": [
+    {
+      "id": "add-milk",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "invented_delivery_date",
+        "expected_operation_missing"
+      ],
+      "ms": 25992,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-17",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "20",
+            "productTerm": "maitoa",
+            "option": 20,
+            "quantity": {
+              "value": 20,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "change-milk",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "expected_operation_missing"
+      ],
+      "ms": 11831,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-20",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "L1",
+            "productTerm": "maito",
+            "option": 30,
+            "quantity": {
+              "value": 20,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "cream-dl",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "invented_delivery_date",
+        "expected_operation_missing"
+      ],
+      "ms": 14554,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-17",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "5 desii",
+            "productTerm": "5 desii",
+            "option": 5,
+            "quantity": {
+              "value": 0.5,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "butter-grams",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "invented_delivery_date",
+        "expected_operation_missing"
+      ],
+      "ms": 12395,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-17",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "250 grammaa voita /no_think",
+            "productTerm": "voita",
+            "addClaims": [],
+            "removeClaims": [],
+            "claims": [],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "remove-milk",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "expected_operation_missing"
+      ],
+      "ms": 18528,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-20",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "L1",
+            "productTerm": "maito",
+            "option": 1,
+            "quantity": {
+              "value": 20,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "milk-allergen",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "expected_operation_missing"
+      ],
+      "ms": 16917,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-20",
+        "ops": [
+          {
+            "op": "no_preference",
+            "productTerm": "maito",
+            "quantity": {
+              "value": 20,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "lactose-claim",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "expected_operation_missing"
+      ],
+      "ms": 11286,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-20",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "L1",
+            "productTerm": "maito",
+            "option": 1,
+            "quantity": {
+              "value": 20,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "missing-quantity",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "invented_delivery_date",
+        "expected_operation_missing"
+      ],
+      "ms": 13800,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-17",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "maitoa sittenkin 30",
+            "productTerm": "maitoa",
+            "quantity": {
+              "value": 30,
+              "unit": "L"
+            },
+            "addClaims": [
+              "LOW_LACTOSE",
+              "LOW_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "LOW_LACTOSE",
+              "LOW_LACTOSE"
+            ],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "no-order",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "invented_delivery_date",
+        "unrequested_operation"
+      ],
+      "ms": 13124,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "null",
+        "ops": [
+          {
+            "op": "no_preference",
+            "ref": "null",
+            "productTerm": "kiitos avusta",
+            "quantity": {
+              "value": 1,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [
+              "LOW_LACTOSE"
+            ],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": [
+              "maidoton"
+            ]
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "select-second",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "expected_operation_missing"
+      ],
+      "ms": 15268,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-20",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "L1",
+            "productTerm": "maito",
+            "option": 2,
+            "quantity": {
+              "value": 20,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "more-options",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "intent",
+        "expected_operation_missing"
+      ],
+      "ms": 11740,
+      "actual": {
+        "intent": "show",
+        "deliveryDate": "2026-11-20",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "L1",
+            "productTerm": "maito",
+            "option": 1,
+            "quantity": {
+              "value": 20,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    },
+    {
+      "id": "ambiguous-amount",
+      "round": 1,
+      "passed": false,
+      "failures": [
+        "unrequested_operation"
+      ],
+      "ms": 18869,
+      "actual": {
+        "intent": "order",
+        "deliveryDate": "2026-11-20",
+        "ops": [
+          {
+            "op": "add",
+            "ref": "L1",
+            "productTerm": "maito",
+            "option": 1,
+            "quantity": {
+              "value": 20,
+              "unit": "L"
+            },
+            "addClaims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "removeClaims": [],
+            "claims": [
+              "FREE_FROM_LACTOSE"
+            ],
+            "excludeAllergens": []
+          },
+          {
+            "op": "add",
+            "ref": "L2",
+            "productTerm": "kerma",
+            "option": 2,
+            "quantity": {
+              "value": 5,
+              "unit": "L"
+            },
+            "addClaims": [],
+            "removeClaims": [],
+            "claims": [],
+            "excludeAllergens": []
+          }
+        ],
+        "via": "model"
+      }
+    }
+  ],
+  "metadata": {
+    "date": "2026-11-17",
+    "ollamaVersion": "0.40.16",
+    "modelId": "7df6b6e09427",
+    "modelSizeMB": 522,
+    "contextTokens": 8192,
+    "thinking": false,
+    "temperature": 0,
+    "provider": "local-cpu",
+    "modelTimeoutMs": 60000,
+    "trainingPerformed": false,
+    "scope": "production interpreter only; synthetic fixed inputs; no Meta/Valio/orders",
+    "checker": "Original saved outputs reinspected without model calls: an unchanged existing date is allowed, an unrequested new date is rejected."
+  }
+}

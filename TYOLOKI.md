@@ -2,6 +2,25 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — oikeat paikalliset mallikokeet valmiit: 0/12 ja 2/12 (Codex, Danielin chatti)
+
+- Ajettu qwen3:0.6b ja qwen3:1.7b samalla 12 synteettisen tapauksen tuotantotulkin kokeella. Lopulliset tulokset 0/12 ja 2/12. Suurempi osasi määränmuutoksen ja poiston; muissa tapauksissa mm. väärä tuote, keksitty määrä/päivä tai väärä operaatio. Normaali WhatsApp-tuotanto ja Anthropic-agentti eivät muuttuneet. 8B-mallia ei ajettu eikä mitään mallia hienosäädetty.
+- Päivätarkistusta täsmennetty ja testattu: ennestään valitun päivän toistaminen kelpaa, uusi pyytämätön päivä ei. Tallennetut vastaukset tarkistettu samalla lopullisella arvioijalla; 1.7b:n alkuperäinen 3/12 muuttui 2/12:een. Ei ylimääräisiä mallikutsuja uusintatarkistuksessa. Tapausajat 0.6b 11,3–26,0 s, 1.7b 13,9–50,9 s; ei vakioitu nopeusvertailu.
+- Yhteensä 25 oikeaa paikallista mallikutsua (ensimmäinen epäonnistunut savutestiviesti + 24 tulkintaa), ei henkilökohtaisia maksullisia API-kutsuja. Ajokontti pysäytetty. Synteettiset vastaukset, ajat, virheet ja rajaukset docs/evaluations/ollama-20261117.md sekä kaksi JSON-raporttia.
+- Lopullisen arvioijan/sovittimen testit 10/10 läpi. Laaja npm test 469: 386 läpi, 0 virhettä, 83 katalogiriippuvaista ohitusta. git diff --check läpi. Koulutuspolku docs/agent-improvement.md: ensin vertailu ja hyväksytyt esimerkit, sitten tarvittaessa LoRA/QLoRA erillisellä testijoukolla; keskustelu tai selfplay ei yksin kouluta painoja.
+
+## 17.11.2026 — qwen3:0.6b:n oikea tuotantotulkinnan koe 0/12 (Codex, Danielin chatti)
+
+- Oikea Ollama-/CPU-ajo valmiiksi: 12 kiinteää suomenkielistä tapausta tuotannon tulkkiohjeella ja skeemalla. qwen3:0.6b ei läpäissyt yhtään tapausta. Väärä update/add/poisto, keksitty määrä ja maitoallergian kadottaminen olivat sisältövirheitä; HTTP-kutsut onnistuivat. Tämä ei ole tuotannon Claude-agentin tulos eikä 8B-mallin arvio.
+- Konteksti 8192, thinking pois, lämpötila 0, nykyinen tulkin 60 s aikaraja. Havaitut tapausajat 11,3–26,0 sekuntia. JSON-validaattori torjuu rakennevirheet mutta ei itsessään semanttisesti väärää tilausmuutosta. Päivän keksiminen lisättiin myös tarkistimeen; alkuperäiset vastaukset säilyvät uusintatarkistusta varten.
+- Vertailuun ladataan ja ajetaan qwen3:1.7b samoilla tapauksilla; tulosta ei vielä ole. Ei kouluteta epäonnistuneita vastauksia oikeiksi esimerkeiksi.
+
+## 17.11.2026 — ensimmäinen oikean paikallisen mallin koe löysi sisältövirheen (Codex, Danielin chatti)
+
+- Ollama 0.40.16 ja qwen3:0.6b (522 MB, tunniste 7df6b6e09427) saatu oikeasti käyntiin eristetyssä CPU-kontissa, pilvi-inferenssi pois. Normaali ajobinaari tarvitsi kirjoitettavan kotihakemiston, joten käytettiin omaa konttia muuttamatta kehittäjän HOME-asetusta. Julkaisupaketista purettiin vain CPU-ajon tarvitsemat osat.
+- Oikean mallin savutesti epäonnistui jo ensimmäisessä kohdassa: "20 litraa laktoositonta maitoa" → product="laktoseFree", litres=20, lactoseFree=true. Syntaksi ja tyypit oikein, tuotteen semantiikka väärin. Pientä mallia ei tämän perusteella pidetä tuotantokelpoisena. 12 tapauksen tuotantotulkinnan arviointi käynnissä; savutestin muita kahta tapausta ei ajettu fail-fast-keskeytyksen jälkeen.
+- Ei Metaa, Valion rajapintaa, asiakkaiden kantoja, tilauksia tai maksullisia tekoälyrajapintoja. Oikean 8B-mallin laadusta ei vielä näyttöä.
+
 ## 17.11.2026 — korjaus ja 12 tulkintatapauksen arvioija varmennettu (Codex, Danielin chatti)
 
 - Skeemavalidoinnin korjauksen jälkeen uudet sovitin-/arviointitestit 10/10 läpi. Laaja npm test: 469 yhteensä, 386 läpi, 0 virhettä, 83 katalogiriippuvaista ohitusta. Uusi ajuri scripts/ollama-eval.mjs käyttää tuotannon createModelInterpreter-ohjetta, kiinteitä synteettisiä odotuksia ja estää sääntövarapolun laskemisen mallin onnistumiseksi.

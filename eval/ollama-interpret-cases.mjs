@@ -19,10 +19,12 @@ export const CASES = [
 export function inspect(caseInfo, result) {
   const want = caseInfo.expected; const ops = result?.ops;
   if (result?.via !== 'model' || !Array.isArray(ops)) return ['model_result_missing'];
-  if (want.empty) return ops.length ? ['unrequested_operation'] : [];
-  const failures = [];
+  // Echoing the existing date changes nothing; a new date needs an explicit request.
+  const failures = result.deliveryDate != null && result.deliveryDate !== caseInfo.draft.deliveryDate ? ['invented_delivery_date'] : [];
+  if (want.empty) return [...failures, ...(ops.length ? ['unrequested_operation'] : [])];
+  if (result.intent !== 'order') failures.push('intent');
   const found = ops.find((o) => o.op === want.op && (!want.ref || o.ref === want.ref) && (!want.productTerm || o.productTerm === want.productTerm));
-  if (!found) return ['expected_operation_missing'];
+  if (!found) return [...failures, 'expected_operation_missing'];
   if (want.value != null && (found.quantity?.value !== want.value || found.quantity?.unit !== want.unit)) failures.push('quantity');
   if (want.noQuantity && found.quantity != null) failures.push('invented_quantity');
   if (want.option && found.option !== want.option) failures.push('option');

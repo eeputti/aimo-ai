@@ -35,3 +35,5 @@ Ajuri tekee 12 tulkintakoetta per toisto tuotannon `createModelInterpreter`-ohje
 Projektissa on jo laajempi `whatsapp-selfplay-batch.mjs`-arviointi. Sen nykyinen käynnistys edellyttää Anthropic-avainta ja osa asetuksista/kustannusarvioista on Anthropic-kohtaisia, joten sitä ei tässä väitetä avaimettomaksi Ollama-koulutusputkeksi.
 
 Painojen koulutusta, asiakkaiden keskustelujen keräämistä tai automaattista mallin vaihtoa ei ole tässä aloitettu.
+
+Kokeiden toteutuneet tulokset ja rajaukset: [paikallisten mallien arviointi](evaluations/ollama-20261117.md). Näitä virheellisiä vastauksia ei käytetä hyväksyttyinä koulutusesimerkkeinä.

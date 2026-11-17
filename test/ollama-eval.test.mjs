@@ -4,8 +4,10 @@ import { CASES, inspect } from '../eval/ollama-interpret-cases.mjs';
 import { evaluate } from '../scripts/ollama-eval.mjs';
 test('interpreter checker rejects wrong amounts, lost restrictions and extra operations', () => {
   const change = CASES.find((c) => c.id === 'change-milk');
-  const good = { via: 'model', ops: [{ op: 'update', ref: 'L1', quantity: { value: 30, unit: 'L' } }] };
+  const good = { via: 'model', intent: 'order', ops: [{ op: 'update', ref: 'L1', quantity: { value: 30, unit: 'L' } }] };
   assert.deepEqual(inspect(change, good), []);
+  assert.deepEqual(inspect(change, { ...good, deliveryDate: change.draft.deliveryDate }), []);
+  assert.ok(inspect(change, { ...good, deliveryDate: '2026-11-17' }).includes('invented_delivery_date'));
   assert.ok(inspect(change, { ...good, via: 'rules-fallback' }).length);
   assert.ok(inspect(change, { ...good, ops: [{ ...good.ops[0], quantity: { value: 50, unit: 'L' } }] }).includes('quantity'));
   assert.ok(inspect(change, { ...good, ops: [{ ...good.ops[0], removeClaims: ['FREE_FROM_LACTOSE'] }] }).includes('constraint_removed'));

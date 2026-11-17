@@ -67,7 +67,7 @@ Tuotannon vaihtoa ei tehdä ennen näitä tuloksia. Säilytä nykyiset asiakasli
 
 Lähteet: [Ollama chat](https://docs.ollama.com/api/chat), [JSON-skeemaiset vastaukset](https://docs.ollama.com/capabilities/structured-outputs), [Docker](https://docs.ollama.com/docker).
 
-## Tämän toteutuskerran tarkistukset (17.11.2026)
+## Alkuperäisen sovittimen toteutusvaiheen tarkistukset (17.11.2026)
 
 - Kohdistetut sovitin-, välimuisti- ja käynnistystestit 18/18 läpi. Sovittimen oikea HTTP-koe käyttää simuloitua mallipalvelinta.
 - Koko `npm test`: 464 testiä, 381 läpi, 0 epäonnistunutta, 83 ohitettu puuttuvan paikallisen katalogin vuoksi. Aluksi puuttunut @libsql/client saatiin asentamalla lukitut riippuvuudet erillisellä npm-välimuistilla; sovelluskoodia ei muutettu tämän vuoksi.
@@ -76,3 +76,5 @@ Lähteet: [Ollama chat](https://docs.ollama.com/api/chat), [JSON-skeemaiset vast
 - Ollama-painoja ei ladattu eikä oikean mallin savutestiä ajettu. Mallin laatu, resurssitarve ja todellinen WhatsApp-koe ovat avoinna. Tuotannon julkaisu ja palvelimen hankinta eivät sisälly tähän muutokseen.
 
 Lisätestit ja hienosäädön etenemistapa: [agent-improvement.md](agent-improvement.md). Oma 12 tapauksen tulkintakoe: `node scripts/ollama-eval.mjs`, kun Ollama-asetukset ovat ympäristössä.
+
+Myöhemmin samana päivänä ajettiin myös oikeat paikalliset mallit. Tulokset: [ollama-20261117.md](evaluations/ollama-20261117.md). Edellä kuvatut alkuperäisen vaiheen rajoitukset eivät ole näiden uusien kokeiden tuloksia.
