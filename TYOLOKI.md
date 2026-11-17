@@ -2,6 +2,11 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — ääniviesti toimii oikealla puhelimella pilvessä (Claude Code, sessio H)
+
+- **Käyttäjän varmennus:** Eelis lähetti ääniviestin omalla puhelimellaan Vercelissä pyörivälle botille: "kokeilen ääniviestiä puhelimella ja toimi hyvin". Ketju Meta → media-API → Groq-litterointi → tilauskeskustelu toimii siis oikeasti, ei vain simuloituna. Tarkkaa julkaisuversiota ei kirjattu: tuotannossa oli tuolloin jonkin muun session klo 9.15 julkaisu, ja ääniviestit ovat mukana 1c49398:sta lähtien.
+- **Ei vielä kokeiltu puhelimella:** kuva ostoslistasta ja "sama ku viimeks". Ei koodimuutoksia, ei testejä.
+
 ## 17.11.2026 aamu — landing-ilmoittautuminen poistettu myös botista (Claude Code, pääsessio)
 
 - **Käyttäjän pyyntö:** "poista ilmoittautuminen myös botista". Sivuston ilmoittautuminen ja tickin linkitys oli jo poistettu (2c1bfec, D1:n rivit 75f6121).
