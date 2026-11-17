@@ -2,6 +2,22 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — korisivulle "Tarkista nämä ensin": huomiot kuitataan ennen SIIRRY MAKSAMAAN -vaihetta (Claude Code, Mankeli-vertailu)
+
+- **Käyttäjän pyyntö:** Eelis pyysi katsomaan mallia Mankelin S.I.MO:sta (toisen tiimin vastaus samaan Valio-haasteeseen, github.com/Mankeli-Software/junction-2026) ja hyväksyi ensimmäiseksi lainaukseksi sen vahvistussivun "Check these first" -osion ("Kyllä, tee huomiot"). Repossa ei ole lisenssiä, joten koodia ei kopioitu, vain idea.
+- **Muutos:** uusi `server/cart-notes.mjs` laskee huomiot ilman mallia samasta tarkistetusta tarjouksesta, Valion tuotetiedoista ja ostajan omista gateway-tilauksista:
+  - *Sama tuote on jo tilattu:* sama tuote vahvistetussa tai hyväksyntää odottavassa tilauksessa samalle toimituspäivälle (kiertävällä demokellolla vain saman kierroksen tilaukset; tämän luonnoksen oma tilaus ja hylätyt eivät lasketa).
+  - *Tavallista enemmän / vähemmän:* myyntierät yli 2-kertaiset tai alle puolet saman tuotteen mediaanista vähintään kahdessa vahvistetussa tilauksessa. Portin vahti vie hyväksyntään vasta 3-kertaisesta, kuten ennen.
+  - *Pyöristetty ylöspäin:* toimitettava määrä yli 10 % pyydettyä suurempi (ei pakkauksina pyydetyille).
+  - *Merkintä puuttuu:* pyydetty merkintä (esim. laktoositon) puuttuu valitun tuotteen Valion tiedoista.
+  - Koko tilausta koskevat yhtenä huomiona: *Saldoa ei vahvistettu* (rajapinta ei kerro saldoa) ja *Hinta ei ole ajantasainen* (viimeisin tunnettu hinta, hakuaika näkyy). Tätä varten `order-tools`-tarjouksen rivi kertoo nyt `priceCurrent` ja `priceFetchedAt`.
+  - Allergeenihuomiota ei tarvittu: puuttuva tai "voi sisältää" -tieto pysäyttää tarjouksen jo nyt (ALLERGEN_CONFLICT).
+- **Korisivu (`public/whatsapp-storefront-cart.*`):** tuotekohtainen huomio keltaisena rivinä tuotteen alla, yhteiset huomiot ja laskuri ("0/3 kuitattu") korin yläpuolella. Jokaisella on Selvä-painike; kuitattu muuttuu vihreäksi. SIIRRY MAKSAMAAN pysyy harmaana ja sen alla lukee "Kuittaa 2 huomiota ennen maksamista." Kuittaukset säilyvät välilehden istunnossa. Huomion avain sisältää määrän, joten muuttunut huomio pitää kuitata uudelleen.
+- **Palvelimen lukko (`cart-link.mjs`):** vahvistuspyyntö lähettää kuitatut avaimet, ja palvelin hylkää vahvistuksen (400), jos jokin samassa viennissä näkyvä huomio on kuittaamatta. Jos vienti epäonnistuu tai kori ei ole valmis (esim. kadonneen vastauksen uusinta jo suljetulle korille), tarkistus väistyy ja tilausmoottori päättää kuten ennen. Tarkistus tehdään rajojen laskemisen jälkeen, joten se ei ohita minuuttirajaa.
+- **Tarkistukset:** uusi `test/cart-notes.test.mjs` 5/5 (säännöt ja avaimet, lukko HTTP:n yli, sivun piirto ja escapointi VM:ssä), korisivun päästä päähän -testi lähettää kuittaukset. Koko `npm test` 418/418 origin/mainin 23508c8 päällä. Selaimessa eristetty paikallinen palvelin (omat kannat, simuloidut hinnat, ei Metaa eikä Valiota): kaksi 4 litran maitotilausta ja kolmas kori (40 l maitoa, 7 kg perunaa, 30 kpl samaa maitoa) toi kolme huomiota (pyöristys 7 → 10 kg, tuplatilaus, 30 kpl vs. tavallisesti 4). Vahvistus ilman kuittausta 400, kuittausten jälkeen painike aukesi. 800 ja 375 px ilman vaakaylivuotoa tai konsolivirheitä. Selaimesta ei lähetetty vahvistusta, koska paikallinen alkuperä ei vastaa korilinkin HTTPS-alkuperää; vahvistus kuittauksineen ajettiin HTTP:llä.
+- **Käyttöönotto kesken:** korisivu ja lukko tulevat käyttöön botin seuraavassa Vercel-julkaisussa (sessio E). Worker välittää korisivun botilta, joten Worker-julkaisua ei tarvita.
+- **Seuraavaksi (Mankeli-vertailusta, ei aloitettu):** tavallinen tilaus ("se tavallinen" ostajan historiasta) ja tervehdys yrityksen nimellä. Kuvat ja ääniviestit ovat WhatsAppissa jo tuettuja (`media.mjs`, `transcribe.mjs`), joten niitä ei tarvitse lainata.
+
 ## 17.11.2026 aamu — botin ja Workerin julkaisut keskitetty sessiolle E, kirjoittaa-pisteet toimivat pilvessä (Claude Code, sessio E)
 
 - **Käyttäjän päätökset:** Eelis päätti, että kaikki botin (Vercel) ja Worker-sivuston julkaisut, D1-migraatiot ja Vercelin asetukset tekee vain sessio E (taulu #319), ja käski julkaista heti ("don't wait, deploy now"). Hän hyväksyi kirjoittaa-ilmaisinkorjauksen (2de0839) ja päivänvaihtokorjauksen (53a7189) julkaisun.

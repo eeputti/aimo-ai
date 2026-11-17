@@ -1,6 +1,7 @@
 // Valmis kokoonpano kytkentää varten (henkilö 1): luonnoskanta, tuotetyökalut ja tulkki oletusriippuvuuksilla.
 // Kielimalli on käytössä, kun ANTHROPIC_API_KEY on asetettu; muuten viestit tulkitaan säännöillä.
 import { storefrontCartProjection } from '../storefront-whatsapp-sync.mjs';
+import { cartNotes } from '../cart-notes.mjs';
 import { shoppingListView } from '../shopping-list/index.mjs';
 import { openDraftStore } from './store.mjs';
 import { createOrderingConversation, lastConfirmedOrder } from './index.mjs';
@@ -44,6 +45,13 @@ export async function createConfiguredOrdering({ draftDb = ':memory:', quoteDb =
   };
   const handleTurn = createOrderingConversation({ store, tools, interpretTurn, now: time, lastOrder });
   const cachedExport = createExportCache({ now: time });
+  // Korisivun huomiot samasta tarjouksesta, Valion tuotetiedoista ja ostajan omista gateway-tilauksista (ei mallia).
+  const notesFor = async (list, quote, customer) => {
+    if (quote.issues?.length) return [];
+    const [{ orders }, { loadCatalog }] = await Promise.all([import('../gateway/store.mjs'), import('../catalog.mjs')]);
+    const cat = loadCatalog();
+    return cartNotes({ list, quote, orders: orders.list(customer.buyerId, 50), product: (id) => cat.get(String(id)), cycle: clock.looping ? clock.cycle() : null });
+  };
   return { handleTurn,
     async getStorefrontCart({ conversationId, customer }) {
       const draft = store.active(conversationId); const list = shoppingListView(draft, customer);
@@ -51,7 +59,7 @@ export async function createConfiguredOrdering({ draftDb = ':memory:', quoteDb =
       if (list.status !== 'review') return storefrontCartProjection(list, null);
       return cachedExport(`${customer.customerId}:${customer.bindingVersion}:${list.id}:${list.revision}`, async () => {
         const quote = await tools.quote({ customer, draft });
-        return { value: storefrontCartProjection(list, quote), expiresAt: Date.parse(quote.expiresAt) };
+        return { value: storefrontCartProjection(list, quote, await notesFor(list, quote, customer)), expiresAt: Date.parse(quote.expiresAt) };
       });
     },
     getShoppingList({ conversationId, customer }) { return shoppingListView(store.active(conversationId), customer); },

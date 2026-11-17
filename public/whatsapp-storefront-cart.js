@@ -5,8 +5,23 @@ const token = location.hash.slice(1);
 // Sama avain kuin aiemmalla korisivulla: kesken jäänyt pyyntö säilyy myös sivun vaihtuessa.
 const storageKey = `aimo.whatsapp-cart.pending.${token.slice(-24)}`;
 const doneKey = `aimo.whatsapp-cart.done.${token.slice(-24)}`;
+// "Tarkista nämä ensin": kuitatut huomiot (palvelimen antamat avaimet). Avain sisältää määrän ja tuotteen, joten muuttunut
+// huomio pitää kuitata uudelleen, mutta ennallaan pysyvä säilyy kuitattuna, vaikka kori päivittyisi.
+const ackKey = `aimo.whatsapp-cart.ack.${token.slice(-24)}`;
 let list = null; let priced = null; let busy = false; let pending = null; let done = null; let rows = [];
+let acked = new Set();
 try { pending = JSON.parse(sessionStorage.getItem(storageKey)); } catch { /* read-only browsing still works */ }
+try { acked = new Set(JSON.parse(sessionStorage.getItem(ackKey)) || []); } catch { acked = new Set(); }
+const notes = () => (priced?.state === 'ready' && Array.isArray(priced.notes) ? priced.notes : []);
+const openNotes = () => notes().filter((n) => !acked.has(n.key));
+// Vahvistukseen lähtevät vain nykyisen korin kuitatut huomiot (palvelin hyväksyy enintään 50).
+const ackedNow = () => notes().map((n) => n.key).filter((k) => acked.has(k));
+function acknowledge(key) {
+  if (!notes().some((n) => n.key === key)) return;
+  acked.add(key);
+  try { sessionStorage.setItem(ackKey, JSON.stringify([...acked].slice(-50))); } catch { /* kuittaus pysyy tämän sivun ajan */ }
+  render();
+}
 
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 // Luvut ja päivät päätyvät innerHTML:ään: muunnetaan aina luvuksi tai escapoidaan, vaikka palvelin ne jo tarkistaa.
@@ -40,7 +55,9 @@ async function prices(value) {
   if (priced?.key === key) return priced;
   try {
     const data = await request('/export');
-    if (data.state === 'ready' && data.id === value.id && data.revision === value.revision && Array.isArray(data.lines)) return { key, state: 'ready', lines: data.lines };
+    if (data.state === 'ready' && data.id === value.id && data.revision === value.revision && Array.isArray(data.lines)) {
+      return { key, state: 'ready', lines: data.lines, notes: Array.isArray(data.notes) ? data.notes.filter((n) => n && typeof n.key === 'string') : [] };
+    }
     return { key, state: data.state === 'waiting' ? 'waiting' : 'none', message: data.message };
   } catch { return { key, state: 'none' }; } // Rivit näkyvät ilman hintoja, jos tarkistus ei onnistu.
 }
@@ -58,16 +75,24 @@ function lines() {
     qty: l.quantity?.value ?? null, unit: l.quantity ? unitLabel(l.quantity) : '', price: null, net: null, note: diet(l),
     needsProduct: !l.selectedProductId, needsQty: !l.quantity }));
 }
+// Yksi huomio keltaisena rivinä: kuittaamaton saa Selvä-painikkeen, kuitattu näkyy vihreänä merkkinä.
+function check(n) {
+  const ok = acked.has(n.key);
+  return `<div class="wa-check${ok ? ' is-ok' : ''}" data-kind="${esc(n.kind)}">${ok ? '<span class="wa-tick" aria-hidden="true"></span>' : icon('warning')}<p><strong>${esc(n.title)}</strong> ${esc(n.text)}</p>${ok
+    ? '<span class="wa-check-ok">Kuitattu</span>'
+    : `<button type="button" class="wa-ack" data-ack="${esc(n.key)}" aria-label="Selvä: ${esc(n.title)}">Selvä</button>`}</div>`;
+}
 function picture(p) {
   return `<div class="cart-picture${p.id ? '' : ' wa-noimg'}">${p.id ? `<img src="/whatsapp/cart/img/${encodeURIComponent(p.id)}" alt="" loading="lazy">` : ''}</div>`;
 }
 function row(p) {
   const qty = p.qty == null ? '<span class="wa-qty-missing">Määrä?</span>' : `<span class="wa-qty-value">${esc(num(p.qty))}</span><span class="wa-unit">${esc(p.unit)}</span>`;
   const gross = p.net == null || p.taxUnknown ? null : round(p.net * (1 + p.vat / 100));
-  const notes = [];
-  if (p.needsProduct) notes.push(`Valitse tarkka tuote: ${esc(p.term)}`);
-  if (p.needsQty) notes.push(`Kerro määrä: ${esc(p.term)}`);
-  return `<tbody data-term="${esc(p.term)}">
+  const problems = [];
+  if (p.needsProduct) problems.push(`Valitse tarkka tuote: ${esc(p.term)}`);
+  if (p.needsQty) problems.push(`Kerro määrä: ${esc(p.term)}`);
+  const checks = p.id ? notes().filter((n) => n.productId != null && String(n.productId) === String(p.id)) : [];
+  return `<tbody data-term="${esc(p.term)}"${checks.some((n) => !acked.has(n.key)) ? ' class="wa-flagged"' : ''}>
     <tr>
       <td><div class="cart-product">${picture(p)}<div><span class="cart-product-name">${esc(p.name)}</span><span class="cart-product-code">${p.id ? esc(p.id) : 'Tuote valitaan'}${p.note ? `<span class="wa-diet">${esc(p.note)}</span>` : ''}</span></div></div></td>
       <td><div class="cart-unit-price"><span class="cart-price"><strong>${money(p.price)}</strong>${p.price == null ? '' : ` / ${esc(p.unit)}`}</span></div></td>
@@ -77,7 +102,8 @@ function row(p) {
       <td class="cart-line-total"><strong>${p.net == null ? '–' : money(p.net)}</strong>${p.net == null ? '' : gross == null ? '<small>Alv tarkistetaan</small>' : `<small>${money(gross)} (alv ${esc(num(p.vat))} %)</small>`}</td>
       <td><button type="button" class="cart-remove" data-prefill="poista ${esc(p.term)}" aria-label="Poista tuote ostoskorista: ${esc(p.name)}">${icon('trash')}</button></td>
     </tr>
-    ${notes.length ? `<tr class="cart-problem wa-note"><td colspan="7"><div class="cart-move-line">${icon('warning')}${notes.join('. ')}. <button type="button" data-prefill="${esc(p.term)} ">Täydennä</button></div></td></tr>` : ''}
+    ${problems.length ? `<tr class="cart-problem wa-note"><td colspan="7"><div class="cart-move-line">${icon('warning')}${problems.join('. ')}. <button type="button" data-prefill="${esc(p.term)} ">Täydennä</button></div></td></tr>` : ''}
+    ${checks.length ? `<tr class="wa-check-row"><td colspan="7">${checks.map(check).join('')}</td></tr>` : ''}
   </tbody>`;
 }
 function totals() {
@@ -90,10 +116,14 @@ function totals() {
 }
 function controls() {
   const locked = busy || !list || !!pending || !!done;
-  for (const el of document.querySelectorAll('#wa-edit-form input, #wa-edit-form button, [data-prefill]')) el.disabled = locked;
+  for (const el of document.querySelectorAll('#wa-edit-form input, #wa-edit-form button, [data-prefill], [data-ack]')) el.disabled = locked;
   // SIIRRY MAKSAMAAN vain valmiille korille (päivä, tuotteet ja määrät kunnossa); puutteet näkyvät keltaisessa huomiossa.
-  $('wa-review').disabled = locked || list.status !== 'review';
+  // Lisäksi jokainen "Tarkista nämä ensin" -huomio pitää kuitata (palvelin tarkistaa saman vahvistuksessa).
+  const open = list && !done ? openNotes().length : 0;
+  $('wa-review').disabled = locked || list.status !== 'review' || open > 0;
   $('wa-review').hidden = !!done;
+  $('wa-review-hint').hidden = !open;
+  $('wa-review-hint').textContent = open ? `Kuittaa ${open === 1 ? '1 huomio' : `${open} huomiota`} ennen maksamista.` : '';
   $('wa-retry').hidden = !pending; $('wa-retry').disabled = busy;
 }
 function render() {
@@ -102,7 +132,7 @@ function render() {
     $('wa-days').replaceChildren(); $('wa-selected-day').textContent = '';
     for (const id of ['wa-company', 'wa-site', 'wa-diet']) $(id).textContent = '–';
     $('wa-head-count').textContent = '0'; $('wa-head-total').textContent = '0,00 €'; $('wa-head-date-label').textContent = '–';
-    $('wa-totals').replaceChildren();
+    $('wa-totals').replaceChildren(); $('wa-checks').hidden = true;
     controls(); return;
   }
   rows = lines();
@@ -121,6 +151,14 @@ function render() {
   $('wa-lines').innerHTML = rows.length
     ? `<table class="cart-table" aria-label="Ostoskorin tuotteet"><colgroup>${'<col>'.repeat(7)}</colgroup><thead><tr><th scope="col">Tuote</th><th scope="col">Yksikköhinta<span>(alv 0 %)</span></th><th scope="col">Vertailuhinta<span>(alv 0 %)</span></th><th scope="col">Määrä</th><th scope="col">Sis.</th><th scope="col">Hinta yhteensä<span>(alv 0 % / sis. alv)</span></th><th scope="col"><span class="sr-only">Poista</span></th></tr></thead>${rows.map(row).join('')}</table>`
     : '<div class="cart-empty"><p>Ostoskori on tyhjä. Kirjoita tuotteet yllä olevaan kenttään tai WhatsAppiin.</p></div>';
+  // Koko tilausta koskevat huomiot (esim. saldo) korin yläpuolella; tuotekohtaiset näkyvät oman rivinsä alla.
+  const all = done ? [] : notes(); const general = all.filter((n) => n.productId == null);
+  const left = all.filter((n) => !acked.has(n.key)).length;
+  $('wa-checks').hidden = !all.length;
+  $('wa-checks-count').textContent = all.length ? (left ? `${all.length - left}/${all.length} kuitattu` : 'Kaikki kuitattu') : '';
+  $('wa-checks').classList?.toggle('is-done', all.length > 0 && !left);
+  const onRows = all.length - general.length;
+  $('wa-checks-list').innerHTML = `${general.map(check).join('')}${onRows ? `<p class="wa-checks-rows">${onRows === 1 ? '1 huomio on' : `${onRows} huomiota on`} tuoterivien alla.</p>` : ''}`;
   const missing = [];
   if (!date) missing.push('toimituspäivä');
   if (rows.some((p) => p.needsProduct)) missing.push('tarkka tuotevalinta');
@@ -148,15 +186,16 @@ const formatted = (text) => esc(text).replace(/\*([^*\n]+)\*/g, '<strong>$1</str
 async function send(text, review = false, confirm = false, pay = false) {
   if (busy || done || (!list && !pending)) return null;
   if (!pending) {
-    pending = { text, messageId: crypto.randomUUID(), expectedList: { id: list.id, revision: list.revision }, review, ...(confirm ? { confirm: true } : {}), ...(pay ? { pay: true } : {}) };
+    pending = { text, messageId: crypto.randomUUID(), expectedList: { id: list.id, revision: list.revision }, review, ...(confirm ? { confirm: true, acknowledged: ackedNow() } : {}), ...(pay ? { pay: true } : {}) };
     try { sessionStorage.setItem(storageKey, JSON.stringify(pending)); }
     catch { pending = null; tell('Salli selaimen istuntotallennus ennen tilauksen muuttamista tai vahvistamista.'); return null; }
   }
   busy = true; controls(); tell(pending.pay ? 'Tehdään tilausta…' : 'Päivitetään ostoskoria…');
+  const wasConfirm = pending.confirm === true;
   try {
     const paying = pending.pay === true;
-    const { text: message, messageId, expectedList, confirm: confirmed } = pending;
-    const data = await request('/chat', { text: message, messageId, expectedList, ...(confirmed ? { confirm: true } : {}) });
+    const { text: message, messageId, expectedList, confirm: confirmed, acknowledged } = pending;
+    const data = await request('/chat', { text: message, messageId, expectedList, ...(confirmed ? { confirm: true, acknowledged: acknowledged || ackedNow() } : {}) });
     pending = null; sessionStorage.removeItem(storageKey);
     if (['confirmed', 'pending_approval'].includes(data.status)) {
       done = { status: data.status, text: data.text || '', ...(data.checkout ? { checkout: data.checkout } : {}), orderId: data.orderId };
@@ -177,6 +216,8 @@ async function send(text, review = false, confirm = false, pay = false) {
         try { await load(); error.message = 'Ostoskori muuttui WhatsAppissa ja on nyt päivitetty. Tarkista ostoskori ja paina SIIRRY MAKSAMAAN uudelleen.'; }
         catch { list = null; render(); }
       } else if ([403, 410].includes(error.status)) { list = null; render(); showProblem(error.message); }
+      // Hylätty vahvistus (esim. uusi kuittaamaton huomio): haetaan kori ja huomiot uudelleen näkyviin.
+      else if (error.status === 400 && wasConfirm) { try { await load({ keepReview: true }); } catch { /* viesti näytetään joka tapauksessa */ } }
     }
     tell(error.message);
     return null;
@@ -190,6 +231,8 @@ async function pay() {
   if (pending?.pay && pending.confirm) { await send('TILAA', false, true, true); return; }
   const review = await send('näytä', true, false, true);
   if (review?.status !== 'ready' || done) return;
+  // Yhteenveto voi tuoda uuden huomion (esim. hinta muuttui): sitä ei kuitata ostajan puolesta.
+  if (openNotes().length) { tell('Tilausta ei tehty. Kuittaa ensin huomiot kohdassa Tarkista nämä ensin.'); $('wa-checks').scrollIntoView({ block: 'start', behavior: 'smooth' }); return; }
   if (list?.status === 'review') await send('TILAA', false, true, true);
   else showReply(review, true);
 }
@@ -224,6 +267,7 @@ function prefill(text) {
 document.addEventListener('click', (ev) => {
   const b = ev.target.closest('button'); if (!b) return;
   if (b.dataset.prefill != null) { prefill(b.dataset.prefill); return; }
+  if (b.dataset.ack != null) { if (!busy && !pending) acknowledge(b.dataset.ack); return; }
   if (b.dataset.action === 'print') window.print();
   if (b.dataset.action === 'reload' && !busy && !pending) load({ keepReview: true }).then(() => tell('Ostoskori on ajan tasalla.')).catch((e) => tell(e.message));
 });

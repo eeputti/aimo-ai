@@ -181,10 +181,13 @@ test('the WhatsApp cart link opens the storefront cart through the tunnel, price
     assert.ok(line.comparison?.value > 0 && ['L', 'KG'].includes(line.comparison.unit), JSON.stringify(line));
   }
   assert.doesNotMatch(JSON.stringify(exported), /358000000001|binding|Bearer/);
+  // "Tarkista nämä ensin" -huomiot tulevat samassa viennissä; vahvistus lähettää niiden kuittaukset (cart-notes.test.mjs).
+  assert.ok(Array.isArray(exported.notes));
+  const acknowledged = exported.notes.map((n) => n.key);
 
   const chat = async (text, expectedList, messageId = crypto.randomUUID()) => {
     const res = await fetch(`${base}/whatsapp/cart/api/chat`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ text, messageId, expectedList, ...(text === 'TILAA' ? { confirm: true } : {}) }) });
+      body: JSON.stringify({ text, messageId, expectedList, ...(text === 'TILAA' ? { confirm: true, acknowledged } : {}) }) });
     return { status: res.status, data: await res.json(), messageId };
   };
   const review = await chat('näytä', { id: shoppingList.id, revision: shoppingList.revision });

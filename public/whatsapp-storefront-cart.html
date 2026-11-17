@@ -61,11 +61,18 @@
       </form>
       <div id="wa-alert" class="cart-alert wa-alert" role="status" hidden><span class="icon i-warning" aria-hidden="true"></span><p id="wa-alert-text"></p></div>
       <div class="cart-columns">
-        <div id="wa-lines"><div class="cart-empty"><p>Ostoskoria ladataan…</p></div></div>
+        <div class="wa-lines-col">
+          <section id="wa-checks" class="wa-checks" aria-labelledby="wa-checks-title" hidden>
+            <div class="wa-checks-head"><span class="icon i-warning" aria-hidden="true"></span><h3 id="wa-checks-title">Tarkista nämä ensin</h3><span id="wa-checks-count" class="wa-checks-count"></span></div>
+            <div id="wa-checks-list"></div>
+          </section>
+          <div id="wa-lines"><div class="cart-empty"><p>Ostoskoria ladataan…</p></div></div>
+        </div>
         <aside class="cart-summary" id="wa-summary" aria-labelledby="cart-summary-title">
           <h3 id="cart-summary-title">Yhteenveto</h3>
           <dl id="wa-totals"></dl>
           <button type="button" class="cart-checkout" id="wa-review" disabled>SIIRRY MAKSAMAAN</button>
+          <p id="wa-review-hint" class="wa-review-hint" hidden></p>
           <section id="wa-review-panel" class="wa-review" aria-label="Apurin vastaus" hidden>
             <h4>Apurin vastaus</h4>
             <div id="wa-reply" class="wa-reply" aria-live="polite"></div>
