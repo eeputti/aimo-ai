@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — reseptimäärien arvio ja jäätelön korvaajat tuotantoon: botti 1c0f200 (Claude Code, sessio E)
+
+- **Käyttäjän lupa:** kaksi sessiota pyysi samaa julkaisua Eeliksen nimissä; Eelis vahvisti tässä sessiossa ("Kyllä, julkaise").
+- **Julkaisu:** botti mainista 1c0f200, deployment aimo-whatsapp-cf6qxfp19. Mukana e1b0f8f (reseptilinkin puuttuva määrä arvioidaan annosta kohti ja syy kerrotaan, `link-advice.mjs`) ja 162dad1 (valmiin tuotteen kuten jäätelön tilalle ei tarjota raaka-ainetta, `nearby.mjs`, `storefront.mjs`).
+- **Tarkistukset:** `npm test` 455/455, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54, tuoteajo 611 vaihtoehtoa ilman tarjouksen kaatumista. Julkaisun jälkeen healthz `host: cloud`, webhookin vahvistus 200, tick 200. Worker ennallaan (32cc6312).
+
 ## 17.11.2026 — tuotekysymysten jatkoviestit tuotantoon: botti b8035bc (Claude Code, sessio E)
 
 - **Käyttäjän lupa:** sessio A pyysi, Eelis vahvisti tässä sessiossa ("Kyllä, julkaise"). 04ddcdd:n erillinen julkaisupyyntö kuitattiin jo hoidetuksi (7079c24).
