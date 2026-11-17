@@ -2,6 +2,17 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — botti tuotantoon mainista 16ddf16: vastaus listaa muuttamattomaan viestiin ja ääniviestien ääkköset (Claude Code, sessio E)
+
+- **Käyttäjän lupa:** pääsessio pyysi julkaisua Eeliksen luvalla ("Kyllä, julkaise"), ja Eelis vahvisti sen myös tässä sessiossa.
+- **Julkaisu:** botti mainista 16ddf16, deployment aimo-whatsapp-3ewo907q8, tuotannossa klo 21.35. Mukana:
+  - 6e418ab: ääniviestien ääkköset (sanastokehote ääkkösineen, NFC, kehotteen toiston hylkäys), `transcribe.mjs`.
+  - 16ddf16: listaa muuttamattomaan viestiin vastataan eikä samaa listaa toisteta (`unchanged-reply.mjs`, `dialogue.mjs`).
+  - 16ddf16: "ei laktoosittomia" ei muutu laktoosittomaksi (`interpret.mjs`).
+  - 16ddf16: luontevammat kuittaukset (`cart-presentation.mjs`) ja saman päivän tilattavattomat rivit yhteen lauseeseen (`order-conversation/index.mjs`).
+- **Huomio:** uusi mallikutsu `whatsapp_unchanged_reply` (syvä taso) tehdään vain, kun viesti ei muuta listaa. Jos dialogimallin vastaus ilmoittaa valinnan ("Valitsen vaihtoehdon 3"), koodi tekee valinnan koriin. Tilausta se ei tee. Eelikselle kerrottiin tästä ennen julkaisua.
+- **Tarkistukset:** ennen julkaisua `npm test` 489/489, Worker 58/58, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54 ja tuoteajo 611 vaihtoehtoa ilman tarjouksen kaatumista. Julkaisun jälkeen healthz `host: cloud`, webhookin vahvistus 200 ja tick 200 (12 tilausta), ja tuotantoalias osoittaa uuteen julkaisuun. Worker ennallaan (32cc6312). Asetuksiin ei muutoksia, ja malli on ennallaan.
+
 ## 17.11.2026 — hankalat asiakkaat oikeassa WhatsAppissa ja ääniviestien ääkköset (Claude Code, pääsessio)
 
 - **Käyttäjän pyyntö:** Eelis pyysi testaamaan botin rajoja omasta WhatsAppistaan noin 45 minuuttia ("koita saada se solmuun"), kaikki keskustelut WhatsAppissa, ja korjaamaan ääniviestien ääkköset. Lisätoiveet: vastaukset innostuneen ihmisen tapaan ("äh, tätä ei löydy valikoimasta, kelpaisiko tällainen?") ja suosituimpien tuotteiden ehdottaminen.
