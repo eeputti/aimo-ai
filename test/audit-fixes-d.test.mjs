@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openWhatsAppStore, codeHash, landingCode, PROCESSING_LEASE_MS } from '../server/whatsapp/store.mjs';
-import { createWhatsAppChannel, SIGNUP_ATTEMPTS, workerCount } from '../server/whatsapp/channel.mjs';
+import { openWhatsAppStore, codeHash, PROCESSING_LEASE_MS } from '../server/whatsapp/store.mjs';
+import { createWhatsAppChannel, workerCount } from '../server/whatsapp/channel.mjs';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aimo-audit-d-'));
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
@@ -155,43 +155,39 @@ test('#12: on a libsql (Turso) database two instances never take the same job or
   } finally { one.close(); two.close(); }
 });
 
-test('#14: the code pairs only its own number, before the invitation it is retried, and an existing customer is told', async () => {
-  let clock = Date.parse('2026-11-16T12:00:00Z');
+test('#14 ja ilmoittautumisen poisto: ylläpitäjän koodi yhdistää vain oman numeron, landing-koodi on tavallinen viesti', async () => {
+  let clock = Date.parse('2026-11-17T12:00:00Z');
   const store = openWhatsAppStore(':memory:', () => clock);
   try {
     const out = sender();
     const channel = createWhatsAppChannel({ settings, store, now: () => clock, send: out.send,
       chat: async () => { throw new Error('malli ei saa käynnistyä ilman jäsenyyttä'); } });
-    const code = 'K7Q2-9XPA';
-    const hash = codeHash(landingCode(code));
-    // The code arrives before the watcher has made the invitation: retried, not refused.
-    store.enqueue(message('s1', A, `Moi! Opeta mua tilaamaan tämän kautta.\nYHDISTA ${code}`));
-    assert.equal(await channel.processNext(), false);
-    assert.equal(out.sent.length, 0);
-    store.inviteLanding(A, 'Ravintola A', 'Omistaja', hash, clock + 86400_000);
-    clock += 31_000;
+    // Ylläpitäjän kutsu numerolle A: toisen numeron viesti samalla koodilla ei yhdistä.
+    const { code } = store.invite(A, 'Ravintola A', 'Omistaja');
+    store.enqueue(message('x1', C, `YHDISTA ${code}`));
+    assert.equal(await channel.processNext(), true);
+    assert.match(out.sent.at(-1).text, /Yhdistämiskoodi on virheellinen/);
+    assert.equal(store.member(C), undefined);
+    store.enqueue(message('a1', A, `YHDISTA ${code}`));
     assert.equal(await channel.processNext(), true);
     assert.match(out.sent.at(-1).text, /Testiyhteys yhdistetty: Omistaja, Ravintola A/);
-    assert.equal(store.memberSource(store.member(A).binding), 'landing');
+    assert.equal(store.memberSource(store.member(A).binding), 'admin');
 
-    // Someone else's number with the same code never pairs; after the retries it gets a clear answer.
-    store.inviteLanding(B, 'Ravintola B', 'Oikea', codeHash('ABCDEFGH'), clock + 86400_000);
-    store.enqueue(message('x1', C, 'YHDISTA ABCD-EFGH'));
-    for (let i = 1; i < SIGNUP_ATTEMPTS; i++) { assert.equal(await channel.processNext(), false); clock += i * 30_000 + 1; }
+    // Etusivun vanha viestimuoto ei ole enää ilmoittautuminen: tavallinen viesti, jäsenyyttä ei synny.
+    store.enqueue(message('s1', B, 'Moi! Opeta mua tilaamaan tämän kautta.\nYHDISTA K7Q2-9XPA'));
+    assert.equal(store.db.prepare("SELECT kind FROM inbox WHERE id='s1'").get().kind, 'text');
     assert.equal(await channel.processNext(), true);
-    assert.match(out.sent.at(-1).text, /Yhdistämiskoodia ei löytynyt/);
-    assert.equal(store.member(C), undefined);
+    assert.match(out.sent.at(-1).text, /Numeroasi ei ole yhdistetty/);
     assert.equal(store.member(B), undefined);
 
-    // A new sign-up's code from a number that is already a customer keeps its binding.
-    const binding = store.member(A).binding;
-    store.enqueue(message('s2', A, 'YHDISTA MMMM-NNNN'));
-    clock += 1;
-    while (!(await channel.processNext()) && store.db.prepare("SELECT state FROM inbox WHERE id='s2'").get().state === 'pending') clock += 120_000;
-    assert.match(out.sent.at(-1).text, /Numerosi on jo yhdistetty: Omistaja, Ravintola A/);
-    assert.equal(store.member(A).binding, binding);
+    // Ennen poistoa jonoon jäänyt ilmoittautumisviesti ohitetaan vastaamatta.
+    const sent = out.sent.length;
+    store.db.prepare("INSERT INTO inbox(id,phone,text,kind,binding,received,sent_at) VALUES('old',?,'hash','signup',NULL,?,?)").run(B, clock, clock);
+    assert.equal(await channel.processNext(), true);
+    assert.equal(store.db.prepare("SELECT state FROM inbox WHERE id='old'").get().state, 'cancelled');
+    assert.equal(out.sent.length, sent);
 
-    // An image or voice note is never read as a code.
+    // Kuva tai ääniviesti ei ole koskaan koodi.
     store.enqueue({ id: 'm1', phone: B, sentAt: Date.now(), kind: 'image', text: 'YHDISTA ABCD-EFGH' });
     assert.equal(store.db.prepare("SELECT kind FROM inbox WHERE id='m1'").get().kind, 'image');
   } finally { store.close(); }

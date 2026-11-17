@@ -9,15 +9,8 @@ export const MESSAGES_PER_DAY = 400;
 // Pilven yksi kutsu kestää enintään 300 s; tätä vanhempi käsittelyvaraus on keskeytynyt.
 export const PROCESSING_LEASE_MS = 6 * 60_000;
 export const codeHash = (code) => crypto.createHash('sha256').update(code.trim()).digest('hex');
-// Landing page link code: 8 symbols without I, L, O, 0, 1. The landing sign-up API that issued these codes was removed on 17.11.2026.
-// "abcd-efgh" and "ABCD EFGH" are the same code. Returns the canonical form, or null for anything else.
-export function landingCode(value) {
-  const code = String(value ?? '').replace(/[\s-]/g, '').toUpperCase();
-  return /^[A-HJKMNP-Z2-9]{8}$/.test(code) ? code : null;
-}
-// Itse ilmoittautuneen kutsu on voimassa yhtä kauan kuin ilmoittautuminen Workerissa.
-export const LANDING_INVITE_MAX_MS = 7 * 24 * 3600_000;
-export const LANDING_INVITES_PER_PHONE = 5;
+// Landing-ilmoittautuminen poistettiin 17.11.2026: käyttäjät lisää ylläpitäjä (invite + YHDISTA-koodi). Vanhaa
+// landing_invites-taulua ei enää lueta eikä kirjoiteta; sitä ei pudoteta, ettei pilvikanta tarvitse migraatiota.
 export function phoneNumber(value) {
   const phone = String(value || '').replace(/^\+/, '');
   if (!/^[1-9]\d{6,14}$/.test(phone)) throw new Error('Anna puhelinnumero kansainvälisessä muodossa, esimerkiksi +358401234567.');
@@ -63,26 +56,12 @@ export function openWhatsAppStore(filename, now = Date.now) {
       db.prepare('INSERT OR REPLACE INTO invites VALUES(?,?,?,?,?)').run(phone, company.trim().slice(0, 120), person.trim().slice(0, 120), codeHash(code), expires);
       return { code, expires };
     },
-    // The landing page sign-up's code arrives only as its hash. Until a WhatsApp message from this number
-    // carries the code, the number is not a member and cannot order.
-    inviteLanding(phone, company, person, hash, expires) {
-      phone = phoneNumber(phone);
-      if (!/^[a-f0-9]{64}$/.test(String(hash || ''))) throw new Error('Kutsun tiiviste puuttuu.');
-      if (!company?.trim() || !person?.trim()) throw new Error('Yritys ja henkilö vaaditaan.');
-      if (!Number.isSafeInteger(expires) || expires <= now()) return false;
-      db.prepare('INSERT OR REPLACE INTO landing_invites VALUES(?,?,?,?,?,?)').run(phone, hash, company.trim().slice(0, 120), person.trim().slice(0, 120),
-        Math.min(expires, now() + LANDING_INVITE_MAX_MS), now());
-      // A flood of sign-ups for one number keeps only the newest few codes.
-      db.prepare(`DELETE FROM landing_invites WHERE phone=? AND hash NOT IN (SELECT hash FROM landing_invites WHERE phone=? ORDER BY created DESC, rowid DESC LIMIT ${LANDING_INVITES_PER_PHONE})`).run(phone, phone);
-      return true;
-    },
     memberSource(binding) { return db.prepare('SELECT source FROM member_sources WHERE binding=?').get(binding || '')?.source || 'admin'; },
     revoke(phone) {
       phone = phoneNumber(phone);
       const old = member(phone);
       db.prepare('DELETE FROM members WHERE phone=?').run(phone);
       db.prepare('DELETE FROM invites WHERE phone=?').run(phone);
-      db.prepare('DELETE FROM landing_invites WHERE phone=?').run(phone);
       if (old) db.prepare('DELETE FROM member_sources WHERE binding=?').run(old.binding);
       if (old) db.prepare('DELETE FROM turns WHERE binding=?').run(old.binding);
       if (old && db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='wa_dialogue'").get()) {
@@ -94,20 +73,17 @@ export function openWhatsAppStore(filename, now = Date.now) {
     },
     pair(phone, hash, jobId) {
       // Includes failed attempts; a new invitation does not bypass the attempt limit.
-      const attempts = db.prepare("SELECT count(*) n FROM inbox WHERE phone=? AND kind IN ('pair','signup') AND received>=?").get(phone, now() - 15 * 60_000).n;
+      const attempts = db.prepare("SELECT count(*) n FROM inbox WHERE phone=? AND kind='pair' AND received>=?").get(phone, now() - 15 * 60_000).n;
       // The code must match an invitation for this very number: a code typed from another number never pairs.
       const invitation = db.prepare('SELECT * FROM invites WHERE phone=? AND hash=? AND expires>?').get(phone, hash, now());
-      const landing = !invitation && db.prepare('SELECT * FROM landing_invites WHERE phone=? AND hash=? AND expires>?').get(phone, hash, now());
-      if (!(invitation || landing) || attempts > 5) return null;
-      const chosen = invitation || landing;
+      if (!invitation || attempts > 5) return null;
+      const chosen = invitation;
       const binding = crypto.randomUUID();
       const old = member(phone);
       db.exec('BEGIN IMMEDIATE');
       try {
         db.prepare('INSERT OR REPLACE INTO members VALUES(?,?,?,?)').run(phone, chosen.company, chosen.person, binding);
         db.prepare('DELETE FROM invites WHERE phone=?').run(phone);
-        db.prepare('DELETE FROM landing_invites WHERE phone=?').run(phone);
-        if (landing) db.prepare('INSERT OR REPLACE INTO member_sources VALUES(?,?,?)').run(binding, 'landing', now());
         if (jobId) db.prepare('UPDATE inbox SET binding=? WHERE id=?').run(binding, jobId);
         if (old) db.prepare('DELETE FROM turns WHERE binding=?').run(old.binding);
         if (old) db.prepare('DELETE FROM member_sources WHERE binding=?').run(old.binding);
@@ -120,17 +96,13 @@ export function openWhatsAppStore(filename, now = Date.now) {
       const count = (ms) => db.prepare('SELECT count(*) n FROM inbox WHERE phone=? AND received>=?').get(message.phone, now() - ms).n;
       // Kustannusraja: yksi numero ei voi käynnistää loputtomasti mallikutsuja. Tavallinen keskustelu ei osu näihin.
       if (count(60_000) >= 10 || count(3600_000) >= MESSAGES_PER_HOUR || count(86400_000) >= MESSAGES_PER_DAY) return false;
-      // The landing page's chat link ends with "YHDISTA ABCD-EFGH" on its own line after the greeting.
-      // An administrator's code is still the whole message. Only the code's hash is stored.
-      // Only a typed text message can carry a code; an image or voice note is never a pairing.
+      // Ylläpitäjän koodi on koko viesti. Vain koodin tiiviste tallennetaan. Kuva tai ääniviesti ei ole koskaan yhdistäminen.
       const text = message.text || '';
       const typed = !message.kind || message.kind === 'text';
-      const signup = typed && /(?:^|\s)yhdist[aä]\s+([a-z0-9]{4}[ \t-]?[a-z0-9]{4})\s*$/iu.exec(text);
-      const code = signup && landingCode(signup[1]);
-      const pair = typed && !code && /^yhdist[aä]\s+(\S+)\s*$/iu.exec(text);
+      const pair = typed && /^yhdist[aä]\s+(\S+)\s*$/iu.exec(text);
       db.prepare('INSERT INTO inbox(id,phone,text,kind,binding,received,sent_at) VALUES(?,?,?,?,?,?,?)').run(
-        message.id, message.phone, code ? codeHash(code) : pair ? codeHash(pair[1]) : text,
-        code ? 'signup' : pair ? 'pair' : message.kind || 'text', member(message.phone)?.binding || null, now(), message.sentAt);
+        message.id, message.phone, pair ? codeHash(pair[1]) : text,
+        pair ? 'pair' : message.kind || 'text', member(message.phone)?.binding || null, now(), message.sentAt);
       return true;
     },
     // Atominen varaus yhdellä lauseella (audit #12): valinta ja varaus tapahtuvat samassa kirjoituksessa, joten
@@ -183,7 +155,6 @@ export function openWhatsAppStore(filename, now = Date.now) {
     },
     prune() {
       db.prepare('DELETE FROM invites WHERE expires<=?').run(now());
-      db.prepare('DELETE FROM landing_invites WHERE expires<=?').run(now());
       db.exec('DELETE FROM member_sources WHERE binding NOT IN (SELECT binding FROM members)');
       db.prepare('DELETE FROM turns WHERE created<?').run(now() - 7 * 86400_000);
       db.prepare('DELETE FROM inbox WHERE received<?').run(now() - 7 * 86400_000);

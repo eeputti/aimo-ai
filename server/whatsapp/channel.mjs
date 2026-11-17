@@ -139,9 +139,6 @@ export function workerCount(env = process.env) {
   const n = Number.parseInt(env.WHATSAPP_CONCURRENCY ?? '', 10);
   return Number.isInteger(n) && n >= 1 ? Math.min(n, 16) : 4;
 }
-// A landing page code can arrive before the watcher has turned it into an invitation (cloud tick once a
-// minute): such a message is retried a few times before it is answered as unknown.
-export const SIGNUP_ATTEMPTS = 4;
 
 export function createWhatsAppChannel({ settings, store, chat, send, typing, media = null, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now, onPrune = () => {},
   concurrency = workerCount(), typingRefreshMs = 20_000, diagnostics = Boolean(process.env.VERCEL) }) {
@@ -205,22 +202,17 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
       }
       if (!reply) {
         let historyBinding; let historyText; let parts;
-        if (job.kind === 'pair' || job.kind === 'signup') {
+        if (job.kind === 'signup') {
+          // Landing-ilmoittautuminen poistettiin 17.11.2026. Ennen sitä jonoon jäänyt koodiviesti ohitetaan vastaamatta.
+          store.finish(job.id, 'cancelled'); return true;
+        }
+        if (job.kind === 'pair') {
           // The message itself comes from the number, so a code that matches this number's invitation proves it (audit #14).
           const paired = store.pair(job.phone, job.text, job.id);
           const howTo = settings.orderingDemo ? 'Kerro tuotteet ja määrät, niin kokoan demotilausluonnoksen. Oikeaa Valio-tilausta ei lähetetä.' : 'Voit kysyä tuotteita, hintoja ja toimitusaikoja. Tämä testiversio ei tee tilauksia.';
           if (paired) job.binding = paired.binding;
-          if (!paired && job.kind === 'signup' && member) {
-            // A new sign-up of a number that already talks to the assistant: its own binding stays.
-            reply = `Numerosi on jo yhdistetty: ${member.person}, ${member.company}. ${howTo}\n${support}`;
-          } else if (!paired && job.kind === 'signup' && job.attempts < SIGNUP_ATTEMPTS) {
-            throw Object.assign(new Error('SIGNUP_NOT_READY'), { code: 'SIGNUP_NOT_READY' });
-          } else {
-            reply = paired ? `Testiyhteys yhdistetty: ${paired.person}, ${paired.company}. ${howTo}\n${support}`
-              : job.kind === 'signup'
-                ? `Yhdistämiskoodia ei löytynyt tälle numerolle. Koodi toimii vain siitä numerosta, jolla ilmoittauduit, ja vain kerran. Ilmoittaudu tarvittaessa uudelleen.\n${support}`
-                : 'Yhdistämiskoodi on virheellinen, käytetty tai vanhentunut, tai yrityksiä on liikaa. Pyydä ylläpitäjältä uusi koodi ja tarvittaessa odota 15 minuuttia.';
-          }
+          reply = paired ? `Testiyhteys yhdistetty: ${paired.person}, ${paired.company}. ${howTo}\n${support}`
+            : 'Yhdistämiskoodi on virheellinen, käytetty tai vanhentunut, tai yrityksiä on liikaa. Pyydä ylläpitäjältä uusi koodi ja tarvittaessa odota 15 minuuttia.';
         } else if (!member || !job.binding) {
           reply = `Numeroasi ei ole yhdistetty asiakastiliin. Pyydä yrityksesi ylläpitäjältä yhdistämiskoodi ja lähetä: YHDISTA koodi\n${support}`;
         } else if (job.kind === 'unsupported' || ((job.kind === 'image' || job.kind === 'audio') && !media)) {
@@ -292,8 +284,7 @@ export function createWhatsAppChannel({ settings, store, chat, send, typing, med
       return true;
     } catch (err) {
       if (job) {
-        if (err.code === 'SIGNUP_NOT_READY') store.retry(job, 'SIGNUP_NOT_READY', SIGNUP_ATTEMPTS);
-        else store.retry(job, /^META_HTTP_\d+$/.test(err.message) ? err.message : 'PROCESSING_OR_DELIVERY_ERROR');
+        store.retry(job, /^META_HTTP_\d+$/.test(err.message) ? err.message : 'PROCESSING_OR_DELIVERY_ERROR');
       }
       return false;
     } finally { clearInterval(typingTimer); if (job) { typingUpdates.delete(job.id); activePhones.delete(job.id); } inFlight -= 1; }

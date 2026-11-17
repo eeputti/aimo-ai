@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — landing-ilmoittautuminen poistettu myös botista (Claude Code, pääsessio)
+
+- **Käyttäjän pyyntö:** "poista ilmoittautuminen myös botista". Sivuston ilmoittautuminen ja tickin linkitys oli jo poistettu (2c1bfec, D1:n rivit 75f6121).
+- **Muutos:** `server/whatsapp/store.mjs` ei enää tunnista "…YHDISTA ABCD-EFGH" -landing-koodia. `inviteLanding`, `landingCode` ja landing-kutsujen luku, kirjoitus ja siivous on poistettu. `server/whatsapp/channel.mjs`:stä poistettiin `SIGNUP_ATTEMPTS` ja odottavan ilmoittautumisen uusinnat. Ennen poistoa jonoon jäänyt `signup`-viesti ohitetaan vastaamatta. Ylläpitäjän tavallinen kutsu ja YHDISTA-yhdistäminen säilyvät: Eelis lisää käyttäjät puhelun jälkeen. `landing_invites`-taulua ei pudotettu, ettei pilvikanta tarvitse migraatiota. Aiemmin ilmoittautuneiden lähde `landing` säilyy, joten heidän pienempi tilausrajansa pysyy.
+- **Tarkistukset:** `test/audit-fixes-d.test.mjs`:n #14-testi kirjoitettiin uudelleen: oman numeron koodi, toisen numeron torjunta, vanha landing-viesti tavallisena viestinä, jonoon jäänyt signup ohitetaan ja kuva ei ole koodi. 6/6, koko `npm test` 418/418, `git diff --check`.
+- **Käyttöönotto:** botti julkaistaan E:n kautta Eeliksen luvalla.
+
 ## 17.11.2026 aamu — korisivulle "Tarkista nämä ensin": huomiot kuitataan ennen SIIRRY MAKSAMAAN -vaihetta (Claude Code, Mankeli-vertailu)
 
 - **Käyttäjän pyyntö:** Eelis pyysi katsomaan mallia Mankelin S.I.MO:sta (toisen tiimin vastaus samaan Valio-haasteeseen, github.com/Mankeli-Software/junction-2026) ja hyväksyi ensimmäiseksi lainaukseksi sen vahvistussivun "Check these first" -osion ("Kyllä, tee huomiot"). Repossa ei ole lisenssiä, joten koodia ei kopioitu, vain idea.
