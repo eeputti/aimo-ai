@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — allergiakorjaukset ja kappalemäärät tuotantoon: botti bb10ded ja 7079c24 (Claude Code, sessio E)
+
+- **bb10ded (Eeliksen vahvistus "Kyllä, molemmat"):** session A:n bbcd3cd (koko tilauksen allergiassa todennetut vaihtoehdot ensin, kyllä/ei-vastaukset nimeävät ominaisuuden) ja bb10ded (tuote ilman allergeenitietoa tai "voi sisältää" jää pending_approvaliin). Deployment aimo-whatsapp-g463wxlii. Eelikselle kerrottu ennen julkaisua, että pilvessä ei ole hyväksyntäsivua (`/approve.html` estetty), joten tällaiset tilaukset jäävät odottamaan eivätkä pääse maksusivulle. Testit 437/437, `aimo:eval` 26/26.
+- **7079c24 (Eeliksen vahvistus "Kyllä, julkaise"):** 04ddcdd ("10 kpl" kappaleina kaikilla tuotteilla, pakkauksen kappalemäärä tuotetiedoista), 7079c24 (tilausaika näytetään aikaisimman päivän hyväksynnän jälkeen) ja 3c70ee5:n tekstisiivous. Deployment aimo-whatsapp-915fqylu9. Testit 445/445, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54.
+- **Tuoteajo molemmille:** 68 tuotetta × 4 määrätapaa, 613 ja 611 näytettyä vaihtoehtoa, ei yhtään tarjouksen kaatumista. 04ddcdd:n jälkeen tunnetun pakkauskoon tuotteet osuvat paremmin (5 hampurilaissämpylää → 1 laatikko à 36, ennen 5 laatikkoa). Kurkku myydään kiloina, joten "5 kurkkua" näyttää yhä 5 kg.
+- Jokaisen julkaisun jälkeen healthz `host: cloud`, webhookin vahvistus 200, tick 200. Worker ennallaan (32cc6312). Puhelimella ei kokeiltu.
+
 ## 17.11.2026 — aikaisimman päivän hyväksyntä näyttää tilausaikarajan (Claude Code, sessio C)
 
 - **Käyttäjän pyyntö:** Eelis hyväksyi kolmannen Haiku-otoksen X064-löydöksen korjauksen: kun asiakas hyväksyi tiistain maanantain sijaan, tiistain tilausaikaraja ei näkynyt.
