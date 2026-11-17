@@ -49,6 +49,7 @@ Jos source kertoo kappaleita tai muun yksikön (2 valkosipulinkynttä, 1 nippu t
 unit on aina arvion yksikkö, KG tai L: unitWeightin yksikkö kappaleilla, muuten perPortionin. Tyhjä vain, kun et arvioi lainkaan.
 Käytä known-aineiden suhdetta apuna. Jos ainetta käytetään vain maun mukaan tai koristeeksi etkä osaa arvioida luotettavasti, unit on tyhjä ja perPortion 0. Älä lisää rivejä.`;
 const PER_PORTION_MAX = { kg: 0.5, l: 0.6 };
+const LIQUID = /(?:maito|kerma|mehu|liemi|öljy|juoma|viini|etikka|kastike|vesi|siirappi|olut|kermaviili|jogurtti)$/u;
 const portionsOf = (s) => (s.target && s.servings ? s.target : s.servings && s.multiplier ? s.servings * s.multiplier : s.target || s.servings || null);
 const roundAmount = (v) => (v >= 10 ? Math.round(v * 2) / 2 : v >= 1 ? Math.round(v * 10) / 10 : v >= 0.1 ? Math.round(v * 100) / 100 : Math.round(v * 1000) / 1000);
 const estimateTotal = (item, s) => { const n = portionsOf(s); return item.estimate && n ? { value: roundAmount(item.estimate.perPortion * n), unit: item.estimate.unit } : null; };
@@ -73,10 +74,12 @@ async function estimateAmounts(ask, state) {
     user: JSON.stringify({ dish: state.title, servings: state.servings || 0, known: state.items.filter((i) => i.quantity).map((i) => ({ term: i.term, amount: `${count(i.quantity.value)} ${i.quantity.unit}` })), rows }) })).json; } catch { return; }
   for (const r of Array.isArray(data?.rows) ? data.rows : []) {
     const item = rows.some((x) => x.index === r?.index) ? state.items[r.index] : null;
-    const unit = { KG: 'kg', L: 'l' }[r?.unit];
     // Kappaleet ("2 valkosipulinkynttä" 4 annokselle): annoskohtainen määrä lasketaan koodissa sourcen luvusta ja yhden kappaleen
     // painosta. Malli antoi annoskohtaisen suoraan noin kaksinkertaisena (live 17.11.: 5 g, oikein noin 2,5 g).
     const counted = Number.isFinite(r?.count) && r.count > 0 && countsIn(item?.source).includes(r.count);
+    // Haiku jätti kappalerivin yksikön tyhjäksi, vaikka count ja unitWeight olivat oikein (tuotanto 17.11.: valkosipuli
+    // jäi "määrä tarkennettava"). Kappaleen yksikkö päätellään silloin aineesta: nesteet litroina, muut kiloina.
+    const unit = { KG: 'kg', L: 'l' }[r?.unit] || (counted && item ? (LIQUID.test(norm(item.term)) ? 'l' : 'kg') : undefined);
     const perPortion = counted ? (Number.isFinite(r.unitWeight) && r.unitWeight >= 0.0005 && r.unitWeight <= 5 && state.servings > 0 ? r.count * r.unitWeight / state.servings : NaN)
       : r?.count > 0 ? NaN : r?.perPortion;
     // Vain järkevä annoskoko kelpaa: muuten määrä jää tarkennettavaksi kuten ennen.

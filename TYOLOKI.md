@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — reseptin valkosipuliarvio toimii myös, kun malli jättää yksikön tyhjäksi (Claude Code, Aimo-tilausapuri verkossa -chat)
+
+- **Pyyntö:** pääsessio kertoi Eeliksen pyynnöstä, ettei valkosipulin arvio toimi tuotannossa c78e73b:n jälkeen. Liitetty resepti (Kermainen kanapasta, 4 annosta, 2 valkosipulinkynttä, 20 annokselle) näytti "valkosipuli, määrä tarkennettava". Odotettu noin 0,05 kg.
+- **Syy:** toistettu paikallisesti tuotannon malliasetuksilla (Haiku lukuun ja arvioon) 3/3 kertaa. Arviomalli palautti valkosipulille oikean kappalemäärän ja kynnen painon (count 2, unitWeight 0,005), mutta yksikön tyhjänä. Koodi hylkäsi rivin tyhjän yksikön vuoksi. Opus ja erilliset arviokutsut antoivat yksikön, joten vika näkyi vain koko ketjussa Haikulla.
+- **Muutos (`server/whatsapp/link-advice.mjs`):** kun kappalerivin luku löytyy reseptin tekstistä ja yksikkö puuttuu, yksikkö päätellään aineesta: nesteet (maito, kerma, liemi, öljy, kastike ym.) litroina, muut kiloina. Tyhjä yksikkö ilman kappaleita hylätään kuten ennen.
+- **Tarkistukset:** uusi regressiotesti `test/whatsapp-link-estimate.test.mjs`:ssä tuotannon vastauksella (valkosipuli 0,05 kg ja 2,5 g annokselle, kookosmaito tölkkinä litroina, tyhjä yksikkö ilman kappaleita yhä tarkennettava). Testi kaatui vanhalla koodilla. `npm test` 472/472, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54. Sama liitetty resepti tuotannon malliasetuksilla 3/3: "valkosipuli, noin 0,05 kg, arvio". Kahdessa ajossa Haiku jätti yksikön yhä tyhjäksi, ja koodi päätteli kilot. Ei tilauksia, Meta-viestejä eikä Valio-kutsuja.
+- **Käyttöönotto:** botin Vercel-julkaisu (sessio E, Eeliksen luvalla). Pääsessio tarkistaa livenä julkaisun jälkeen.
+
 ## 17.11.2026 — käyttäjän itse kokeiltava yksityinen live-demo julkaistu (Codex, Danielin chatti)
 
 - Käyttäjä korjasi tavoitteen: tarvitaan itse käytettävä live-sivu, ei tallenne tai oman koneen localhost. Julkaistu https://aimo-live-8b-demo-1711.daniel-turkkinen.chatgpt.site Sitesiin vain omistajalle; ChatGPT-kirjautuminen. Oikea erillinen Qwen3 8B pilvitestikoneessa, synteettiset tuotteet/hinnat, tilauslähetys estetty. Nykyisen WhatsApp-tuotannon koodia, asetuksia tai kantoja ei muutettu.

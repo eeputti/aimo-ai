@@ -13,17 +13,18 @@ const { createLinkAdvice } = await import('../server/whatsapp/link-advice.mjs');
 
 const PHONE = '358401234567';
 const page = { title: 'Kermainen kanapasta', recipes: [],
-  text: 'Kermainen kanapasta, 4 annosta. 600 g broilerin fileesuikaleita, spagettia, 2 dl ruokakermaa ja 2 valkosipulinkynttä.' };
-const analysis = (servings = 4) => ({ summary: 'Kanapastan resepti.', servings, servingsEvidence: servings ? '4 annosta' : '', ingredients: [
+  text: 'Kermainen kanapasta, 4 annosta. 600 g broilerin fileesuikaleita, spagettia, 2 dl ruokakermaa ja 2 valkosipulinkynttä. Halutessa 1 tölkki kookosmaitoa.' };
+const analysis = (servings = 4, extra = []) => ({ summary: 'Kanapastan resepti.', servings, servingsEvidence: servings ? '4 annosta' : '', ingredients: [
   { term: 'broilerin fileesuikale', source: '600 g broilerin fileesuikaleita', amount: '600 g' },
   { term: 'spagetti', source: 'spagettia', amount: '' },
   { term: 'ruokakerma', source: '2 dl ruokakermaa', amount: '2 dl' },
   { term: 'valkosipuli', source: '2 valkosipulinkynttä', amount: '' },
+  ...extra,
 ] });
 // Spagetti annosarviona, valkosipuli kappaleina: sourcen 2 kynttä × 5 g jaetaan koodissa 4 annoksella (2,5 g annokselle).
 const sensible = { rows: [{ index: 1, perPortion: 0.1, unit: 'KG', count: 0, unitWeight: 0 }, { index: 3, perPortion: 0, unit: 'KG', count: 2, unitWeight: 0.005 }] };
 
-function fixture(t, { estimate = async () => ({ json: sensible }), servings = 4 } = {}) {
+function fixture(t, { estimate = async () => ({ json: sensible }), servings = 4, extra = [] } = {}) {
   const store = openWhatsAppStore(':memory:'); t.after(() => store.close());
   bootstrapDemoMember(store, { WHATSAPP_DEMO_PHONE: PHONE });
   const member = store.member(PHONE); const asks = []; const orders = [];
@@ -32,7 +33,7 @@ function fixture(t, { estimate = async () => ({ json: sensible }), servings = 4 
       asks.push(args);
       if (args.purpose === 'whatsapp_link_estimate') return estimate(args);
       if (args.purpose === 'whatsapp_link_match') return { json: { rows: JSON.parse(args.user).rows.map((r) => ({ index: r.index, productIds: r.candidates.map((p) => p.id), needsQuantityCheck: false })) } };
-      return { json: analysis(servings) };
+      return { json: analysis(servings, extra) };
     },
     lookup: async (term) => [{ id: `p-${term}`, name: `Testi ${term}`, labels: [], hasAllergenData: true, contains: [], mayContain: [] }] });
   let n = 0;
@@ -95,4 +96,19 @@ test('kappalemäärä lasketaan koodissa: mallin oma annosmäärä ei kelpaa, ei
   }
   const unknown = fixture(t, { servings: 0, estimate: async () => ({ json: { rows: [{ index: 3, perPortion: 0, unit: 'KG', count: 2, unitWeight: 0.005 }] } }) });
   assert.doesNotMatch((await unknown.turn('https://example.com/kanapasta')).text, /Arvioin/u);
+});
+
+test('kappalerivin yksikkö tyhjä (tuotannon Haiku 17.11.): valkosipulin yksikkö päätellään, nesteelle litrat', async (t) => {
+  // Tuotannon arviovastaus valkosipulille sellaisenaan: count ja unitWeight oikein, unit tyhjä.
+  const f = fixture(t, { extra: [{ term: 'kookosmaito', source: '1 tölkki kookosmaitoa', amount: '' }],
+    estimate: async () => ({ json: { rows: [{ index: 1, perPortion: 0.1, unit: 'KG', count: 0, unitWeight: 0 },
+      { index: 3, perPortion: 0, unit: '', count: 2, unitWeight: 0.005 }, { index: 4, perPortion: 0, unit: '', count: 1, unitWeight: 0.4 }] } }) });
+  const out = await f.turn('https://example.com/kanapasta tää 20 annokselle');
+  assert.match(out.text, /- valkosipuli, noin 0,05 kg, arvio/u);
+  assert.match(out.text, /- kookosmaito, noin 2 l, arvio/u);
+  assert.match(out.text, /valkosipuli 2,5 g annokselle \(reseptissä "2 valkosipulinkynttä"\)/u);
+  assert.match(out.text, /kookosmaito 1 dl annokselle \(reseptissä "1 tölkki kookosmaitoa"\)/u);
+  // Tyhjä yksikkö ilman kappaleita ei edelleenkään kelpaa: spagetti jää tarkennettavaksi.
+  const g = fixture(t, { estimate: async () => ({ json: { rows: [{ index: 1, perPortion: 0.1, unit: '', count: 0, unitWeight: 0 }] } }) });
+  assert.match((await g.turn('https://example.com/kanapasta tää 20 annokselle')).text, /- spagetti, määrä tarkennettava, reseptissä ei ole määrää\n/u);
 });
