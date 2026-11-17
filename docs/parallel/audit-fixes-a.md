@@ -16,6 +16,10 @@ worktreessä origin/mainin päällä. Ei malli-, Meta- tai Valio-kutsuja, ei res
 | 19 | "16.11" ja "ma 16.11" ilman loppupistettä ovat päiviä, kun kuukausi on kahdella numerolla tai edessä on viikonpäivä, eikä perässä ole yksikköä ("1.10 l") eikä edessä kelloa ("klo 11.10"). Ristiriitainen viikonpäivä näytetään oletuksena (`DATE_WEEKDAY_MISMATCH`). "Ensi viikon tiistaina" on maanantaista alkavan seuraavan viikon tiistai: sunnuntaina 15.11. ti 17.11., maanantaina 16.11. ti 24.11. | `aimo/understand.mjs` |
 | 22 | "3 kennoa kananmunia" on 90 munaa (kenno 30 munaa). Munaosaston (10590) ja nimen "Vapaan kanan muna" tuotteet muuntuvat kappaleiksi (M10, L15, L180, 20 × L6), joten niitä ehdotetaan munamäärälle. Munakoiso ei ole muna. | `itemQuantities.mjs`, `aimo/understand.mjs` |
 
+## Jatko 17.11.: #4 myös WhatsApp-asiakkaan omalle allergiakiellolle (itsepeli V033)
+
+V-itsepelissä maitoallergiselle lapselle tarjottiin ensin jäätelöä, jolta allergeenitieto puuttui, ja asiakkaan valinta vahvistui ilman ihmistä. Syy oli se, että portin mandaatti ei nähnyt keskustelussa annettua allergiaa. Nyt allergeenivapaaksi todennetut vaihtoehdot tulevat ensin, kun kielletty allergeeni esiintyy haun tuotteissa (bbcd3cd). Lisäksi `place_order` ottaa valinnaisen `excludeAllergens`-kiellon, jonka `evaluateMandate` arvioi kuten mandaatin kiellon: "voi sisältää" tai puuttuva tieto vie ihmisen hyväksyntään. Testit: `test/whatsapp-diet-allergy.test.mjs`.
+
 ## Tarkistukset
 
 - Uudet `test/audit-fixes-a.test.mjs` (11) ja `test/audit-fixes-a-clock.test.mjs` (4). Ajettu origin/mainin koodia vasten (vain uusi `allergens.mjs` lisättynä): kaikki löydöstestit epäonnistuivat, hierarkian oma yksikkötesti meni läpi. Demokellon kaksi ensimmäistä testiä kaatuvat vanhalla koodilla puuttuvaan `clock.cycle`-funktioon; käytöksen todistavat kolmas (vanha tarjous vahvistui kierroksen jälkeen) ja neljäs (WhatsAppin tarjous ei vanhentunut).

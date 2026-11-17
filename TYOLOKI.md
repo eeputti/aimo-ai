@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — #4 jatko (V033): WhatsApp-asiakkaan allergiakielto mandaatin arvioon, tuote ilman allergeenitietoa ihmisen hyväksyntään (Claude Code, sessio A)
+
+- **Pyyntö:** koordinoiva sessio pyysi viemään V033-aukon korjauksen loppuun osana katselmuksen #4-tehtävää. Maitoallergiselle lapselle ei saa tarjota ensimmäisenä eikä tilata ilman ihmisen tarkistusta tuotetta, jonka allergeenitieto puuttuu. Ensimmäinen osa (todennetut vaihtoehdot ensin) on commitissa bbcd3cd.
+- **Syy:** WhatsAppin koko tilauksen allergiakielto (`draft.diet.excludeAllergens`) päästi tuotteen ilman allergeenitietoa varoituksella, ja portin mandaatti ei nähnyt kieltoa. Asiakkaan valitsema tuote ilman tietoa vahvistui siksi autonomisella mandaatilla itsestään.
+- **Korjaus:** `place_order` ottaa valinnaisen `excludeAllergens`-kentän (GS1-koodit, enintään 20, vain tiukentaa). `evaluateMandate` arvioi sen kuten mandaatin kiellon: sisältää-osuma on este, ja "voi sisältää" tai puuttuva tieto ovat `ALLERGEN_MAY_CONTAIN` / `ALLERGEN_DATA_MISSING`, eli ihmisen hyväksyntään. Kielto tallentuu tilaukselle, ja tilaukseen tehtävä lisäys arvioidaan samalla kiellolla. WhatsAppin tuotetyökalut välittävät koko tilauksen ja rivien kiellot. Muutokset: `server/gateway/mandate.mjs` (`orderAllergenBans`), `server/gateway/service.mjs` (placeOrder ja lisäys), `server/gateway/contract.mjs` (place_order-skeema) ja `server/order-tools/index.mjs` (submit).
+- **Tarkistukset:** `test/whatsapp-diet-allergy.test.mjs` kahdella uudella testillä: oikea portti simuloiduin hinnoin ja maitokielto antaa pending_approval ja `ALLERGEN_DATA_MISSING`, ilman kieltoa ei tätä syytä, ja virheelliset koodit ohitetaan. Lisäksi WhatsAppin submit välittää kiellot. Molemmat epäonnistuivat vanhalla koodilla. `npm test` 437/437, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54, `git diff --check` läpi. Itsepeliä ei ajettu uudelleen: V033 meni läpi jo bbcd3cd:n järjestyskorjauksella (vegaaninen todennettu valinta), ja tämä muutos koskee vain tilauksen vahvistusta.
+- **Käyttöönotto:** E:n julkaisu Eeliksen luvalla. Workeriin tai D1:een ei muutoksia.
+
 ## 17.11.2026 — yksikköajo kaikille tuotteille ja julkaisu 64b9150 (Claude Code, sessio E)
 
 - **Käyttäjän kysymys:** "varmista onks muita ku sipuli". Ajo oikealla katalogilla, oikealla haulla ja gatewayn tarjouksella, simuloiduin hinnoin ja väliaikaisin kannoin (ei malli-, Meta- tai Valio-kutsuja): 68 yleistä tuotetta × 4 määrätapaa (kappaleet, paketit, kilot, litrat), jokaisen näytetyn vaihtoehdon valinta tarjoukseen. Ennen afb9d1f:ää 189/613 valintaa kaatui UNIT_NOT_CONVERTIBLE-virheeseen, kaikki kappalemäärillä ja lähes kaikilla tuotteilla (kananmunat toimivat). afb9d1f:n jälkeen 0/613. Tuotannon päätösketjussa viimeinen tällainen virhe klo 9.45, ennen korjauksen julkaisua.

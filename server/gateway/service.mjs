@@ -12,7 +12,7 @@ import { clock, parseApiTime, cutoffPassed, helsinkiLabel } from './clock.mjs';
 import { verifiedFree } from '../allergens.mjs';
 import { signOffer, verifyOffer } from './signing.mjs';
 import { quotes, orders, ledger, buyers, transaction } from './store.mjs';
-import { evaluateMandate, productBlock, substitutionRules, publicMandate } from './mandate.mjs';
+import { evaluateMandate, productBlock, substitutionRules, publicMandate, orderAllergenBans } from './mandate.mjs';
 import { reason, REASONS, PRODUCT_TYPES, CLAIM_PHRASES } from './contract.mjs';
 import { watchOrder, noteSearch } from './watch.mjs';
 import { pickSubstitute, explainApproval } from './advisor.mjs';
@@ -416,6 +416,7 @@ export async function placeOrder(buyer, input = {}, { baseUrl = '' } = {}) {
   if (key.length < 8) throw new GatewayError(400, 'IDEMPOTENCY_KEY_REQUIRED', 'idempotencyKey (vähintään 8 merkkiä) on pakollinen: sama avain palauttaa saman tilauksen');
   if (!Array.isArray(input.offers) || !input.offers.length) throw new GatewayError(400, 'OFFERS_REQUIRED', 'offers puuttuu: anna request_quote-vastauksen offer-kentät');
   const fingerprint = requestFingerprint(input.offers);
+  const allergenBans = orderAllergenBans(input.excludeAllergens); // tilauksen oma allergiakielto, vain tiukentaa (#4, V033)
   // Nopea polku tavalliselle uusinnalle. Lopullinen tarkistus tehdään vielä sitoutumisen transaktiossa (commit alla).
   const early = idempotencyState(buyer.id, key, fingerprint);
   if (early.duplicate) return { ...publicOrder(early.duplicate), duplicate: true };
@@ -425,7 +426,7 @@ export async function placeOrder(buyer, input = {}, { baseUrl = '' } = {}) {
   // Numero varataan atomisesti. Kesken jäänyt tai uusinnaksi osoittautunut yritys jättää numeroon aukon, ei kahta samaa.
   const orderId = `AGW-${clock.today().replaceAll('-', '')}-${String(orders.reserveNumber()).padStart(4, '0')}`;
   const refs = { buyerId: buyer.id, orderId };
-  const base = { orderId, buyerId: buyer.id, buyerName: buyer.name, idempotencyKey: key, requestFingerprint: fingerprint, clockCycle: clockCycle(), buyerReference: input.buyerReference || null, requestedBy: input.requestedBy || null, createdAt: now.toISOString(), history: [], notifications: [], commit: { simulated: true, note: 'Junction-mock-rajapinnassa ei ole tilausendpointia: sitoumus kirjataan portin omaan kantaan.' } };
+  const base = { orderId, buyerId: buyer.id, buyerName: buyer.name, idempotencyKey: key, requestFingerprint: fingerprint, clockCycle: clockCycle(), ...(allergenBans.length ? { excludeAllergens: allergenBans } : {}), buyerReference: input.buyerReference || null, requestedBy: input.requestedBy || null, createdAt: now.toISOString(), history: [], notifications: [], commit: { simulated: true, note: 'Junction-mock-rajapinnassa ei ole tilausendpointia: sitoumus kirjataan portin omaan kantaan.' } };
 
   // Sitoutuminen yhdessä kirjoitustransaktiossa tuoreen tarkistuksen (await) jälkeen: idempotenssi, tarjousten kertakäyttö,
   // mandaatin päiväkatto ja tallennus näkevät saman tilanteen, eikä samanaikainen tilaus voi ehtiä väliin (#6).
@@ -490,7 +491,7 @@ export async function placeOrder(buyer, input = {}, { baseUrl = '' } = {}) {
       return { ...order, status: 'rejected', reasons: reused.map((p) => reason('OFFER_ALREADY_USED', 'block', { offerId: p.jti })) };
     }
     // 3) Mandaatti päättää: vahvistus, ihmisen hyväksyntä vai hylkäys
-    const verdict = evaluateMandate(buyer, { lines, totals: order.totals, deliveryDate, requestedDeliveryDate, substitutions: order.substitutions });
+    const verdict = evaluateMandate(buyer, { lines, totals: order.totals, deliveryDate, requestedDeliveryDate, substitutions: order.substitutions }, { extraBannedAllergens: allergenBans });
     order.status = verdict.status;
     order.reasons = verdict.reasons;
     ledger.append('policy', 'MANDATE_EVALUATED', { approvalLevel: buyer.mandate.approval, outcome: verdict.status, reasons: verdict.reasons.map((r) => ({ code: r.code, severity: r.severity, detail: r.detail })) }, refs);
@@ -575,7 +576,7 @@ export async function addToOrder(buyer, input = {}, { baseUrl = '' } = {}) {
   // mutta eurokatto lasketaan aina koko summasta: isompi tilaus tarvitsee uuden luvan.
   const stillOpen = o.status === 'pending_approval';
   const allLines = [...o.lines, ...add.lines];
-  const verdict = evaluateMandate(buyer, { lines: allLines, totals: totalsOf(allLines), deliveryDate: o.deliveryDate, requestedDeliveryDate: stillOpen ? o.requestedDeliveryDate : o.deliveryDate, substitutions: stillOpen ? [...(o.substitutions || []), ...add.substitutions] : add.substitutions }, { excludeOrderId: o.orderId });
+  const verdict = evaluateMandate(buyer, { lines: allLines, totals: totalsOf(allLines), deliveryDate: o.deliveryDate, requestedDeliveryDate: stillOpen ? o.requestedDeliveryDate : o.deliveryDate, substitutions: stillOpen ? [...(o.substitutions || []), ...add.substitutions] : add.substitutions }, { excludeOrderId: o.orderId }, { extraBannedAllergens: o.excludeAllergens || [] });
   ledger.append('policy', 'MANDATE_EVALUATED', { scope: 'addition', additionId, approvalLevel: buyer.mandate.approval, outcome: verdict.status, orderNetAfter: totalsOf(allLines).net, reasons: verdict.reasons.map((r) => ({ code: r.code, severity: r.severity, detail: r.detail })) }, refs);
   if (verdict.status === 'rejected') return done('rejected', verdict.reasons.filter((r) => r.severity === 'block'), 'ADDITION_REJECTED');
   // Taustavahti: koko tilaus uusilla määrillä ostajan historiaa vasten, havainnot vain lisätyistä tuotteista. Voi vain tiukentaa.

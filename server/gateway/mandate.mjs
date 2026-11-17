@@ -58,6 +58,9 @@ export function productAllergenReview(mandate, p) {
   return out;
 }
 
+/** Tilauksen mukana annetut allergeenikiellot: vain GS1-koodin näköiset merkkijonot, enintään 20. */
+export const orderAllergenBans = (list) => [...new Set((Array.isArray(list) ? list : []).filter((a) => typeof a === 'string' && /^[A-Z]{2,3}$/.test(a)))].slice(0, 20);
+
 const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000);
 
 /**
@@ -67,8 +70,12 @@ const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(
  * @returns {{status: 'confirmed'|'pending_approval'|'rejected', reasons: Array}}
  * severity: block = hylätään aina, approval = ihminen päättää, info = kirjataan ja ilmoitetaan jälkikäteen
  */
-export function evaluateMandate(buyer, draft, { excludeOrderId } = {}) {
-  const m = buyer.mandate;
+export function evaluateMandate(buyer, draft, { excludeOrderId, extraBannedAllergens = [] } = {}) {
+  // Tilauksen oma allergiakielto (esim. WhatsApp-asiakkaan "lapsella maitoallergia") arvioidaan kuten mandaatin kielto: sisältävä
+  // tuote on este, ja "voi sisältää" tai puuttuva allergeenitieto vie ihmisen hyväksyntään (katselmus #4, itsepeli V033).
+  // Kielto voi vain tiukentaa mandaattia, ei koskaan löysätä sitä.
+  const extra = orderAllergenBans(extraBannedAllergens);
+  const m = extra.length ? { ...buyer.mandate, bannedAllergens: [...new Set([...(buyer.mandate.bannedAllergens || []), ...extra])] } : buyer.mandate;
   const cat = loadCatalog();
   const reasons = [];
   for (const line of draft.lines) {

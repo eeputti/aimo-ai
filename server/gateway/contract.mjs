@@ -79,6 +79,7 @@ export const OPERATIONS = [
         idempotencyKey: { type: 'string', minLength: 8, maxLength: 120 },
         buyerReference: { type: 'string', maxLength: 120, description: 'Ostajan oma viite, esim. ostotilausnumero.' },
         requestedBy: { type: 'string', maxLength: 200, description: 'Alkuperäinen pyyntö tai pyytäjä; näytetään ihmiselle hyväksyntänäkymässä.' },
+        excludeAllergens: { type: 'array', maxItems: 20, items: { type: 'string', pattern: '^[A-Z]{2,3}$' }, description: 'Tämän tilauksen oma allergiakielto GS1-koodeina (esim. AM maito). Voi vain tiukentaa mandaattia: sisältävä tuote hylätään, ja "voi sisältää" tai puuttuva allergeenitieto vie ihmisen hyväksyntään.' },
       },
     },
   },

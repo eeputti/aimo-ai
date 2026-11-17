@@ -395,7 +395,9 @@ export function createOrderingTools(deps = {}) {
     if (!b) return reject('BUYER_UNKNOWN', 'Asiakkuutta ei löydy tilausjärjestelmästä.');
     let order;
     // Virhe ei tuota onnistumiskuittausta. Gatewayn oma idempotenssi estää kaksoistilauksen uusinnassa.
-    try { order = await placeOrder(b, { offers: JSON.parse(q.offers), idempotencyKey: key, buyerReference: `whatsapp:${draft.id}`, requestedBy: customer.personName || null }); } catch { return reject('ORDER_FAILED', 'Tilauksen tallennus ei onnistunut. Tilausta ei ole tehty.'); }
+    // Asiakkaan allergiakielto (koko tilaus ja rivit) kulkee portille: tuote ilman allergeenitietoa ei vahvistu ilman ihmistä (V033).
+    const excludeAllergens = [...new Set([...(draft.diet?.excludeAllergens || []), ...draft.lines.flatMap((l) => l.excludeAllergens || [])])];
+    try { order = await placeOrder(b, { offers: JSON.parse(q.offers), idempotencyKey: key, buyerReference: `whatsapp:${draft.id}`, requestedBy: customer.personName || null, ...(excludeAllergens.length ? { excludeAllergens } : {}) }); } catch { return reject('ORDER_FAILED', 'Tilauksen tallennus ei onnistunut. Tilausta ei ole tehty.'); }
     const result = { status: order.status, orderId: order.orderId, deliveryDate: order.deliveryDate || null, totals: order.totals || null, approvalUrl: order.approval?.url || null,
       reasons: (order.reasons || []).map((r) => ({ code: r.code, message: r.message, severity: r.severity })) };
     db.prepare('UPDATE tool_quotes SET idem_key=?, result=? WHERE id=?').run(key, JSON.stringify(result), q.id);
