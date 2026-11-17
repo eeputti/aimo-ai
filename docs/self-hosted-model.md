@@ -6,7 +6,7 @@ AIMO_MODEL_PROVIDER=ollama vaihtaa nykyisen `askAgent`-rajapinnan Ollaman `/api/
 
 Valinta on palvelimen asetus. Oletuksena Anthropic-polku säilyy; Ollaman ollessa valittu myös jäljelle jäänyt ANTHROPIC_API_KEY jätetään käyttämättä. Katko tai puuttuva malli palauttaa virheen nykyiselle kutsujalle, joka voi jatkaa omalla sääntöpolullaan. Maksulliseen malliin ei siirrytä automaattisesti.
 
-Ensimmäinen sovitin tukee tekstiä ja Ollaman JSON-skeemaformaattia. Vastauksen pitää valmistua normaalisti ja JSONin on oltava luettavissa. Osittaista tai katkennutta vastausta ei hyväksytä. Kutsujien toimialatarkistukset ovat edelleen välttämättömiä; JSON-formaatti ei todista tilauksen oikeellisuutta. Vastaukset puskuroidaan, joten onToken saa koko tekstin yhtenä osana. Sovitin ei tee automaattisia uusintakutsuja. Syöte- ja tulostokenit tulevat Ollaman laskureista; Anthropic-välimuistilaskurit ovat nolla.
+Ensimmäinen sovitin tukee tekstiä ja Ollaman JSON-skeemaformaattia. Vastauksen pitää valmistua normaalisti. JSON validoidaan myös pyydettyä skeemaa vasten ilman automaattisia tyyppimuunnoksia. Osittaista tai katkennutta vastausta ei hyväksytä. Kutsujien toimialatarkistukset ovat edelleen välttämättömiä; JSON-formaatti ei todista tilauksen oikeellisuutta. Vastaukset puskuroidaan, joten onToken saa koko tekstin yhtenä osana. Sovitin ei tee automaattisia uusintakutsuja. Syöte- ja tulostokenit tulevat Ollaman laskureista; Anthropic-välimuistilaskurit ovat nolla.
 
 Kuvien luku on tässä tilassa pois; botti pyytää kirjoittamaan tuotteet. Ääni on erillinen litterointipalvelu: alla oleva Compose poistaa maksulliset litterointipalvelut käytöstä. Paikallinen Whisper voidaan myöhemmin liittää nykyiseen command-rajapintaan. Anthropic API:n etä-MCP-connector ei ole tuettu Ollamalla; käytä varsinaista tilaustilaa (`WHATSAPP_ORDERING_ENABLED=true`). Tämä ei muuta gatewayn omia REST/MCP-rajapintoja.
 
@@ -74,3 +74,5 @@ Lähteet: [Ollama chat](https://docs.ollama.com/api/chat), [JSON-skeemaiset vast
 - Yhdistetty Compose validoitu tyhjällä eristetyllä asetustiedostolla; yksityisiä tuotantoasetuksia ei luettu.
 - Docker-buildia yritettiin, mutta npm-pakettien lataus kontissa pysähtyi tämän ympäristön `self-signed certificate in certificate chain` -virheeseen. TLS-tarkistusta ei poistettu. Valmista imagea tai kontissa käynnistyvää bottia ei siksi väitetä varmennetuksi.
 - Ollama-painoja ei ladattu eikä oikean mallin savutestiä ajettu. Mallin laatu, resurssitarve ja todellinen WhatsApp-koe ovat avoinna. Tuotannon julkaisu ja palvelimen hankinta eivät sisälly tähän muutokseen.
+
+Lisätestit ja hienosäädön etenemistapa: [agent-improvement.md](agent-improvement.md). Oma 12 tapauksen tulkintakoe: `node scripts/ollama-eval.mjs`, kun Ollama-asetukset ovat ympäristössä.

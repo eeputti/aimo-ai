@@ -1,4 +1,7 @@
 // Native Ollama /api/chat adapter. No paid-provider fallback, tools or image requests.
+import Ajv from 'ajv';
+const validator = new Ajv({ strict: false, allErrors: false, coerceTypes: false, useDefaults: false, removeAdditional: false });
+const validators = new WeakMap();
 const MAX_RESPONSE = 8 * 1024 * 1024;
 function textBlocks(value) {
   if (typeof value === 'string') return value;
@@ -37,10 +40,16 @@ export async function askOllama({ settings, model, system, user, turns, schema, 
   } catch { await reader.cancel().catch(() => {}); throw new Error('Ollama-vastaus katkesi tai ylitti kokorajan.'); }
   let msg;
   try { msg = JSON.parse(raw); } catch { throw new Error('Ollama ei palauttanut kelvollista vastausta.'); }
-  if (msg.done !== true || msg.done_reason !== 'stop' || msg.message?.tool_calls?.length
+  if (!msg || msg.done !== true || msg.done_reason !== 'stop' || msg.message?.tool_calls?.length
     || typeof msg.message?.content !== 'string' || !msg.message.content.trim()) throw new Error('Ollama-vastaus jäi kesken tai ei ole tuettu tekstivastaus.');
   const text = msg.message.content;
-  if (schema) { try { JSON.parse(text); } catch { throw new Error('Ollama ei palauttanut kelvollista JSON-vastausta.'); } }
+  if (schema) {
+    let value;
+    try { value = JSON.parse(text); } catch { throw new Error('Ollama ei palauttanut kelvollista JSON-vastausta.'); }
+    let validate = validators.get(schema);
+    if (!validate) { validate = validator.compile(schema); validators.set(schema, validate); }
+    if (!validate(value)) throw new Error('Ollama-vastaus ei vastaa pyydettyä JSON-skeemaa.');
+  }
   // Buffered callback: do not expose partial structured output or retry after emitting it.
   onToken?.(text);
   const count = (n) => Number.isSafeInteger(n) && n >= 0 ? n : 0;

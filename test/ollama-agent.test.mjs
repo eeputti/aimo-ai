@@ -86,3 +86,35 @@ test('real askAgent routes to own HTTP server despite paid key, counts results, 
     assert.equal(requests.length, 2);
   } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
 });
+
+test('schema-invalid but syntactically valid JSON never reaches the consumer', async () => {
+  const schema = { type: 'object', additionalProperties: false, required: ['qty'], properties: { qty: { type: 'number', minimum: 0 } } };
+  for (const content of ['null', '[]', '{}', '{"qty":"30"}', '{"qty":-1}', '{"qty":30,"price":0}']) {
+    const emitted = [];
+    await assert.rejects(ask(success(content), { schema, onToken: (t) => emitted.push(t) }), /skeema/);
+    assert.deepEqual(emitted, [], content);
+  }
+});
+
+test('malformed envelopes, body errors and oversized replies fail without emitting text', async () => {
+  for (const body of ['null', '[]', '{', '{"done":true,"done_reason":"stop"}']) {
+    await assert.rejects(ask(success(), { fetchImpl: async () => new Response(body) }));
+  }
+  const emitted = [];
+  await assert.rejects(ask(success(), { onToken: (t) => emitted.push(t), fetchImpl: async () => new Response('x'.repeat(8 * 1024 * 1024 + 1)) }), /kokorajan/);
+  await assert.rejects(ask(success(), { fetchImpl: async () => new Response(new ReadableStream({ start(controller) { controller.error(new Error('private upstream error')); } })) }), /katkesi/);
+  assert.deepEqual(emitted, []);
+});
+
+test('a real redirect never forwards the model request or its bearer credential', async () => {
+  let destinationCalls = 0;
+  const server = http.createServer((req, res) => {
+    if (req.url === '/api/chat') { res.writeHead(307, { location: '/collect' }); res.end(); }
+    else { destinationCalls++; res.end('should not arrive'); }
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  try {
+    await assert.rejects(ask(success(), { settings: { ...settings, ollamaUrl: `http://127.0.0.1:${server.address().port}`, ollamaToken: 'private' }, fetchImpl: fetch }), /yhteys/);
+    assert.equal(destinationCalls, 0);
+  } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); }
+});

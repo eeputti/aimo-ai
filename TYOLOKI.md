@@ -2,6 +2,22 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — korjaus ja 12 tulkintatapauksen arvioija varmennettu (Codex, Danielin chatti)
+
+- Skeemavalidoinnin korjauksen jälkeen uudet sovitin-/arviointitestit 10/10 läpi. Laaja npm test: 469 yhteensä, 386 läpi, 0 virhettä, 83 katalogiriippuvaista ohitusta. Uusi ajuri scripts/ollama-eval.mjs käyttää tuotannon createModelInterpreter-ohjetta, kiinteitä synteettisiä odotuksia ja estää sääntövarapolun laskemisen mallin onnistumiseksi.
+- Arvioija mittaa tulkintaa, ei vielä koko keskustelun sujuvuutta. docs/agent-improvement.md erottaa ohje-/koodikorjaukset, selfplay-arvioinnin ja oikean LoRA/QLoRA-hienosäädön sekä erillisen testijoukon. Ei painojen koulutusta.
+- Paikalliseen eristettyyn CPU-konttiin saatu käyntiin Ollama 0.40.16, vain loopback-portti, 3 GiB muistiraja ja kaksi CPU:ta; pilvi-inferenssi estetty OLLAMA_NO_CLOUD=1. Sama esto lisätty Compose-esimerkkiin. Pienen qwen3:0.6b-mallin lataus/testi vielä käynnissä, laatutulosta ei ole. Normaalia WhatsApp-tuotantoimagea ei tällä osoiteta rakennetuksi.
+
+## 17.11.2026 — lisätesti löysi JSON-rakenteen validoinnin puutteen (Codex, Danielin chatti)
+
+- Uusi regressiotesti epäonnistui ennen korjausta: syntaktisesti kelvollinen mutta skeeman vastainen JSON (esim. null tai määrän merkkijono) pääsi sovittimesta eteenpäin. Lisätty Ajv-validointi ilman tyyppimuunnoksia, oletusarvoja tai ylimääräisten kenttien poistoa. Virhe estää myös onToken-palautteen; kutsuja päättää sääntövarapolusta.
+- Lisätestit kattavat myös puuttuvan/virheellisen vastauskuoren, kesken katkeavan rungon, 8 MiB -kokorajan ja oikean HTTP-redirectin, joka ei saa välittää Bearer-tunnusta eteenpäin. Oikean pienen mallin eristetyn kokeen valmistelu käynnissä; laatutulosta ei vielä ole.
+
+## 17.11.2026 — Ollaman lisätestit ja koulutuspolun selvitys aloitettu (Codex, Danielin chatti)
+
+- Käyttäjä pyysi lisää testejä ja kysyi agentin kouluttamisesta. Lisätään häiriö-/syöte-/JSON-regressioita ja selvitetään mahdollisuus oikean pienen avoimen mallin eristettyyn kokeeseen tämän ympäristön resursseilla. Nykyinen selfplay on mallipohjainen arviointi, ei painojen koulutusta; se ei vielä hyväksy avaimetonta Ollamaa.
+- Tarkistetaan erikseen keskustelun ohjeiden/logiikan korjaus, testiaineisto ja mahdollinen LoRA-hienosäätö. Ei käynnistetä henkilökohtaisia maksullisia API-kutsuja tai tuotannon muutoksia. Mallin laadun tuloksia ei sekoiteta HTTP-testituplan tuloksiin.
+
 ## 17.11.2026 — itse ajettavan tekstimallin toteutus valmis GitHubiin, käyttöönotto avoin (Codex, Danielin chatti)
 
 - Viimeistelty Ollama-sovitin, malliasetusten ennakkotarkistus, ehdollinen Vercel-asetusten vienti, tekstipohjainen median rajaus ja sisäverkon Compose-palvelu. Docker-pakettiin lisätty kolmen todellisen mallikutsun savutesti. Ohje docs/self-hosted-model.md sisältää VPS-/Vercel-vaihtoehdot, mallin/kuvan version lukituksen, kustannukset ja avoimet laatu-/kapasiteettikokeet. Nykyinen Anthropic-oletus säilyy.
