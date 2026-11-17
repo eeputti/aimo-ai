@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — korisivun "Tarkista nämä ensin" -kuittaukset tuotantoon (Claude Code, sessio E)
+
+- **Käyttäjän lupa:** Eelis pyysi julkaisua toisessa sessiossa ("pyydä E:tä julkaisemaan se") ja vahvisti sen tässä sessiossa ("Kyllä, julkaise").
+- **Julkaisu:** botti Verceliin mainista e6c95b9 (9609308: korisivun huomiot kuitataan Selvä-painikkeella ennen SIIRRY MAKSAMAAN -vaihetta), deployment aimo-whatsapp-5wlnx0w9b klo 9.33. Workeria ei julkaistu, koska sen koodi ei muuttunut 4748547:n jälkeen (tuotannossa d3b04d07).
+- **Tarkistukset:** `npm test` 418/418 ennen julkaisua. Julkaisun jälkeen healthz `host: cloud`, webhookin GET-vahvistus 200, tick 200 (12 tilausta), korisivu ja `shop.js` 200, Workerin kautta `/whatsapp/cart.js` 200. Korisivun huomioita ei kokeiltu selaimessa oikealla korilinkillä.
+- **Edellinen lokitesti (c087af2):** Eeliksen puhelinviesti klo 9.23: `typing_sent` 967 ms, kaksi uusintaa, `reply_sent` 12,2 s vastaanotosta, ei `typing_failed`-rivejä. Tiedot välitetty pääsessiolle.
+
 ## 17.11.2026 aamu — ääniviesti toimii oikealla puhelimella pilvessä (Claude Code, sessio H)
 
 - **Käyttäjän varmennus:** Eelis lähetti ääniviestin omalla puhelimellaan Vercelissä pyörivälle botille: "kokeilen ääniviestiä puhelimella ja toimi hyvin". Ketju Meta → media-API → Groq-litterointi → tilauskeskustelu toimii siis oikeasti, ei vain simuloituna. Tarkkaa julkaisuversiota ei kirjattu: tuotannossa oli tuolloin jonkin muun session klo 9.15 julkaisu, ja ääniviestit ovat mukana 1c49398:sta lähtien.
