@@ -33,6 +33,24 @@ Persoonittain (vain muuttuneet):
 - **X041** (`date_not_asked_first`): emojiavaukseen "🥛🥛🥛 20? 🧈 5 🙏" malli kysyi määrät ennen päivää. Mallin satunnaisuutta, F:n ajossa läpi.
 - **S002, S014** (`more_requested_before_options`): simuloitu asiakas pyysi "4" ennen kuin vaihtoehtoja näytettiin; apuri toimi oikein. Asiakaspuolen satunnaisuutta.
 
+## Neljäs otos (17.11.2026)
+
+Sama otos ja asetukset, main 1c0f200 (mukana 7079c24). Perusvaatimukset **27/30**, uusi vaatimus **29/30**, 322 kutsua, 0,12 USD, 0 tilausta.
+
+| persoona | F 671b9a1 | ajo 2 | ajo 3 | ajo 4, 1c0f200 |
+|---|---|---|---|---|
+| V032 | läpi | vaihtoehtoja ei näytetty | sama | sama |
+| X064 | läpi | päivä, korilinkki | tilausaika puuttui | **läpi** |
+| X041 | läpi | päivää ei kysytty ensin | läpi | päivää ei kysytty ensin |
+| S002 | läpi | "4" liian aikaisin | sama | jogurttia ei valittu |
+| X001 | läpi | läpi | läpi | määrä kerma |
+| S014, S016 | läpi | vaihtelu | vaihtelu | läpi |
+
+- **V032** kaatuu kolmannen kerran samoin (A:n alue, ei vielä muutettu).
+- **X041:** emojiavaukseen "🥛🥛🥛 20? 🧈 5 🙏" malli kysyy yksiköt kysymättä päivää (2/3 viimeisintä ajoa). Mahdollinen korjaus dialogiin: kun lista ja päivä puuttuvat ja mallin tarkennus ei kysy päivää, perään lisätään päiväkysymys.
+- **S002:** tilausrivi on ajoissa 3 ja 4 pelkkä "jogurtti" (F:n ajossa ja ajossa 2 "maustamaton jogurtti"), joten vaihtoehtoina oli maustettuja jogurtteja ja asiakas hylkäsi ne. A:n slangikorjaus ei poista sanaa (tarkistettu suoraan). Syy selvittämättä: Haikun vaihtelu tai tulkin ohjeen muutos; vaatisi kohdennetun tulkkikokeen.
+- **X001:** asiakas pyysi ensin 0,5 l ja sitten "pari pulloa, 2 kpl"; rivi jäi 2 kpl:ksi (0,4 l). Asiakkaan ristiriitainen pyyntö.
+
 ## Kolmas otos X064-korjauksen jälkeen (17.11.2026)
 
 Sama otos ja asetukset, main 8357e11 (mukana e13cb54). Perusvaatimukset **27/30**, uusi vaatimus **28/30**, 321 kutsua, 0,11 USD.

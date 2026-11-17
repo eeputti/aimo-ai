@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — neljäs 30 persoonan Haiku-otos (Claude Code, sessio C)
+
+- **Käyttäjän pyyntö:** Eelis pyysi ajamaan otoksen uudelleen X064-tilausaikakorjauksen (7079c24) jälkeen. Samat asetukset, main 1c0f200.
+- **Tulos:** perusvaatimukset 27/30 ja uusi vaatimus 29/30, 322 kutsua, 0,12 USD, 0 tilausta. X064 läpi. V032 kaatuu kolmannen kerran (A:n alue). X041: emojiavaukseen ei kysytty päivää ensin (2/3 viimeisintä ajoa). S002: tilausrivi pelkkä "jogurtti" ajoissa 3 ja 4 ("maustamaton" katosi, syy selvittämättä). X001 asiakkaan ristiriitainen määrä. Taulukko `docs/parallel/haiku-findings-c.md`.
+- **Ei koodimuutoksia.**
+
 ## 17.11.2026 — reseptin puuttuvan määrän arvio varmennettu livenä (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
 
 - **Käyttäjän pyyntö:** "tarkista reseptimäärä livenä kun E on julkaissut". Sessio E julkaisi botin mainista 1c0f200 (sisältää e1b0f8f:n ja 162dad1:n), deployment aimo-whatsapp-cf6qxfp19.
