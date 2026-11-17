@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — kaikki valmis liveen: botti c78e73b, Worker ennallaan (Claude Code, sessio E)
+
+- **Käyttäjän pyyntö:** "ja sitte ku kaikki valmista ni heitä tää livee kaikki". Odotettiin taulun viimeisen koodivarauksen (3001849c, reseptin valkosipuliarvio) valmistumista; sen jälkeen ei ollut kesken olevaa koodityötä (ainoa avoin varaus 5f708b58 on 15.11. vanhentunut).
+- **Julkaisu:** botti mainista c78e73b (laskettavat reseptimäärät koodissa, korvaajan esimerkkituotteen pitää sisältää korvaajan sanat), deployment aimo-whatsapp-g5b7cp5oz. Worker-koodiin ja D1:een ei muutoksia 4741cff:n jälkeen, joten Worker 32cc6312 on ajan tasalla eikä sitä julkaistu uudelleen.
+- **Tarkistukset:** `npm test` 457/457, Worker 58/58, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54, tuoteajo 611 vaihtoehtoa ilman tarjouksen kaatumista. Julkaisun jälkeen healthz `host: cloud`, webhookin vahvistus 200, tick 200, Workerin sivut ja `/whatsapp/cart.js` 200.
+- **Tila:** kaikki mainin koodi on nyt livenä (botti c78e73b, Worker 32cc6312).
+
 ## 17.11.2026 — reseptin kappalemäärät lasketaan koodissa, ja korvaajan esimerkkituote on samaa tuotetta (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
 
 - **Käyttäjän pyyntö:** Eelis: "korjaa myös valkosipuliarvio ja kalafilee-esimerkki". Molemmat näkyivät reseptiarvion live-kokeessa (400a392).
