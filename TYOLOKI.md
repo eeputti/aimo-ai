@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — botin julkaisut 23d29cc, 43e87ae, 4741cff ja 75f5edb (Claude Code, sessio E)
+
+- **Käyttäjän luvat:** jokainen julkaisu pyydettiin toisesta sessiosta Eeliksen sanoin ja vahvistettiin tässä sessiossa ("Kyllä, julkaise"): ilmoittautumisen poisto botista (ca96393), siirtymäviestin rajaus (43e87ae), korin huomiot pelkkinä tietoina (4741cff) ja "se tavallinen" -tilaus (8357e11).
+- **Julkaisut (Vercel, puhdas tilannevedos mainista):** 23d29cc (aimo-whatsapp-9elgisxwb), 43e87ae (l6riogg22), 4741cff (8r88hw0hs, Workerin 32cc6312 jälkeen), 75f5edb (p6x94ei43). Tuotannossa nyt botti **75f5edb**. Worker 32cc6312 mainista 4741cff julkaisi maksusivusession Eeliksen luvalla omassa chatissaan (puhelimella kaikki sivut paitsi Keskustele); sen jälkeen Workeriin ei muutoksia.
+- **Tarkistukset:** ennen julkaisuja `npm test` 418/418, 418/418, 417/417 ja 420/420, `aimo:eval` 26/26 (75f5edb), Worker 58/58. Jokaisen jälkeen healthz `host: cloud`, webhookin GET-vahvistus 200 ja tick 200 (12 tilausta). "Se tavallinen" -tilausta ei ole ajettu oikealla mallilla eikä puhelimella.
+- **Päällekkäisyys estetty:** maksusivusessio ja integraatiosessio pyysivät saman botin julkaisun 8b112a2:sta, joka eroaa 75f5edb:stä vain lokimerkinnöillä; molemmille kerrottu, ettei uutta julkaisua tarvita.
+
 ## 17.11.2026 — Worker julkaistu: puhelimella kaikki sivut paitsi Keskustele (Claude Code, puhelinesto-chat)
 
 - **Käyttäjän pyyntö:** Eelis pyysi tässä chatissa "julkaise nyt" 47b42fd:n jälkeen. Julkaisut tekee muuten sessio E (taulu #319); E kuittasi, ettei julkaise Workeria rinnalle, ja julkaisu varattiin taululla (6dbe048c).
