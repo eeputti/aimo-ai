@@ -2,6 +2,16 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — botin ja Workerin julkaisut keskitetty sessiolle E, kirjoittaa-pisteet toimivat pilvessä (Claude Code, sessio E)
+
+- **Käyttäjän päätökset:** Eelis päätti, että kaikki botin (Vercel) ja Worker-sivuston julkaisut, D1-migraatiot ja Vercelin asetukset tekee vain sessio E (taulu #319), ja käski julkaista heti ("don't wait, deploy now"). Hän hyväksyi kirjoittaa-ilmaisinkorjauksen (2de0839) ja päivänvaihtokorjauksen (53a7189) julkaisun.
+- **Julkaisut:** botti ja Worker mainista 4748547 (Worker-versio d3b04d07, ilmoittautumisreitti /api/signups poistunut 404), botti 2c1bfec (pilven tick ilman poistettua ilmoittautumislinkkeriä, joka kaatui joka minuutti) ja botti c087af2 (53a7189, e13cb54, 55c4208). Tuotannossa nyt botti **c087af2** (aimo-whatsapp-16hrxpzc4) ja Worker 4748547:n koodi (ei muuttunut sen jälkeen). Jokaisen jälkeen healthz `host: cloud`, webhookin GET-vahvistus 200 ja tick 200; tick julkaisee 11 tilausta (kaikki testaajat, Eeliksen päätös).
+- **Päällekkäiset julkaisut:** samaan aikaan julkaisivat myös sessiot H, "Aimo tilausapuri verkossa" ja tukinumerosessio. Klo 9.17 tukinumerosession uudelleenjulkaisu palautti tuotannon hetkeksi vanhempaan koodiin, korjautui seuraavassa julkaisussa. Kaikki ovat kuitanneet, että julkaisut tekee jatkossa E.
+- **Tukiyhteystieto:** Eeliksen pyynnöstä `WHATSAPP_SUPPORT_CONTACT` on nyt hänen puhelinnumeronsa (tukinumerosessio muutti Macin `.env`:n ja vei arvon Verceliin `push-env.mjs --only`:lla). Varmennettu: selainkeskustelun "tuki"-vastaus päättyy uuteen numeroon.
+- **Kirjoittaa-pisteet:** Eelis vahvisti puhelimella, että pisteet näkyvät tilausviestissä. Lyhyeen tervehdykseen vastataan ilman mallikutsua, joten pisteet eivät ehdi näkyä. Vercelin lokissa ei `typing_failed`-rivejä.
+- **Huomio:** vanha ilmoittautumislinkkeri tulosti Vercelin lokiin kokeilijoiden puhelinnumeroita ja Metan vahvistuskoodin. Linkkeri on poistettu (8ba07b0, 2c1bfec), vanhat lokirivit vanhenevat Vercelin säilytysajan mukaan.
+- **Tarkistukset:** `npm test` 410/410 (4748547) ja 413/413 (c087af2), Worker 57/57. Ei Meta-lähetyksiä testinä.
+
 ## 17.11.2026 aamu — kirjoittaa-ilmaisimen diagnostiikka pilveen (Claude Code, pääsessio)
 
 - **Havainto:** Eeliksen puhelintestissä pisteitä ei näkynyt, vaikka 2de0839 oli julkaistu (Vercel dpl …PSn9Lozi klo 9.13, snapshot 32c5c0b/61199c0 sisältää korjauksen) eikä lokissa ollut `typing_failed`-riviä. Lokista ei voinut päätellä, lähtikö ilmaisin, koska onnistumista ei kirjattu. Lisäksi Vercel kirjaa pyynnön vain, jos se tulostaa jotain. Pilvikannan suora luku estettiin käyttöoikeustarkistuksessa, eikä estoa kierretty.
