@@ -8,7 +8,7 @@
   "functions": {
     "api/index.mjs": {
       "maxDuration": 300,
-      "includeFiles": "{server/**,public/**,scripts/whatsapp-signups.mjs,deploy/cloudflare/*.mjs,deploy/cloudflare/src/protocol.ts,deploy/cloudflare/src/agent-trace.ts,data/catalog.json,data/img/**}"
+      "includeFiles": "{server/**,public/**,deploy/cloudflare/*.mjs,deploy/cloudflare/src/protocol.ts,deploy/cloudflare/src/agent-trace.ts,data/catalog.json,data/img/**}"
     }
   },
   "rewrites": [
