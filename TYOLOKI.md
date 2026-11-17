@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 aamu — sipulikorjaus ja puuttuvien määrien arvio tuotantoon (Claude Code, sessio E)
+
+- **Käyttäjän lupa:** kaksi sessiota pyysi julkaisua Eeliksen sanoin; Eelis vahvisti tässä sessiossa molemmat samaan julkaisuun ("Kyllä, molemmat").
+- **Julkaisu:** botti Verceliin mainista afb9d1f, deployment aimo-whatsapp-g05oos8dm. Mukana afb9d1f (`quotedQuantity()`: "5 sipulia" tarjotaan myyntierinä kuten vaihtoehdoissa, valinta ei enää kaadu UNIT_NOT_CONVERTIBLE-virheeseen) ja 515632c (puuttuvat määrät arvioidaan annetusta määrästä suurkeittiön annoskoilla, uusi mallikutsu `whatsapp_quantity_estimate`, tier deep). Worker ennallaan (32cc6312).
+- **Tarkistukset:** `npm test` 430/430 ja `aimo:eval` 26/26 ennen julkaisua; julkaisun jälkeen healthz `host: cloud`, webhookin GET-vahvistus 200, tick 200. Sipulia ja määräarviota ei kokeiltu puhelimella tässä sessiossa.
+
 ## 17.11.2026 — Haikun effort-tason koe alkuun, mittausajuri ja tarkistin korjattu (Claude Code, Haiku-laatumittaus F)
 
 - **Pyyntö:** Eelis halusi kokeilla Haikun effort-tason laskua ilman että vastaukset tyhmenevät. Ajurille `--deep-effort` (kiinnittää effortin vain ajon kopioon, sovelluskoodi ennallaan) ja testi. 241 persoonaa kolmella tasolla samalla commitilla 56fe2df: medium vastaa high-tasoa koodin tarkistuksilla (226/240 vs 225/241, poikkeavia 11 vs 12) ja vähentää tulostokeneita 32 % ja vuoron mediaania 21 %; low on nopein (-58 % tokeneita, -43 % mediaani) mutta hieman heikompi (222/241, R-joukko 2/6).
