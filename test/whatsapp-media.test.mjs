@@ -181,7 +181,7 @@ test('litterointipalvelun valinta: oletuksena pois, avain vaaditaan, OpenAI-yhte
   const local = createCommandTranscriber({ command: '/usr/local/bin/aimo-whisper', tmpdir: dir, run: (cmd, args, opts, cb) => {
     seen = { cmd, args, exists: fs.existsSync(args[0]), bytes: fs.readFileSync(args[0]).length }; cb(null, ' viisi kiloa voita \n');
   } });
-  assert.equal(await local.transcribe({ buffer: OGG, mime: 'audio/ogg' }), ' viisi kiloa voita \n');
+  assert.equal(await local.transcribe({ buffer: OGG, mime: 'audio/ogg' }), 'viisi kiloa voita');
   assert.deepEqual([seen.cmd, seen.exists, seen.bytes, path.extname(seen.args[0])], ['/usr/local/bin/aimo-whisper', true, OGG.length, '.ogg']);
   assert.equal(fs.existsSync(seen.args[0]), false);
 });

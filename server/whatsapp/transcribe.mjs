@@ -15,8 +15,30 @@ import os from 'node:os';
 import path from 'node:path';
 import { MediaRejected } from './media.mjs';
 
-// Sanasto auttaa tunnistamaan keittiön tuotesanat ja yksiköt. Ei ohjeita, vain esimerkkisanoja.
-export const VOCABULARY = 'Tilaus Valio Aimolle: laktoositon kevytmaito, rasvaton maito, kerma, ruokakerma, voi, Oltermanni, kananmunat, jogurtti, rahka, litraa, kiloa, laatikkoa, perjantaiksi, maanantaiksi.';
+// Sanasto auttaa tunnistamaan keittiön tuotesanat ja yksiköt. Ei ohjeita, vain esimerkkisanoja. Whisper jäljittelee kehotteen
+// kirjoitusasua: ilman ääkkösiä se kirjoitti "kermaviilia", ääkkösillä "kermaviiliä" (17.11. Groq-koe). Siksi sanastossa on ä- ja
+// ö-sanoja. Epäselvästä äänestä Whisper voi myös palauttaa kehotteen sellaisenaan, joten echoesVocabulary hylkää sen.
+export const VOCABULARY = 'Keittiön ääniviesti: jäätelöä, kermaviiliä, täysmaitoa, laktoositonta kevytmaitoa, ruokakermaa, voita, juustoa, kananmunia, jogurttia, rahkaa, säilykkeitä, pähkinätöntä, öljyä, kiloa, litraa, laatikkoa, tänään, huomiseksi, perjantaiksi.';
+
+const words = (s) => String(s || '').normalize('NFC').toLocaleLowerCase('fi-FI').match(/\p{L}+/gu) || [];
+const PROMPT_WORDS = words(VOCABULARY);
+const PROMPT_PAIRS = new Set(PROMPT_WORDS.slice(1).map((w, i) => `${PROMPT_WORDS[i]} ${w}`));
+
+/** Litterointi, joka on lähinnä kehotteen toistoa ("Keittiön ääniviesti: jäätelöä, kermaviiliä…"), ei ole asiakkaan puhetta. */
+export function echoesVocabulary(text) {
+  const w = words(text);
+  if (w[0] === 'keittiön' && w[1] === 'ääniviesti') return true;
+  const pairs = w.slice(1).map((x, i) => `${w[i]} ${x}`);
+  if (pairs.length < 3) return false;
+  return pairs.filter((p) => PROMPT_PAIRS.has(p)).length / pairs.length >= 0.5;
+}
+
+/** Litteroinnin teksti yhtenäiseen muotoon: ä ja ö yhtenä merkkinä (NFC), jotta haku ja tulkinta tunnistavat ne. Kehotteen
+ *  toisto palautetaan tyhjänä, jolloin median luku vastaa "En saanut ääniviestistä selvää" eikä lisää keksittyjä tuotteita. */
+export function cleanTranscript(text) {
+  const t = String(text || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+  return echoesVocabulary(t) ? '' : t;
+}
 const EXTENSION = { 'audio/ogg': 'ogg', 'audio/opus': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/aac': 'aac', 'audio/amr': 'amr', 'audio/webm': 'webm', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
 const PROVIDERS = {
   openai: { url: 'https://api.openai.com/v1/audio/transcriptions', key: 'OPENAI_API_KEY', model: 'gpt-transcribe' },
@@ -39,7 +61,7 @@ export function createHttpTranscriber({ name, url, apiKey, model, fetchImpl = fe
       if (res.status === 400 || res.status === 415) throw new MediaRejected('TYPE');
       if (!res.ok) throw new Error(`TRANSCRIBE_HTTP_${res.status}`);
       const data = await res.json();
-      return typeof data.text === 'string' ? data.text : '';
+      return cleanTranscript(typeof data.text === 'string' ? data.text : '');
     },
   };
 }
@@ -54,7 +76,7 @@ export function createCommandTranscriber({ command, run = execFile, tmpdir = os.
       try {
         await fs.writeFile(file, buffer, { mode: 0o600 });
         return await new Promise((resolve, reject) => {
-          run(command, [file], { timeout: 90_000, maxBuffer: 64 * 1024, encoding: 'utf8' }, (err, stdout) => (err ? reject(new Error('TRANSCRIBE_COMMAND_FAILED')) : resolve(String(stdout))));
+          run(command, [file], { timeout: 90_000, maxBuffer: 64 * 1024, encoding: 'utf8' }, (err, stdout) => (err ? reject(new Error('TRANSCRIBE_COMMAND_FAILED')) : resolve(cleanTranscript(stdout))));
         });
       } finally { await fs.rm(dir, { recursive: true, force: true }); }
     },

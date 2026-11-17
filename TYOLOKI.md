@@ -2,6 +2,14 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — hankalat asiakkaat oikeassa WhatsAppissa ja ääniviestien ääkköset (Claude Code, pääsessio)
+
+- **Käyttäjän pyyntö:** Eelis pyysi testaamaan botin rajoja omasta WhatsAppistaan noin 45 minuuttia ("koita saada se solmuun"), kaikki keskustelut WhatsAppissa, ja korjaamaan ääniviestien ääkköset. Lisätoiveet: vastaukset innostuneen ihmisen tapaan ("äh, tätä ei löydy valikoimasta, kelpaisiko tällainen?") ja suosituimpien tuotteiden ehdottaminen.
+- **Koe:** 13 asiakasta, noin 45 viestiä tuotantobotille klo 20.27–21.07, ei vahvistettuja tilauksia eikä maksuja. Raportti `docs/parallel/whatsapp-chaos-2026-11-17.md`. Pahin umpikuja: valintavaiheen kysymys tai valitus toistaa saman vaihtoehtolistan vastaamatta (kerma kolme kertaa). Muut: "ei laktoosittomia" ei kirjaudu, voi 4x5 kg näkyy "à 0,08 kg, yhteensä 2 kg, 3 635 €", pähkinättömälle suklaalle tarjottiin suklaakaurajuomaa, malli lupaa valintoja ja asiakaspalvelukyselyjä joita ei tehdä, toistuvat fraasit ("Nyt olisi aika valita vaihtoehtoja...", "Päivitetty:", "Ei tilattavaa tuotetta päivälle X: Y" kolmesti). Suosittuustietoa ei ole Valion aineistossa.
+- **Ääkköset (`server/whatsapp/transcribe.mjs`):** Whisperin sanastokehote oli ilman ääkkösiä, ja Whisper jäljittelee sen kirjoitusasua (Groq-koe: "kermaviilia" vanhalla, "kermaviiliä" uudella sanastolla). Uusi sanasto ääkkösineen, litterointi NFC-muotoon ja kehotteen toisto hylätään: epäselvästä äänestä Whisper palautti kehotteen sellaisenaan ("Tilaus Valio Aimolle, kira, voi, ola"), mikä olisi lisännyt koriin tuotteita, joita kukaan ei sanonut.
+- **Tarkistukset:** uusi `test/whatsapp-transcribe.test.mjs` 4/4, `whatsapp-media`-testin odotus päivitetty siivottuun tekstiin, koko `npm test` 482/482 origin/mainin 8496582 päällä. Oikea Groq-kutsu macOS:n synteettisellä suomenkielisellä äänellä; oikeaa puhelimen ääniviestiä ei kokeiltu.
+- **Käyttöönotto kesken:** botin Vercel-julkaisu (sessio E, Eeliksen luvalla). Seuraavaksi raportin umpikujien korjaus.
+
 ## 17.11.2026 — white label -palvelun tuotteistamis- ja arkkitehtuurisuositus (Codex, Danielin chatti)
 
 - Käyttäjä kysyi järkevää ratkaisua yrityksille tarjottavaan white label -palveluun. Suositus: yhteinen koodipohja, ensimmäisille 2–3 maksavalle pilotille omat käyttöönotot/kannat ja numerot, kielimalli palvelua myyvän yrityksen API-organisaatiosta asiakaskohtaisilla kulurajoilla. Laajempi jaettu SaaS-ajo ja oma GPU arvioidaan todellisen käytön ja laatutestien perusteella. Ei käyttäjän päätös ostaa palvelinta tai tilata koko SaaS-muutos.
