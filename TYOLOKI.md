@@ -2,6 +2,13 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — koneista riippumaton ajo ja projektin oma tekoälylaskutus (Codex, Danielin chatti)
+
+- Käyttäjän tavoite: WhatsApp-agentti toimii ilman kummankaan kehittäjän konetta eikä kuluta heidän henkilökohtaisia tekoälytilejään. Päivitetty puhdas klooni origin/main 34eed26:een ennen selvitystä.
+- Todettu jo toteutettu Vercel + Turso + Cloudflare -pilviajo. Julkinen /healthz vastasi ok ja host: cloud. Ei varsinaista WhatsApp-viestikoetta; terveystarkistus ei varmista Metaa. Mallikutsut käyttävät ANTHROPIC_API_KEY:tä ja suoraa Anthropic SDK:ta, eivät chattilausta. Tuotannon avaimen laskutustilin omistajaa ei tässä nähdä.
+- Suositus: nykyinen hosting säilyy, projektin oma API-laskutus ja yksityinen palvelinavain käyttörajoineen. Vaihtoehtona itse ajettava malli vaatii sovittimen ja laatukokeet sekä oman laskennan kulut. Käyttäjältä kysytty tavoitellaanko omaa laskutusta vai maksullisen mallirajapinnan poistamista; valintaa ei ole oletettu hyväksytyksi.
+- Selvitys ja siirron varmennus docs/independent-hosting.md. Vain dokumentit; ei mallikutsuja, tilausta, avaimen vaihtoa tai julkaisua. Lähdekoodin ja ohjeiden tarkistus sekä julkinen GET /healthz; git diff --check läpi. Sovellustestejä ei toistettu dokumenttimuutokselle.
+
 ## 17.11.2026 — valkosipuliarvio ja korvaajan esimerkki varmennettu livenä (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
 
 - **Julkaisu:** sessio E vei c78e73b:n tuotantoon, deployment aimo-whatsapp-g5b7cp5oz.
