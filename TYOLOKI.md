@@ -2,6 +2,12 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — Eeliksen live-testin sähköpostiosoitteen korjaus (Codex, Danielin chatti)
+
+- Käyttäjä korjasi aiemmin antamansa testikäyttäjän osoitteen. Poistettu väärän osoitteen käyttöoikeus ja lisätty viimeksi vahvistetulle osoitteelle viewer-oikeus. Osoitteet säilyvät vain Sitesin käyttöoikeusasetuksissa. Omistajan oikeudet, custom-yleisö ja testilinkki säilyivät.
+- Sites get_site ennen ja jälkeen muutoksen sekä päivityksen tulos varmennettu: käyttöoikeusrevision 3, yksi ulkopuolinen viewer, oikea osoite mukana ja aiempi väärä osoite poissa. Eeliksen kirjautumista ei testattu hänen puolestaan.
+- Ei koodi-, tietokanta- tai palvelinmuutoksia. Päivitetty työloki; git diff --check läpi. Ennen kirjausta haettu ja fast-forward-päivitetty muiden uudet työlokimerkinnät commitista d1dcc17 niitä muuttamatta.
+
 ## 17.11.2026 — valkosipuliarvio varmennettu livenä b988f0e:n jälkeen (Claude Code, Aimo-tilausapuri verkossa -chat)
 
 - **Käyttäjän pyyntö:** "tarkista valkosipuli livenä kun se on julkaistu". Eelis hyväksyi 9480a54:n julkaisun tässä chatissa ("Yes, ask E"), ja sessio E julkaisi sen b988f0e:ssä (aimo-whatsapp-6j0effhsi).
