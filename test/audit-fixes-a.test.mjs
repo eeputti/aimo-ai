@@ -187,7 +187,8 @@ test('#22 kananmunat: kenno on 30 munaa, ja Vapaan kanan munat muuntuvat kappale
   assert.equal(egg('Kieku Vapaan kanan muna L15 1020g'), 15);
   assert.equal(egg('Kieku Vapaan kanan muna L180 12300g', { salesUnit: 'KI', baseUnit: 'KI' }), 180);
   assert.equal(egg('20 x Kieku Vapaan kanan muna L6 408g', { salesUnit: 'KI', baseUnit: 'RAS', perSales: 20 }), 120);
-  assert.equal(itemsPerSalesUnit({ name: 'Munakoiso 5 kg', category: '17400', salesUnit: 'ST', baseUnit: 'ST', perSales: 1 }), null, 'munakoiso ei ole muna');
+  // Munakoiso ei ole muna: nimen 5 kg ei ole munamäärä. Kappaleina myytävä tuote on yksi kappale myyntierää kohden (17.11.).
+  assert.deepEqual(itemsPerSalesUnit({ name: 'Munakoiso 5 kg', category: '17400', salesUnit: 'ST', baseUnit: 'ST', perSales: 1 }), { value: 1, source: 'sales-unit' }, 'munakoiso ei ole muna');
 });
 
 test('#22 kananmunien vaihtoehdot oikealla katalogilla: Vapaan kanan munat tulevat munamäärälle', { skip }, async () => {

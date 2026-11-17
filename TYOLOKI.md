@@ -2,6 +2,22 @@
 
 Tämä tiedosto välittää toteutuksen tilan ja päätökset Codexin ja Claude Coden välillä. Lisää uusin työvaihe ylimmäksi. Älä kirjaa salaisuuksia tai koko keskusteluhistoriaa.
 
+## 17.11.2026 — "10 kpl" on kappaleita kaikille tuotteille: 30 leivoksen laatikko ja 10 kpl on yksi laatikko (Claude Code, sivusessio Aimo-tilausapuri verkossa -chatista)
+
+- **Käyttäjän pyyntö:** Eelis: "korjaa myös 10 kpl kappaleiksi". Selainkokeilussa jäätelön tilalle valittu Elonen KP Vadelma-valkosuklaaleivos 30x60g ja vastaus "10 kpl" antoivat "10 laatikkoa, 555,50 €". Kappalemäärä luettiin kappaleiksi vain kananmunille, muille myyntieriksi.
+- **Päätös:** kpl, kappale ja pcs sekä paljas luku tai tuotteen nimi ("10 leivosta") ovat kappaleita (basis items) kaikille tuotteille. Pakkaussanat (laatikko, ltk, paketti, pkt, rasia, säkki, pussi, purkki, tölkki, pullo, munille kenno) ovat myyntieriä. Kananmunien säännöt ennallaan.
+- **Muunnos (`server/itemQuantities.mjs`):** pakkauksen kappaleet tulevat Valion yksikkömuunnoksesta (myyntiyksikkö laatikko, perusyksikkö kappale, perSales 30 = 30 kappaletta). Nimen monipakkaus ("30x60g", "6 x …") vain vahvistaa, eikä ristiriidassa arvata. Yksittäin myytävä tuote (kappale, paketti, pussi, rasia, purkki, pullo) on 1 kappale, tusina 12. Laatikko ilman muunnosta käyttää vain nimen monipakkausta ("60x90g"). Muuten kappalemäärä on tuntematon.
+- **Tuntematon kappalemäärä:** ei arvata. Tuote näytetään yhden myyntierän hinnalla tunnettujen jälkeen (`storefront.mjs`, `countUnknown`). Valinnan jälkeen botti sanoo "Pakkauksen kappalemäärää ei ole Valion tiedoissa: … Kerro, montako laatikkoa laitetaan.", ja vastauksen luku on myyntieriä (`askPacks`). Munissa tuntematon pakkaus jää pois kuten ennen.
+- **Kiloina myytävä tuote:** kappaleriville se lasketaan myyntierinä (`gateway/quantity.mjs`), ja ydin kysyy kilot kuten fd9c7e1:ssä, nyt myös kappaleina annetuille riveille (munat poikkeuksena).
+- **Tulkit:** sääntötulkin vastaus "10 kpl" saa basis items. Jos mallitulkki jättää basisin tyhjäksi, luvun perässä oleva sana ratkaisee (`basisFromText`). Mallien ohjeet ja skeeman kuvaus päivitetty (`aimo/model.mjs`, `interpret.mjs`). Aimo-jäsentimen INDIVIDUAL_ITEMS-huomio ei enää puhu munista muilla tuotteilla.
+- **Tarkistukset:**
+  - Uusi `test/kpl-items.test.mjs` 7/7: leivos 10 kpl → 1 laatikko (30 kpl) ja "Tarve on 10 kpl; pienin näistä myyntieristä kattaa 30 kpl.", hillo 12 kpl → 2 laatikkoa à 6 kpl, "2 laatikkoa" pysyy myyntierinä, vastaavan tuotteen valinnan jälkeen "10 kpl" on kappaleita, tuntematon kappalemäärä kysytään laatikkoina, kilotavara ja kilomunat sekä oikea katalogi (472410 → 30).
+  - `audit-fixes-a`:n munakoisotesti päivitetty: munakoiso 5 kg ei ole munamäärä vaan yksi kappale myyntierää kohden.
+  - Koko `npm test` 444/444 origin/mainin 3c70ee5 päällä, `aimo:eval` 26/26, `aimo:eval:spoken` 54/54.
+  - Oikea katalogi simuloiduin hinnoin, 24 tuotetta × 3 määrätapaa (10 kpl, 10 ilman yksikköä, 2 laatikkoa): 196 vaihtoehdon valintaa tarjoukseen, 0 UNIT_NOT_CONVERTIBLE-virhettä.
+  - Oikea Haiku ja välimuistikannan kopio: "tarviin 1000 litraa jäätelöä keskiviikoksi" → "1" → "10 kpl" antoi "Ph7 marjamousse leivos pakaste: 1 laatikko à 126 kpl, yhteensä 126 kpl (pyysit 10 kpl), 58,66 €" eikä kymmentä laatikkoa. Ei tilausta, Meta- eikä Valio-kutsuja.
+- **Käyttöönotto kesken:** tarvitsee botin Vercel-julkaisun (sessio E, Eeliksen luvalla). Worker-julkaisua ei tarvita.
+
 ## 17.11.2026 — valioaimo-tilausapuri ajan tasalle ja aimo-ai sen kanssa samaksi (Claude Code, repojen yhtenäistys)
 
 - **Käyttäjän pyyntö:** Eelis kysyi, kumpi repo on käytössä. Vastaus: aimo-ai, josta botti julkaistaan, ja valioaimo-tilausapuri oli 124 committia jäljessä. Eelis pyysi tekemään valioaimo-tilausapurista täysin samanlaisen ("tosi fiksu"), ja sen jälkeen myös aimo-ai:sta samanlaisen. Collaboratorit jäävät ennalleen (Eeliksen päätös).

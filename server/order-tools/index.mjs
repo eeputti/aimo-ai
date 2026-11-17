@@ -322,10 +322,12 @@ export function createOrderingTools(deps = {}) {
         // Pyydetyn tuotteen saatavuus on tuntematon (rajapinta alhaalla): lähimmät vaihtoehdot eivät todista sen puuttumista.
         ...(!fit.some(onTerm) && found.requestedUnknown ? { availabilityUnknown: true } : {}), clarify, options: top.map((o) => ({
         productId: String(o.id), name: o.name, brand: o.brand || null, salesUnits: o.qty, salesUnitLabel: o.unitLabel,
-        covers: o.quantityExplanation ? { value: o.quantityExplanation.providedItems, unit: 'PCS' } : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
+        covers: o.countUnknown ? null : o.quantityExplanation ? { value: o.quantityExplanation.providedItems, unit: 'PCS' } : o.litres ? { value: +(o.qty * o.litres).toFixed(2), unit: 'L' } : o.kg ? { value: +(o.qty * o.kg).toFixed(2), unit: 'KG' } : null,
         unitPriceNet: o.price, lineNet: +(o.price * o.qty).toFixed(2), deliveryDate: o.availability?.deliveryDate || draft.deliveryDate,
         cutoff: o.availability?.closingTime || null, // tilausaikaraja; ydin muotoilee sen kiireisessä tilauksessa
         stock: o.availability?.stock ?? null, labels: o.labels || [], note: o.quantityExplanation?.text || null,
+        // Pakkauksen kappalemäärä tuntematon: hinta yhdestä myyntierästä, määrä kysytään valinnan jälkeen myyntierinä.
+        ...(o.countUnknown ? { askQuantity: true, countUnknown: true } : {}),
         // Katalogin hiilijalanjälki (kg CO2e/kg) ja toimitusvarmuus (0–1): ydin vastaa niillä vertailukysymykseen, ei malli.
         co2PerKg: Number.isFinite(product(o.id)?.co2) ? product(o.id).co2 : null,
         deliveryReliability: Number.isFinite(product(o.id)?.reliability) ? product(o.id).reliability : null,

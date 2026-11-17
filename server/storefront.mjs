@@ -6,7 +6,7 @@ import { findSubstitutes } from './substitutes.mjs';
 import { clock, cutoffPassed } from './gateway/clock.mjs';
 import { unitSizeFor } from './gateway/quantity.mjs';
 import { PRODUCT_TYPES } from './gateway/contract.mjs';
-import { explainItemQuantity } from './itemQuantities.mjs';
+import { explainItemQuantity, isEggItem } from './itemQuantities.mjs';
 import { typeInfo, compareKeys, TIER } from './aimo/match.mjs';
 import { verifiedFree } from './allergens.mjs';
 
@@ -98,7 +98,14 @@ export async function availableStorefront(r, opts = {}) {
     const wanted = catalogMiss ? [] : card.list.filter((p) => { const prod = cat.get(p.id); if (!prod) return false; const t = typeInfo(prod, item); return t.tier == null || t.requested === true; });
     const wantedUnknown = wanted.length > 0 && wanted.every(unknownOf);
     const exact = card.status === 'ok' ? card.list.flatMap((p) => {
-      const a = orderableProduct(cat.get(p.id), quotes.get(p.id), date, item.quantity);
+      const prod = cat.get(p.id);
+      let a = orderableProduct(prod, quotes.get(p.id), date, item.quantity);
+      // Kappalemäärä ("10 kpl leivoksia"), mutta pakkauksen kappaleita ei ole tuotetiedoissa: ei arvata. Tuote näytetään yhden
+      // myyntierän hinnalla, ja määrä kysytään valinnan jälkeen myyntierinä (17.11.). Munissa tuntematon pakkaus jää pois kuten ennen.
+      if (!a.ok && a.code === 'UNIT_NOT_CONVERTIBLE' && item.quantity?.unit === 'PCS' && item.quantity.basis === 'items' && prod && !isEggItem(prod)) {
+        a = orderableProduct(prod, quotes.get(p.id), date, { value: 1, unit: 'PCS' });
+        if (a.ok) a.product = { ...a.product, quantityExplanation: null, askQuantity: true, countUnknown: true };
+      }
       return a.ok ? [a.product] : [];
     }) : [];
     // Tyhjä tulos kertoo aikaisimman päivän, jolle sama haku löytää tilattavaa.
@@ -114,7 +121,7 @@ export async function availableStorefront(r, opts = {}) {
     // Pyydetty tuotetyyppi ennen hintaa (match.mjs): kurkun tuorehylly ennen säilykkeitä, tuore tomaatti ennen tomaattimurskaa,
     // spagetti ennen spagettilihavuokaa. Saman tyypin sisällä halvin tarpeen kattava ensin, kuten ennenkin.
     const info = new Map(exact.map((p) => [p, typeInfo(cat.get(p.id), item)]));
-    exact.sort((a, b) => compareKeys(info.get(a).key, info.get(b).key) || (item.quantity?.basis === 'items' ? (a.quantityExplanation?.excessItems || 0) - (b.quantityExplanation?.excessItems || 0) : 0) || a.price * a.qty - b.price * b.qty);
+    exact.sort((a, b) => compareKeys(info.get(a).key, info.get(b).key) || (a.countUnknown ? 1 : 0) - (b.countUnknown ? 1 : 0) || (item.quantity?.basis === 'items' ? (a.quantityExplanation?.excessItems || 0) - (b.quantityExplanation?.excessItems || 0) : 0) || a.price * a.qty - b.price * b.qty);
     // Tilausapurin vaihtoehdot (order-tools) järjestävät näillä eivätkä nosta halvempaa väärää tyyppiä kärkeen:
     // typeRank = tyyppiryhmän järjestysnumero (0 = paras), match = nimen osuman taso (4 = pyydettyä tuotetta ei mainita),
     // requested = tuote on pyydettyä tuotetta. Kuratoidulla tuotetyypillä (maito, kerma, voi, munat) ryhmä on jo oikea.

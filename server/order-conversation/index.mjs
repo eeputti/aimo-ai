@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { CLAIMS, DEADLINE_QUESTION } from './interpret.mjs';
 import { helsinkiLabel, parseApiTime } from '../gateway/clock.mjs';
 import { packWord, readableName, summaryRow, optionRow } from './wording.mjs';
+import { isEggItem } from '../itemQuantities.mjs';
 
 const UNIT_FI = { L: 'l', KG: 'kg', PCS: 'kpl' };
 const CLAIM_FI = { FREE_FROM_LACTOSE: 'laktoositon', LOW_LACTOSE: 'vähälaktoosinen', FREE_FROM_GLUTEN: 'gluteeniton', VEGAN: 'vegaaninen', VEGETARIAN: 'kasvis', EU_ORGANIC_FARMING: 'luomu' };
@@ -150,7 +151,9 @@ function apply(draft, turn, customer, today) {
     } else if (o.op === 'update' && line) {
       const before = JSON.stringify([line.productTerm, line.claims, line.excludeAllergens]);
       // Kiloja kysyttiin (kiloina myytävä tuote): pelkkä luku tai kappalemäärä vastauksena tarkoittaa kiloja.
-      if (line.byWeight && o.quantity?.unit === 'PCS' && !o.quantity.basis) o = { ...o, quantity: { value: o.quantity.value, unit: 'KG' } };
+      if (line.byWeight && o.quantity?.unit === 'PCS' && o.quantity.basis !== 'sales') o = { ...o, quantity: { value: o.quantity.value, unit: 'KG' } };
+      // Myyntierät kysyttiin, koska pakkauksen kappalemäärää ei tiedetä: vastauksen luku on myyntieriä (17.11.).
+      if (line.askPacks && o.quantity?.unit === 'PCS') { o = { ...o, quantity: { value: o.quantity.value, unit: 'PCS', basis: 'sales' } }; delete line.askPacks; }
       if (o.quantity) {
         if (!validQuantity(o.quantity)) notes.push(`Tarkista määrä: ${line.productTerm}.`);
         else {
@@ -166,7 +169,7 @@ function apply(draft, turn, customer, today) {
       line.claims = claims([...line.claims, ...(o.addClaims || [])]).filter((c) => !(o.removeClaims || []).includes(c));
       line.excludeAllergens = allergens([...line.excludeAllergens, ...(o.excludeAllergens || [])]);
       // Tuotteen tai ruokavaatimuksen muutos vaatii uuden tuotevalinnan. Määrän muutos säilyttää valinnan ja tarkistetaan tarjouksessa.
-      if (before !== JSON.stringify([line.productTerm, line.claims, line.excludeAllergens])) { line.selectedProductId = null; line.selectedName = null; delete draft.offered[line.ref]; delete draft.seen?.[line.ref]; }
+      if (before !== JSON.stringify([line.productTerm, line.claims, line.excludeAllergens])) { line.selectedProductId = null; line.selectedName = null; delete line.askPacks; delete draft.offered[line.ref]; delete draft.seen?.[line.ref]; }
       touch(line.ref);
     } else if (o.op === 'remove' && line) {
       draft.lines = draft.lines.filter((l) => l !== line); delete draft.offered[line.ref]; delete draft.seen?.[line.ref];
@@ -177,9 +180,14 @@ function apply(draft, turn, customer, today) {
       // Vastaava tuote saatavuudeltaan tuntemattoman tilalle: rivin tuote vaihtuu, ja eri mittayksikössä määrä kysytään uudelleen.
       if (option.replaceTerm) {
         line.productTerm = String(option.replaceTerm).slice(0, 80); delete line.noExact; line.answeredClaims = [];
-        if (option.askQuantity) line.quantity = null;
         draft.unknownNoted = null;
       }
+      if (option.askQuantity) line.quantity = null;
+      // Pakkauksen kappalemäärä puuttuu Valion tiedoista: kappaleita ei muunneta arvaamalla, vaan määrä kysytään myyntierinä.
+      if (option.countUnknown) {
+        line.askPacks = true;
+        notes.push(`Pakkauksen kappalemäärää ei ole Valion tiedoissa: ${readableName(option.name)}. Kerro, montako ${option.salesUnitLabel ? packWord(2, option.salesUnitLabel) : 'myyntierää'} laitetaan.`);
+      } else delete line.askPacks;
     } else if (o.op === 'no_preference') {
       if (draft.pending?.kind === 'preference') {
         for (const ref of draft.pending.refs) {
@@ -493,7 +501,7 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
       // tuotetta ei tarjota kappaleriville. Kun vähintään puolet vaihtoehdoista myydään kiloina, tuote on kilotavaraa ja
       // kilot kysytään (muuten 100 kpl → 100 rasiaa à 3 kg = 300 kg). Muuten kiloina myytävät vain jäävät pois (10 kpl leipää).
       // Edellisestä tilauksesta kopioitu rivi (packFor) on jo oikeina myyntierinä, eikä munien kappalemäärä (items) koske tätä.
-      if (line.quantity?.unit === 'PCS' && line.quantity.basis !== 'items' && !line.packFor) {
+      if (line.quantity?.unit === 'PCS' && (line.quantity.basis !== 'items' || !isEggItem(line)) && !line.packFor) {
         const counted = x.options.filter((o) => o.salesUnitLabel !== 'kg');
         if (!again && counted.length * 2 <= x.options.length) {
           const asked = line.quantity;
@@ -718,7 +726,11 @@ export function createOrderingConversation({ store, tools, interpretTurn, now = 
         // Vastaus kilokysymykseen ("30", "30 kg"): kilot suoraan kysyttyyn riviin ilman tulkkia (kiloina myytävä tuote).
         const weightLine = draft.pending?.kind === 'checklist' && draft.pending.asks?.includes('quantity') ? draft.lines.find((l) => l.ref === draft.pending.refs?.[0] && l.byWeight) : null;
         const kilos = weightLine && t.match(/^(\d+(?:[.,]\d+)?)\s*(?:kg|kilo\p{L}*)?[.!\s]*$/iu);
-        const weightAnswer = kilos ? { intent: 'order', ops: [{ op: 'update', ref: weightLine.ref, quantity: { value: Number(kilos[1].replace(',', '.')), unit: 'KG' } }] } : null;
+        // Vastaus myyntieräkysymykseen ("2", "2 laatikkoa"), kun pakkauksen kappalemäärää ei tiedetä.
+        const packLine = !weightLine && draft.pending?.kind === 'checklist' && draft.pending.asks?.includes('quantity') ? draft.lines.find((l) => l.ref === draft.pending.refs?.[0] && l.askPacks) : null;
+        const packs = packLine && t.match(/^(\d+)\s*(?:kpl|kappale\p{L}*|ltk|laatik\p{L}*|pkt|paket\p{L}*|pakkau\p{L}*|rasi\p{L}*|säk\p{L}*|pussi\p{L}*|purk\p{L}*|tölk\p{L}*|pullo\p{L}*|kotelo\p{L}*|myyntierä\p{L}*|erä\p{L}*)?[.!\s]*$/iu);
+        const weightAnswer = kilos ? { intent: 'order', ops: [{ op: 'update', ref: weightLine.ref, quantity: { value: Number(kilos[1].replace(',', '.')), unit: 'KG' } }] }
+          : packs ? { intent: 'order', ops: [{ op: 'update', ref: packLine.ref, quantity: { value: Number(packs[1]), unit: 'PCS', basis: 'sales' } }] } : null;
         const interpreted = dateAnswer || choice || weightAnswer || (preferenceYes || preferenceNo ? { intent: 'order', ops: draft.pending.refs.map((ref) => preferenceYes
           ? { op: 'update', ref, addClaims: [draft.pending.claim] } : { op: 'no_preference', ref }) }
           : onlyRepeat ? { intent: 'order', ops: [] }

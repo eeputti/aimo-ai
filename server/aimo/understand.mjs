@@ -7,7 +7,7 @@
 //  - jokainen kenttä on tyypitetty ja validoitu (määrä, yksikkö, päivä), kelpaamaton arvo hylätään eikä arvata
 //  - oletukset kirjataan näkyviin, ihmiseltä ei kysytä avoimia kysymyksiä
 import { normalize } from '../catalog.mjs';
-import { quantityBasisFor, EGGS_PER_TRAY } from '../itemQuantities.mjs';
+import { quantityBasisFor, isEggItem, EGGS_PER_TRAY } from '../itemQuantities.mjs';
 import { conceptOf, brandAt, variants, loadLexicon, recognize } from './lexicon.mjs';
 import { synonymOf, learnedOf, SHELVES } from './synonyms.mjs';
 
@@ -330,8 +330,13 @@ function parseItem(raw, lang) {
   if (basis === 'items') {
     item.quantity.basis = basis;
     const assumed = notes.findIndex((n) => n.code === 'UNIT_ASSUMED');
-    if (assumed >= 0) notes.splice(assumed, 1);
-    notes.push({ code: 'INDIVIDUAL_ITEMS', fi: `${item.quantity.value} kananmunaa tarkoittaa munien lukumäärää. Pakkaukset lasketaan tuotetiedoista.`, en: 'The quantity counts individual eggs, not sales packs.' });
+    if (isEggItem(item)) {
+      if (assumed >= 0) notes.splice(assumed, 1);
+      notes.push({ code: 'INDIVIDUAL_ITEMS', fi: `${item.quantity.value} kananmunaa tarkoittaa munien lukumäärää. Pakkaukset lasketaan tuotetiedoista.`, en: 'The quantity counts individual eggs, not sales packs.' });
+    } else if (assumed >= 0) {
+      // Paljas luku ("10 leivosta") on kappaleita: laatikon kappalemäärä luetaan tuotetiedoista (17.11.).
+      notes[assumed] = { code: 'UNIT_ASSUMED', fi: `Yksikköä ei annettu: ${item.quantity.value} tulkittu kappaleiksi`, en: `No unit given: ${item.quantity.value} read as individual items` };
+    } else notes.push({ code: 'INDIVIDUAL_ITEMS', fi: `${item.quantity.value} kpl tarkoittaa tuotteiden lukumäärää. Myyntipakkaukset lasketaan tuotetiedoista.`, en: 'The quantity counts individual items, not sales packs.' });
   }
   if (!item.quantity) notes.push({ code: 'QUANTITY_MISSING', fi: 'Määrää ei annettu', en: 'No quantity given' });
   return { item, notes, unparsed };

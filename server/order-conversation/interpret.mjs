@@ -13,10 +13,15 @@ const dietOf = (text) => {
   return hits.length ? { op: 'diet', addClaims: hits.map((h) => h.claim).filter(Boolean), excludeAllergens: hits.flatMap((h) => h.allergens || []) } : null;
 };
 const UNIT = [[/^(l|litra\w*)$/i, 'L'], [/^(kg|kilo\w*)$/i, 'KG'], [/^(kpl|kappale\w*)$/i, 'PCS']];
+// Kappale vai myyntierä mallin PCS-määrälle, kun malli jätti basisin tyhjäksi: luvun perässä oleva sana ratkaisee
+// ("10 kpl" kappaleita, "2 laatikkoa" myyntieriä). Paljas luku tai tuotteen nimi ("10 leivosta") on kappaleita (17.11.).
+const PACK_AFTER_NUMBER = /\d\s*(?:ltk|laatik\p{L}*|pkt|paket\p{L}*|pakkau\p{L}*|rasi\p{L}*|säk\p{L}*|pussi\p{L}*|purk\p{L}*|tölk\p{L}*|pullo\p{L}*|kotelo\p{L}*|kenno\p{L}*|box\w*|case\w*|pack\w*)(?![\p{L}])/iu;
+export const basisFromText = (text) => (PACK_AFTER_NUMBER.test(String(text || '')) ? 'sales' : 'items');
 const bareQuantity = (text) => {
   const m = text.match(/(\d+(?:[.,]\d+)?)\s*([a-zåäö]+)/i);
   const unit = m && UNIT.find(([re]) => re.test(m[2]))?.[1];
-  return unit ? { value: Number(m[1].replace(',', '.')), unit } : null;
+  // "10 kpl" on kappaleita (leivokset laatikossa), ei myyntieriä (17.11.).
+  return unit ? { value: Number(m[1].replace(',', '.')), unit, ...(unit === 'PCS' ? { basis: 'items' } : {}) } : null;
 };
 // Kysymys tilausaikarajasta. Vastaus tulee työkalujen tiedoista, ei mallilta.
 export const DEADLINE_QUESTION = /(?:mihin|mihi|mihkä)\s+(?:asti|mennessä|saakka)[^?.!]*(?:tila|ehti)|(?:tila\p{L}*|ehti\p{L}*)[^?.!]*(?:mihin|mihi|mihkä)\s+(?:asti|mennessä|saakka)|takaraja|aikaraja|tilausaika(?!toive)|jättöai\p{L}*|viimeinen\s+tilaus\p{L}*|milloin\s+(?:pitää|täytyy|pitäis\p{L}*|viimeistään)(?:\s+(?:viimeistään|olla))*\s+tila|ehti\p{L}*\s+(?:vielä\s+)?tilata/iu;
@@ -77,7 +82,7 @@ const SCHEMA = {
         productTerm: { type: 'string', description: 'tuotteen perusmuoto suomeksi, esim. maito; tyhjä jos ei muutu' },
         quantityValue: { type: 'number', description: '0 jos määrää ei annettu' },
         quantityUnit: { type: 'string', enum: ['L', 'DL', 'CL', 'ML', 'KG', 'G', 'PCS', ''] },
-        quantityBasis: { type: 'string', enum: ['items', 'sales', ''], description: 'PCS: items = yksittäiset kappaleet (100 kananmunaa), sales = myyntipakkaukset' },
+        quantityBasis: { type: 'string', enum: ['items', 'sales', ''], description: 'PCS: items = yksittäiset kappaleet (100 kananmunaa, 10 kpl leivoksia, 10 leivosta), sales = myyntipakkaukset (2 laatikkoa, 3 pakettia)' },
         addClaims: { type: 'array', items: { type: 'string', enum: CLAIMS } },
         removeClaims: { type: 'array', items: { type: 'string', enum: CLAIMS } },
         excludeAllergens: { type: 'array', items: { type: 'string' }, description: 'GS1-koodit, esim. AM maito, AW gluteeniviljat, AE kananmuna, AN pähkinät, AY soija, AF kala' },
@@ -152,7 +157,7 @@ export function createModelInterpreter({ ask, fallback, datesIn = null }) {
       const amount = (o) => {
         const scale = { DL: [0.1, 'L'], CL: [0.01, 'L'], ML: [0.001, 'L'], G: [0.001, 'KG'], L: [1, 'L'], KG: [1, 'KG'], PCS: [1, 'PCS'] }[o.quantityUnit];
         return o.quantityValue > 0 && scale ? { value: Number((o.quantityValue * scale[0]).toPrecision(12)), unit: scale[1],
-          ...(o.quantityUnit === 'PCS' && o.quantityBasis ? { basis: o.quantityBasis } : {}) } : null;
+          ...(o.quantityUnit === 'PCS' ? { basis: o.quantityBasis || basisFromText(text) } : {}) } : null;
       };
       const ops = (r.json.ops || []).map((o) => ({
         op: o.op, ref: o.ref || undefined, productTerm: o.productTerm || undefined, option: o.option || undefined,
